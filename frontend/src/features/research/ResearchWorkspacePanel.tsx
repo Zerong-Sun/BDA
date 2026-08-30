@@ -39,6 +39,7 @@ import { LiteraturePanel } from './LiteraturePanel'
 import { ProjectReviewPanel } from './ProjectReviewPanel'
 import { ResearchGapResolutionButton } from './ResearchGapResolutionButton'
 import { ReviewMarkdown } from './ReviewMarkdown'
+import { DryLabDecisionTree } from './DryLabDecisionTree'
 import {
   DatasetDataGrid,
   ResearchTargetDataGrid,
@@ -385,6 +386,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
 
       {view === 'methods' ? (
         <>
+          <DryLabDecisionTree projectId={projectId} />
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0"><FrameTitle>{w.methodsTitle}</FrameTitle><FrameDescription>{w.methodsDescription}</FrameDescription></FrameHeader>

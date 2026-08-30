@@ -979,6 +979,31 @@ function createStrictRoutes({ scenario, routeId }) {
   }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/research-workspace`, {}, () =>
     ok(researchWorkspaceFixture(scenario)))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/timeline`, { limit: '100' }, () => ok({
+    items: empty
+      ? []
+      : [{
+          id: 'decision_browser_1',
+          project_id: PROJECT_ID,
+          occurred_at: NOW,
+          entry_type: 'decision',
+          phase: 'binder-route-a',
+          title: 'Advance the restrained backbone route',
+          summary: 'The restrained route retained the target interface.',
+          body: '## Browser decision basis\n\nAdvance because the interface checks passed.',
+          outcome: 'supported',
+          provenance: { workflow_run_ids: [workflowRun.id], candidate_ids: ['candidate_browser_1'] },
+          code_refs: [{ path: 'qm-scripts/plugins/rfdiffusion/run.sh', role: 'backbone generation' }],
+          supersedes_id: null,
+          caused_by_id: null,
+          tags: ['dry-lab'],
+          created_by: 'user_browser',
+          version: 1,
+          created_at: NOW,
+          updated_at: NOW,
+        }],
+    next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/workflow-runs`, { limit: '200' }, () => ok({
     items: empty ? [] : [workflowRun],
     next_cursor: null,

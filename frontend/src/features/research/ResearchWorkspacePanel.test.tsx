@@ -28,6 +28,9 @@ vi.mock('./GenerateSimilarResearchPanel', () => ({
 vi.mock('./LiteraturePanel', () => ({ LiteraturePanel: () => <div>literature operations</div> }))
 vi.mock('./TargetIntelligencePanel', () => ({ TargetIntelligencePanel: () => <div>target operations</div> }))
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => <div>knowledge operations</div> }))
+vi.mock('./DryLabDecisionTree', () => ({
+  DryLabDecisionTree: ({ projectId }: { projectId: string }) => <div>decision tree · {projectId}</div>,
+}))
 vi.mock('../pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: () => <div>structure viewer</div> }))
 
 const localized = (en: string, zh = `中文 ${en}`) => ({ en, zh, default: en })
@@ -98,6 +101,12 @@ describe('ResearchWorkspacePanel', () => {
     renderWithProviders(<ResearchWorkspacePanel view="evidence" />)
     await screen.findByText('Unique review body')
     expect(screen.getAllByText('Unique review body')).toHaveLength(1)
+  })
+
+  it('shows the computational decision tree above research methods', async () => {
+    renderWithProviders(<ResearchWorkspacePanel view="methods" />)
+    expect(await screen.findByText('decision tree · project-one')).toBeInTheDocument()
+    expect(screen.getByText('Unique method title')).toBeInTheDocument()
   })
 
   it('renders the saved structure in the 3D viewer', async () => {

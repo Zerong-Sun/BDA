@@ -350,6 +350,10 @@ export const bundleEn = {
       methodsTitle: 'Methods and Reproducibility',
       methodsDescription: 'Review methods, search strategies, validation notes, field dictionaries, and ontology.',
       methodsOperations: 'Curated knowledge editor',
+      decisionTreeTitle: 'Computational Decision Evidence Tree',
+      decisionTreeDescription: 'Trace plans, methods, results, and decisions by project phase; each node retains its full rationale, data lineage, and code references.',
+      decisionTreeEmpty: 'No structured computational decisions have been recorded for this project. Future project timeline entries will form branches here.',
+      decisionTreeBranchCount: '{count} decision nodes in this branch',
       tabEvidence: 'Review & Evidence',
       tabEvidenceDescription: 'Read the review and validate claims',
       tabReferences: 'References',
@@ -1003,6 +1007,7 @@ export const bundleEn = {
       causedBy: 'Answers an earlier problem',
       showDetail: 'Show reasoning',
       hideDetail: 'Hide reasoning',
+      decisionDocument: 'View decision document',
       entryCount: '{count} entries',
       type: {
         plan: 'Plan',

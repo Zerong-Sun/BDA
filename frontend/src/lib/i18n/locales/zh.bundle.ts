@@ -343,6 +343,10 @@ export const bundleZh = {
       methodsTitle: '方法与可复现性',
       methodsDescription: '查阅方法、检索策略、验证说明、字段字典和本体。',
       methodsOperations: '精选知识库编辑',
+      decisionTreeTitle: '干实验决策证据树',
+      decisionTreeDescription: '按项目阶段展开计算路线中的计划、方法、结果与判断；节点保留完整决策正文、数据谱系和代码引用。',
+      decisionTreeEmpty: '该项目尚无结构化的干实验决策记录。后续写入项目时间轴的内容会在这里形成分支。',
+      decisionTreeBranchCount: '该分支 {count} 个决策节点',
       tabEvidence: '综述与证据',
       tabEvidenceDescription: '阅读综述并审核声明',
       tabReferences: '参考文献',
@@ -975,6 +979,7 @@ export const bundleZh = {
       causedBy: '回应更早的一个问题',
       showDetail: '展开推理',
       hideDetail: '收起推理',
+      decisionDocument: '查看决策文档',
       entryCount: '共 {count} 条',
       type: {
         plan: '计划',
