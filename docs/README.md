@@ -30,6 +30,7 @@ reports are maintained only in the private BDA-demo archive.
 - [Research record structure](RESEARCH_RECORD_STRUCTURE.md)
 - [Research review writing standard](RESEARCH_REVIEW_WRITING_STANDARD.md)
 - [RFdiffusion workflow submission](RFDIFFUSION_WORKFLOW_SUBMISSION.md)
+- [Staging release and recovery evidence](STAGING_RELEASE_AND_RECOVERY.md)
 - [Local staging acceptance](V2_LOCAL_ACCEPTANCE.md)
 - [PD1 demo data card](../examples/migration-fixtures/pd1/DATA_CARD.md)
 

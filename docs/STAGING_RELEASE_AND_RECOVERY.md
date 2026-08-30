@@ -1,5 +1,15 @@
 # Staging release and recovery evidence
 
+状态：活跃
+
+最后核验：2026-08-30（Asia/Shanghai；staging 发布与恢复演练基线）
+
+权威范围：公开 BDA 的可复现 staging 发布、回滚与恢复证据要求。
+
+数据来源：仓库内 staging workflow、Helm 配置、健康检查与恢复演练流程。
+
+替代关系：取代非版本化的发布备忘；真实基础设施验收记录仍应保存在私有证据库。
+
 BDA is not production-ready. The staging workflow always deploys with
 `BDA_V2_WRITES_ENABLED=false`; there is deliberately no production deployment job.
 
