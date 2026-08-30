@@ -346,7 +346,7 @@ export const bundleZh = {
       decisionTreeTitle: '干实验决策证据树',
       decisionTreeDescription: '按项目阶段展开计算路线中的计划、方法、结果与判断；节点保留完整决策正文、数据谱系和代码引用。',
       decisionTreeEmpty: '该项目尚无结构化的干实验决策记录。后续写入项目时间轴的内容会在这里形成分支。',
-      decisionTreeBranchCount: '该分支 {count} 个决策节点',
+      decisionTreeBranchCount: '该分支 {count} 个证据节点',
       tabEvidence: '综述与证据',
       tabEvidenceDescription: '阅读综述并审核声明',
       tabReferences: '参考文献',

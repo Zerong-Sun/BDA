@@ -1070,10 +1070,18 @@ async function exerciseResearchGrids(page, diagnostics) {
   await methodsTab.click()
   await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
   await expectVisible(page.getByText('Advance the restrained backbone route'), 'decision tree node')
-  const decisionDocument = page.getByRole('button', { name: /View decision document/i })
+  await expectVisible(
+    page.getByText('Interface geometry drifted outside the preregistered gate').last(),
+    'decision relationship target',
+  )
+  const decisionNode = page
+    .locator('[data-tour-id="dry-lab-decision-tree"] article')
+    .filter({ hasText: 'Advance the restrained backbone route' })
+  const decisionDocument = decisionNode.getByRole('button', { name: /View decision document/i })
   await decisionDocument.click()
   await expectVisible(page.getByText('Browser decision basis'), 'expanded decision document')
   diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded document'
+  diagnostics.interactions.researchDecisionTreeOverflow = await assertNoPageOverflow(page)
 }
 
 async function exerciseDisclosure(page, containerSelector, label) {
