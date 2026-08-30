@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { CaretDownIcon, SignOutIcon, UserIcon } from '@phosphor-icons/react'
 import { useAppStore, type Language, type ThemePreference } from '../../lib/store/appStore'
 import { applyTheme, resolveTheme } from '../../lib/theme/initTheme'
 import { useI18n } from '../../lib/i18n'
 import { Button } from './Button'
+import { clearAuthenticatedBrowserState } from '../../lib/auth/browserSession'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +38,7 @@ const THEME_LABELS: Record<ThemePreference, (t: ReturnType<typeof useI18n>['t'])
 export function UserMenu() {
   const { t } = useI18n()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const {
     language,
     setLanguage,
@@ -47,8 +50,7 @@ export function UserMenu() {
   const userLabel = currentUserLabel()
 
   const logout = () => {
-    sessionStorage.removeItem('bda_token')
-    sessionStorage.removeItem('bda_user')
+    clearAuthenticatedBrowserState(queryClient)
     navigate('/login', { replace: true })
   }
 

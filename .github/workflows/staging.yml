@@ -1,0 +1,189 @@
+name: Staging release
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the signed images to the configured staging environment
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: bda-staging
+  cancel-in-progress: false
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-digest: ${{ steps.backend.outputs.digest }}
+      frontend-digest: ${{ steps.frontend.outputs.digest }}
+      backend-image: ${{ steps.names.outputs.backend }}
+      frontend-image: ${{ steps.names.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: names
+        name: Resolve immutable image names
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "backend=ghcr.io/${owner}/bda-backend-v2" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${owner}/bda-frontend-v2" >> "$GITHUB_OUTPUT"
+      - id: backend
+        name: Build and push backend
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: backend_v2/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
+          build-args: |
+            BDA_BUILD_REVISION=${{ github.sha }}
+            BDA_SCHEMA_REVISION=0049_autopilot_formalization
+          provenance: mode=max
+          sbom: true
+      - id: frontend
+        name: Build and push frontend
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.names.outputs.frontend }}:sha-${{ github.sha }}
+          build-args: VITE_API_BASE=/api/v2
+          provenance: mode=max
+          sbom: true
+      - name: Generate backend SPDX SBOM
+        uses: anchore/sbom-action@a930d0ac434e3182448fe678398ba5713717112a # v0.21.0
+        with:
+          image: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+          format: spdx-json
+          output-file: backend.spdx.json
+          upload-artifact: false
+      - name: Generate frontend SPDX SBOM
+        uses: anchore/sbom-action@a930d0ac434e3182448fe678398ba5713717112a # v0.21.0
+        with:
+          image: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+          format: spdx-json
+          output-file: frontend.spdx.json
+          upload-artifact: false
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Attest backend provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ${{ steps.names.outputs.backend }}
+          subject-digest: ${{ steps.backend.outputs.digest }}
+          push-to-registry: true
+      - name: Attest frontend provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ${{ steps.names.outputs.frontend }}
+          subject-digest: ${{ steps.frontend.outputs.digest }}
+          push-to-registry: true
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Keyless-sign immutable images
+        env:
+          BACKEND: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
+          FRONTEND: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
+        run: |
+          cosign sign --yes "$BACKEND"
+          cosign sign --yes "$FRONTEND"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: staging-sbom-${{ github.sha }}
+          path: '*.spdx.json'
+          if-no-files-found: error
+
+  deploy-staging:
+    if: ${{ inputs.deploy }}
+    needs: supply-chain
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      KUBECONFIG: ${{ runner.temp }}/bda-staging-kubeconfig
+      BACKEND_IMAGE: ${{ needs.supply-chain.outputs.backend-image }}
+      BACKEND_DIGEST: ${{ needs.supply-chain.outputs.backend-digest }}
+      FRONTEND_IMAGE: ${{ needs.supply-chain.outputs.frontend-image }}
+      FRONTEND_DIGEST: ${{ needs.supply-chain.outputs.frontend-digest }}
+      STAGING_HOST: ${{ vars.BDA_STAGING_HOST }}
+      MINIO_HOST: ${{ vars.BDA_STAGING_MINIO_HOST }}
+      LSF_HOST: ${{ vars.BDA_STAGING_LSF_HOST }}
+      LSF_USER: ${{ vars.BDA_STAGING_LSF_USER }}
+      LSF_ROOT: ${{ vars.BDA_STAGING_LSF_ROOT }}
+      LSF_KEY_FILE: ${{ vars.BDA_STAGING_LSF_KEY_FILE }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Load staging kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.BDA_STAGING_KUBECONFIG_B64 }}
+        run: |
+          test -n "$KUBECONFIG_B64"
+          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
+      - name: Validate staging inputs
+        run: |
+          test -n "$STAGING_HOST"
+          test -n "$MINIO_HOST"
+          test -n "$LSF_HOST"
+          test -n "$LSF_ROOT"
+          test -n "$LSF_KEY_FILE"
+          test "$BACKEND_DIGEST" != ""
+          test "$FRONTEND_DIGEST" != ""
+      - id: prior
+        name: Record rollback revision
+        run: |
+          revision="$(helm history bda -n bda-staging -o json 2>/dev/null | jq -r '.[-1].revision // empty')"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - name: Migration, deploy and readiness wait
+        run: |
+          helm upgrade --install bda backend_v2/helm \
+            --namespace bda-staging --create-namespace \
+            --atomic --wait --timeout 15m \
+            --set-string image.repository="$BACKEND_IMAGE" \
+            --set-string image.digest="$BACKEND_DIGEST" \
+            --set-string frontendImage.repository="$FRONTEND_IMAGE" \
+            --set-string frontendImage.digest="$FRONTEND_DIGEST" \
+            --set-string config.buildRevision="${GITHUB_SHA}" \
+            --set-string config.writesEnabled=false \
+            --set-string ingress.host="$STAGING_HOST" \
+            --set-string config.minioPublicEndpoint="$MINIO_HOST" \
+            --set-string config.lsf.sshHost="$LSF_HOST" \
+            --set-string config.lsf.sshUser="$LSF_USER" \
+            --set-string config.lsf.remoteRoot="$LSF_ROOT" \
+            --set-string lsfCredentials.keyFile="$LSF_KEY_FILE"
+      - name: Read-only smoke
+        run: |
+          curl --fail --show-error --silent --retry 12 --retry-all-errors \
+            "https://${STAGING_HOST}/api/v2/health/ready" | jq -e '.status == "ready"'
+      - name: Roll back failed release
+        if: ${{ failure() && steps.prior.outputs.revision != '' }}
+        run: helm rollback bda "${{ steps.prior.outputs.revision }}" -n bda-staging --wait --timeout 10m
+
+  # Production intentionally has no deploy job. It remains unavailable until the
+  # infrastructure, OIDC/TLS, LSF, PITR/MinIO restore and rollback evidence is signed off.

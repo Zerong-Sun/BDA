@@ -25,7 +25,14 @@ from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.config import get_settings
 from ..core.database import SessionFactory, session_scope
-from ..core.metrics import OUTBOX_BACKLOG, OUTBOX_DEAD_LETTERED
+from ..core.metrics import (
+    ARTIFACT_CHECKSUM_FAILURES,
+    JOB_QUEUE_LAG_SECONDS,
+    LSF_FAILURES,
+    OUTBOX_BACKLOG,
+    OUTBOX_DEAD_LETTERED,
+    STUCK_OPERATIONS,
+)
 from ..platform.models import Operation
 from ..projects.models import Project
 from ..registry.ports import output_port_for_artifact, parse_output_ports
@@ -230,6 +237,8 @@ def publish_outbox(batch_size: int = 100) -> dict:
             "research.gaps.resolve": "bda_v2.research_gaps_resolve",
             "ligand.import": "bda_v2.ligand_import",
             "compute_draft.confirm": "bda_v2.compute_draft_confirm",
+            "autopilot.execute": "bda_v2.autopilot_execute",
+            "autopilot.cancel": "bda_v2.autopilot_cancel",
             "experiment_results.import": "bda_v2.experiment_results_import",
             "target.structure.import": "bda_v2.target_structure_import",
             "target.structure.prepare": "bda_v2.target_structure_prepare",
@@ -325,6 +334,8 @@ def dispatch_job(self, job_id: str) -> dict:
             )
         external_id = adapter.ensure_submitted(runtime)
     except Exception as exc:
+        if backend == "lsf":
+            LSF_FAILURES.labels("dispatch").inc()
         if self.request.retries >= self.max_retries:
             with session_scope() as session:
                 failed = ComputeRepository(session).job(parsed, for_update=True)
@@ -405,6 +416,8 @@ def poll_job(self, job_id: str) -> dict:
     try:
         live = adapter_for(backend).status(runtime, external_id)
     except Exception as exc:
+        if backend == "lsf":
+            LSF_FAILURES.labels("poll").inc()
         raise self.retry(exc=exc, countdown=min(60, 2 ** (self.request.retries + 1))) from exc
     with session_scope() as session:
         job = ComputeRepository(session).job(parsed, for_update=True)
@@ -451,6 +464,10 @@ def collect_job(self, job_id: str) -> dict:
                 raise ValueError("collect_output_checksum_mismatch")
             verified.append(output)
     except Exception as exc:
+        if "checksum" in str(exc).lower():
+            ARTIFACT_CHECKSUM_FAILURES.labels("compute_output").inc()
+        if backend == "lsf":
+            LSF_FAILURES.labels("collect").inc()
         if self.request.retries >= self.max_retries:
             with session_scope() as session:
                 failed = ComputeRepository(session).job(parsed, for_update=True)
@@ -476,6 +493,35 @@ def collect_job(self, job_id: str) -> dict:
             # state, so success no longer needs its own enqueue here.
             _advance_submission(session, job)
     return {"job_id": job_id, "status": "succeeded", "outputs": outputs}
+
+
+@celery_app.task(name="bda_v2.collect_operational_metrics")
+def collect_operational_metrics() -> dict:
+    """Refresh gauges whose values live in PostgreSQL rather than one process."""
+    now = datetime.now(UTC)
+    lags: dict[str, float] = {backend: 0.0 for backend in ("docker", "lsf", "demo")}
+    with SessionFactory() as session:
+        rows = session.execute(
+            select(Job.compute_backend, sa.func.min(Job.created_at))
+            .where(Job.status.in_(["pending", "dispatching", "queued"]))
+            .group_by(Job.compute_backend)
+        )
+        for backend, oldest in rows:
+            if oldest is not None:
+                lags[str(backend)] = max(0.0, (now - _as_utc(oldest)).total_seconds())
+        stuck = int(
+            session.scalar(
+                select(sa.func.count(Operation.id)).where(
+                    Operation.status.in_(["pending", "running", "cancel_requested"]),
+                    Operation.updated_at <= now - timedelta(minutes=15),
+                )
+            )
+            or 0
+        )
+    for backend, seconds in lags.items():
+        JOB_QUEUE_LAG_SECONDS.labels(backend).set(seconds)
+    STUCK_OPERATIONS.set(stuck)
+    return {"queue_lag_seconds": lags, "stuck_operations": stuck}
 
 
 def _persist_outputs(session: Session, job: Job, submission: JobSubmission, verified: list[dict]) -> list[Artifact]:

@@ -11,6 +11,7 @@ from ..audit.service import record_audit
 from ..candidates.models import Candidate
 from ..compute.models import Job
 from ..core.problem import DomainError
+from ..core.rate_limit import enforce_project_quota
 from ..experiments.models import ExperimentResult
 from ..identity.models import User
 from ..intelligence.models import IntelligenceRun
@@ -57,6 +58,46 @@ def require_project(session: Session, project_id: uuid.UUID, user: User) -> Proj
         raise DomainError("project_not_found", "Project was not found", status_code=404)
     if not repo.user_can_access(project, user):
         raise DomainError("forbidden", "The current user cannot access this project", status_code=403)
+    return project
+
+
+PROJECT_PERMISSION_MINIMUMS = {
+    "read": "viewer",
+    "write": "researcher",
+    "compute": "researcher",
+    "research_import": "researcher",
+    "artifact": "researcher",
+    "experiment": "researcher",
+    "autopilot": "researcher",
+    "manage": "admin",
+}
+
+
+def require_project_permission(
+    session: Session,
+    project_id: uuid.UUID,
+    user: User,
+    action: str,
+) -> Project:
+    """Authorize an action using global, organization, then project scope.
+
+    Project membership can only narrow the organization role. It can never turn
+    an organization viewer into a writer.
+    """
+    project = require_project(session, project_id, user)
+    role = ProjectRepository(session).effective_project_role(project, user)
+    ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
+    minimum = PROJECT_PERMISSION_MINIMUMS.get(action)
+    if minimum is None:
+        raise RuntimeError(f"unknown project permission action: {action}")
+    if role is None or ranks[role] < ranks[minimum]:
+        raise DomainError(
+            "project_permission_denied",
+            f"Project permission '{action}' is required",
+            status_code=403,
+        )
+    if action != "read":
+        enforce_project_quota(user.id, project.organization_id, action)
     return project
 
 

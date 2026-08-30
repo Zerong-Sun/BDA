@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Cookie, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.database import get_session
+from ..core.rate_limit import enforce_login_quota
 from .deps import current_user
 from .models import User
 from .schemas import LoginRequest, OIDCAuthorizationResponse, RefreshRequest, TokenResponse, UserResponse
@@ -43,7 +44,13 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/token", response_model=TokenResponse)
-def login(payload: LoginRequest, response: Response, session: Session = Depends(get_session)) -> TokenResponse:
+def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+) -> TokenResponse:
+    enforce_login_quota(request.client.host if request.client else "unknown", payload.username)
     user = authenticate(session, payload.username, payload.password)
     _set_refresh_cookie(response, issue_refresh_token(session, user))
     return _token_response(user)

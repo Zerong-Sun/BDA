@@ -13,12 +13,14 @@ import { normalizeResearchTab, RESEARCH_TABS, type ResearchTab } from '../featur
 import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { useI18n } from '../lib/i18n'
 import { useAppStore, type Language } from '../lib/store/appStore'
+import { isDemoProject } from '../features/tour'
 
 export function ResearchPage() {
   const { language, t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')
-  const { projectId } = useProjectContext()
+  const { projectId, activeProject } = useProjectContext()
+  const isPd1Demo = Boolean(activeProject && isDemoProject(activeProject))
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
   const setCopilotSelectedEntityIds = useAppStore((state) => state.setCopilotSelectedEntityIds)
@@ -59,6 +61,15 @@ export function ResearchPage() {
             <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p>
             <h1 className="text-xl font-semibold text-text-primary">{t.research.page.title}</h1>
           </div>
+          {isPd1Demo ? (
+            <Alert className="mt-3" variant="warning">
+              <AlertDescription>
+                {language === 'zh'
+                  ? 'PD‑1 页面仅展示预计算的合成演示数据；它不是实时模型运行、真实实验结果或科研结论。'
+                  : 'This PD-1 page contains precomputed synthetic demo data only; it is not a live model run, experimental result, or research conclusion.'}
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {projectId ? (
             <Button
               type="button"

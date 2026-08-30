@@ -13,6 +13,7 @@ from ..core.database import SessionFactory, get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
+from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
@@ -220,7 +221,7 @@ def stream_messages(
                 return
             await asyncio.sleep(1)
 
-    return EventSourceResponse(stream())
+    return EventSourceResponse(observed_sse("copilot_messages", stream()))
 
 
 @router.get("/projects/{project_id}/config", response_model=CopilotConfigResponse)

@@ -111,7 +111,7 @@ describe('streamCopilotMessage', () => {
     )
 
     expect(statuses).toEqual(['connecting', 'connecting', 'thinking', 'tool:search_pdb', 'streaming', 'done'])
-    expect(sessionStorage.getItem('bda_copilot_last_mode')).toBe('llm_with_tools')
+    expect(sessionStorage.getItem('bda_copilot_last_mode')).toBeNull()
   })
 
   it('extracts assistant content and ignores the persisted user message', async () => {

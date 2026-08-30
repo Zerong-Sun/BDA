@@ -25,19 +25,11 @@ export const DELETE_PROJECT_CONFIRMATION =
   'Move "{projectName}" to project trash?\n\nThe project is soft-deleted for the configured retention period. Artifacts remain in MinIO until a maintenance purge runs.'
 
 export function invalidateDeletedProjectQueries(queryClient: QueryClient, projectId: string) {
+  queryClient.removeQueries({
+    predicate: ({ queryKey }) => queryKey.some((part) => part === projectId),
+  })
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    queryClient.invalidateQueries({ queryKey: ['project-overview', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['workflow-run', 'current', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['workflow-runs', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['project-artifacts', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['candidates', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['candidate-funnel', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['experiment-results', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['results-summary', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['delivery-package', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['campaigns', projectId] }),
-    queryClient.invalidateQueries({ queryKey: ['project-research-summary', projectId] }),
   ])
 }
 

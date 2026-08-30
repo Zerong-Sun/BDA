@@ -19,10 +19,13 @@ make ``core`` depend on ``platform``. They run once per task, not in any hot pat
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
+from socket import gethostname
 
 from celery import Celery  # type: ignore[import-untyped]
-from celery.signals import task_failure, task_prerun, task_success  # type: ignore[import-untyped]
+from celery.signals import heartbeat_sent, task_failure, task_prerun, task_success  # type: ignore[import-untyped]
 
+from ..module_registry import task_modules
 from .config import get_settings
 from .database import session_scope
 
@@ -31,20 +34,7 @@ celery_app = Celery("bda-v2", broker=settings.celery_broker_url, backend=setting
 
 # Every module that registers a task. A worker imports these at startup, so no module
 # here may be imported at the top of another for registration purposes.
-TASK_MODULES = (
-    "backend_v2.app.compute.tasks",
-    "backend_v2.app.campaigns.tasks",
-    "backend_v2.app.copilot.tasks",
-    "backend_v2.app.delivery.tasks",
-    "backend_v2.app.experiments.tasks",
-    "backend_v2.app.intelligence.tasks",
-    "backend_v2.app.ligands.tasks",
-    "backend_v2.app.literature.tasks",
-    "backend_v2.app.projects.tasks",
-    "backend_v2.app.registry.tasks",
-    "backend_v2.app.research.tasks",
-    "backend_v2.app.targets.tasks",
-)
+TASK_MODULES = task_modules()
 
 celery_app.conf.update(
     task_serializer="json",
@@ -90,6 +80,7 @@ celery_app.conf.update(
         "poll-due-jobs": {"task": "bda_v2.poll_due_jobs", "schedule": 5.0},
         "reconcile-artifacts": {"task": "bda_v2.reconcile_artifacts", "schedule": 300.0},
         "reap-stale-jobs": {"task": "bda_v2.reap_stale_jobs", "schedule": 120.0},
+        "collect-operational-metrics": {"task": "bda_v2.collect_operational_metrics", "schedule": 30.0},
         # The backstop for agent runs, not their wake-up mechanism: compute emits
         # an event on every terminal job state, so this normally finds nothing.
         # It exists for the wake-ups no event can carry - a task settled by a
@@ -98,6 +89,26 @@ celery_app.conf.update(
         "purge-deleted-projects": {"task": "bda_v2.purge_deleted_projects", "schedule": 86400.0},
     },
 )
+
+
+@heartbeat_sent.connect
+def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
+    """Publish worker identity without making task execution depend on telemetry."""
+    from ..platform.models import WorkerHeartbeat
+
+    instance_id = str(getattr(sender, "hostname", "") or gethostname())
+    try:
+        with session_scope() as session:
+            row = session.get(WorkerHeartbeat, instance_id)
+            if row is None:
+                row = WorkerHeartbeat(instance_id=instance_id, service="celery-worker")
+                session.add(row)
+            row.queues = settings.worker_queue_list
+            row.build_revision = settings.build_revision
+            row.schema_revision = settings.schema_revision
+            row.last_seen_at = datetime.now(UTC)
+    except Exception:
+        return
 
 
 @task_prerun.connect

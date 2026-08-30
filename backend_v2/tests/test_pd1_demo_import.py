@@ -23,8 +23,25 @@ def _package() -> dict:
 
 def test_pd1_demo_import_is_idempotent_and_evidence_closed(domain_client) -> None:
     client, ids = domain_client
-    package = _package()
-    payload = {"organization_id": str(ids["organization"]), "package": package}
+    descriptors = client.get("/api/v2/research-packages")
+    assert descriptors.status_code == 200
+    assert len(descriptors.json()) == 1
+    descriptor = descriptors.json()[0]
+    assert descriptor == {
+        "package_id": "pd1-demo-v1",
+        "version": "1.0.0",
+        "display_name": {**_package()["title"], "default": ""},
+        "license": "CC-BY-4.0",
+        "checksum": "484e5077390906df5a3c96449d77778a525a4c8daecec28dd12f7f1d9dada007",
+        "size": PACKAGE_PATH.stat().st_size,
+        "installed": False,
+    }
+    payload = {
+        "organization_id": str(ids["organization"]),
+        "package_id": descriptor["package_id"],
+        "version": descriptor["version"],
+        "checksum": descriptor["checksum"],
+    }
 
     first = client.post("/api/v2/research-package-imports", json=payload)
     assert first.status_code == 201
@@ -46,6 +63,7 @@ def test_pd1_demo_import_is_idempotent_and_evidence_closed(domain_client) -> Non
     assert second.json()["counts"] == first.json()["counts"]
     assert second.json()["pdb_operation_ids"] == []
     assert second.json()["projects"][0]["status"] == "unchanged"
+    assert client.get("/api/v2/research-packages").json()[0]["installed"] is True
 
     projects = [
         item
@@ -101,7 +119,7 @@ def test_pd1_demo_import_rejects_open_or_invalid_evidence_sets(domain_client, mu
     mutate(package)
 
     response = client.post(
-        "/api/v2/research-package-imports",
+        "/api/v2/research-package-imports/legacy-payload",
         json={"organization_id": str(ids["organization"]), "package": package},
     )
 

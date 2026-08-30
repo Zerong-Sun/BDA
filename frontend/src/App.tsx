@@ -1,6 +1,6 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { Topbar } from './components/ui/Topbar'
 import { PipelineRail } from './components/ui/PipelineRail'
 import { Toast } from './components/ui/Toast'
@@ -9,21 +9,12 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { AppSettingsDrawer } from './components/ui/AppSettingsDrawer'
 import { ActivityDrawer } from './features/operations/ActivityDrawer'
 import { ProjectRequired } from './features/projects/ProjectRequired'
-import { ExperimentsPage } from './app/Experiments'
-import { WorkflowPage } from './app/Workflow'
-import { CandidatesPage } from './app/Candidates'
-import { LabPage } from './app/Lab'
-import { ResultsPage } from './app/Results'
-import { LoginPage } from './app/Login'
-import { ResearchPage } from './app/Research'
-import TimelinePage from './app/Timeline'
-import { FAQPage } from './app/FAQ'
-import { GuidePage } from './app/Guide'
 import { ApiError, setUnauthorizedHandler } from './lib/api/client'
 import { useProjectContext } from './lib/hooks/useProjectContext'
 import { useAppStore } from './lib/store/appStore'
 import { applyTheme, resolveTheme, watchSystemTheme } from './lib/theme/initTheme'
 import { isDemoProject, TourOverlay } from './features/tour'
+import { clearAuthenticatedBrowserState } from './lib/auth/browserSession'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,11 +38,27 @@ const queryClient = new QueryClient({
   },
 })
 
+const ExperimentsPage = lazy(() => import('./app/Experiments').then((module) => ({ default: module.ExperimentsPage })))
+const WorkflowPage = lazy(() => import('./app/Workflow').then((module) => ({ default: module.WorkflowPage })))
+const CandidatesPage = lazy(() => import('./app/Candidates').then((module) => ({ default: module.CandidatesPage })))
+const LabPage = lazy(() => import('./app/Lab').then((module) => ({ default: module.LabPage })))
+const ResultsPage = lazy(() => import('./app/Results').then((module) => ({ default: module.ResultsPage })))
+const LoginPage = lazy(() => import('./app/Login').then((module) => ({ default: module.LoginPage })))
+const ResearchPage = lazy(() => import('./app/Research').then((module) => ({ default: module.ResearchPage })))
+const TimelinePage = lazy(() => import('./app/Timeline'))
+const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: module.FAQPage })))
+const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
+const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
+
+function RouteFallback() {
+  return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
+}
+
 function AuthHandler() {
   const navigate = useNavigate()
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      sessionStorage.removeItem('bda_token')
+      clearAuthenticatedBrowserState(queryClient)
       navigate('/login')
     })
   }, [navigate])
@@ -158,7 +165,8 @@ export default function App() {
         <AuthHandler />
         <LanguageSync />
         <ThemeSync />
-        <Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/guide" element={<GuidePage />} />
             <Route element={<RequireAuth />}>
@@ -175,10 +183,12 @@ export default function App() {
                 <Route path="/results" element={<ProjectRequired><ResultsPage /></ProjectRequired>} />
                 <Route path="/research" element={<ResearchPage />} />
                 <Route path="/timeline" element={<ProjectRequired><TimelinePage /></ProjectRequired>} />
+                <Route path="/autopilot" element={<ProjectRequired><AutopilotPage /></ProjectRequired>} />
                 <Route path="/faq" element={<FAQPage />} />
               </Route>
             </Route>
-        </Routes>
+          </Routes>
+        </Suspense>
       </HashRouter>
     </QueryClientProvider>
   )

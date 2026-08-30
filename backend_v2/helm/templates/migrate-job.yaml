@@ -15,7 +15,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "bda.backendImage" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["alembic", "-c", "backend_v2/alembic.ini", "upgrade", "head"]
           env:

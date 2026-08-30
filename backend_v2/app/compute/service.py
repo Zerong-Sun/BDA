@@ -24,11 +24,12 @@ from .schemas import ComputeDraftCreate, SubmissionCreate
 
 TERMINAL_STATES = TERMINAL_JOB_STATUSES
 ALLOWED_TRANSITIONS = {
-    "pending": {"dispatching", "cancelled", "failed"},
-    "dispatching": {"queued", "running", "failed", "cancelled"},
-    "queued": {"running", "collecting", "failed", "cancelled"},
-    "running": {"collecting", "failed", "cancelled"},
-    "collecting": {"succeeded", "failed"},
+    "pending": {"dispatching", "cancel_requested", "cancelled", "failed"},
+    "dispatching": {"queued", "running", "cancel_requested", "failed", "cancelled"},
+    "queued": {"running", "collecting", "cancel_requested", "failed", "cancelled"},
+    "running": {"collecting", "cancel_requested", "failed", "cancelled"},
+    "collecting": {"succeeded", "cancel_requested", "failed"},
+    "cancel_requested": {"cancelled", "failed"},
     "succeeded": set(),
     "failed": set(),
     "cancelled": set(),

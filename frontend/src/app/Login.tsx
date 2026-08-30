@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { BookOpen } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/reui/alert'
@@ -10,10 +11,12 @@ import { ApiError } from '../lib/api/client'
 import { loginApiV2AuthTokenPost } from '../lib/api/generated/sdk.gen'
 import '../lib/api/generatedTransport'
 import { useI18n } from '../lib/i18n'
+import { clearAuthenticatedBrowserState } from '../lib/auth/browserSession'
 
 export function LoginPage() {
   const { t } = useI18n()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +37,7 @@ export function LoginPage() {
     setError(null)
     try {
       const { data } = await loginApiV2AuthTokenPost<true>({ body: { username, password }, throwOnError: true })
+      clearAuthenticatedBrowserState(queryClient)
       sessionStorage.setItem('bda_token', data.access_token)
       sessionStorage.setItem('bda_user', JSON.stringify(data.user))
       navigate('/projects')

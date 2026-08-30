@@ -57,6 +57,10 @@ class ObjectStorage:
             self.client.make_bucket(self.bucket)
         ObjectStorage._known_buckets.add(self.bucket)
 
+    def healthy(self) -> bool:
+        """Read-only readiness check; health probes must never create storage."""
+        return bool(self.client.bucket_exists(self.bucket))
+
     def upload_url(self, object_key: str, *, ttl_seconds: int | None = None) -> str:
         expires = ttl_seconds if ttl_seconds is not None else get_settings().upload_url_ttl_seconds
         return self.presign_client.presigned_put_object(

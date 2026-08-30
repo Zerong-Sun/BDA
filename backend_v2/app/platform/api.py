@@ -13,6 +13,7 @@ from sse_starlette.sse import EventSourceResponse
 from ..core.database import SessionFactory, get_session
 from ..core.pagination import decode_time_cursor, encode_time_cursor
 from ..core.problem import DomainError
+from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_roles, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project, visible_project_ids
@@ -134,7 +135,7 @@ def operation_events(operation_id: uuid.UUID, user: User = Depends(streaming_use
                 return
             await asyncio.sleep(1)
 
-    return EventSourceResponse(stream())
+    return EventSourceResponse(observed_sse("operations", stream()))
 
 
 @router.get("/platform/operations/summary", response_model=OperationsSummary)

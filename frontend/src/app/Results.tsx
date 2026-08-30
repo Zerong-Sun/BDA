@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../components/ui/AppFrame'
 import { Alert, AlertDescription } from '@/components/reui/alert'
+import { isDemoProject } from '../features/tour'
 
 function ResultsMetricsSkeleton() {
   return (
@@ -48,8 +49,7 @@ export function ResultsPage() {
   const showToast = useToastStore((s) => s.show)
   const [interpretation, setInterpretation] = useState<InterpretationReasoning | null>(null)
   const candidateParam = searchParams.get('candidate')?.trim() || null
-  const isDemoReferenceProject =
-    projectId === 'proj_pd1_0423' || activeProject?.name === 'PD1Binder_validation_0423'
+  const isDemoReferenceProject = Boolean(activeProject && isDemoProject(activeProject))
 
   const {
     data: results = [],

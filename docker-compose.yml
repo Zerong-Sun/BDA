@@ -15,6 +15,27 @@ services:
       timeout: 5s
       retries: 10
 
+  pgbouncer-v2:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    environment:
+      DB_HOST: postgres-v2
+      DB_PORT: "5432"
+      DB_NAME: bda_v2
+      DB_USER: bda
+      DB_PASSWORD: ${BDA_V2_POSTGRES_PASSWORD:?BDA_V2_POSTGRES_PASSWORD must be set}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "200"
+      DEFAULT_POOL_SIZE: "20"
+    depends_on:
+      postgres-v2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5432", "-U", "bda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis-v2:
     image: redis:7.4-alpine
     command: ["redis-server", "--requirepass", "${BDA_V2_REDIS_PASSWORD:?BDA_V2_REDIS_PASSWORD must be set}"]
@@ -52,23 +73,31 @@ services:
       dockerfile: backend_v2/Dockerfile
     env_file: .env
     environment: &v2_environment
-      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@postgres-v2:5432/bda_v2
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
       BDA_V2_REDIS_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/0
+      BDA_V2_RATE_LIMIT_ENABLED: "true"
+      BDA_V2_RATE_LIMIT_FAIL_CLOSED: "true"
       BDA_V2_CELERY_BROKER_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/1
       BDA_V2_MINIO_ENDPOINT: minio-v2:9000
       BDA_V2_MINIO_PUBLIC_ENDPOINT: ${BDA_V2_MINIO_PUBLIC_ENDPOINT:-localhost:9002}
       BDA_V2_MINIO_ACCESS_KEY: ${BDA_V2_MINIO_ACCESS_KEY:?BDA_V2_MINIO_ACCESS_KEY must be set}
       BDA_V2_MINIO_SECRET_KEY: ${BDA_V2_MINIO_SECRET_KEY:?BDA_V2_MINIO_SECRET_KEY must be set}
       BDA_V2_LLM_LOCAL_SECRET_DIR: /var/lib/bda/secrets
+      BDA_V2_DATABASE_POOL_SIZE: "5"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "5"
+      BDA_V2_BUILD_REVISION: local
+      BDA_V2_SCHEMA_REVISION: 0049_autopilot_formalization
+      BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot
     command: >-
-      sh -c "alembic -c backend_v2/alembic.ini upgrade head &&
+      sh -c "BDA_V2_DATABASE_URL=postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@postgres-v2:5432/bda_v2
+      alembic -c backend_v2/alembic.ini upgrade head &&
       uvicorn backend_v2.app.main:app --host 0.0.0.0 --port 8200"
     ports:
       - "127.0.0.1:8200:8200"
     volumes:
       - byok-secrets:/var/lib/bda/secrets
     depends_on:
-      postgres-v2:
+      pgbouncer-v2:
         condition: service_healthy
       redis-v2:
         condition: service_healthy
@@ -83,8 +112,12 @@ services:
   worker-v2:
     image: bda-api-v2:local
     env_file: .env
-    environment: *v2_environment
-    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q dispatch,poll,collect,maintenance --loglevel=info
+    environment:
+      <<: *v2_environment
+      BDA_V2_DATABASE_POOL_SIZE: "2"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "0"
+      BDA_V2_WORKER_QUEUES: dispatch,poll,collect,maintenance
+    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q dispatch,poll,collect,maintenance --loglevel=info --concurrency=2
     depends_on:
       api-v2:
         condition: service_healthy
@@ -92,8 +125,12 @@ services:
   research-worker-v2:
     image: bda-api-v2:local
     env_file: .env
-    environment: *v2_environment
-    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q research --loglevel=info
+    environment:
+      <<: *v2_environment
+      BDA_V2_DATABASE_POOL_SIZE: "2"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "0"
+      BDA_V2_WORKER_QUEUES: research
+    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q research --loglevel=info --concurrency=2
     depends_on:
       api-v2:
         condition: service_healthy
@@ -101,8 +138,12 @@ services:
   copilot-worker-v2:
     image: bda-api-v2:local
     env_file: .env
-    environment: *v2_environment
-    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q copilot --loglevel=info
+    environment:
+      <<: *v2_environment
+      BDA_V2_DATABASE_POOL_SIZE: "2"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "0"
+      BDA_V2_WORKER_QUEUES: copilot
+    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q copilot --loglevel=info --concurrency=2
     volumes:
       - byok-secrets:/var/lib/bda/secrets:ro
     depends_on:
@@ -112,7 +153,10 @@ services:
   beat-v2:
     image: bda-api-v2:local
     env_file: .env
-    environment: *v2_environment
+    environment:
+      <<: *v2_environment
+      BDA_V2_DATABASE_POOL_SIZE: "1"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "0"
     command: celery -A backend_v2.app.compute.tasks.celery_app beat --loglevel=info
     depends_on:
       api-v2:

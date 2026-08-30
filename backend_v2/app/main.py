@@ -6,12 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import make_asgi_app
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .artifacts.api import router as artifacts_router
-from .audit.api import router as audit_router
-from .campaigns.api import router as campaigns_router
-from .candidates.api import router as candidates_router
-from .compute.api import router as compute_router
-from .copilot.api import router as copilot_router
 from .core.config import get_settings
 from .core.metrics import MetricsMiddleware
 from .core.problem import (
@@ -24,22 +18,7 @@ from .core.problem import (
 )
 from .core.telemetry import configure_telemetry
 from .core.trace import TraceMiddleware
-from .delivery.api import router as delivery_router
-from .experiments.api import router as experiments_router
-from .identity.api import router as identity_router
-from .identity.organizations_api import router as organizations_router
-from .intelligence.api import router as intelligence_router
-from .knowledge.api import router as knowledge_router
-from .ligands.api import router as ligands_router
-from .literature.api import router as literature_router
-from .platform.api import router as platform_router
-from .projects.api import router as projects_router
-from .registry.api import router as registry_router
-from .research.api import router as research_router
-from .targets.api import router as targets_router
-from .timeline.api import router as timeline_router
-from .wetlab.api import router as wetlab_router
-from .workflows.api import router as workflows_router
+from .module_registry import routers
 
 settings = get_settings()
 configure_telemetry(settings.otel_endpoint)
@@ -80,30 +59,7 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 app.add_exception_handler(Exception, unhandled_error_handler)
 
 api = APIRouter(prefix="/api/v2")
-for router in (
-    identity_router,
-    organizations_router,
-    projects_router,
-    targets_router,
-    workflows_router,
-    compute_router,
-    candidates_router,
-    campaigns_router,
-    delivery_router,
-    artifacts_router,
-    audit_router,
-    experiments_router,
-    knowledge_router,
-    literature_router,
-    intelligence_router,
-    registry_router,
-    research_router,
-    timeline_router,
-    copilot_router,
-    ligands_router,
-    platform_router,
-    wetlab_router,
-):
+for router in routers():
     api.include_router(router)
 app.include_router(api)
 app.mount("/internal/metrics", make_asgi_app())

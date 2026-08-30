@@ -316,6 +316,23 @@ class ResearchPackageImportCreate(BaseModel):
     package: dict
 
 
+class ResearchPackageDescriptor(BaseModel):
+    package_id: str
+    version: str
+    display_name: LocalizedResearchText
+    license: str
+    checksum: str
+    size: int
+    installed: bool = False
+
+
+class ResearchPackageCatalogImportCreate(BaseModel):
+    organization_id: uuid.UUID
+    package_id: str = Field(min_length=1, max_length=120)
+    version: str = Field(min_length=1, max_length=80)
+    checksum: str = Field(min_length=64, max_length=64, pattern=r"^[a-f0-9]{64}$")
+
+
 class ResearchPackageProjectResult(BaseModel):
     source_project_key: str
     project_id: uuid.UUID

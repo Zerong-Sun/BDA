@@ -30,12 +30,14 @@ class DomainError(Exception):
         *,
         status_code: int = 400,
         errors: Sequence[Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(detail)
         self.error_code = error_code
         self.detail = detail
         self.status_code = status_code
         self.errors = list(errors) if errors else None
+        self.headers = headers or {}
 
 
 def _json_safe(value: Any) -> Any:
@@ -60,7 +62,13 @@ def _json_safe(value: Any) -> Any:
 
 
 def problem_response(
-    request: Request, *, status: int, code: str, detail: str, errors: Sequence[Any] | None = None
+    request: Request,
+    *,
+    status: int,
+    code: str,
+    detail: str,
+    errors: Sequence[Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = Problem(
         type=f"https://bda.invalid/problems/{code}",
@@ -72,7 +80,12 @@ def problem_response(
         trace_id=current_trace_id(),
         errors=[_json_safe(item) for item in errors] if errors else None,
     )
-    return JSONResponse(status_code=status, content=body.model_dump(mode="json"), media_type="application/problem+json")
+    return JSONResponse(
+        status_code=status,
+        content=body.model_dump(mode="json"),
+        media_type="application/problem+json",
+        headers=headers,
+    )
 
 
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
@@ -82,6 +95,7 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
         code=exc.error_code,
         detail=exc.detail,
         errors=exc.errors,
+        headers=exc.headers,
     )
 
 

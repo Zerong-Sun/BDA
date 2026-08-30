@@ -62,6 +62,7 @@ const CANVAS_STATUS: Record<ApiWorkflowNodeStatus, WorkflowNodeStatus> = {
   queued: 'queued',
   running: 'running',
   collecting: 'running',
+  cancel_requested: 'running',
   succeeded: 'completed',
   failed: 'failed',
   cancelled: 'skipped',

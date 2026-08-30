@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..identity.models import OrganizationMember, User
@@ -48,20 +48,14 @@ class ProjectRepository:
     ) -> list[Project]:
         query = select(Project).where(Project.deleted_at.is_(None))
         if user.role != "admin":
-            project_ids = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
             organization_ids = select(OrganizationMember.organization_id).where(OrganizationMember.user_id == user.id)
-            query = query.where(or_(Project.id.in_(project_ids), Project.organization_id.in_(organization_ids)))
+            query = query.where(Project.organization_id.in_(organization_ids))
         if after:
             query = query.where(Project.id > after)
         return list(self.session.scalars(query.order_by(Project.id).limit(limit + 1)))
 
     def user_can_access(self, project: Project, user: User) -> bool:
-        if user.role == "admin" or project.owner_id == user.id:
-            return True
-        project_member = self.session.scalar(
-            select(ProjectMember).where(ProjectMember.project_id == project.id, ProjectMember.user_id == user.id)
-        )
-        if project_member:
+        if user.role == "admin":
             return True
         organization_member = self.session.scalar(
             select(OrganizationMember).where(
@@ -69,7 +63,32 @@ class ProjectRepository:
                 OrganizationMember.user_id == user.id,
             )
         )
-        return organization_member is not None
+        if organization_member is None:
+            return False
+        project_member = self.session.scalar(
+            select(ProjectMember).where(ProjectMember.project_id == project.id, ProjectMember.user_id == user.id)
+        )
+        return project_member is not None or organization_member is not None
+
+    def effective_project_role(self, project: Project, user: User) -> str | None:
+        """Return the deny-first role after applying the organization cap."""
+        if user.role == "admin":
+            return "owner"
+        organization_role = self.organization_role(project.organization_id, user.id)
+        if organization_role is None:
+            return None
+        organization_role = "researcher" if organization_role == "member" else organization_role
+        project_member = self.session.scalar(
+            select(ProjectMember).where(ProjectMember.project_id == project.id, ProjectMember.user_id == user.id)
+        )
+        project_role = project_member.role if project_member is not None else organization_role
+        if project.owner_id == user.id and project_member is None:
+            project_role = "owner"
+        ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
+        if organization_role not in ranks or project_role not in ranks:
+            return None
+        effective_rank = min(ranks[organization_role], ranks[project_role])
+        return next(role for role, rank in ranks.items() if rank == effective_rank)
 
     def organization_role(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> str | None:
         member = self.session.scalar(

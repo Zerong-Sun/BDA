@@ -1,6 +1,6 @@
 import { getTranslations } from '../../lib/i18n'
 import { matchSkill } from './skills/registry'
-import { streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
+import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
 import { useEffect, useState } from 'react'
@@ -62,10 +62,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   const [loadingStage, setLoadingStage] = useState<CopilotLoadingStage>('idle')
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [lastMode, setLastMode] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return sessionStorage.getItem('bda_copilot_last_mode')
-  })
+  const [lastMode, setLastMode] = useState<string | null>(() => getLatestCopilotMode())
   const usableMessages = messages.filter(
     (message) => message.content.trim().length > 0 && message.content !== legacyCopilotIntro,
   )
@@ -129,8 +126,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
           setLoadingStage(stage)
         }
         if (stage !== 'thinking') setLoadingDetail(null)
-        if (stage === 'done' && typeof window !== 'undefined') {
-          const mode = sessionStorage.getItem('bda_copilot_last_mode')
+        if (stage === 'done') {
+          const mode = getLatestCopilotMode()
           if (mode) setLastMode(mode)
         }
       }, (message) => {
