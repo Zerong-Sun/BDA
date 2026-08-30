@@ -456,7 +456,8 @@ describe('REUI migration guardrails', () => {
     const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
     expect(packageJson.dependencies).not.toHaveProperty('lucide-react')
     expect(readFileSync(resolve(root, 'package-lock.json'), 'utf8')).not.toContain('"lucide-react"')
-    expect(readFileSync(resolve(root, 'bun.lock'), 'utf8')).not.toContain('"lucide-react"')
+    expect(existsSync(resolve(root, 'package-lock.json'))).toBe(true)
+    expect(existsSync(resolve(root, 'bun.lock'))).toBe(false)
 
     for (const module of staleUiModules) {
       expect(existsSync(resolve(root, `src/components/ui/${module}.tsx`))).toBe(false)
