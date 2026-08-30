@@ -154,7 +154,9 @@ jobs:
           node-version: "22"
       - name: Node dependency audit
         working-directory: frontend
-        run: npm audit --omit=dev
+        # Build, codegen, lint, and browser tooling execute in trusted CI, so
+        # vulnerabilities in devDependencies are part of the supply chain too.
+        run: npm audit
       - name: Filesystem & config vulnerability scan (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
