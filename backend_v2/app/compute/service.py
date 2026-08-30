@@ -79,7 +79,12 @@ def transition_job(session: Session, job: Job, next_status: JobStatus, *, payloa
         # every consumer to discover failure by polling: a campaign round whose
         # job died stayed "running" until another job in the same submission
         # happened to succeed, and an agent waiting on the job slept forever.
-        repo.enqueue("job.settled", job.id, {"job_id": str(job.id), "status": next_status})
+        repo.enqueue(
+            "job.settled",
+            job.id,
+            project_id=job.project_id,
+            payload={"job_id": str(job.id), "status": next_status},
+        )
     _mirror_status_onto_node(session, job)
     return job
 
@@ -337,7 +342,12 @@ def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: W
                 if not _bind_upstream_inputs(session, job, dependencies[key], by_key):
                     changed = True
                     continue
-                repo.enqueue("job.dispatch", job.id, {"job_id": str(job.id)})
+                repo.enqueue(
+                    "job.dispatch",
+                    job.id,
+                    project_id=job.project_id,
+                    payload={"job_id": str(job.id)},
+                )
 
     statuses = {job.status for job in by_key.values()}
     if statuses == {"succeeded"}:
@@ -430,7 +440,12 @@ def _job_plugin(session: Session, job: Job):
 def request_cancel(session: Session, job: Job, project: Project, user: User) -> Job:
     if job.status in TERMINAL_STATES:
         return job
-    ComputeRepository(session).enqueue("job.cancel", job.id, {"job_id": str(job.id)})
+    ComputeRepository(session).enqueue(
+        "job.cancel",
+        job.id,
+        project_id=job.project_id,
+        payload={"job_id": str(job.id)},
+    )
     record_audit(
         session,
         action="job.cancel.request",

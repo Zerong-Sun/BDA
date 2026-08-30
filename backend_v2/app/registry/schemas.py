@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 
@@ -155,21 +156,60 @@ class PluginManifestPage(BaseModel):
     items: list[PluginManifestDescriptor]
 
 
+class PluginResourceLimits(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cpu_cores: float | None = Field(default=None, gt=0, le=1024)
+    memory_mb: int | None = Field(default=None, ge=16, le=16 * 1024 * 1024)
+    gpu_count: int | None = Field(default=None, ge=0, le=128)
+    walltime_seconds: int | None = Field(default=None, ge=1, le=31 * 24 * 60 * 60)
+
+
+class PluginSiteOverrides(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runtime_root: str | None = Field(default=None, min_length=1, max_length=1000)
+    module_names: list[str] = Field(default_factory=list, max_length=64)
+    environment: dict[str, str] = Field(default_factory=dict)
+    queue: str | None = Field(default=None, min_length=1, max_length=128)
+    resource_limits: PluginResourceLimits | None = None
+
+    @field_validator("runtime_root")
+    @classmethod
+    def validate_runtime_root(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("/"):
+            raise ValueError("runtime_root must be an absolute site path")
+        return value
+
+    @field_validator("module_names")
+    @classmethod
+    def validate_module_names(cls, value: list[str]) -> list[str]:
+        if any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/+:-]{0,199}", item) for item in value):
+            raise ValueError("module_names contain an invalid module identifier")
+        return value
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, value: dict[str, str]) -> dict[str, str]:
+        if len(value) > 64:
+            raise ValueError("environment cannot contain more than 64 entries")
+        sensitive = re.compile(r"(?:SECRET|TOKEN|PASSWORD|PRIVATE_KEY|ACCESS_KEY)", re.IGNORECASE)
+        for key, item in value.items():
+            if not re.fullmatch(r"[A-Z_][A-Z0-9_]{0,127}", key):
+                raise ValueError(f"invalid environment variable name: {key}")
+            if sensitive.search(key):
+                raise ValueError(f"secret-like environment variable must use a credential reference: {key}")
+            if len(item) > 4000:
+                raise ValueError(f"environment variable is too large: {key}")
+        return value
+
+
 class PluginDeploymentCreate(BaseModel):
     manifest_id: str = Field(min_length=3, max_length=240)
     plugin_version: str = Field(min_length=1, max_length=80)
     checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
     enabled: bool = True
-    site_overrides: dict = Field(default_factory=dict)
-
-    @field_validator("site_overrides")
-    @classmethod
-    def validate_site_overrides(cls, value: dict) -> dict:
-        allowed = {"runtime_root", "module_names", "environment", "queue", "resource_limits"}
-        unknown = sorted(set(value) - allowed)
-        if unknown:
-            raise ValueError(f"unsupported site override fields: {', '.join(unknown)}")
-        return value
+    site_overrides: PluginSiteOverrides = Field(default_factory=PluginSiteOverrides)
 
 
 class MethodPluginPage(BaseModel):

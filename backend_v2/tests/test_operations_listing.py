@@ -19,7 +19,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.core.database import get_session
 from backend_v2.app.core.models import Base
-from backend_v2.app.identity.deps import current_user, require_command
+from backend_v2.app.identity.deps import current_user
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.main import app
 from backend_v2.app.platform.models import Operation
@@ -123,7 +123,6 @@ def client() -> Generator[tuple[TestClient, dict[str, uuid.UUID], dict[str, uuid
 
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[current_user] = user_override
-    app.dependency_overrides[require_command] = user_override
     try:
         yield TestClient(app, raise_server_exceptions=True), ids, acting
     finally:

@@ -4614,12 +4614,7 @@ export type PluginDeploymentCreate = {
      * Plugin Version
      */
     plugin_version: string;
-    /**
-     * Site Overrides
-     */
-    site_overrides?: {
-        [key: string]: unknown;
-    };
+    site_overrides?: PluginSiteOverrides;
 };
 
 /**
@@ -4664,6 +4659,53 @@ export type PluginManifestPage = {
      * Items
      */
     items: Array<PluginManifestDescriptor>;
+};
+
+/**
+ * PluginResourceLimits
+ */
+export type PluginResourceLimits = {
+    /**
+     * Cpu Cores
+     */
+    cpu_cores?: number | null;
+    /**
+     * Gpu Count
+     */
+    gpu_count?: number | null;
+    /**
+     * Memory Mb
+     */
+    memory_mb?: number | null;
+    /**
+     * Walltime Seconds
+     */
+    walltime_seconds?: number | null;
+};
+
+/**
+ * PluginSiteOverrides
+ */
+export type PluginSiteOverrides = {
+    /**
+     * Environment
+     */
+    environment?: {
+        [key: string]: string;
+    };
+    /**
+     * Module Names
+     */
+    module_names?: Array<string>;
+    /**
+     * Queue
+     */
+    queue?: string | null;
+    resource_limits?: PluginResourceLimits | null;
+    /**
+     * Runtime Root
+     */
+    runtime_root?: string | null;
 };
 
 /**

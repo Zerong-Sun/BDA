@@ -93,6 +93,7 @@ def test_finishing_an_operation_announces_it(session: Session) -> None:
     events = _settled(session, operation)
     assert len(events) == 1
     assert events[0].payload["status"] == "succeeded"
+    assert events[0].payload["project_id"] == str(operation.project_id)
     assert events[0].payload["kind"] == "literature.search"
 
 

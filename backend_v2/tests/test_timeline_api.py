@@ -15,7 +15,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.core.database import get_session
 from backend_v2.app.core.models import Base
-from backend_v2.app.identity.deps import current_user, require_command
+from backend_v2.app.identity.deps import current_user
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.main import app
 from backend_v2.app.projects.models import Project, ProjectMember
@@ -33,18 +33,29 @@ def client() -> Generator[tuple[TestClient, dict[str, uuid.UUID]]]:
     factory = sessionmaker(engine, expire_on_commit=False)
     with factory() as session:
         user = User(username="tl-admin", display_name="TL Admin", role="admin", enabled=True)
+        narrowed = User(username="tl-viewer", display_name="TL Viewer", role="researcher", enabled=True)
         organization = Organization(name="TL Org")
-        session.add_all([user, organization])
+        session.add_all([user, narrowed, organization])
         session.flush()
-        session.add(OrganizationMember(organization_id=organization.id, user_id=user.id, role="owner"))
+        session.add_all(
+            [
+                OrganizationMember(organization_id=organization.id, user_id=user.id, role="owner"),
+                OrganizationMember(organization_id=organization.id, user_id=narrowed.id, role="researcher"),
+            ]
+        )
         project = Project(
             organization_id=organization.id, owner_id=user.id, name="TL project", project_type="protein_design"
         )
         session.add(project)
         session.flush()
-        session.add(ProjectMember(project_id=project.id, user_id=user.id, role="owner"))
+        session.add_all(
+            [
+                ProjectMember(project_id=project.id, user_id=user.id, role="owner"),
+                ProjectMember(project_id=project.id, user_id=narrowed.id, role="viewer"),
+            ]
+        )
         session.commit()
-        ids = {"user": user.id, "project": project.id}
+        ids = {"user": user.id, "admin": user.id, "narrowed": narrowed.id, "project": project.id}
 
     def session_override() -> Generator[Session]:
         with factory() as session:
@@ -61,7 +72,6 @@ def client() -> Generator[tuple[TestClient, dict[str, uuid.UUID]]]:
 
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[current_user] = user_override
-    app.dependency_overrides[require_command] = user_override
     try:
         yield TestClient(app, raise_server_exceptions=True), ids
     finally:
@@ -85,6 +95,16 @@ def test_create_then_read_back(client) -> None:
     assert fetched.status_code == 200
     assert fetched.json()["title"] == "a decision"
     assert fetched.headers["ETag"] == 'W/"1"'
+
+
+def test_project_viewer_cannot_write_through_a_legacy_command_route(client) -> None:
+    api, ids = client
+    ids["user"] = ids["narrowed"]
+
+    denied = _post(api, ids["project"], title="must not be created")
+
+    assert denied.status_code == 403
+    assert denied.json()["error_code"] == "project_permission_denied"
 
 
 def test_listing_is_chronological_and_pages_with_a_real_cursor(client) -> None:

@@ -102,6 +102,7 @@ def _announce_settled(session: Session, operation: Operation) -> None:
                 "status": operation.status,
                 "kind": operation.kind,
                 "resource_id": str(operation.resource_id),
+                **({"project_id": str(operation.project_id)} if operation.project_id else {}),
             },
         )
     )

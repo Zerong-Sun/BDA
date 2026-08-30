@@ -38,11 +38,20 @@ kubectl create secret generic bda-v2-migration \
 
 kubectl create secret generic bda-v2-worker \
   --from-literal=BDA_V2_DATABASE_URL='postgresql+psycopg://bda_worker_login:WORKER_PASSWORD@pgbouncer:5432/bda_v2'
+
+kubectl create secret generic bda-v2-maintenance \
+  --from-literal=BDA_V2_DATABASE_URL='postgresql+psycopg://bda_maintenance_login:MAINTENANCE_PASSWORD@pgbouncer:5432/bda_v2'
 ```
 
-`workerSecret` overrides only `BDA_V2_DATABASE_URL` in worker and Beat pods. The worker
+`workerSecret` overrides only `BDA_V2_DATABASE_URL` in operation workers and Beat. The worker
 login is `NOBYPASSRLS`, owns no tables, and receives project scope through each operation;
 it is not the API login and never receives the migration credential.
+
+`maintenanceSecret` is mounted only by the single-concurrency `scheduler` worker. That
+login is a member of the `bda_maintenance` capability role and may bypass RLS solely for
+cross-project outbox publication, polling, reconciliation, metrics, and retention sweeps.
+The scheduler does not consume API or operation queues. This separation prevents a Beat
+task from silently seeing an empty RLS result while keeping ordinary workers project-fenced.
 
 The migration Job sets `BDA_V2_MAINTENANCE_DATABASE_ROLE=bda_migrator`. Alembic executes
 `SET ROLE bda_migrator` before its first DDL statement, so migrated objects and default

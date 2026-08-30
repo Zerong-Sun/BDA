@@ -367,7 +367,11 @@ def copilot_agent_step(run_id: str) -> dict:
             # running when it returns has to be handed on, or it sits in a state
             # the sweep does not look at (the sweep reads `awaiting_tasks`) and
             # nothing ever picks it up again.
-            celery_app.send_task("bda_v2.copilot_agent_step", args=[str(run.id)])
+            celery_app.send_task(
+                "bda_v2.copilot_agent_step",
+                args=[str(run.id)],
+                headers={"bda_project_id": str(run.project_id)},
+            )
         return {"run_id": run_id, "status": status, "turns": run.turn_count}
 
 
@@ -414,7 +418,11 @@ def copilot_agent_sweep(limit: int = 50) -> dict:
     with session_scope() as session:
         for run in agent_runs.resumable_runs(session, limit=limit):
             if agent_runs.resume(session, run):
-                celery_app.send_task("bda_v2.copilot_agent_step", args=[str(run.id)])
+                celery_app.send_task(
+                    "bda_v2.copilot_agent_step",
+                    args=[str(run.id)],
+                    headers={"bda_project_id": str(run.project_id)},
+                )
                 dispatched += 1
     return {"dispatched": dispatched}
 
@@ -428,7 +436,11 @@ def _wake(session: Session, run_id: uuid.UUID | None) -> bool:
     run = session.get(CopilotAgentRun, run_id)
     if run is None or not agent_runs.resume(session, run):
         return False
-    celery_app.send_task("bda_v2.copilot_agent_step", args=[str(run.id)])
+    celery_app.send_task(
+        "bda_v2.copilot_agent_step",
+        args=[str(run.id)],
+        headers={"bda_project_id": str(run.project_id)},
+    )
     return True
 
 

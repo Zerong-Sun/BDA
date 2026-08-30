@@ -109,7 +109,7 @@ def deploy_plugin_manifest(
         "manifest_checksum": manifest.checksum_sha256,
         "enabled": payload.enabled,
         "deployment_status": "installed" if payload.enabled else "disabled",
-        "site_overrides": payload.site_overrides,
+        "site_overrides": payload.site_overrides.model_dump(exclude_none=True),
     }
     if row is None:
         row = ModelPlugin(**definition)
@@ -121,9 +121,11 @@ def deploy_plugin_manifest(
             status_code=409,
         )
     else:
-        for field, value in definition.items():
+        changes = {field: value for field, value in definition.items() if getattr(row, field) != value}
+        for field, value in changes.items():
             setattr(row, field, value)
-        row.version += 1
+        if changes:
+            row.version += 1
     session.flush()
     return row
 

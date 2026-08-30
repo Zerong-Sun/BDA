@@ -67,6 +67,14 @@ def require_roles(*roles: str) -> Callable:
 
 
 def require_command(user: User = Depends(current_user)) -> User:
+    """Mark legacy write routes for project-scoped authorization.
+
+    New routes should call ``require_project_permission`` with their explicit
+    action.  Existing routes still use this dependency, so the marker lets
+    ``require_project`` apply the same deny-first project write fence instead of
+    stopping at the old global-viewer check.
+    """
     if user.role == "viewer":
         raise DomainError("forbidden", "Viewer accounts are read-only", status_code=403)
+    user._bda_project_write_required = True  # type: ignore[attr-defined]
     return user

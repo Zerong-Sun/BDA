@@ -305,6 +305,7 @@ def test_every_terminal_state_emits_an_event_not_only_success(compute_session) -
     settled = list(session.scalars(select(OutboxEvent).where(OutboxEvent.topic == "job.settled")))
     assert {event.aggregate_id for event in settled} == {first.id, second.id}
     assert {event.payload["status"] for event in settled} == {"failed", "cancelled"}
+    assert {event.payload["project_id"] for event in settled} == {str(project.id)}
 
 
 def test_a_non_terminal_transition_emits_nothing(compute_session) -> None:

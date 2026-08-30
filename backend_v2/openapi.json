@@ -7758,9 +7758,7 @@
             "type": "string"
           },
           "site_overrides": {
-            "additionalProperties": true,
-            "title": "Site Overrides",
-            "type": "object"
+            "$ref": "#/components/schemas/PluginSiteOverrides"
           }
         },
         "required": [
@@ -7828,6 +7826,123 @@
           "items"
         ],
         "title": "PluginManifestPage",
+        "type": "object"
+      },
+      "PluginResourceLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "cpu_cores": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1024.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Cores"
+          },
+          "gpu_count": {
+            "anyOf": [
+              {
+                "maximum": 128.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Count"
+          },
+          "memory_mb": {
+            "anyOf": [
+              {
+                "maximum": 16777216.0,
+                "minimum": 16.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Mb"
+          },
+          "walltime_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2678400.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walltime Seconds"
+          }
+        },
+        "title": "PluginResourceLimits",
+        "type": "object"
+      },
+      "PluginSiteOverrides": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Environment",
+            "type": "object"
+          },
+          "module_names": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Module Names",
+            "type": "array"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue"
+          },
+          "resource_limits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginResourceLimits"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runtime_root": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Root"
+          }
+        },
+        "title": "PluginSiteOverrides",
         "type": "object"
       },
       "PluginSnapshot": {

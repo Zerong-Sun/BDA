@@ -370,6 +370,50 @@ def test_outbox_dispatch_carries_project_rls_header(task_database, monkeypatch) 
     assert sent[0]["headers"] == {"bda_project_id": str(ids["project"])}
 
 
+def test_outbox_recovers_legacy_job_project_context(task_database, monkeypatch) -> None:
+    factory, ids = task_database
+    with factory() as session:
+        session.add(
+            OutboxEvent(
+                topic="job.dispatch",
+                aggregate_id=ids["job"],
+                payload={"job_id": str(ids["job"])},
+            )
+        )
+        session.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(tasks.celery_app, "send_task", lambda _name, **kwargs: sent.append(kwargs))
+
+    assert tasks.publish_outbox.run()["published"] == 1
+    assert sent[0]["headers"] == {"bda_project_id": str(ids["project"])}
+
+
+def test_project_outbox_fails_closed_without_project_context(task_database, monkeypatch) -> None:
+    factory, _ids = task_database
+    missing_id = uuid.uuid4()
+    with factory() as session:
+        session.add(OutboxEvent(topic="job.dispatch", aggregate_id=missing_id, payload={}))
+        session.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(tasks.celery_app, "send_task", lambda _name, **kwargs: sent.append(kwargs))
+    result = tasks.publish_outbox.run()
+
+    assert result["published"] == 0
+    assert sent == []
+    with factory() as session:
+        event = session.scalar(select(OutboxEvent).where(OutboxEvent.aggregate_id == missing_id))
+        assert event is not None
+        assert event.last_error == "missing_project_context"
+
+
+def test_cross_project_beat_tasks_are_isolated_on_scheduler_queue() -> None:
+    schedule = celery_app_module.celery_app.conf.beat_schedule
+    for item in schedule.values():
+        assert item["options"]["queue"] == "scheduler"
+
+
 def test_celery_hooks_bind_and_reset_project_context(monkeypatch) -> None:
     marker: ContextVar[str | None] = ContextVar("test_worker_project", default=None)
     bound: list[object | None] = []

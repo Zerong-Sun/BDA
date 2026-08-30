@@ -70,7 +70,8 @@ class PluginManifestCatalog:
 
     def manifests(self) -> list[PluginManifest]:
         rows: list[PluginManifest] = []
-        identities: set[tuple[str, str]] = set()
+        manifest_identities: set[tuple[str, str]] = set()
+        deployment_identities: set[tuple[str, str]] = set()
         for path in sorted(self.root.glob("*.json")):
             try:
                 manifest = PluginManifest.model_validate_json(path.read_text())
@@ -81,13 +82,21 @@ class PluginManifestCatalog:
                     status_code=500,
                 ) from exc
             identity = (manifest.manifest_id, manifest.plugin_version)
-            if identity in identities:
+            deployment_identity = (manifest.plugin_key, manifest.plugin_version)
+            if identity in manifest_identities:
                 raise DomainError(
                     "plugin_manifest_duplicate",
                     f"Duplicate plugin manifest identity: {identity[0]}@{identity[1]}",
                     status_code=500,
                 )
-            identities.add(identity)
+            if deployment_identity in deployment_identities:
+                raise DomainError(
+                    "plugin_manifest_duplicate",
+                    f"Duplicate plugin deployment identity: {deployment_identity[0]}@{deployment_identity[1]}",
+                    status_code=500,
+                )
+            manifest_identities.add(identity)
+            deployment_identities.add(deployment_identity)
             rows.append(manifest)
         return rows
 

@@ -136,6 +136,51 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: {{ .Release.Name }}-scheduler-worker
+spec:
+  replicas: {{ .Values.replicas.schedulerWorker }}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-scheduler-worker}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-scheduler-worker}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: scheduler-worker
+          image: {{ include "bda.backendImage" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend_v2.app.compute.tasks.celery_app", "worker", "-Q", "scheduler", "--loglevel=info", "--concurrency=1"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          envFrom:
+            - configMapRef: {name: {{ .Release.Name }}-config}
+            - secretRef: {name: {{ .Values.existingSecret }}}
+          env:
+            - name: BDA_V2_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.maintenanceSecret }}, key: BDA_V2_DATABASE_URL}}
+            - {name: BDA_V2_DATABASE_POOL_SIZE, value: "2"}
+            - {name: BDA_V2_DATABASE_MAX_OVERFLOW, value: "0"}
+            - {name: BDA_V2_WORKER_QUEUES, value: "scheduler"}
+          resources: {{- toYaml .Values.resources.worker | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "bda.lsfVolumeMount" . | nindent 12 }}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        {{- include "bda.lsfVolume" . | nindent 8 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: {{ .Release.Name }}-beat
 spec:
   replicas: 1

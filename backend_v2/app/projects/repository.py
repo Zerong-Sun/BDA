@@ -71,7 +71,7 @@ class ProjectRepository:
         return project_member is not None or organization_member is not None
 
     def effective_project_role(self, project: Project, user: User) -> str | None:
-        """Return the deny-first role after applying the organization cap."""
+        """Return the deny-first role after all three authorization caps."""
         if user.role == "admin":
             return "owner"
         organization_role = self.organization_role(project.organization_id, user.id)
@@ -87,7 +87,10 @@ class ProjectRepository:
         ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
         if organization_role not in ranks or project_role not in ranks:
             return None
-        effective_rank = min(ranks[organization_role], ranks[project_role])
+        global_role = "researcher" if user.role == "member" else user.role
+        if global_role not in ranks:
+            return None
+        effective_rank = min(ranks[global_role], ranks[organization_role], ranks[project_role])
         return next(role for role, rank in ranks.items() if rank == effective_rank)
 
     def organization_role(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> str | None:
