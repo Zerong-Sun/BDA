@@ -48,7 +48,14 @@ app.add_middleware(MetricsMiddleware)
 async def production_write_gate(request, call_next):
     if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/api/v2"):
         if not settings.writes_enabled and request.url.path not in {"/api/v2/auth/token", "/api/v2/auth/refresh"}:
-            raise DomainError("writes_disabled", "BDA v2 writes are disabled for cutover validation", status_code=503)
+            return await domain_error_handler(
+                request,
+                DomainError(
+                    "writes_disabled",
+                    "BDA v2 writes are disabled for cutover validation",
+                    status_code=503,
+                ),
+            )
     return await call_next(request)
 
 
