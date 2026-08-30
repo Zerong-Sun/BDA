@@ -1,42 +1,57 @@
-# BDA 外部数据目录
+# BDA 数据发布与外部数据目录
 
-状态：活跃 / 外部数据入口
+状态：活跃
 
-最后核验：2026-08-29 22:35（Asia/Shanghai）
+最后核验：2026-08-30（Asia/Shanghai）
 
-权威范围：定义代码仓库如何稳定引用已移出的科研产物；不复制或改写原始数据。
+权威范围：定义公开演示数据、私有研究包和外部制品如何与 BDA 软件关联。
 
-数据来源：`BDA-data`、2026-08-29 worktree 保全副本及其 SHA-256 清单。
+数据来源：仓库内 PD1 数据卡、研究包 schema、对象存储接口和公开数据门禁。
 
-替代关系：替代指向仓库内 `analysis/`、`research projects/`、`deliverables/`、`fig/` 的失效相对链接。
+替代关系：取代任何包含本机路径、worktree 清单、私有快照哈希或研究运行数量的旧目录。
 
-## 唯一逻辑入口
+## 1. 发布问题
 
-所有活跃文档和代码都用环境变量 `BDA_DATA_ROOT` 表示数据仓库根目录。开发机默认由
-`backend_v2/scripts/_data_root.py` 解析；linked worktree 会通过 Git common directory 找到主检出旁的
-数据仓库，因此不得假定当前 worktree 自己包含 `backend_v2/.venv` 或相邻的 `BDA-data`。
+软件版本与研究数据具有不同的发布周期和访问边界。把私有研究文件、运行快照或本机目录写入代码仓库，会使软件发布携带无法撤回的数据披露；反过来，让软件依赖某台开发机的相对路径，也会破坏克隆后的可复现性。
 
-2026-08-29 的收口数据位于：
+BDA 因此只在 Git 中保存可公开审查的小型数据、schema 和 manifest。业务记录由 PostgreSQL 管理，计算制品由 MinIO 管理；私有研究数据通过服务器端研究包目录注册，不要求前端上传完整 JSON，也不要求软件仓库知道物理数据副本的位置。
 
-- `BDA_DATA_ROOT/analysis/2026-08-29/analysis/`：审计报告、表格、带输出 notebook、证据包和作业提交记录；
-- `BDA_DATA_ROOT/analysis/2026-08-29/worktree-recovery/`：两个旧研究工作区中仍有独立价值的数据树；
-- `BDA_DATA_ROOT/analysis/2026-08-29/SHA256SUMS`：544 条 payload 校验记录；
-- `BDA_DATA_ROOT/analysis/2026-08-29/SOURCES.json`：来源说明。
-- [`docs/data/BDA_DATA_INDEX_2026-08-29.json`](data/BDA_DATA_INDEX_2026-08-29.json)：代码仓库内的机器可读目录，记录快照、清单哈希和 payload 数量。
+## 2. 公开数据
 
-当前物理副本共 546 个文件、约 185 MiB。`SHA256SUMS` 自身 SHA-256 为
-`fc68f3a2a04ce6ecb4747cde733d9191d96069a0540907cb4397319f41fe080b`。
+公开仓库当前只发布 `pd1-demo-v1`：
 
-## 验证
+- 研究包：`frontend/public/research-packages/pd1-demo-v1.json`；
+- 数据卡与 manifest：`examples/migration-fixtures/pd1/`；
+- 六个带固定 SHA-256 的合成 `DEMO` PDB fixture。
 
-CI 没有外部数据仓库时，文档检查器验证逻辑路径格式和版本化机器目录；开发机解析到
-`BDA_DATA_ROOT` 时，它还验证被活跃文档引用的物理文件、`SHA256SUMS` 自身哈希，以及清单内全部
-544 个 payload 的路径、数量和 SHA-256。独立复核命令为：
+候选标识、指标和 fixture 结构均明确标记为 synthetic demonstration。新增或升级公开数据时，必须更新 package version、schema version、来源、许可、免责声明和 checksum，并通过人工审查。
+
+## 3. 私有研究包
+
+私有数据不进入公开 Git 历史。站点管理员在服务端登记版本化 manifest，至少包含：
+
+- package ID、version 与 schema version；
+- display name、license 与数据卡位置；
+- 内容大小、SHA-256 和 MinIO URI；
+- 安装状态及允许访问的组织范围。
+
+客户端使用 `GET /api/v2/research-packages` 获取可见目录，再用 package ID、version 和 checksum 请求导入。对象路径、预签名凭证和私有 manifest 内容不得反向写入公开 BDA。
+
+## 4. 开发脚本的外部数据根
+
+少数离线迁移或验证脚本支持 `BDA_DATA_ROOT`，用于在获授权的环境中解析外部数据。该变量是本地输入边界，不是公开数据目录：
+
+- CI 不发现、不下载也不验证任何私有数据根；
+- 文档不得记录用户目录、worktree 路径、私有 payload 数量或 manifest 哈希；
+- 脚本输出进入 Git 前必须经过公开数据门和 secret scan；
+- 缺少外部数据时，公开软件和 PD1 演示仍必须能够独立测试。
+
+## 5. 验证
+
+公开数据门执行：
 
 ```bash
-cd "$BDA_DATA_ROOT/analysis/2026-08-29"
-shasum -a 256 -c SHA256SUMS
+python scripts/check_public_data.py
 ```
 
-代码内记录的历史路径由 `_data_root.resolve_recorded()` 转换；文档中不得重新引入指向仓库内
-`../analysis/` 的相对链接。
+该检查要求研究包目录只有 `pd1-demo-v1`，PD1 引用关系闭合，六个 fixture checksum 与 manifest 一致，并拒绝数据库备份、压缩运行包、超大文件和常见密钥格式。私有仓库另行验证其 overlay 和 LFS 清单；两套检查不能互相替代。

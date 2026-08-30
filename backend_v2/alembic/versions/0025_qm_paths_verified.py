@@ -6,7 +6,7 @@ at all. What the cluster actually has:
 
 * **BindCraft** is at ``/work/bme-liz/software/BindCraft`` with env
   ``/work/bme-liz/miniconda3/envs/BindCraft`` - not under our own account as the example
-  config claimed. ``/work/bme-sunzr/software`` is empty and our only env is ``gemmi``.
+  config claimed. ``/opt/bda/software`` is empty and our only env is ``gemmi``.
 * **Boltz** is ``/work/bme-liz/miniconda3/envs/boltz/bin/boltz`` (plus source in
   ``software/boltz-2``), again not ours.
 * **Chai-1 is not installed anywhere on qm.** Disabled: a plugin that names software that

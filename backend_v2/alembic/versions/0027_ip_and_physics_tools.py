@@ -3,9 +3,9 @@
 Three of route A's and route 3's gaps were "lightweight, install it ourselves" items. They
 are now installed and verified to start on qm, so they get plugin rows:
 
-* **Foldseek** - route A's IP fold-space gate. The manuka analysis script already computes
-  a pairwise TM-score against five named sweet proteins, but the freedom-to-operate
-  question is "does this design collide with *anything* in the PDB", which is a search, not
+* **Foldseek** - route A's IP fold-space gate. Pairwise TM-score comparisons against a
+  small reference set cannot answer the freedom-to-operate question "does this design
+  collide with *anything* in the PDB", which is a search, not
   a pairwise alignment. Only Foldseek does that in usable time.
 * **US-align** - the pairwise half of the same gate, and a TM-align superset that handles
   multi-chain comparisons. Compiled from source; there is no conda package.
@@ -15,7 +15,7 @@ are now installed and verified to start on qm, so they get plugin rows:
   the structure and writes the APBS input file; splitting them would make a node whose only
   output is an input file for the next node.
 
-ThermoMPNN is installed at ``/work/bme-sunzr/software/ThermoMPNN`` with its default
+ThermoMPNN is installed at ``/opt/bda/software/ThermoMPNN`` with its default
 weights but is deliberately **not** registered: its ``analysis/SSM.py`` entry point reads
 dataset paths from the authors' own cluster layout (``local.yaml`` points at
 ``/nas/longleaf/...``), so running it on arbitrary PDBs needs a wrapper rather than a
@@ -45,8 +45,8 @@ down_revision: str | None = "0026_rfd3_and_af3"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-TOOLS_ENV = "/work/bme-sunzr/.conda/envs/bda-tools"
-OUR_CONDA_PROFILE = "/work/bme-sunzr/miniconda3/etc/profile.d/conda.sh"
+TOOLS_ENV = "/opt/bda/.conda/envs/bda-tools"
+OUR_CONDA_PROFILE = "/opt/bda/miniconda3/etc/profile.d/conda.sh"
 CONDA_SETUP = [f"source {OUR_CONDA_PROFILE}", f"conda activate {TOOLS_ENV}"]
 
 # easy-search takes query structures, a target database, an output file and a scratch dir.
@@ -72,10 +72,10 @@ foldseek easy-search \
 # The trailing slash on the directory matters: US-align concatenates prefix + name.
 USALIGN_COMMAND = """\
 usalign_dir="$BDA_INPUT_DIR/structures"
-find "$usalign_dir" -maxdepth 1 \( -name '*.pdb' -o -name '*.cif' \) -printf '%f\\n' 2>/dev/null | sort > "$BDA_OUTPUT_DIR/query.list"
+find "$usalign_dir" -maxdepth 1 \\( -name '*.pdb' -o -name '*.cif' \\) -printf '%f\\n' 2>/dev/null | sort > "$BDA_OUTPUT_DIR/query.list"
 usalign_ref="$(find "$BDA_INPUT_DIR/reference" -maxdepth 1 -type f 2>/dev/null | sort | head -1)"
 if [ ! -s "$BDA_OUTPUT_DIR/query.list" ] || [ -z "$usalign_ref" ]; then echo "bda: US-align needs structures and a reference" >&2; exit 2; fi
-/work/bme-sunzr/software/USalign/USalign \
+/opt/bda/software/USalign/USalign \
   -dir1 "$usalign_dir/" "$BDA_OUTPUT_DIR/query.list" \
   "$usalign_ref" \
   -TMscore "${tmscore_mode:-0}" \
@@ -173,7 +173,7 @@ USALIGN = {
     "plugin_key": "US-align",
     "plugin_version": "20260527",
     "name": "US-align (TM-score)",
-    "container_image": "/work/bme-sunzr/software/USalign",
+    "container_image": "/opt/bda/software/USalign",
     "command": USALIGN_COMMAND,
     # A single static binary: nothing to activate.
     "runtime_mode": "script",
@@ -216,7 +216,7 @@ USALIGN = {
             "content_types": [],
             "required": True,
             "multiple": False,
-            "description": "Natural sweet protein to compare against (brazzein, MNEI, ...).",
+            "description": "Reference protein structure to compare against.",
         },
     ],
     "output_ports": [

@@ -7,10 +7,9 @@ empty. So a user who pastes a scaffold sequence into that box gets a job that si
 ignores it and designs from scratch, which is the worst failure mode a parameter can have:
 it looks like it worked.
 
-This came out of the cannabinoid project, where "redesign from the 6MP4 pocket" and "refine
-the three winners for a few more cycles" were both planned around this field before the
-source was read (CANNABINOID_PHASE2_BROAD_SPECTRUM_DESIGN.md §6.14.5). Scaffold-conditioned
-design needs RFdiffusion partial diffusion, not this entrypoint.
+This surfaced during a scaffold-redesign review in which the plan depended on the field
+before the upstream source was inspected. Scaffold-conditioned design needs RFdiffusion
+partial diffusion, not this entrypoint.
 
 Patched surgically rather than by restating the schema: 0034 later annotated the same row
 with ``x-bda-order-pairs`` and a wholesale rewrite would drop it.

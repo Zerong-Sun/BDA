@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-26
 **Status:** Approved for autonomous implementation by the user's hands-off directive
-**Scope:** `/mnt/e/BDA-demo/frontend`
+**Scope:** `frontend/`
 
 ## 1. Objective
 

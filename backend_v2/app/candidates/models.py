@@ -74,9 +74,8 @@ class CandidateMetric(UUIDVersionMixin, Base):
     evidence_kind: Mapped[str] = mapped_column(String(20), default="predicted", index=True)
     # Who produced the number, which `method` alone cannot say: the same model is a
     # design model in one workflow and an independent check in another. A design model
-    # scoring its own output is self-assessment and must not be read as corroboration -
-    # on the cannabinoid project the design model's own top pick fell to seventh once an
-    # independent model re-scored the same structures.
+    # scoring its own output is self-assessment and must not be read as independent
+    # corroboration.
     assessor: Mapped[str] = mapped_column(String(24), default="unknown", index=True)
     # What the value is about beyond the candidate itself - the ligand a design was
     # scored against, the binding partner, the temperature. Part of the unique key, so a

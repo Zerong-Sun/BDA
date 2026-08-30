@@ -128,7 +128,7 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
         # A manual stage is part of the route but is not run here - target intake, a
         # hand-built hotspot map, a scientist reviewing candidates. Requiring a registry
         # plugin for those blocked whole workflows that were otherwise ready, which is why
-        # the sweet-protein routes ran as hand-written LSF instead of through the platform.
+        # legacy routes ran as hand-written LSF instead of through the platform.
         # The blocker itself stays: it is what stops an unvalidated free-text command from
         # reaching the cluster.
         if getattr(node, "execution_mode", "dispatch") == "manual":

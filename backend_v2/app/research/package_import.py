@@ -36,7 +36,7 @@ from .schemas import (
     ResearchPackageProjectResult,
 )
 
-BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo", "protein-knowledge-pain-targets")
+BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo",)
 
 
 def _builtin_package_family(package_id: str) -> str | None:
@@ -369,18 +369,24 @@ def _upsert_findings(
 
 
 def _upsert_candidates(session: Session, project: Project, package: dict, project_source: dict) -> int:
-    if project.source_project_key != "PAIN":
-        return 0
+    project_candidates = [
+        item
+        for item in package.get("candidates", [])
+        if str(item.get("project_id") or "") == str(project.source_project_key or "")
+    ]
     rows = list(session.scalars(select(Candidate).where(Candidate.project_id == project.id)))
     by_key = {row.candidate_key: row for row in rows}
     bibliometrics = {str(item.get("id")): item for item in package.get("bibliometrics", [])}
-    ranked = sorted(package.get("candidates", []), key=lambda item: float(item.get("weighted_score", 0)), reverse=True)
+    ranked = sorted(project_candidates, key=lambda item: float(item.get("weighted_score", 0)), reverse=True)
     rank_by_key = {str(item.get("candidate_id")): index + 1 for index, item in enumerate(ranked)}
-    for item in package.get("candidates", []):
+    for item in project_candidates:
         key = str(item.get("candidate_id"))
         localized = {
             "name": _localized(item.get("target")),
-            "pain_group": _localized(item.get("pain_group")),
+            # The public workspace API retains the historical `pain_group`
+            # field name for compatibility; package schema uses the generic
+            # `group` term and maps it at this boundary.
+            "pain_group": _localized(item.get("group")),
             "protein_type": _localized(item.get("protein_type")),
             "localization": _localized(item.get("localization")),
             "axis": _localized(item.get("axis")),
@@ -390,7 +396,7 @@ def _upsert_candidates(session: Session, project: Project, package: dict, projec
             },
         }
         properties = {
-            "pain_group": _text(item.get("pain_group")),
+            "pain_group": _text(item.get("group")),
             "rank_in_group": item.get("rank_in_group"),
             "gene": item.get("gene"),
             "protein_type": _text(item.get("protein_type")),
@@ -438,7 +444,7 @@ def _upsert_candidates(session: Session, project: Project, package: dict, projec
                 scores=scores,
                 properties=properties,
             )
-    return len(package.get("candidates", []))
+    return len(project_candidates)
 
 
 def _upsert_references(
@@ -572,11 +578,11 @@ def _reconcile_managed_project(
         for edge in package["edges"]
         if edge["project"] == project_key
     }
-    desired_candidates = (
-        {str(candidate["candidate_id"]) for candidate in package["candidates"]}
-        if project_key == "PAIN"
-        else set()
-    )
+    desired_candidates = {
+        str(candidate["candidate_id"])
+        for candidate in package["candidates"]
+        if str(candidate.get("project_id") or "") == project_key
+    }
     desired_references = {
         str(reference["ref_id"])
         for reference in package["references"]
@@ -816,7 +822,10 @@ def import_research_package(
                 "version": version,
                 "as_of": package.get("as_of"),
                 "content_checksum": package_checksum,
-                "candidate_count": len(package.get("candidates", [])) if key == "PAIN" else 0,
+                "candidate_count": sum(
+                    str(candidate.get("project_id") or "") == key
+                    for candidate in package.get("candidates", [])
+                ),
                 "finding_count": sum(1 for edge in package.get("edges", []) if edge.get("project") == key),
                 "reference_count": sum(
                     1

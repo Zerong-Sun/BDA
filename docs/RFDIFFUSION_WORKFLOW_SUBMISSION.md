@@ -4,7 +4,7 @@
 
 最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
 
-权威范围：本文标题所述主题；当前平台与科研总状态以 docs/refactor/CURRENT_STATE_2026-08-29.md 为准。
+权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
@@ -23,7 +23,8 @@ This is the fixed path for running RFdiffusion from the Workbench UI.
 
 The Node details panel is the source of truth before submission. Save or preview with these parameters:
 
-- `scaffold`: route label such as `monellin` or `brazzein`; this is written to candidate metadata.
+- `scaffold`: a project-defined route label such as `de_novo` or
+  `scaffold_redesign`; this is written to candidate metadata.
 - `contigmap.contigs`: RFdiffusion Hydra contig expression.
 - `ppi.hotspot_res`: optional hotspot residue list.
 - `inference.num_designs`: number of RFdiffusion trajectories/backbones.
@@ -64,11 +65,14 @@ After the LSF job finishes, click **Sync result** in Jobs.
 - PDB outputs become artifacts and are registered in the Candidate table with `generated_backbone` status.
 - Generated-but-unscored RFdiffusion candidates are valid candidate rows; downstream ProteinMPNN, folding, and scoring steps add sequences and scores later.
 
-## Sweet protein reference routes
+## Reference route classes
 
-- Monellin route: uses the prepared Monellin structure, RFdiffusion contigs that preserve the known sweet-protein fold context, and standard generation with `diffuser.partial_T = 0`.
-- Brazzein route: uses partial diffusion from the prepared Brazzein structure, length-compatible contigs, and `contigmap.provide_seq` to keep conserved residues visible.
-- The route label must be set in `scaffold` so generated candidates can be grouped in the table.
+- A de novo route uses an reviewed target structure, explicit contigs and
+  `diffuser.partial_T = 0`.
+- A scaffold-redesign route uses a compatible starting structure, a positive
+  `diffuser.partial_T` and reviewed `contigmap.provide_seq` ranges.
+- The route label must be set in `scaffold` so generated candidates can be
+  grouped without encoding a private project name in the plugin manifest.
 
 ## Review checklist before submitting
 

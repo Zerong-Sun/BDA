@@ -6,8 +6,8 @@ Both are owner decisions recorded as data rather than left in a chat log.
 the protocol asked for RFdiffusion2, which is not on qm. RFdiffusion3 is, and reading
 ``rfd3/inference/input_parsing.py`` shows it does more than RFD2 was wanted for:
 ``select_fixed_atoms`` takes a per-residue, per-atom-name mapping
-(``{"A43": "NE,CZ,NH1,NH2"}``), so the brazzein charge pharmacophore can be pinned atom by
-atom while ``select_unfixed_sequence`` frees everything else.
+(``{"A43": "NE,CZ,NH1,NH2"}``), so a reference pharmacophore can be pinned atom by atom
+while ``select_unfixed_sequence`` frees everything else.
 
 The plugin runs the existing ``foundry`` environment in place, read-only, exactly as the
 other plugins run BindCraft, Boltz and RFdiffusion out of ``/work/bme-liz``. Cloning it into
@@ -51,7 +51,7 @@ depends_on: str | Sequence[str] | None = None
 
 # Another account's environment, used in place and read-only.
 RFD3_ENV = "/work/bme-rongx/.conda/envs/foundry"
-OUR_CONDA_PROFILE = "/work/bme-sunzr/miniconda3/etc/profile.d/conda.sh"
+OUR_CONDA_PROFILE = "/opt/bda/miniconda3/etc/profile.d/conda.sh"
 # Read-only: 12 GB of checkpoints owned by another account, including rfd3_latest.ckpt.
 SHARED_CHECKPOINTS = "/work/bme-rongx/.foundry/checkpoints"
 

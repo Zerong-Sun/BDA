@@ -510,14 +510,14 @@ function projectFixture(scenario) {
     legacy_id: null,
     organization_id: 'org_browser',
     owner_id: 'user_browser',
-    name: 'Sweet Protein Browser Acceptance',
-    project_type: 'sweet_protein_design',
+    name: 'Protein Design Browser Acceptance',
+    project_type: 'protein_design',
     status: scenario === 'read-only' ? 'archived' : 'active',
     source_package_id: 'package_browser',
     source_project_key: 'PD1',
     summary: 'Deterministic browser acceptance project for scientific UI verification.',
     localized_content: {
-      name: localized('Sweet Protein Browser Acceptance', '甜味蛋白浏览器验收'),
+      name: localized('Protein Design Browser Acceptance', '蛋白设计浏览器验收'),
       summary: localized(
         'Deterministic browser acceptance project for scientific UI verification.',
         '用于科研界面验证的确定性浏览器验收项目。',
@@ -607,7 +607,7 @@ function candidateFixture(id, rank, overrides = {}) {
       solubility_score: 0.72 + rank / 100,
     },
     properties: {
-      family: overrides.family ?? 'sweet-protein',
+      family: overrides.family ?? 'demo-protein',
       pred_kd: `${rank * 10} nM`,
       decision: overrides.decision ?? (rank === 2 ? 'Anchor' : 'Review'),
       next_action: 'Review evidence before ordering.',
@@ -647,12 +647,12 @@ function researchWorkspaceFixture(scenario) {
   return {
     project: {
       id: PROJECT_ID,
-      name: localized('Sweet Protein Evidence Workspace', '甜味蛋白证据工作区'),
+      name: localized('Protein Design Evidence Workspace', '蛋白设计证据工作区'),
       summary: localized(
         'Bilingual evidence, target, and dataset acceptance fixtures.',
         '双语证据、靶点与数据集验收夹具。',
       ),
-      project_type: 'sweet_protein_design',
+      project_type: 'protein_design',
       source_project_key: 'PD1',
       source_package_id: 'package_browser',
       package: { version: '2.0', as_of: '2026-07-29' },
@@ -680,7 +680,7 @@ function researchWorkspaceFixture(scenario) {
       : [{
           id: 'node_browser_1',
           kind: 'target',
-          label: localized('Sweet receptor target', '甜味受体靶点'),
+          label: localized('Reference protein target', '参考蛋白靶点'),
           description: localized('Primary evidence node', '主要证据节点'),
           reference_ids: ['REF-BROWSER-1'],
           review_status: scenario === 'pending' ? 'pending_review' : 'accepted',
@@ -691,7 +691,7 @@ function researchWorkspaceFixture(scenario) {
           id: 'edge_browser_1',
           source: 'node_browser_1',
           target: 'node_browser_2',
-          source_label: localized('Sweet receptor target', '甜味受体靶点'),
+          source_label: localized('Reference protein target', '参考蛋白靶点'),
           target_label: localized('Binding response', '结合响应'),
           predicate: 'supports',
           summary: localized('Curated binding evidence', '已整理的结合证据'),
@@ -951,7 +951,7 @@ function createStrictRoutes({ scenario, routeId }) {
     return ok({
       id: 'target_browser',
       project_id: PROJECT_ID,
-      name: 'Sweet receptor target',
+      name: 'Reference protein target',
       sequence: null,
       uniprot_accession: 'P01234',
       organism: 'Homo sapiens',
@@ -1087,7 +1087,7 @@ function createStrictRoutes({ scenario, routeId }) {
       const rank = index + 7
       return candidateFixture(`candidate_browser_${rank}`, rank, {
         score: 94 - rank,
-        family: rank === 12 ? 'later-page-family' : 'sweet-protein',
+        family: rank === 12 ? 'later-page-family' : 'demo-protein',
         status: rank % 2 === 0 ? 'Validated' : 'Reserve',
       })
     }),
@@ -1113,7 +1113,7 @@ function createStrictRoutes({ scenario, routeId }) {
       const rank = index + 7
       return candidateFixture(`candidate_browser_${rank}`, rank, {
         score: 94 - rank,
-        family: rank === 12 ? 'later-page-family' : 'sweet-protein',
+        family: rank === 12 ? 'later-page-family' : 'demo-protein',
         status: rank % 2 === 0 ? 'Validated' : 'Reserve',
       })
     }),

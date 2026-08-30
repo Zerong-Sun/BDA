@@ -837,7 +837,7 @@ def _manual_node(workflow, key) -> WorkflowNode:
 def test_manual_node_does_not_block_preflight(env) -> None:
     """Target intake and candidate review have no plugin and never will.
 
-    Requiring one made whole workflows unsubmittable, which is why the sweet-protein
+    Requiring one made whole workflows unsubmittable, which is why legacy
     routes ran as hand-written LSF instead of through the platform.
     """
     from backend_v2.app.workflows.preflight import evaluate_preflight

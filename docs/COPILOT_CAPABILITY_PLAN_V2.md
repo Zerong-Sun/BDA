@@ -4,7 +4,7 @@
 
 最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
 
-权威范围：本文标题所述主题；当前平台与科研总状态以 docs/refactor/CURRENT_STATE_2026-08-29.md 为准。
+权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
@@ -30,6 +30,13 @@ database access.
 | Research gap repair | Queue reference/AlphaFold repairs for an exact Research target UUID | Queue | Explicit request; scientific gaps remain open |
 | Workflow planning | Inspect and recommend routes | Draft | Applying a route remains a user action |
 | Compute drafting | Create Docker/LSF draft | Draft | Explicit request; confirmation and submission remain user actions |
+| Durable agent run | Persist a bounded multi-turn task; suspend on a job or one child run and resume | Queue | Explicit run creation, project scope, tool allow-list, cost and depth limits |
+
+The durable runner stores its transcript, tool calls, pending tasks and accumulated cost
+on the server. A run may wait for a submitted compute job or spawn one level of child
+work, but those abilities do not grant direct shell access or bypass normal compute
+draft/confirmation controls. The archived binder-agent prototype's dedicated prompt and
+direct GPU-submission behavior are intentionally not part of the public contract.
 
 ## Always prohibited from ordinary chat
 
@@ -66,6 +73,8 @@ database access.
     checksum- and retrieval-trace-backed literature excerpt.
 14. Composite, modified, or otherwise non-unique molecular identities remain
     `requires_review` until one exact entity is mapped to a UniProt accession.
+15. Durable runs persist budget use and pending work transactionally; cancellation walks
+    the child/task tree, and a periodic sweep only recovers missed wake-ups.
 
 ## Acceptance experiments
 
@@ -79,3 +88,5 @@ Each tool must pass:
 6. Database verification of created resource state and attributed audit entry.
 7. Duplicate-delivery or concurrent-request verification for mutation paths.
 8. Negative-language, prohibited-action, and disabled-capability guard tests.
+9. Durable-run restart, budget exhaustion, one-level child limit, job wake-up and
+   cancellation propagation tests.

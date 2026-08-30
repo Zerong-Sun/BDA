@@ -6,8 +6,9 @@ Two defects, both of which make a plugin unrunnable rather than merely misconfig
 registered with ``command = "python run.py"`` against a ``bda/<model>:<ver>`` image that
 does not exist. ``compute.scripts.render_script`` builds the LSF script straight from
 ``plugin.command``, so submitting any of them runs ``python run.py`` on a login-class
-node and fails. Every real sweet-protein job so far went through the hand-rendered
-``qm-scripts/library`` path instead, which is why nobody hit this. ``proteinhunter_boltz``
+node and fails. Earlier validated jobs went through the hand-rendered
+``qm-scripts/library`` path instead, which is why the registry defect was not exercised.
+``proteinhunter_boltz``
 (0021) is the only plugin wired to qm, and it is the pattern followed here: conda runtime,
 ``container_image`` naming the environment prefix, ``runtime_setup`` sourcing it by
 absolute path, and an absolute entrypoint.
@@ -22,8 +23,7 @@ keeps its real CLI spelling in a new ``cli`` entry, which is what the command te
 map back to.
 
 Entry points and environments come from job scripts that actually ran on qm
-(``qm-scripts/rfd/rfd-binder.lsf``, ``qm-scripts/mpnn/mpnn1.lsf``, the sweet-protein
-``deliverables/.../submit*.lsf``) and from the curated configs in
+(``qm-scripts/rfd/rfd-binder.lsf`` and ``qm-scripts/mpnn/mpnn1.lsf``) and from the curated configs in
 ``qm-scripts/library/examples/``. See ``docs/QM_MODEL_AVAILABILITY_AND_SUBSTITUTES.md``.
 
 Enabled flags are left exactly as they were. Pointing a plugin at a real install is a
@@ -54,7 +54,7 @@ CONDA_PROFILE = "/work/bme-liz/miniconda3/etc/profile.d/conda.sh"
 # written into them, so every command below sends its output to $BDA_OUTPUT_DIR.
 LIZ = "/work/bme-liz"
 # Our own account. New installs and new conda environments belong here.
-OWN = "/work/bme-sunzr"
+OWN = "/opt/bda"
 
 # Hydra/flag spellings a plugin's CLI needs, keyed by the renderer-safe parameter name.
 # Renaming is what makes the parameter reach the script at all; the `cli` field records
@@ -198,7 +198,7 @@ rosetta_bin="/work/bme-liz/software/rosetta/source/bin/${application:-score_jd2}
 """
 
 BINDCRAFT_COMMAND = """\
-python -u /work/bme-sunzr/software/BindCraft/bindcraft.py \
+python -u /opt/bda/software/BindCraft/bindcraft.py \
   --settings "$settings" \
   ${filters:+--filters "$filters"} \
   ${advanced:+--advanced "$advanced"}\

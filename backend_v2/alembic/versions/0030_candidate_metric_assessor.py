@@ -16,10 +16,9 @@ assay condition. Existing rows take "" and keep their current meaning.
 
 ``assessor`` records who produced the number, which ``method`` cannot: the same model is a
 design model in one workflow and an independent check in another. It matters because a
-design model scoring its own output is self-assessment. On the cannabinoid project the
-design model's own best candidate ranked seventh of ten once an independent model
-re-scored the same structures - rank correlation between the two was +0.28. A UI that
-shows both numbers the same way invites exactly that mistake. Backfilled as "unknown"
+design model scoring its own output is self-assessment. In one validation study, an
+independent model substantially reordered the candidates produced by the design model.
+A UI that shows both numbers the same way invites exactly that mistake. Backfilled as "unknown"
 rather than guessed from the method name, because the answer depends on the workflow the
 metric came from, not on the tool.
 

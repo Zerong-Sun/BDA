@@ -1,20 +1,18 @@
 """A project's decision record, as rows rather than as a document.
 
-The cannabinoid project's most valuable output was not a protein - it was the reasoning:
-which decisions were made, on what evidence, which ones were later overturned, and what
-was tried and ruled out. All of that lived in hand-written markdown
-(docs/CANNABINOID_DESIGN_REASONING.md). That is fine for one project and useless for the
-next one: it cannot be queried, it is not linked to the jobs and candidates it talks
-about, and nothing stops the prose from drifting away from the data.
+Research reasoning often starts in hand-written notes: which decisions were made, on
+what evidence, which ones were later overturned, and what was tried and ruled out.
+Unstructured notes cannot be queried or reliably linked to the jobs and candidates
+they discuss, and their prose can drift away from the data.
 
 The platform already stores the *outputs* of research (jobs, candidates, metrics,
 findings) and the *system's* actions (audit log, job events). What it had no place for is
 the chronology of human/agent judgement that connects them - the plan, the problem hit
 halfway through, the call made about it, and the result that followed.
 
-Deliberately generic. Nothing here is cannabinoid-specific: `entry_type` and `outcome`
-use vocabulary any wet-lab or computational project can fill, so a future project gets a
-working timeline by writing rows, not by adding tables.
+The model is deliberately generic: `entry_type` and `outcome` use vocabulary any
+wet-lab or computational project can fill, so a future project gets a working timeline
+by writing rows, not by adding tables.
 
 Relationship to neighbouring tables:
 
@@ -78,7 +76,7 @@ class ProjectTimelineEntry(UUIDVersionMixin, Base):
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     # Stable caller-chosen identifier for scripted history, e.g.
-    # ``manuka-2026-06-27-mpnn-no-fixed-positions``. NULL for entries a person created
+    # ``phase-1-sequence-design-no-fixed-positions``. NULL for entries a person created
     # through the API, which have no natural key and are never re-seeded.
     entry_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
     # When it actually happened, which is NOT created_at: the record is often written

@@ -247,9 +247,8 @@ def render(config_path: Path, output_dir: Path) -> Path:
         # ptile is slots PER HOST, so ptile=1 spreads -n slots across -n separate hosts.
         # Every model here is single-node, and a single-GPU job asking for four hosts
         # stays PEND on "Not enough hosts to meet the job's spanning requirement" rather
-        # than failing - manuka-routeA-rfd3-smoke (4127204) sat pending 13 h that way.
-        # Packing all slots onto one host is what the hand-written jobs in this project
-        # already do; allow an explicit override for a genuinely multi-node model.
+        # than failing. Pack all slots onto one host by default; allow an explicit
+        # override for a genuinely multi-node model.
         f'#BSUB -R "span[ptile={int(scheduler.get("ptile", cpus))}]"',
         "#BSUB -o logs/%J.out",
         "#BSUB -e logs/%J.err",

@@ -66,7 +66,7 @@ def test_the_thread_count_and_the_reservation_are_one_number() -> None:
         script = render_script(
             ScriptContext(
                 job_name="bda-foldseek",
-                remote_dir="/work/bme-sunzr/bda/jobs/test",
+                remote_dir="/opt/bda/bda/jobs/test",
                 command=PATCHED_COMMAND,
                 queue="v3-64",
                 backend="lsf",

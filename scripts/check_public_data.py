@@ -30,6 +30,26 @@ SECRET_PATTERNS = {
     "private key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
 }
 MAX_FILE_BYTES = 10 * 1024 * 1024
+PUBLICATION_TEXT_ROOTS = (Path("docs"),)
+PUBLICATION_TEXT_FILES = {Path("README.md"), Path("README.zh-CN.md"), Path("CLAUDE.md")}
+FORBIDDEN_PUBLICATION_MARKERS = {
+    "missing private status document": b"docs/refactor/CURRENT_STATE",
+    "private demo checkout path": b"/mnt/e/BDA-demo",
+    "user-specific cluster path": b"/work/" + b"bme-" + b"sunzr/",
+    "private cluster-sync snapshot": b"backups/cluster-sync/",
+    "private data snapshot index": b"BDA_DATA_INDEX_",
+    "worktree recovery inventory": b"worktree-recovery/",
+    "private project run identifier": b"SweetProtein_" + b"RFdiffusion_100x2_20260626",
+    "private stash reference": b"stash@{",
+    "unmerged branch as product truth": b"codex/autopilot-campaigns-wip",
+}
+FORBIDDEN_REPOSITORY_MARKERS = {
+    "private research package identifier": b"protein_knowledge_" + b"pain_targets",
+    "private cannabinoid design report": b"CANNABINOID_" + b"DESIGN_REASONING",
+    "private cannabinoid phase report": b"CANNABINOID_" + b"PHASE2",
+    "user-specific cluster account": b"/work/" + b"bme-" + b"sunzr",
+    "private project run identifier": b"SweetProtein_" + b"RFdiffusion_100x2_20260626",
+}
 
 
 def sha256(path: Path) -> str:
@@ -47,6 +67,25 @@ def repository_files() -> set[Path]:
     return {Path(line) for line in result.stdout.splitlines() if line}
 
 
+def is_publication_text(path: Path) -> bool:
+    return path in PUBLICATION_TEXT_FILES or any(path.is_relative_to(root) for root in PUBLICATION_TEXT_ROOTS)
+
+
+def validate_publication_text(path: Path, content: bytes, errors: list[str]) -> None:
+    if not is_publication_text(path) or path.suffix.lower() not in {".md", ".json"}:
+        return
+    for description, marker in FORBIDDEN_PUBLICATION_MARKERS.items():
+        if marker in content:
+            errors.append(f"{description} is forbidden in public documentation: {path}")
+
+
+def validate_repository_text(path: Path, content: bytes, errors: list[str]) -> None:
+    """Reject exact private identifiers while allowing generic research capabilities."""
+    for description, marker in FORBIDDEN_REPOSITORY_MARKERS.items():
+        if marker in content:
+            errors.append(f"{description} is forbidden in the public repository: {path}")
+
+
 def validate_package(errors: list[str]) -> None:
     payload = json.loads((ROOT / PACKAGE).read_text())
     if payload.get("package_id") != "pd1-demo-v1" or payload.get("schema_version") != "1.1":
@@ -59,6 +98,17 @@ def validate_package(errors: list[str]) -> None:
         errors.append("candidate results belong in the synthetic fixture manifest, not curated evidence")
     if len(payload.get("references", [])) != 12 or len(payload.get("edges", [])) != 4:
         errors.append("PD1 evidence cardinality changed; publish a reviewed package version")
+    package_blob = json.dumps(payload, ensure_ascii=False).encode()
+    for marker in (
+        b"CANN",
+        b"INSECT",
+        b"PAIN",
+        b"all four projects",
+        "全部四个项目".encode(),
+    ):
+        if marker in package_blob:
+            errors.append("PD1 package contains an identifier from a removed private project")
+            break
 
     project = payload["projects"][0]
     visible = {item["ref_id"] for item in payload["references"] if item["project_ids"] == ["PD1"]}
@@ -111,6 +161,8 @@ def main() -> int:
             errors.append(f"file exceeds 10 MiB public limit: {path}")
             continue
         content = absolute.read_bytes()
+        validate_publication_text(path, content, errors)
+        validate_repository_text(path, content, errors)
         for name, pattern in SECRET_PATTERNS.items():
             if pattern.search(content):
                 errors.append(f"possible {name} in {path}")

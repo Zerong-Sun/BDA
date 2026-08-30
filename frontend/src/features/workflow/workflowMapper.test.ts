@@ -69,18 +69,18 @@ describe('workflowMapper', () => {
   it('uses imported display metadata and confidence metrics', () => {
     const node = apiNode({
       node_type: 'fold_prediction',
-      node_key: 'brazzein_alphafold2',
+      node_key: 'candidate_alphafold2',
       model_plugin: 'AlphaFold2',
       status: 'running',
       parameters: {
-        display_name: 'Brazzein AlphaFold2',
+        display_name: 'Candidate AlphaFold2',
         description: 'Validated confidence results.',
         metrics: { folded: 316, mean_plddt: 76.64 },
       },
     })
 
     const nodes = mapApiNodesToGraph([node])
-    expect(nodes[0]?.data.label).toBe('Brazzein AlphaFold2')
+    expect(nodes[0]?.data.label).toBe('Candidate AlphaFold2')
     expect(nodes[0]?.data.description).toBe('Validated confidence results.')
     expect(footerFromMetrics(node)).toBe('316 folded · 76.64 mean pLDDT')
   })

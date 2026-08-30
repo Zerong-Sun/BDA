@@ -187,7 +187,7 @@ describe('target intelligence api', () => {
           knowledge_entry_id: 'knowledge-methods',
           title: 'Methods',
           category: 'methods',
-          summary: 'De novo binder design methods for chronic-pain targets',
+          summary: 'De novo binder design methods for a protein target',
         }],
         route_options: [{
           route_id: 'de-novo-binder-pooled',

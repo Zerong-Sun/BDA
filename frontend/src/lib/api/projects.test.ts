@@ -59,22 +59,21 @@ describe('project api', () => {
 
     // The toolbar's "new route" button persists {nodes: [], edges: []} immediately, so an
     // empty draft is always the newest run in the project. Selecting it by recency alone
-    // blanks the canvas of a project whose real runs are older - which is what happened to
-    // manuka: two stray drafts from 2026-08-04 hid a 19-node run.
+    // blanks the canvas of a project whose real runs are older.
     expect(hasWorkflowNodes(run({ nodes: [], edges: [] }))).toBe(false)
     expect(hasWorkflowNodes(run({}))).toBe(false)
-    expect(hasWorkflowNodes(run({ nodes: [{ id: 'monellin_rfdiffusion' }] }))).toBe(true)
+    expect(hasWorkflowNodes(run({ nodes: [{ id: 'binder_backbone_generation' }] }))).toBe(true)
   })
 
   it('hides archived runs from the route list', async () => {
     server.use(
-      http.get('/api/v2/projects/manuka/workflow-runs', () =>
+      http.get('/api/v2/projects/project/workflow-runs', () =>
         HttpResponse.json({
           items: [
             {
               id: 'merged',
-              project_id: 'manuka',
-              name: 'Sweet-protein design workflow: routes 1-3',
+              project_id: 'project',
+              name: 'Binder design workflow: routes 1-3',
               status: 'running',
               graph: {
                 nodes: [{ id: 'n1' }],
@@ -87,8 +86,8 @@ describe('project api', () => {
             },
             {
               id: 'route-2',
-              project_id: 'manuka',
-              name: '设计路线 2 · 天然 Brazzein',
+              project_id: 'project',
+              name: '设计路线 2 · 参考骨架',
               status: 'running',
               graph: { nodes: [{ id: 'n1' }], edges: [] },
               version: 1,
@@ -102,7 +101,7 @@ describe('project api', () => {
       ),
     )
 
-    const runs = await listProjectWorkflowRuns('manuka')
+    const runs = await listProjectWorkflowRuns('project')
 
     // A route is a run, so a superseded run is a second way to open the same route.
     expect(runs.map((run) => run.id)).toEqual(['route-2'])
@@ -111,7 +110,7 @@ describe('project api', () => {
   it('selects the started run with nodes, not the newest draft', async () => {
     const item = (name: string, status: string, createdAt: string, nodeCount: number) => ({
       id: name,
-      project_id: 'manuka',
+      project_id: 'project',
       name,
       status,
       graph: { nodes: Array.from({ length: nodeCount }, (_, i) => ({ id: `n${i}` })), edges: [] },
@@ -122,7 +121,7 @@ describe('project api', () => {
     })
 
     server.use(
-      http.get('/api/v2/projects/manuka/workflow-runs', () =>
+      http.get('/api/v2/projects/project/workflow-runs', () =>
         HttpResponse.json({
           items: [
             // Newest first is also the order the API returns; both of the leading entries
@@ -136,7 +135,7 @@ describe('project api', () => {
       ),
     )
 
-    const current = await getCurrentWorkflowRun('manuka')
+    const current = await getCurrentWorkflowRun('project')
     expect(current.name).toBe('observed results')
   })
 })

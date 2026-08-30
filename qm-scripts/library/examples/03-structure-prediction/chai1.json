@@ -10,7 +10,7 @@
   },
   "setup": [
     "module purge",
-    "source activate /work/bme-sunzr/.conda/envs/chai1"
+    "source activate /opt/bda/.conda/envs/chai1"
   ],
   "parameters": {
     "fasta_file": "./input/complex.fasta",

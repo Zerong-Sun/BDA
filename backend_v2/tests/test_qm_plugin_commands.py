@@ -56,7 +56,7 @@ def render_command(
     return render_script(
         ScriptContext(
             job_name="bda-test",
-            remote_dir="/work/bme-sunzr/bda/jobs/test",
+            remote_dir="/opt/bda/bda/jobs/test",
             command=command,
             queue="v3-64",
             backend="lsf",
@@ -121,7 +121,7 @@ def test_rfdiffusion_parameters_reach_the_rendered_script() -> None:
             "num_designs": 100,
             "partial_t": 5,
             "provide_seq": "[1-1,13-13]",
-            "output_prefix": "monellin_design",
+            "output_prefix": "example_design",
         },
     )
 
@@ -264,12 +264,12 @@ MIGRATION_0025 = _load_revision("0025_qm_paths_verified")
 def test_corrections_do_not_point_at_our_own_empty_directories() -> None:
     """0024 trusted the curated example configs; the cluster said otherwise.
 
-    /work/bme-sunzr/software is empty and our only conda env is `gemmi`, so any plugin
+    /opt/bda/software is empty and our only conda env is `gemmi`, so any plugin
     claiming BindCraft or Boltz lives under our account was unrunnable.
     """
     for plugin_key, target in MIGRATION_0025.REPOINT.items():
         assert target["container_image"].startswith("/work/bme-liz/"), plugin_key
-        assert "/work/bme-sunzr/" not in target["command"], plugin_key
+        assert "/opt/bda/" not in target["command"], plugin_key
 
 
 def test_absent_software_is_disabled_rather_than_left_pointing_nowhere() -> None:

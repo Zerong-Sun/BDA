@@ -5,7 +5,7 @@ import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { PDBFileUpload } from './PDBFileUpload'
 
-function pdbFile(name = 'sweet-protein.pdb') {
+function pdbFile(name = 'reference-target.pdb') {
   return new File(['ATOM      1  N   GLY A   1      11.104  13.207  14.099\nEND\n'], name, {
     type: 'chemical/x-pdb',
   })
@@ -102,7 +102,7 @@ describe('PDBFileUpload persistence semantics', () => {
         HttpResponse.json({ detail: 'Project has no primary target' }, { status: 404 })),
       http.post('/api/v2/projects/proj_layer8/targets', async ({ request }) => {
         const body = await request.json() as { name: string }
-        expect(body.name).toBe('sweet-protein')
+        expect(body.name).toBe('reference-target')
         return HttpResponse.json({
           id: 'target_layer8', project_id: 'proj_layer8', name: body.name,
           sequence: null, uniprot_accession: null, organism: null, identity_status: 'unconfirmed',
@@ -111,7 +111,7 @@ describe('PDBFileUpload persistence semantics', () => {
         }, { status: 201 })
       }),
       http.put('/api/v2/projects/proj_layer8/primary-target', () => HttpResponse.json({
-        id: 'target_layer8', project_id: 'proj_layer8', name: 'sweet-protein',
+        id: 'target_layer8', project_id: 'proj_layer8', name: 'reference-target',
         sequence: null, uniprot_accession: null, organism: null, identity_status: 'unconfirmed',
         structure_artifact_id: null, structure_status: 'missing', version: 1,
         created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',
@@ -120,7 +120,7 @@ describe('PDBFileUpload persistence semantics', () => {
         const body = await request.json() as { artifact_id: string }
         expect(body.artifact_id).toBe('file_layer8_target')
         return HttpResponse.json({
-          id: 'target_layer8', project_id: 'proj_layer8', name: 'sweet-protein',
+          id: 'target_layer8', project_id: 'proj_layer8', name: 'reference-target',
           sequence: null, uniprot_accession: null, organism: null, identity_status: 'unconfirmed',
           structure_artifact_id: 'file_layer8_target', structure_status: 'available', version: 2,
           created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',

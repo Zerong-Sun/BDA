@@ -1,16 +1,12 @@
 """Turn paired-condition metrics into a stored comparison.
 
-The cannabinoid binder project (docs/CANNABINOID_DESIGN_REASONING.md §2.7-2.8) showed
-that a single ipTM number cannot say whether a design is selective - only the gap
-against a negative control can: Δ = ipTM(target) - max(ipTM(controls)). That gap was
-computed once, by hand, from a downloaded JSON file, after the GPU time was already
-spent. This makes Δ a first-class metric, written the moment both conditions exist, so
-it is queryable and visible instead of a one-off notebook result - the platform-side
-prerequisite for using Δ as a selection signal during design rather than a post-hoc
-filter (docs/CANNABINOID_DESIGN_REASONING.md §7 step 1).
+A single ipTM number cannot establish selectivity; the interpretable quantity is the
+gap between a target condition and a reviewed control. Making that delta a first-class
+metric keeps it queryable and traceable instead of leaving a one-off notebook result.
 
 A delta is derived only from metric pairs recorded under the same method and model
-variant. Comparing Boltz's self-assessed ipTM(THC) against AlphaFold3's ipTM(CBD) would
+variant. Comparing one model's self-assessed target score against another model's
+control score would
 attribute a modelling disagreement to a chemistry difference.
 """
 

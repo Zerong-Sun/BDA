@@ -12,7 +12,7 @@ rather than inventing a provenance that would later be read as first-hand.
 
 Idempotent: re-running updates existing rows instead of duplicating them.
 
-    python backend_v2/scripts/backfill_candidate_metrics.py --project-name SweetProtein...
+    python backend_v2/scripts/backfill_candidate_metrics.py --project-name <project-name>
     python backend_v2/scripts/backfill_candidate_metrics.py --all --dry-run
 """
 

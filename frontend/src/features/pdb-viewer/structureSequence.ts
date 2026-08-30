@@ -15,8 +15,8 @@ const ONE_LETTER: Record<string, string> = {
   // pipelines emit; they are the same residue as far as a sequence is concerned.
   HID: 'H', HIE: 'H', HIP: 'H', HSD: 'H', HSE: 'H', HSP: 'H',
   CYX: 'C', CYM: 'C', ASH: 'D', GLH: 'E', LYN: 'K', ARN: 'R', MSE: 'M',
-  // Post-translational modifications seen in deposited structures — PCA in
-  // particular opens brazzein, and an X there would not match UniProt.
+  // Post-translational modifications seen in deposited structures. Mapping known
+  // residues avoids false mismatches against canonical UniProt sequences.
   PCA: 'Q', SEP: 'S', TPO: 'T', PTR: 'Y', CSO: 'C', CME: 'C', OCS: 'C',
   MLY: 'K', M3L: 'K', ALY: 'K', KCX: 'K', HYP: 'P', TYS: 'Y',
   DA: 'A', DC: 'C', DG: 'G', DT: 'T', DU: 'U', A: 'A', C: 'C', G: 'G', U: 'U',

@@ -28,7 +28,7 @@ describe('projectSearch', () => {
     expect(query).not.toContain('RFdiffusion')
   })
 
-  it('builds literature search from project research context instead of sweet protein defaults', () => {
+  it('builds literature search from project research context instead of unrelated defaults', () => {
     const research: ProjectResearchSummary = {
       brief: {
         id: 'brief_botrytis',
@@ -54,10 +54,7 @@ describe('projectSearch', () => {
     expect(query).toContain('Botrytis')
     expect(query).toContain('cinerea')
     expect(query).toContain('antifungal')
-    expect(query).not.toContain('monellin')
-    expect(query).not.toContain('brazzein')
-    expect(query).not.toContain('TAS1R2')
-    expect(query).not.toContain('TAS1R3')
+    expect(query).not.toContain('unrelated receptor')
   })
 
   it('falls back to project context when a partial research summary omits findings', () => {

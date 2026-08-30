@@ -5,8 +5,8 @@
   "license": "CC-BY-4.0",
   "synthetic_demo": true,
   "package_file": "frontend/public/research-packages/pd1-demo-v1.json",
-  "package_file_sha256": "abb93a3fd67daa13af2829e04fdf8ea18980751013ee9131a3e94397a47f0cbd",
-  "package_semantic_sha256": "484e5077390906df5a3c96449d77778a525a4c8daecec28dd12f7f1d9dada007",
+  "package_file_sha256": "62d5b5e9eb775a49aebf9200859e92247d25a2cb750b0245db96eb42584d6021",
+  "package_semantic_sha256": "34b9618a8c5d44148267ae907a91a6eb5c16a2062e2c91e64616ddb64d6a0fdd",
   "candidates": [
     {
       "candidate_id": "a0172",

@@ -75,7 +75,7 @@ python qm_job.py render my-rfd-job.json --output jobs/my-rfd-job
 bash upload_to_cluster.sh jobs/my-rfd-job <ssh-host>
 
 # Submit only after reviewing the returned command.
-ssh <ssh-host> "cd /work/bme-sunzr/bda/qm-script-library/my-rfd-job && bsub < submit.lsf"
+ssh <ssh-host> "cd /opt/bda/bda/qm-script-library/my-rfd-job && bsub < submit.lsf"
 ```
 
 ## Commands

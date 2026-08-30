@@ -16,6 +16,7 @@ reports are maintained only in the private BDA-demo archive.
 
 ## Active guides
 
+- [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
 - [Backend v2](BACKEND_V2.md)
 - [Frontend v2](FRONTEND_V2.md)
 - [Research workspace and BYOK](BDA_RESEARCH_WORKSPACE_AND_BYOK.md)
@@ -35,4 +36,5 @@ reports are maintained only in the private BDA-demo archive.
 - [PD1 demo data card](../examples/migration-fixtures/pd1/DATA_CARD.md)
 
 Generated plugin runbooks live under `qm-scripts/plugins/`. Historical v1
-documents under `archive/` are migration archaeology, not deployment guidance.
+documents that contain private paths or research runs are retained only in the
+private recovery archive, not in this public repository.

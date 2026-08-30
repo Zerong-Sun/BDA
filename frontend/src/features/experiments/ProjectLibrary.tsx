@@ -94,7 +94,7 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
     queryKey: ['project-library'],
     queryFn: listProjectLibrary,
     refetchInterval: (queryState) => queryState.state.data?.some(
-      (item) => item.source_project_key && item.source_project_key !== 'PAIN' && !item.primary_structure_ready,
+      (item) => item.source_project_key && item.structure_count > 0 && !item.primary_structure_ready,
     ) ? 10_000 : false,
   })
   const bundleVersion = useQuery({

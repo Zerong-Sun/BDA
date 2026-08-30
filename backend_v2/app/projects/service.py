@@ -36,18 +36,12 @@ from .schemas import (
     TargetReadinessResponse,
 )
 
-BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo", "protein-knowledge-pain-targets")
+BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo",)
 BUILTIN_RESEARCH_PROJECT_NAMES = {
-    "CANN": {"大麻素结合蛋白", "Cannabinoid-binding proteins"},
-    "INSECT": {"杀虫/昆虫毒素蛋白与多肽", "Insecticidal proteins and toxin peptides"},
     "PD1": {"PD-1/PD-L1结合与调控网络", "PD-1/PD-L1 binding and regulatory network"},
-    "PAIN": {"慢性疼痛新型结合蛋白与回路", "Emerging binding proteins and circuits in chronic pain"},
 }
 BUILTIN_RESEARCH_PROJECT_TYPES = {
-    "CANN": "protein_binding_knowledge",
-    "INSECT": "insecticidal_protein_knowledge",
     "PD1": "checkpoint_protein_knowledge",
-    "PAIN": "pain_target_discovery",
 }
 
 

@@ -11,8 +11,8 @@ export function localizedResearchText(value: LocalizedText, language: 'en' | 'zh
   return typeof value === 'string' ? value : value[language]
 }
 
-export const BundledProjectIdSchema = z.enum(['CANN', 'INSECT', 'PD1', 'PAIN'])
 const canonicalId = /^[A-Za-z][A-Za-z0-9_-]*$/
+export const BundledProjectIdSchema = z.string().regex(canonicalId)
 const canonicalPdbId = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 const pmidPattern = /^[1-9]\d{0,8}$/
 const doiPattern = /^10\.\d{4,9}\/\S+$/i
@@ -127,7 +127,8 @@ export const BundledEdgeSchema = z.object({
 
 export const BundledCandidateSchema = z.object({
   candidate_id: z.string().regex(canonicalId),
-  pain_group: LocalizedTextSchema,
+  project_id: BundledProjectIdSchema,
+  group: LocalizedTextSchema.optional().default(''),
   target: LocalizedTextSchema,
   gene: z.string(),
   protein_type: LocalizedTextSchema,
@@ -293,12 +294,20 @@ export const BundledResearchPackageSchema = z.object({
       })
     }
     candidateIds.add(candidate.candidate_id)
+    if (!projectIds.includes(candidate.project_id)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['candidates', index, 'project_id'],
+        message: `Candidate ${candidate.candidate_id} references unknown project ${candidate.project_id}`,
+      })
+      return
+    }
     for (const refId of candidate.reference_ids.split(';')) {
-      if (!referencesById.get(refId)?.project_ids.includes('PAIN')) {
+      if (!referencesById.get(refId)?.project_ids.includes(candidate.project_id)) {
         context.addIssue({
           code: 'custom',
           path: ['candidates', index, 'reference_ids'],
-          message: `Reference ${refId} is not visible in project PAIN`,
+          message: `Reference ${refId} is not visible in project ${candidate.project_id}`,
         })
       }
     }

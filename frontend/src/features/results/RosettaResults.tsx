@@ -54,6 +54,9 @@ export function RosettaResults({ candidates, artifacts, onDownload }: RosettaRes
     counts[route] = (counts[route] ?? 0) + 1
     return counts
   }, {})
+  const routeSummary = Object.entries(routeCounts)
+    .filter(([route]) => route !== '—')
+    .sort(([left], [right]) => left.localeCompare(right))
   const bestScore = rows.length > 0
     ? Math.min(...rows.map((candidate) => numericScore(candidate, 'rosetta_score_per_residue') ?? Infinity))
     : null
@@ -139,14 +142,12 @@ export function RosettaResults({ candidates, artifacts, onDownload }: RosettaRes
             <p className="text-xs text-text-secondary">{copy.total}</p>
             <p className="mt-1 text-xl font-semibold text-text-primary">{rows.length}</p>
           </div>
-          <div className="rounded-md bg-surface-2 p-3">
-            <p className="text-xs text-text-secondary">Brazzein</p>
-            <p className="mt-1 text-xl font-semibold text-text-primary">{routeCounts.brazzein ?? 0}</p>
-          </div>
-          <div className="rounded-md bg-surface-2 p-3">
-            <p className="text-xs text-text-secondary">Monellin</p>
-            <p className="mt-1 text-xl font-semibold text-text-primary">{routeCounts.monellin ?? 0}</p>
-          </div>
+          {routeSummary.map(([route, count]) => (
+            <div key={route} className="rounded-md bg-surface-2 p-3">
+              <p className="truncate text-xs capitalize text-text-secondary">{route}</p>
+              <p className="mt-1 text-xl font-semibold text-text-primary">{count}</p>
+            </div>
+          ))}
           <div className="rounded-md bg-surface-2 p-3">
             <p className="text-xs text-text-secondary">{copy.bestNormalized}</p>
             <p className="mt-1 text-xl font-semibold text-text-primary">

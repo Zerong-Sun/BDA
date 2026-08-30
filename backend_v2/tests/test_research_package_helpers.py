@@ -70,7 +70,7 @@ def test_managed_match_treats_versions_in_one_builtin_family_as_managed() -> Non
     older = f"{BUILTIN_RESEARCH_PACKAGE_PREFIXES[0]}-older-build"
     current = f"{BUILTIN_RESEARCH_PACKAGE_PREFIXES[0]}-current-build"
     assert _managed_package_match(older, current) is True
-    assert _managed_package_match(older, f"{BUILTIN_RESEARCH_PACKAGE_PREFIXES[1]}-current") is False
+    assert _managed_package_match(older, "another-built-in-current") is False
     # A user-uploaded package gets no such latitude.
     assert _managed_package_match(older, "user-uploaded-pkg") is False
 
@@ -109,11 +109,12 @@ def test_project_completeness_score_is_stable_and_total_ordered() -> None:
     )
 
 
-def _pain_package() -> tuple[dict, dict]:
+def _candidate_package() -> tuple[dict, dict]:
     candidate = {
         "candidate_id": "C-1",
+        "project_id": "TARGETS",
         "target": {"zh": "候选一", "en": "Candidate one"},
-        "pain_group": {"zh": "炎症", "en": "Inflammation"},
+        "group": {"zh": "优先组", "en": "Priority"},
         "protein_type": {"zh": "受体", "en": "Receptor"},
         "localization": {"zh": "膜", "en": "Membrane"},
         "axis": {"zh": "免疫", "en": "Immune"},
@@ -131,7 +132,7 @@ def _pain_package() -> tuple[dict, dict]:
         "rubric_version": "v1",
     }
     package = {
-        "package_id": "protein-knowledge-pain-targets-v1",
+        "package_id": "private-target-catalog-v1",
         "schema_version": "1.0",
         "candidates": [candidate],
         "bibliometrics": [{"id": "C-1", "paper_count": 7}],
@@ -145,9 +146,9 @@ def _pain_package() -> tuple[dict, dict]:
     return package, source
 
 
-def test_pain_candidate_upsert_covers_create_update_and_non_pain_paths() -> None:
-    package, source = _pain_package()
-    project = Project(id=uuid.uuid4(), source_project_key="PAIN")
+def test_candidate_upsert_covers_create_update_and_other_project_paths() -> None:
+    package, source = _candidate_package()
+    project = Project(id=uuid.uuid4(), source_project_key="TARGETS")
     session = Mock()
     session.scalars.return_value = []
 
@@ -156,6 +157,7 @@ def test_pain_candidate_upsert_covers_create_update_and_non_pain_paths() -> None
     assert isinstance(created, Candidate)
     assert created.rank == 1
     assert created.properties["bibliometrics"]["paper_count"] == 7
+    assert created.properties["pain_group"] == "优先组"
     assert created.properties["localized_content"]["research_card"]["en"].startswith("## C-1")
 
     existing = Candidate(
@@ -176,7 +178,7 @@ def test_pain_candidate_upsert_covers_create_update_and_non_pain_paths() -> None
     assert existing.name == "候选一"
     assert existing.version == 2
 
-    project.source_project_key = "PD1"
+    project.source_project_key = "OTHER"
     assert _upsert_candidates(session, project, package, source) == 0
 
 

@@ -10,7 +10,7 @@
   },
   "setup": [
     "module purge",
-    "source activate /work/bme-sunzr/.conda/envs/boltz"
+    "source activate /opt/bda/.conda/envs/boltz"
   ],
   "parameters": {
     "input_path": "./input/complex.yaml",

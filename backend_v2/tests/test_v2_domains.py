@@ -93,7 +93,7 @@ def test_project_target_workflow_candidate_loop(domain_client) -> None:
         == 200
     )
 
-    first = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "Monellin", "sequence": "MKT"}).json()
+    first = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "Example protein", "sequence": "MKT"}).json()
     second = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "PD-L1", "sequence": "QDK"}).json()
     assert len(client.get(f"/api/v2/projects/{project_id}/targets").json()["items"]) == 2
     assert (

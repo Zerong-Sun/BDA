@@ -1,7 +1,7 @@
 """Separate stages that dispatch from stages a person does, and declaration-valid from proven-to-run.
 
-Two gaps found while auditing why the sweet-protein project has never dispatched a single
-job through this platform.
+Two gaps were found while auditing why an imported multi-stage workflow had never
+dispatched a job through this platform.
 
 **`workflow_nodes.execution_mode`.** Preflight blocks any node without a registry plugin,
 and submission turns every node into a job. But a real design route contains stages that
@@ -9,7 +9,7 @@ are not models and never will be: importing the target structure, a scientist re
 candidates, a hotspot map assembled by hand. Those stages carry names like
 ``Imported project inputs`` which resolve to nothing in the registry, so a workflow that
 is otherwise perfectly configured reports ``plugin_snapshot_missing`` and cannot be
-submitted - which is exactly the state the sweet-protein routes have been in. The fix is
+submitted - which is exactly the state the imported routes were in. The fix is
 not to weaken the blocker (it exists because unvalidated free-text commands used to reach
 the cluster) but to let a node declare that it is not dispatched at all. Default
 ``dispatch`` keeps every existing node behaving as before.

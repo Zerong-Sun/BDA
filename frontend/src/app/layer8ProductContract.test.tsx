@@ -29,11 +29,11 @@ function envelope<T>(data: T) {
 const project = {
   id: 'proj_layer8',
   organization_id: 'org_test',
-  name: 'Sweet Protein MVP',
-  project_type: 'sweet_protein_design',
+  name: 'Binder Design MVP',
+  project_type: 'binder_design',
   status: 'active',
   owner_id: 'user_test',
-  summary: 'Design a sweet protein acceptance-tested route.',
+  summary: 'Design a binder through an acceptance-tested route.',
   primary_target_id: null,
   version: 1,
   created_at: '2026-07-01T00:00:00Z',
@@ -87,7 +87,7 @@ function installBaseHandlers(readiness: typeof readinessBlocked | typeof readine
     http.get('/api/v2/projects/proj_layer8/target-readiness', () => envelope(readiness)),
     http.get('/api/v2/projects/proj_layer8/primary-target', () =>
       readiness === readinessReady
-        ? HttpResponse.json({ id: 'target_layer8', project_id: 'proj_layer8', name: 'Sweet target',
+        ? HttpResponse.json({ id: 'target_layer8', project_id: 'proj_layer8', name: 'Reference target',
           structure_artifact_id: null, structure_status: 'approved', identity_status: 'confirmed', version: 1 })
         : HttpResponse.json({ detail: 'Project has no primary target' }, { status: 404 }),
     ),
@@ -160,7 +160,7 @@ describe('Layer 8 product contract pages', () => {
 
     renderWithProviders(<ExperimentsPage />)
 
-    expect((await screen.findAllByText('Sweet Protein MVP')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Binder Design MVP')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('Confirm target identity')).length).toBeGreaterThan(0)
     const readinessLinks = screen.getAllByRole('link', { name: 'Resolve target readiness' })
     expect(readinessLinks.length).toBeGreaterThan(0)
@@ -188,7 +188,7 @@ describe('Layer 8 product contract pages', () => {
     const workflowRun = {
       id: 'run_layer8',
       project_id: 'proj_layer8',
-      name: 'Sweet protein route',
+      name: 'Binder design route',
       status: 'draft',
       graph: { nodes: [], edges: [], layout: {} },
       version: 1,
@@ -241,7 +241,7 @@ describe('Layer 8 product contract pages', () => {
     const workflowRun = {
       id: 'run_layer8',
       project_id: 'proj_layer8',
-      name: 'Sweet protein route',
+      name: 'Binder design route',
       status: 'succeeded',
       graph: { nodes: [], edges: [], layout: {} },
       version: 4,
@@ -481,15 +481,15 @@ describe('Layer 8 product contract pages', () => {
         envelope({
           items: [
             {
-              id: 'sweet_candidate_001',
+              id: 'binder_candidate_001',
               project_id: 'proj_layer8',
-              candidate_key: 'sweet_candidate_001',
-              name: 'sweet_candidate_001',
+              candidate_key: 'binder_candidate_001',
+              name: 'binder_candidate_001',
               status: 'generated',
               rank: null,
               score: 81,
               scores: { interface_score: 81, design_score: 81, plddt: 72, solubility_score: 0.77 },
-              properties: { family: 'sweet_protein_route', pred_kd: 'Not scored', decision: 'Review', next_action: 'Run folding before ordering.' },
+              properties: { family: 'binder_design_route', pred_kd: 'Not scored', decision: 'Review', next_action: 'Run folding before ordering.' },
               structure_artifact_id: null,
               complex_artifact_id: null,
               source_job_id: null,
@@ -518,7 +518,7 @@ describe('Layer 8 product contract pages', () => {
 
     renderWithProviders(<CandidatesPage />)
 
-    expect((await screen.findAllByText('sweet_candidate_001')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('binder_candidate_001')).length).toBeGreaterThan(0)
     expect(screen.getByText('No structure file for this candidate yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Download selected' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Select page' }))

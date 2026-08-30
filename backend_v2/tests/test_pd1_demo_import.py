@@ -32,7 +32,7 @@ def test_pd1_demo_import_is_idempotent_and_evidence_closed(domain_client) -> Non
         "version": "1.0.0",
         "display_name": {**_package()["title"], "default": ""},
         "license": "CC-BY-4.0",
-        "checksum": "484e5077390906df5a3c96449d77778a525a4c8daecec28dd12f7f1d9dada007",
+        "checksum": "34b9618a8c5d44148267ae907a91a6eb5c16a2062e2c91e64616ddb64d6a0fdd",
         "size": PACKAGE_PATH.stat().st_size,
         "installed": False,
     }

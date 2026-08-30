@@ -12,8 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 SUPPORTED_SCHEMA_VERSIONS = {"1.0", "1.1"}
 TRUSTED_VERIFICATION_STATUSES = {"verified_europe_pmc"}
 TRUSTED_BUILTIN_PACKAGE_CHECKSUMS = {
-    "pd1-demo-v1": "484e5077390906df5a3c96449d77778a525a4c8daecec28dd12f7f1d9dada007",
-    "protein-knowledge-pain-targets-20260719": "9d4b748a42bdd07115cdd128ea7d6babcd4ed0305ed098ef4aa0d9bdf90cce1c",
+    "pd1-demo-v1": "34b9618a8c5d44148267ae907a91a6eb5c16a2062e2c91e64616ddb64d6a0fdd",
 }
 TRUSTED_REFERENCE_HOSTS = {
     "doi.org",
@@ -188,7 +187,8 @@ class ResearchEdge(_PackageModel):
 
 class ResearchCandidate(_PackageModel):
     candidate_id: str = Field(min_length=1, max_length=200)
-    pain_group: LocalizedText
+    project_id: str = Field(default="", max_length=80)
+    group: LocalizedText = ""
     target: LocalizedText
     gene: str = Field(max_length=80)
     protein_type: LocalizedText
@@ -203,10 +203,25 @@ class ResearchCandidate(_PackageModel):
     safety: int | float
     reference_ids: str = Field(min_length=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_group_name(cls, value: Any) -> Any:
+        if not isinstance(value, dict) or "pain_group" not in value:
+            return value
+        candidate = dict(value)
+        legacy_group = candidate.pop("pain_group")
+        candidate.setdefault("group", legacy_group)
+        return candidate
+
     @field_validator("candidate_id")
     @classmethod
     def canonical_id(cls, value: str) -> str:
-        return _canonical_identifier(value, "candidate id")
+        return _canonical_identifier(value, "candidate identifier")
+
+    @field_validator("project_id")
+    @classmethod
+    def canonical_project_id(cls, value: str) -> str:
+        return _canonical_identifier(value, "candidate project identifier") if value else value
 
     @field_validator("reference_ids")
     @classmethod
@@ -410,10 +425,29 @@ def normalize_research_package(package: dict) -> tuple[dict, str]:
         if candidate_id in candidate_ids:
             raise ResearchPackageValidationError("Candidate IDs must be non-empty and unique")
         candidate_ids.add(candidate_id)
-        if "PAIN" not in project_id_set:
-            raise ResearchPackageValidationError("Research target candidates require a PAIN project")
-        for ref_id in candidate_item["reference_ids"].split(";"):
-            require_reference(ref_id, "PAIN", f"Candidate {candidate_id}")
+        project_id = candidate_item["project_id"]
+        reference_ids = candidate_item["reference_ids"].split(";")
+        if not project_id:
+            visible_projects = set(project_id_set)
+            for ref_id in reference_ids:
+                reference = references_by_id.get(ref_id)
+                if reference is None:
+                    visible_projects.clear()
+                    break
+                visible_projects.intersection_update(reference["project_ids"])
+            if len(visible_projects) != 1:
+                raise ResearchPackageValidationError(
+                    f"Candidate {candidate_id} must declare project_id when its references "
+                    "do not identify exactly one project"
+                )
+            project_id = visible_projects.pop()
+            candidate_item["project_id"] = project_id
+        if project_id not in project_id_set:
+            raise ResearchPackageValidationError(
+                f"Candidate {candidate_id} references unknown project {project_id}"
+            )
+        for ref_id in reference_ids:
+            require_reference(ref_id, project_id, f"Candidate {candidate_id}")
 
     return normalized, schema_version
 

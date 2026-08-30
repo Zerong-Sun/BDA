@@ -94,18 +94,18 @@ def test_pdb_id_backfills_structure_reference_and_rcsb_url(monkeypatch) -> None:
     )
     row = SimpleNamespace(
         id=uuid.uuid4(),
-        filename="2O9U.pdb",
-        object_key="structures/2O9U.pdb",
+        filename="1ABC.pdb",
+        object_key="structures/1ABC.pdb",
         status="available",
-        lineage={"pdb_id": "2o9u", "name": "Monellin"},
+        lineage={"pdb_id": "1abc", "name": "Example protein"},
     )
 
     structure = workspace._structures([row])[0]
 
-    assert structure.pdb_id == "2O9U"
-    assert structure.reference_id == "PDB 2O9U"
-    assert structure.rcsb_url == "https://www.rcsb.org/structure/2O9U"
-    assert structure.download_url == "https://objects.test/structures/2O9U.pdb"
+    assert structure.pdb_id == "1ABC"
+    assert structure.reference_id == "PDB 1ABC"
+    assert structure.rcsb_url == "https://www.rcsb.org/structure/1ABC"
+    assert structure.download_url == "https://objects.test/structures/1ABC.pdb"
 
 
 def test_seeded_boilerplate_is_not_rendered_as_a_review_finding() -> None:

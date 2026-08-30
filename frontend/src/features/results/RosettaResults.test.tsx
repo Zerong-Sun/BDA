@@ -9,8 +9,8 @@ import { RosettaResults } from './RosettaResults'
 const baseCandidate: Candidate = {
   id: 'candidate-1',
   project_id: 'project-1',
-  candidate_key: 'brazzein_design_1_mpnn_seq1',
-  name: 'brazzein_design_1_mpnn_seq1',
+  candidate_key: 'route_a_design_1_mpnn_seq1',
+  name: 'route_a_design_1_mpnn_seq1',
   candidate_kind: 'design_candidate',
   status: 'scored',
   rank: 1,
@@ -20,7 +20,7 @@ const baseCandidate: Candidate = {
     rosetta_score_per_residue: -3.1,
     proteinmpnn_score: 1.2,
   },
-  properties: { route: 'brazzein', residue_count: 100 },
+  properties: { route: 'route_a', residue_count: 100 },
   structure_artifact_id: null,
   complex_artifact_id: null,
   source_job_id: null,
@@ -33,7 +33,7 @@ const scoreArtifact: Artifact = {
   id: 'artifact-1',
   project_id: 'project-1',
   artifact_type: 'score_table',
-  filename: 'sweetprotein_rosetta_scores.csv',
+  filename: 'project_rosetta_scores.csv',
   content_type: 'text/csv',
   status: 'available',
   size_bytes: 100,
@@ -51,28 +51,30 @@ describe('RosettaResults', () => {
 
   it('shows scored designs, routes, score semantics, and registered artifacts', () => {
     const onDownload = vi.fn()
-    const monellin: Candidate = {
+    const routeB: Candidate = {
       ...baseCandidate,
       id: 'candidate-2',
-      candidate_key: 'monellin_design_1_mpnn_seq1',
-      name: 'monellin_design_1_mpnn_seq1',
+      candidate_key: 'route_b_design_1_mpnn_seq1',
+      name: 'route_b_design_1_mpnn_seq1',
       rank: 2,
-      properties: { route: 'monellin', residue_count: 101 },
+      properties: { route: 'route_b', residue_count: 101 },
       scores: { rosetta_score: -300, rosetta_score_per_residue: -2.97 },
     }
 
     renderWithProviders(
       <RosettaResults
-        candidates={[monellin, baseCandidate]}
+        candidates={[routeB, baseCandidate]}
         artifacts={[scoreArtifact]}
         onDownload={onDownload}
       />,
     )
 
     expect(screen.getByText('Rosetta computational scores')).toBeInTheDocument()
-    expect(screen.getByText('brazzein_design_1_mpnn_seq1')).toBeInTheDocument()
-    expect(screen.getByText('monellin_design_1_mpnn_seq1')).toBeInTheDocument()
+    expect(screen.getByText('route_a_design_1_mpnn_seq1')).toBeInTheDocument()
+    expect(screen.getByText('route_b_design_1_mpnn_seq1')).toBeInTheDocument()
+    expect(screen.getAllByText('route_a').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('route_b').length).toBeGreaterThan(0)
     expect(screen.getByText(/Lower Rosetta energy scores are better/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sweetprotein_rosetta_scores.csv/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /project_rosetta_scores.csv/ })).toBeInTheDocument()
   })
 })
