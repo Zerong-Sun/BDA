@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "org.bda.superfold",
+  "plugin_key": "superfold",
+  "plugin_version": "qm-20260803",
+  "display_name": "superfold (AlphaFold2 + initial guess)",
+  "command_template": "\"$BDA_PLUGIN_ROOT/superfold\" \"$BDA_INPUT_DIR/structures\"/* \"$BDA_INPUT_DIR/sequences\"/* --out_dir \"$BDA_OUTPUT_DIR\" --mock_msa_depth \"${mock_msa_depth:-1}\" --models \"${models:-all}\" --nstruct \"${nstruct:-1}\" --max_recycles \"${max_recycles:-3}\" --seed_start \"${seed_start:-0}\" --num_ensemble \"${num_ensemble:-1}\"",
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "initial_guess": {"type": "boolean", "default": true},
+      "mock_msa_depth": {"type": "integer", "minimum": 1, "default": 1},
+      "models": {"type": "string", "default": "all"},
+      "nstruct": {"type": "integer", "minimum": 1, "default": 1},
+      "max_recycles": {"type": "integer", "minimum": 1, "default": 3},
+      "seed_start": {"type": "integer", "minimum": 0, "default": 0},
+      "num_ensemble": {"type": "integer", "minimum": 1, "default": 1}
+    }
+  },
+  "output_schema": {"schema_version": "1.0"},
+  "inputs": [
+    {"name": "structures", "kind": "protein_structure", "accepts": ["backbone_set", "candidate_structure", "complex_structure", "target_structure"], "required": true, "multiple": true, "exclusive_group": "superfold_input_source"},
+    {"name": "sequences", "kind": "protein_sequence", "accepts": ["sequence_set", "sequence"], "required": true, "multiple": true, "exclusive_group": "superfold_input_source"}
+  ],
+  "outputs": [
+    {"name": "structures", "kind": "protein_structure", "artifact_type": "predicted_structure", "filename_glob": "*_unrelaxed.pdb"},
+    {"name": "metrics", "kind": "tabular", "artifact_type": "confidence_record", "filename_glob": "*_prediction_results.json"},
+    {"name": "summary", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "reports.txt"}
+  ],
+  "resources": {"cpus": 1, "gpu": true, "gpu_count": 1, "walltime_minutes": 720},
+  "runtime": {"mode": "script", "reference": "site://superfold/qm-20260803", "image_digest": null, "setup": []},
+  "output_parser": null,
+  "input_adapter": null,
+  "checksum_sha256": "055765f516e55bc170d7ff3b22979c9cf33e49aa901d75aff5878c3e0ebf1e18"
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "org.bda.rosetta",
+  "plugin_key": "Rosetta",
+  "plugin_version": "2024.09",
+  "display_name": "Rosetta",
+  "command_template": "find \"$BDA_INPUT_DIR/s\" -type f \\( -iname '*.pdb' -o -iname '*.cif' -o -iname '*.mmcif' \\) | sort > \"$BDA_OUTPUT_DIR/inputs.list\"\n\"$BDA_PLUGIN_ROOT/bin/${application:-score_jd2}.default.linuxgccrelease\" -in:file:l \"$BDA_OUTPUT_DIR/inputs.list\" -out:path:all \"$BDA_OUTPUT_DIR\" -out:file:scorefile \"$BDA_OUTPUT_DIR/${out_scorefile:-score.sc}\" -nstruct \"${nstruct:-1}\" -ignore_unrecognized_res",
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "application": {"type": "string", "enum": ["score_jd2", "rosetta_scripts", "relax", "InterfaceAnalyzer"], "default": "score_jd2"},
+      "nstruct": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 1},
+      "out_scorefile": {"type": "string", "default": "score.sc"}
+    }
+  },
+  "output_schema": {"schema_version": "1.0"},
+  "inputs": [
+    {"name": "s", "kind": "protein_structure", "accepts": ["backbone_set", "candidate_structure", "complex_structure", "relaxed_structure", "target_structure"], "required": true, "multiple": true}
+  ],
+  "outputs": [
+    {"name": "relaxed_structure", "kind": "protein_structure", "artifact_type": "relaxed_structure", "filename_glob": "**/*.pdb"},
+    {"name": "score_table", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "**/*.sc"}
+  ],
+  "resources": {"cpus": 1, "memory_gb": 2, "walltime_minutes": 240},
+  "runtime": {"mode": "module", "reference": "site://rosetta/2024.09", "image_digest": null, "setup": []},
+  "output_parser": null,
+  "input_adapter": null,
+  "checksum_sha256": "57597f4d7d3a628cf553e72b1e0d8f47cf8882a09a8687fc132fd62d2cac9ef9"
+}

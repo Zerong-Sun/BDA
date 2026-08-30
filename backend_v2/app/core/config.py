@@ -5,6 +5,7 @@ from functools import lru_cache
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = "postgresql+psycopg://bda:bda@localhost:5433/bda_v2"
+    maintenance_database_url: str | None = None
+    maintenance_database_role: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_$-]{0,62}$")
+    require_maintenance_database_url: bool = False
     database_pool_size: int = Field(default=5, ge=1, le=100)
     database_max_overflow: int = Field(default=5, ge=0, le=100)
     redis_url: str = "redis://localhost:6380/0"
@@ -72,9 +76,11 @@ class Settings(BaseSettings):
     llm_local_secret_dir: str = "/var/lib/bda/secrets"
     external_research_sources_json: str = "{}"
     research_package_dir: str = "frontend/public/research-packages"
+    plugin_manifest_dir: str = "backend_v2/plugin_manifests"
     allow_legacy_research_package_payload: bool = False
+    allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0049_autopilot_formalization"
+    schema_revision: str = "0051_worker_project_rls"
     worker_queues: str = ""
     required_worker_queues: str = ""
     writes_enabled: bool = True
@@ -177,6 +183,15 @@ class Settings(BaseSettings):
                 raise ValueError("production requires configured external research sources")
             if not self.otel_endpoint:
                 raise ValueError("production requires an OTLP endpoint")
+            if self.require_maintenance_database_url and not self.maintenance_database_url:
+                raise ValueError("production requires a separate maintenance_database_url")
+            if self.require_maintenance_database_url and not self.maintenance_database_role:
+                raise ValueError("production migration jobs require a maintenance_database_role")
+            if self.maintenance_database_url:
+                application_role = make_url(self.database_url).username
+                maintenance_role = make_url(self.maintenance_database_url).username
+                if not application_role or not maintenance_role or application_role == maintenance_role:
+                    raise ValueError("production application and maintenance database roles must be distinct")
         return self
 
 

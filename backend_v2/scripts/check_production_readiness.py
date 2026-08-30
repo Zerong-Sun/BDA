@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 REQUIRED_VALUES = {
     "BDA_V2_KUBECONFIG",
@@ -12,6 +13,8 @@ REQUIRED_VALUES = {
     "BDA_V2_INGRESS_HOST",
     "BDA_V2_TLS_SECRET",
     "BDA_V2_DATABASE_URL",
+    "BDA_V2_MAINTENANCE_DATABASE_URL",
+    "BDA_V2_MAINTENANCE_DATABASE_ROLE",
     "BDA_V2_REDIS_URL",
     "BDA_V2_CELERY_BROKER_URL",
     "BDA_V2_MINIO_ENDPOINT",
@@ -62,6 +65,13 @@ def readiness_report(environment: dict[str, str]) -> dict:
         invalid.append("BDA_V2_DOCKER_HOST must identify the remote mTLS daemon with tcp://")
     if environment.get("BDA_V2_WRITES_ENABLED", "").lower() not in {"false", "0"}:
         invalid.append("BDA_V2_WRITES_ENABLED must remain false before production acceptance")
+    application_url = environment.get("BDA_V2_DATABASE_URL", "")
+    maintenance_url = environment.get("BDA_V2_MAINTENANCE_DATABASE_URL", "")
+    if "://" in application_url and "://" in maintenance_url:
+        application_role = urlparse(application_url).username
+        maintenance_role = urlparse(maintenance_url).username
+        if not application_role or not maintenance_role or application_role == maintenance_role:
+            invalid.append("application and maintenance database roles must be distinct")
     for name in sorted(REQUIRED_FILES):
         value = environment.get(name, "").strip()
         if value and not Path(value).expanduser().is_file():

@@ -36,7 +36,12 @@ def enqueue_operation(
             id=operation.id,
             topic=topic,
             aggregate_id=resource_id,
-            payload={**(payload or {}), "operation_id": str(operation.id)},
+            payload={
+                **(payload or {}),
+                "operation_id": str(operation.id),
+                **({"project_id": str(project_id)} if project_id else {}),
+                **({"organization_id": str(organization_id)} if organization_id else {}),
+            },
         )
     )
     return operation

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RegistryServerCreate(BaseModel):
@@ -77,6 +77,11 @@ class ModelPluginResponse(ModelPluginCreate):
     runtime_validation_status: str = "unproven"
     runtime_validated_at: datetime | None = None
     runtime_validation_evidence: dict = Field(default_factory=dict)
+    manifest_id: str | None = None
+    manifest_schema_version: str | None = None
+    manifest_checksum: str | None = None
+    deployment_status: str = "legacy"
+    site_overrides: dict = Field(default_factory=dict)
     version: int
     created_at: datetime
     updated_at: datetime
@@ -134,6 +139,37 @@ class ComputeNodePage(BaseModel):
 class ModelPluginPage(BaseModel):
     items: list[ModelPluginResponse]
     next_cursor: str | None = None
+
+
+class PluginManifestDescriptor(BaseModel):
+    manifest_id: str
+    plugin_key: str
+    plugin_version: str
+    display_name: str
+    schema_version: str
+    checksum_sha256: str
+    runtime_mode: str
+
+
+class PluginManifestPage(BaseModel):
+    items: list[PluginManifestDescriptor]
+
+
+class PluginDeploymentCreate(BaseModel):
+    manifest_id: str = Field(min_length=3, max_length=240)
+    plugin_version: str = Field(min_length=1, max_length=80)
+    checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+    enabled: bool = True
+    site_overrides: dict = Field(default_factory=dict)
+
+    @field_validator("site_overrides")
+    @classmethod
+    def validate_site_overrides(cls, value: dict) -> dict:
+        allowed = {"runtime_root", "module_names", "environment", "queue", "resource_limits"}
+        unknown = sorted(set(value) - allowed)
+        if unknown:
+            raise ValueError(f"unsupported site override fields: {', '.join(unknown)}")
+        return value
 
 
 class MethodPluginPage(BaseModel):

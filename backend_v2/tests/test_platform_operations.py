@@ -96,6 +96,21 @@ def test_finishing_an_operation_announces_it(session: Session) -> None:
     assert events[0].payload["kind"] == "literature.search"
 
 
+def test_queued_operation_carries_its_rls_scope(session: Session) -> None:
+    operation = _queue(session)
+
+    event = session.scalar(
+        select(OutboxEvent).where(
+            OutboxEvent.id == operation.id,
+            OutboxEvent.topic == "literature.search",
+        )
+    )
+
+    assert event is not None
+    assert event.payload["project_id"] == str(operation.project_id)
+    assert event.payload["organization_id"] == str(operation.organization_id)
+
+
 def test_a_failed_operation_is_announced_the_same_way(session: Session) -> None:
     """Success-only announcement is what left every waiting consumer polling to
     discover failure — the exact gap `job.settled` closed in compute."""

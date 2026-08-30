@@ -22,6 +22,8 @@ service:
   frontendPort: 80
 
 existingSecret: bda-v2-secrets
+migrationSecret: bda-v2-migration
+workerSecret: bda-v2-worker
 
 ingress:
   enabled: true

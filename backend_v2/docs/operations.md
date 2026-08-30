@@ -33,7 +33,9 @@ backend_v2/.venv/bin/pip install -e './backend_v2[dev]'
 ```
 
 ```bash
-backend_v2/.venv/bin/alembic -c backend_v2/alembic.ini upgrade head
+BDA_V2_MAINTENANCE_DATABASE_URL="$MIGRATION_DATABASE_URL" \
+  BDA_V2_MAINTENANCE_DATABASE_ROLE=bda_migrator \
+  backend_v2/.venv/bin/alembic -c backend_v2/alembic.ini upgrade head
 ```
 
 ```bash

@@ -30,6 +30,8 @@ spec:
             - configMapRef: {name: {{ .Release.Name }}-config}
             - secretRef: {name: {{ .Values.existingSecret }}}
           env:
+            - name: BDA_V2_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.workerSecret }}, key: BDA_V2_DATABASE_URL}}
             - {name: BDA_V2_DATABASE_POOL_SIZE, value: "2"}
             - {name: BDA_V2_DATABASE_MAX_OVERFLOW, value: "0"}
             - {name: BDA_V2_WORKER_QUEUES, value: "dispatch,poll,collect,maintenance"}
@@ -73,6 +75,8 @@ spec:
             - configMapRef: {name: {{ .Release.Name }}-config}
             - secretRef: {name: {{ .Values.existingSecret }}}
           env:
+            - name: BDA_V2_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.workerSecret }}, key: BDA_V2_DATABASE_URL}}
             - {name: BDA_V2_DATABASE_POOL_SIZE, value: "2"}
             - {name: BDA_V2_DATABASE_MAX_OVERFLOW, value: "0"}
             - {name: BDA_V2_WORKER_QUEUES, value: "research"}
@@ -116,6 +120,8 @@ spec:
             - configMapRef: {name: {{ .Release.Name }}-config}
             - secretRef: {name: {{ .Values.existingSecret }}}
           env:
+            - name: BDA_V2_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.workerSecret }}, key: BDA_V2_DATABASE_URL}}
             - {name: BDA_V2_DATABASE_POOL_SIZE, value: "2"}
             - {name: BDA_V2_DATABASE_MAX_OVERFLOW, value: "0"}
             - {name: BDA_V2_WORKER_QUEUES, value: "copilot"}
@@ -158,6 +164,8 @@ spec:
             - configMapRef: {name: {{ .Release.Name }}-config}
             - secretRef: {name: {{ .Values.existingSecret }}}
           env:
+            - name: BDA_V2_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ .Values.workerSecret }}, key: BDA_V2_DATABASE_URL}}
             - {name: BDA_V2_DATABASE_POOL_SIZE, value: "1"}
             - {name: BDA_V2_DATABASE_MAX_OVERFLOW, value: "0"}
           volumeMounts: [{name: tmp, mountPath: /tmp}]

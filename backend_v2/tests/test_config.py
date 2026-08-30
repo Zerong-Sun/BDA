@@ -55,6 +55,55 @@ def test_fully_specified_oidc_provider_is_accepted() -> None:
     assert settings.oidc_providers["campus"]["client_id"] == "bda"
 
 
+def _production_database_settings(**overrides) -> Settings:
+    values = {
+        "environment": "production",
+        "database_url": "postgresql+psycopg://bda_api:secret@postgres/bda_v2",
+        "maintenance_database_url": "postgresql+psycopg://bda_migrator:secret@postgres/bda_v2",
+        "maintenance_database_role": "bda_migrator",
+        "jwt_secret": "x" * 40,
+        "rate_limit_fail_closed": True,
+        "cors_origins": "https://bda.invalid",
+        "compute_backend": "lsf",
+        "lsf_ssh_host": "lsf.invalid",
+        "lsf_remote_root": "/shared/bda",
+        "lsf_ssh_key_path": "/var/run/secrets/lsf/key",
+        "minio_secret_key": "x" * 20,
+        "minio_public_endpoint": "artifacts.bda.invalid",
+        "oidc_providers_json": (
+            '{"campus":{"issuer":"https://idp.invalid","client_id":"bda",'
+            '"redirect_uris":"https://bda.invalid/callback"}}'
+        ),
+        "llm_default_provider_ref": "file:/var/lib/bda/secrets/default.key",
+        "external_research_sources_json": '{"europe_pmc":{"base_url":"https://example.invalid"}}',
+        "otel_endpoint": "http://otel.invalid:4318",
+        "_env_file": None,
+    }
+    values.update(overrides)
+    return Settings(**values)
+
+
+def test_production_requires_distinct_application_and_migration_roles() -> None:
+    with pytest.raises(ValidationError, match="must be distinct"):
+        _production_database_settings(
+            maintenance_database_url="postgresql+psycopg://bda_api:other@postgres/bda_v2"
+        )
+
+    assert _production_database_settings().maintenance_database_url is not None
+
+
+def test_production_migration_job_requires_owner_role() -> None:
+    with pytest.raises(ValidationError, match="maintenance_database_role"):
+        _production_database_settings(
+            require_maintenance_database_url=True,
+            maintenance_database_role=None,
+        )
+
+    assert _production_database_settings(
+        require_maintenance_database_url=True
+    ).maintenance_database_role == "bda_migrator"
+
+
 def test_production_readiness_requires_readable_evidence(tmp_path) -> None:
     evidence = tmp_path / "evidence.json"
     evidence.write_text("{}")

@@ -269,13 +269,18 @@ def publish_outbox(batch_size: int = 100) -> dict:
                 elif event.topic == "experiment_results.import":
                     args.append(bool(event.payload.get("dry_run")))
                 names = (subscribers,) if isinstance(subscribers, str) else subscribers
+                message_headers = (
+                    {"bda_project_id": str(event.payload["project_id"])}
+                    if event.payload.get("project_id")
+                    else None
+                )
                 for index, task_name in enumerate(names):
                     # The first subscriber keeps the event id, because an Operation
                     # row is keyed on it. Any further subscriber gets a task id
                     # derived from that same id, so redelivery of the event still
                     # deduplicates per subscriber instead of colliding between them.
                     task_id = str(event.id) if index == 0 else str(uuid.uuid5(event.id, task_name))
-                    celery_app.send_task(task_name, args=args, task_id=task_id)
+                    celery_app.send_task(task_name, args=args, task_id=task_id, headers=message_headers)
                 event.published_at = datetime.now(UTC)
                 operation = session.get(Operation, event.id)
                 if operation is not None and operation.status == "pending":

@@ -14,7 +14,7 @@ validator in `app/core/config.py`. Create it before installing:
 
 ```bash
 kubectl create secret generic bda-v2-secrets \
-  --from-literal=BDA_V2_DATABASE_URL='postgresql+psycopg://bda:PASSWORD@postgres:5432/bda_v2' \
+  --from-literal=BDA_V2_DATABASE_URL='postgresql+psycopg://bda_api_login:APP_PASSWORD@pgbouncer:5432/bda_v2' \
   --from-literal=BDA_V2_REDIS_URL='redis://:PASSWORD@redis:6379/0' \
   --from-literal=BDA_V2_CELERY_BROKER_URL='redis://:PASSWORD@redis:6379/1' \
   --from-literal=BDA_V2_JWT_SECRET='<32+ random characters>' \
@@ -29,9 +29,30 @@ kubectl create secret generic bda-v2-secrets \
   --from-literal=BDA_V2_OTEL_ENDPOINT='http://otel-collector:4318'
 ```
 
+The migration credential is deliberately a second secret mounted only by the ephemeral
+Alembic Job. API and worker pods must not be able to read it:
+
+```bash
+kubectl create secret generic bda-v2-migration \
+  --from-literal=BDA_V2_MAINTENANCE_DATABASE_URL='postgresql+psycopg://bda_migration_login:MIGRATION_PASSWORD@postgres:5432/bda_v2'
+
+kubectl create secret generic bda-v2-worker \
+  --from-literal=BDA_V2_DATABASE_URL='postgresql+psycopg://bda_worker_login:WORKER_PASSWORD@pgbouncer:5432/bda_v2'
+```
+
+`workerSecret` overrides only `BDA_V2_DATABASE_URL` in worker and Beat pods. The worker
+login is `NOBYPASSRLS`, owns no tables, and receives project scope through each operation;
+it is not the API login and never receives the migration credential.
+
+The migration Job sets `BDA_V2_MAINTENANCE_DATABASE_ROLE=bda_migrator`. Alembic executes
+`SET ROLE bda_migrator` before its first DDL statement, so migrated objects and default
+privileges belong to the stable NOLOGIN capability role instead of the rotating login.
+
 | Key | Required | Notes |
 | --- | --- | --- |
 | `BDA_V2_DATABASE_URL` | always | Must be `postgresql://` or `postgresql+psycopg://`. SQLite is rejected. |
+| `BDA_V2_MAINTENANCE_DATABASE_URL` | migration job | Direct PostgreSQL URL from `migrationSecret`. Its username must differ from the application URL. Alembic uses this URL; API/worker pods never receive the secret. |
+| `BDA_V2_MAINTENANCE_DATABASE_ROLE` | migration job | Stable NOLOGIN owner role. The chart sets this to `bda_migrator`; the migration login must be a member. |
 | `BDA_V2_REDIS_URL` | always | Celery result backend. |
 | `BDA_V2_CELERY_BROKER_URL` | always | Use a different database number from the result backend. |
 | `BDA_V2_JWT_SECRET` | production | At least 32 characters and must not contain `development`. |

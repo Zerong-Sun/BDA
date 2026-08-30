@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "org.bda.proteinmpnn",
+  "plugin_key": "ProteinMPNN",
+  "plugin_version": "1.0.0",
+  "display_name": "ProteinMPNN",
+  "command_template": "python \"$BDA_PLUGIN_ROOT/helper_scripts/parse_multiple_chains.py\" --input_path=\"$BDA_INPUT_DIR/pdb_path\" --output_path=\"$BDA_OUTPUT_DIR/parsed_pdbs.jsonl\"\npython \"$BDA_PLUGIN_ROOT/protein_mpnn_run.py\" --jsonl_path \"$BDA_OUTPUT_DIR/parsed_pdbs.jsonl\" --out_folder \"$BDA_OUTPUT_DIR\" --num_seq_per_target \"${num_seq_per_target:-5}\" --sampling_temp \"${sampling_temp:-0.2}\" --batch_size \"${batch_size:-1}\" --seed \"${seed:-37}\"",
+  "parameter_schema": {
+    "type": "object",
+    "properties": {
+      "num_seq_per_target": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 5},
+      "sampling_temp": {"type": "number", "minimum": 0.01, "maximum": 1.0, "default": 0.2},
+      "batch_size": {"type": "integer", "minimum": 1, "default": 1},
+      "seed": {"type": "integer", "minimum": 0, "default": 37}
+    }
+  },
+  "output_schema": {"schema_version": "1.0"},
+  "inputs": [
+    {"name": "pdb_path", "kind": "protein_structure", "accepts": ["backbone_set", "candidate_structure", "complex_structure", "target_structure"], "required": true, "multiple": true, "exclusive_group": "backbone_source"},
+    {"name": "jsonl_path", "kind": "params", "accepts": ["proteinmpnn_jsonl"], "required": true, "multiple": false, "exclusive_group": "backbone_source"},
+    {"name": "fixed_positions", "kind": "params", "accepts": ["fixed_positions"], "required": false, "multiple": false}
+  ],
+  "outputs": [
+    {"name": "sequence_set", "kind": "protein_sequence", "artifact_type": "sequence_set", "filename_glob": "**/*.fa*"},
+    {"name": "score_table", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "**/*.csv"}
+  ],
+  "resources": {"cpus": 1, "gpu": true, "gpu_count": 1, "walltime_minutes": 720},
+  "runtime": {"mode": "conda", "reference": "site://proteinmpnn/1.0.0", "image_digest": null, "setup": []},
+  "output_parser": null,
+  "input_adapter": null,
+  "checksum_sha256": "8802f699f33141028d118909af9c92cf9278614145499e33a95e745b9b8ac42c"
+}

@@ -23,13 +23,20 @@ from datetime import UTC, datetime
 from socket import gethostname
 
 from celery import Celery  # type: ignore[import-untyped]
-from celery.signals import heartbeat_sent, task_failure, task_prerun, task_success  # type: ignore[import-untyped]
+from celery.signals import (  # type: ignore[import-untyped]
+    heartbeat_sent,
+    task_failure,
+    task_postrun,
+    task_prerun,
+    task_success,
+)
 
 from ..module_registry import task_modules
 from .config import get_settings
 from .database import session_scope
 
 settings = get_settings()
+_worker_context_tokens: dict[str, object] = {}
 celery_app = Celery("bda-v2", broker=settings.celery_broker_url, backend=settings.redis_url)
 
 # Every module that registers a task. A worker imports these at startup, so no module
@@ -109,6 +116,27 @@ def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
             row.last_seen_at = datetime.now(UTC)
     except Exception:
         return
+
+
+@task_prerun.connect
+def _bind_operation_project(sender=None, task_id=None, **_kwargs) -> None:
+    from .database import bind_worker_project_context
+
+    headers = getattr(getattr(sender, "request", None), "headers", None) or {}
+    project_id = headers.get("bda_project_id") if isinstance(headers, dict) else None
+    if task_id is not None:
+        _worker_context_tokens[str(task_id)] = bind_worker_project_context(project_id)
+
+
+@task_postrun.connect
+def _reset_operation_project(task_id=None, **_kwargs) -> None:
+    from contextvars import Token
+
+    from .database import reset_worker_project_context
+
+    token = _worker_context_tokens.pop(str(task_id), None)
+    if isinstance(token, Token):
+        reset_worker_project_context(token)
 
 
 @task_prerun.connect

@@ -12,7 +12,9 @@ from alembic import context
 config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+settings = get_settings()
+database_url = settings.maintenance_database_url or settings.database_url
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
@@ -35,6 +37,14 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        if settings.maintenance_database_role:
+            quoted_role = connection.dialect.identifier_preparer.quote(settings.maintenance_database_role)
+            connection.exec_driver_sql(f"SET ROLE {quoted_role}")
+            # SET ROLE starts SQLAlchemy's autobegin transaction. Commit only that
+            # session switch before Alembic opens its managed migration transaction;
+            # otherwise a successful-looking run is rolled back when the connection
+            # closes because Alembic did not create the outer transaction.
+            connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():
             context.run_migrations()

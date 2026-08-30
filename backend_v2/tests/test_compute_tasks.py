@@ -4,6 +4,7 @@ import hashlib
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -344,6 +345,55 @@ def test_outbox_dispatch_poll_collect_cancel(task_database, monkeypatch) -> None
     ]
     assert tasks.collect_job.run(str(ids["job"]))["status"] == "succeeded"
     assert tasks.cancel_job.run(str(ids["job"]))["status"] == "ignored"
+
+
+def test_outbox_dispatch_carries_project_rls_header(task_database, monkeypatch) -> None:
+    factory, ids = task_database
+    with factory() as session:
+        session.add(
+            OutboxEvent(
+                topic="job.dispatch",
+                aggregate_id=ids["job"],
+                payload={"job_id": str(ids["job"]), "project_id": str(ids["project"])},
+            )
+        )
+        session.commit()
+
+    sent: list[dict] = []
+    monkeypatch.setattr(
+        tasks.celery_app,
+        "send_task",
+        lambda _name, **kwargs: sent.append(kwargs),
+    )
+
+    assert tasks.publish_outbox.run()["published"] == 1
+    assert sent[0]["headers"] == {"bda_project_id": str(ids["project"])}
+
+
+def test_celery_hooks_bind_and_reset_project_context(monkeypatch) -> None:
+    marker: ContextVar[str | None] = ContextVar("test_worker_project", default=None)
+    bound: list[object | None] = []
+
+    def bind(project_id):
+        bound.append(project_id)
+        return marker.set(str(project_id) if project_id else None)
+
+    def reset(token):
+        marker.reset(token)
+
+    monkeypatch.setattr("backend_v2.app.core.database.bind_worker_project_context", bind)
+    monkeypatch.setattr("backend_v2.app.core.database.reset_worker_project_context", reset)
+    task_id = str(uuid.uuid4())
+    sender = SimpleNamespace(
+        request=SimpleNamespace(headers={"bda_project_id": "project-from-message"})
+    )
+
+    celery_app_module._bind_operation_project(sender=sender, task_id=task_id)
+    assert bound == ["project-from-message"]
+    assert marker.get() == "project-from-message"
+
+    celery_app_module._reset_operation_project(task_id=task_id)
+    assert marker.get() is None
 
 
 def test_poll_failure_timeout_and_cancellation(task_database) -> None:

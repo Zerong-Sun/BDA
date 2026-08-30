@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+  # Stacked and release-branch PRs need the same gates as PRs aimed directly at main.
   pull_request:
-    branches: [main]
 
 # Least-privilege default token; jobs opt into more only if needed.
 permissions:
@@ -167,7 +167,7 @@ jobs:
         run: >-
           docker build -f backend_v2/Dockerfile
           --build-arg BDA_BUILD_REVISION=${GITHUB_SHA}
-          --build-arg BDA_SCHEMA_REVISION=0049_autopilot_formalization
+          --build-arg BDA_SCHEMA_REVISION=0051_worker_project_rls
           -t bda-backend-v2:ci .
       # The image ships without pip or setuptools. A library that reaches for pkg_resources
       # at import time would fail only at runtime, which no other step here would catch.
