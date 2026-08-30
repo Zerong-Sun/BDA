@@ -1,0 +1,314 @@
+import type { bundleEn } from './locales/en.bundle'
+
+type DeepString<T> = T extends string
+  ? string
+  : T extends Record<string, unknown>
+    ? { [K in keyof T]: DeepString<T[K]> }
+    : string
+
+type CoreTranslationDict = {
+  brand: string
+  demoMode: string
+  nav: {
+    projects: string
+    lab: string
+    workflow: string
+    candidates: string
+    results: string
+    research: string
+    timeline: string
+    faq: string
+  }
+  lab: {
+    title: string
+    subtitle: string
+    library: {
+      title: string
+      empty: string
+      add: string
+      importFasta: string
+      importPlaceholder: string
+      name: string
+      sequence: string
+      fingerprint: string
+      length: string
+      mass: string
+      extinction: string
+      origin: string
+      originDesign: string
+      originBench: string
+      goal: string
+      search: string
+      imported: string
+      duplicate: string
+      rejected: string
+      sequenceNotice: string
+    }
+    bench: {
+      title: string
+      concentration: string
+      a280: string
+      pathLength: string
+      cystines: string
+      reduced: string
+      oxidized: string
+      compute: string
+      units: string
+      value: string
+      from: string
+      to: string
+      molecularWeight: string
+      convert: string
+      dilution: string
+      stock: string
+      start: string
+      factor: string
+      steps: string
+      perWell: string
+      deadVolume: string
+      plan: string
+      step: string
+      bufferVolume: string
+      totalVolume: string
+    }
+    instruments: {
+      title: string
+      intro: string
+      instrument: string
+      bli: string
+      akta: string
+      enzyme: string
+      file: string
+      choose: string
+      analyse: string
+      uploading: string
+      analysing: string
+      candidate: string
+      candidateHint: string
+      sample: string
+      channel: string
+      tAssoc: string
+      tDissoc: string
+      subtractBackground: string
+      recorded: string
+      analysisVersion: string
+      sourceFile: string
+      kd: string
+      method: string
+      methodStandard: string
+      methodSplit: string
+      methodJoint: string
+      methodSteady: string
+      methodMixed: string
+      notConverged: string
+      sensorgrams: string
+      chromatogram: string
+      kinetics: string
+      peaks: string
+      peakApex: string
+      peakHeight: string
+      peakArea: string
+      peakWidth: string
+      well: string
+      rate: string
+      r2: string
+      wellCount: string
+      noPeaks: string
+      time: string
+      volume: string
+      minutes: string
+      response: string
+      absorbance: string
+    }
+  }
+  loop: {
+    research: string
+    experiments: string
+    workflow: string
+    candidates: string
+    results: string
+    faq: string
+  }
+  pipeline: {
+    eyebrow: string
+    stepOf: string
+    currentBadge: string
+    lockedHint: string
+    nextStep: string
+    continueTo: string
+    openStage: string
+    reviewStage: string
+    startHere: string
+    loopComplete: string
+    loopCompleteBody: string
+    startNextRound: string
+    selectProjectPrompt: string
+    home: string
+    help: string
+    workflowGuide: string
+    guide: string
+  }
+  common: {
+    loading: string
+    retry: string
+    openProject: string
+    newExperiment: string
+    project: string
+    selectProject: string
+    noWorkflowData: string
+  }
+  experiments: {
+    eyebrow: string
+    title: string
+    copilotTitle: string
+    copilotBody: string
+    planRoute: string
+    reviewCandidates: string
+    interpretResults: string
+    overview: {
+      activeProject: string
+      bindingPositives: string
+      computeAccess: string
+      nextAction: string
+    }
+    agent: {
+      planRoute: string
+      planRouteBody: string
+      adjustWorkflow: string
+      adjustWorkflowBody: string
+      interpretLab: string
+      interpretLabBody: string
+    }
+  }
+  workflow: {
+    addNode: string
+    startWorkflow: string
+    targetIntake: string
+    toggleCopilot: string
+    readOnly: string
+  }
+  pdbUpload: {
+    dropzone: string
+    hint: string
+    uploading: string
+    replace: string
+    replaceHint: string
+    invalidFile: string
+    uploadSuccess: string
+    uploadFallback: string
+    browseButton: string
+    replaceButton: string
+    fileInputLabel: string
+    uploadGroup: string
+    readOnly: string
+    uploadErrorTitle: string
+    uploadError: string
+  }
+  nodeBuilder: {
+    title: string
+    subtitle: string
+    modelCards: string
+    methodControls: string
+    previewCard: string
+    addButton: string
+    cancel: string
+    nodeNameLabel: string
+    nodeNamePlaceholder: string
+    noMethodsSelected: string
+    adding: string
+    cardEyebrow: string
+    cardTitle: string
+    pluginParameters: string
+    newMethodName: string
+    methodType: string
+    methodNote: string
+    createMethod: string
+    createMethodFailed: string
+    newMethodSection: string
+    selectedMethods: string
+    noModels: string
+    addCardButton: string
+    exclusiveWith: string
+    recommendedAfter: string
+    recommendedBefore: string
+    nameRequired: string
+    modelPluginFallback: string
+    methodOptions: Record<string, string>
+  }
+  candidates: {
+    eyebrow: string
+    title: string
+    exportCsv: string
+    viewLabResults: string
+    explain: string
+    predKd: string
+  }
+  results: {
+    eyebrow: string
+    title: string
+    preparePackage: string
+    disclaimer: string
+    interpret: string
+  }
+  settings: {
+    title: string
+    subtitle: string
+    description: string
+    operatingMode: string
+    applicationMode: string
+    applicationModeBody: string
+    demoMode: string
+    demoModeBody: string
+    connections: string
+    revalidate: string
+    appearance: string
+    theme: {
+      light: string
+      dark: string
+      system: string
+    }
+    cancel: string
+    save: string
+    testApi: string
+  }
+  projectLibrary: {
+    loading: string
+    selectNone: string
+    title: string
+    subtitle: string
+    searchPlaceholder: string
+    sortBy: string
+    sortRecent: string
+    sortStatus: string
+    sortName: string
+    filterStatus: string
+    filterAll: string
+    empty: string
+    emptyBody: string
+    createFirst: string
+    noResults: string
+    clearSearch: string
+    open: string
+    current: string
+    manage: string
+    moveToTrash: string
+    workspace: string
+    overviewEmpty: string
+    targetStructureTitle: string
+    targetStructureLoading: string
+    builtinSyncing: string
+    researchTargetsCount: string
+    pdbCount: string
+    referencesCount: string
+    claimsCount: string
+    researchAction: string
+    allStructures: string
+    syncFailed: string
+    packageUpdateAvailable: string
+    promptLabel: string
+    promptShowMore: string
+    promptShowLess: string
+  }
+}
+
+export type TranslationDict = CoreTranslationDict & DeepString<typeof bundleEn>

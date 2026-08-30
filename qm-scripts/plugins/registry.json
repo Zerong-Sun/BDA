@@ -1,0 +1,332 @@
+{
+  "schema_version": "bda-qm-plugin-cluster-profiles.v1",
+  "inventory_date": "2026-08-30",
+  "cluster": "SUSTech QM (IBM Spectrum LSF)",
+  "operation_rules": "docs/QM_CLUSTER_OPERATION_RULES.md",
+  "proof_policy": "Historical execution is recorded here, but it is current runtime proof only when the registry evidence contains the matching declaration fingerprint.",
+  "plugins": [
+    {
+      "plugin_key": "AlphaFold 3",
+      "slug": "alphafold3",
+      "versions": [
+        "3.0"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "alphafold3",
+      "example": "qm-scripts/library/examples/03-structure-prediction/alphafold3.json",
+      "runtime": "conda /share/apps/anaconda3/envs/alphafold3-v3.0.1; module purge; CUDA 12.6; XLA flags from the ModelPlugin runtime_setup",
+      "resources": "1 GPU, 8 CPU slots with ptile=8, walltime 1440 min; the eight slots match jackhmmer/nhmmer CPU flags",
+      "rules": [
+        "Run the data pipeline and inference as separate reviewed stages when MSA generation is required.",
+        "Do not keep a GPU reservation during a CPU-only data pipeline stage.",
+        "Record per-seed output completeness; an aggregate confidence file is not a substitute for every requested seed."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "AlphaFold2",
+      "slug": "alphafold2",
+      "versions": [
+        "2.3.0",
+        "2.3.2"
+      ],
+      "state": "mixed",
+      "submission_authorized": false,
+      "renderer": "qm_job",
+      "qm_job_model": "alphafold2",
+      "example": "qm-scripts/library/examples/03-structure-prediction/alphafold2.json",
+      "runtime": "The QM conda declaration 2.3.0 is disabled; 2.3.2 is a container placeholder. Use superfold for the installed QM AF2 wrapper.",
+      "resources": "The declared AF2 shape is 1 GPU and 8 CPU slots, but no direct QM submission is authorized from a placeholder declaration.",
+      "rules": [
+        "Do not submit the bda-placeholder container declaration to QM.",
+        "Use the superfold plugin for the installed monomer-PTM/initial-guess path.",
+        "A historical result labelled AlphaFold2 must identify the actual executable or wrapper before it is attributed to this plugin."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "APBS+PDB2PQR",
+      "slug": "apbs-pdb2pqr",
+      "versions": [
+        "conda-forge-2026-08"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "conda /work/bme-sunzr/.conda/envs/bda-tools",
+      "resources": "CPU only, 1 slot with ptile=1, 16 GB, walltime 240 min",
+      "rules": [
+        "PDB2PQR requires a full-atom structure; backbone-only input is rejected.",
+        "Keep PQR, APBS input, DX potential and summary outputs in BDA_OUTPUT_DIR.",
+        "Render through the workflow preview so the registered forcefield and staged structure port are visible before submission."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "BindCraft",
+      "slug": "bindcraft",
+      "versions": [
+        "2025.09"
+      ],
+      "state": "enabled_unobserved",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "bindcraft",
+      "example": "qm-scripts/library/examples/04-binder-design/bindcraft.json",
+      "runtime": "conda /work/bme-liz/miniconda3/envs/BindCraft",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 2880 min; no measured worker parallelism",
+      "rules": [
+        "Freeze target, filters and advanced JSON files together; they are one declaration.",
+        "Do not raise CPU slots without measured worker or thread parallelism.",
+        "Route B remains scientifically refuted even though the executable is installed."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "Boltz",
+      "slug": "boltz",
+      "versions": [
+        "2.x"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "boltz",
+      "example": "qm-scripts/library/examples/03-structure-prediction/boltz.json",
+      "runtime": "conda /work/bme-liz/miniconda3/envs/boltz; shared read-only CCD cache under /work/bme-liz/.boltz",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 1440 min; job 4167148 measured CPU peak 1.00",
+      "rules": [
+        "Compute nodes must use the shared cache and must not download model or CCD data.",
+        "Count every requested model and write run_complete only after output validation.",
+        "Boltz confidence is a gate, not an independent ranking signal for a design optimized by Boltz."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "Chai-1",
+      "slug": "chai1",
+      "versions": [
+        "0.6.1"
+      ],
+      "state": "disabled",
+      "submission_authorized": false,
+      "renderer": "qm_job",
+      "qm_job_model": "chai1",
+      "example": "qm-scripts/library/examples/03-structure-prediction/chai1.json",
+      "runtime": "The documented conda environment is unavailable; the catalog entry is marked unavailable.",
+      "resources": "No submission authorized; proposed shape is 1 GPU and 1 CPU slot only after installation validation.",
+      "rules": [
+        "Do not render or submit while the plugin and catalog entry are disabled.",
+        "After installation, validate the Python API wrapper against the installed Chai-1 version before a one-input smoke test.",
+        "A successful import is not runtime proof; verify requested samples and output files."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "DiffAb",
+      "slug": "diffab",
+      "versions": [
+        "1.0.0"
+      ],
+      "state": "disabled",
+      "submission_authorized": false,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "Container declaration only; no verified QM installation or image path is recorded.",
+      "resources": "No submission authorized until an installation and measured resource declaration exist.",
+      "rules": [
+        "Keep the plugin disabled until the QM executable or runnable container is verified.",
+        "First use must be a minimal antigen/antibody case with declared output counts.",
+        "Do not treat schema validation as installation proof."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "Foldseek",
+      "slug": "foldseek",
+      "versions": [
+        "conda-forge-2026-08"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "conda /work/bme-sunzr/.conda/envs/bda-tools; Foldseek 10.941cd33",
+      "resources": "CPU only, 8 slots with ptile=8, 16 GB, walltime 240 min; command must pass --threads $BDA_CPUS",
+      "rules": [
+        "Bind both query structures and the reviewed reference database.",
+        "Always pass --threads equal to the reserved BDA_CPUS; the program otherwise defaults to host nproc.",
+        "Collect and parse the hit table; command success without a hit table is not a valid run."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "Mask RGN",
+      "slug": "mask-rgn",
+      "versions": [
+        "experimental-0.1"
+      ],
+      "state": "disabled",
+      "submission_authorized": false,
+      "renderer": "qm_job",
+      "qm_job_model": "maskrgn",
+      "example": "qm-scripts/library/examples/02-sequence-design/maskrgn.json",
+      "runtime": "Local experimental container declaration; no verified QM installation.",
+      "resources": "No submission authorized until a QM runtime and measured resources are registered.",
+      "rules": [
+        "Keep disabled while the catalog entry is unavailable.",
+        "Pin model/data config and checkpoint identities before the first smoke test.",
+        "Verify output schema and requested sample count rather than relying on exit status."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "proteinhunter_boltz",
+      "slug": "proteinhunter-boltz",
+      "versions": [
+        "d4bd951-qm-c18-20260416-sampling"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "conda /work/bme-liz/miniconda3/envs/proteinhunter with LIGAND_MPNN_DIR=/work/bme-liz/software/LigandMPNN",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 1440 min",
+      "rules": [
+        "Use absolute shared CCD and Boltz model paths; compute nodes must not download into a home directory.",
+        "The removed seq option is not an input: this entrypoint does not consume it.",
+        "Record every design cycle and apply independent developability gates; internal Boltz confidence must not be used as the only ranker."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "ProteinMPNN",
+      "slug": "proteinmpnn",
+      "versions": [
+        "1.0.0",
+        "1.0.1"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "proteinmpnn",
+      "example": "qm-scripts/library/examples/02-sequence-design/proteinmpnn.json",
+      "runtime": "QM dispatch must prefer conda /work/bme-liz/miniconda3/envs/mlfold; the 1.0.1 bda-placeholder container is not a QM environment.",
+      "resources": "1 GPU, 1 CPU slot with ptile=1; QM conda declaration walltime 720 min",
+      "rules": [
+        "Stage exactly one backbone source: pdb_path or jsonl_path.",
+        "Constrained routes stage an immutable fixed_positions map and set requires_fixed_positions=true.",
+        "Record checkpoint hash, temperature, seed, chain assignment, sequence count and route-specific residue retention."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "RFdiffusion",
+      "slug": "rfdiffusion",
+      "versions": [
+        "1.1.0"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "rfdiffusion",
+      "example": "qm-scripts/library/examples/01-backbone-design/rfdiffusion-binder.json",
+      "runtime": "conda /work/bme-liz/miniconda3/envs/SE3nv-gpu; installed entrypoint under /work/bme-liz/software/RFdiffusion",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 1440 min",
+      "rules": [
+        "Resolve contigs, hotspot residues and checkpoint explicitly; preserve Hydra list quoting.",
+        "Input-dependent routes must stage and identity-check input_structure before execution.",
+        "Count only paired top-level PDB/TRB outputs as designs; trajectories are evidence, not candidates."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "RFdiffusion3",
+      "slug": "rfdiffusion3",
+      "versions": [
+        "foundry-2025-12-01"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "rfdiffusion3",
+      "example": null,
+      "runtime": "conda /work/bme-rongx/.conda/envs/foundry with FOUNDRY_CHECKPOINT_DIRS=/work/bme-rongx/.foundry/checkpoints",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 1440 min",
+      "rules": [
+        "Fail before execution when the Foundry environment or checkpoint directory is absent.",
+        "Use only installed rfd3 design override names; unknown keys may be ignored silently.",
+        "Verify conditioning from output geometry, not from a zero exit code."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "Rosetta",
+      "slug": "rosetta",
+      "versions": [
+        "2024.09",
+        "2026.06"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "qm_job",
+      "qm_job_model": "rosetta",
+      "example": "qm-scripts/library/examples/05-scoring-and-refinement/rosetta-interface.json",
+      "runtime": "QM dispatch must prefer /work/bme-liz/software/rosetta and serial .default.linuxgccrelease binaries; the 2026.06 container is a placeholder.",
+      "resources": "CPU only, 1 slot with ptile=1; memory/walltime depend on the selected registered version",
+      "rules": [
+        "Stage PDB/mmCIF inputs on port s and select the binary only through the application parameter.",
+        "The reviewed binary is non-MPI and must not request extra CPU slots without measured parallel work outside the binary.",
+        "Count decoys and score rows before run_complete; LSF Successfully completed is not sufficient."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "superfold",
+      "slug": "superfold",
+      "versions": [
+        "qm-20260803"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "direct script /work/bme-liz/software/superfold; deactivate conda and unset CONDA_DEFAULT_ENV",
+      "resources": "1 GPU, 1 CPU slot with ptile=1, walltime 720 min",
+      "rules": [
+        "Bind exactly one of structures or sequences; ProteinMPNN output uses sequences.",
+        "Never activate a conda environment: the installed wrapper rejects it.",
+        "Verify initial_guess, model selection and recycle count from independent log/output observations."
+      ],
+      "observations": []
+    },
+    {
+      "plugin_key": "US-align",
+      "slug": "us-align",
+      "versions": [
+        "20260527"
+      ],
+      "state": "enabled",
+      "submission_authorized": true,
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
+      "runtime": "direct script /work/bme-sunzr/software/USalign/USalign",
+      "resources": "CPU only, 1 slot with ptile=1, 4 GB, walltime 120 min",
+      "rules": [
+        "Use one explicit query/reference pair per invocation; do not pass the crashing empty -dir1 form.",
+        "Collect the pairwise TM-score table and identify which normalization is used.",
+        "Keep the job serial unless the workflow explicitly runs independent pairs outside the binary."
+      ],
+      "observations": []
+    }
+  ]
+}

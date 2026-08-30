@@ -1,0 +1,24 @@
+name: Public data gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Enforce the public data allowlist
+        run: python scripts/check_public_data.py
+      - name: Validate the server-side trust checksum
+        run: |
+          python -m pip install -e './backend_v2[dev]'
+          python -m pytest backend_v2/tests/test_bundled_research_package.py -q

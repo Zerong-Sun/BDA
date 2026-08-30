@@ -1,0 +1,15 @@
+# Overlay for running the compute worker on the host.
+#
+# The dispatch/poll/collect queues need a route to the compute cluster. On this
+# deployment that route is a host VPN, which a container's network namespace does not
+# inherit, so those queues are handed to a host process instead.
+#
+# Without this overlay both workers would consume the same queues and jobs would land on
+# whichever picked them up first - the containerised one failing with "no route to host".
+#
+#   docker-compose -f docker-compose.yml -f docker-compose.host-worker.yml up -d
+#   backend_v2/scripts/run-host-worker.sh
+services:
+  worker-v2:
+    # Keeps the queues that only need database, Redis and object storage.
+    command: celery -A backend_v2.app.compute.tasks.celery_app worker -Q maintenance --loglevel=info

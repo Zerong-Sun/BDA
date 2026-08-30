@@ -1,0 +1,9 @@
+BDA Workbench
+Copyright 2026 BDA contributors
+
+The software in this repository is licensed under Apache License 2.0.
+
+The PD1 demo dataset is a separate work licensed under Creative Commons
+Attribution 4.0 International (CC BY 4.0). It includes bibliographic metadata
+derived from the cited public sources and synthetic demonstration records.
+See DATA_LICENSE.md and examples/migration-fixtures/pd1/DATA_CARD.md.

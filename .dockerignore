@@ -1,0 +1,59 @@
+# Version control / CI
+.git
+.github
+.gitignore
+
+# Python caches & local envs
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.egg-info
+
+# Node / frontend build artifacts
+**/node_modules
+frontend/dist
+frontend/.vite
+frontend/.npm-cache
+
+# Local data, secrets, and artifacts (never bake into images)
+.env
+.env.*
+!.env.example
+backend/db/*.sqlite3*
+artifacts/uploads
+artifacts/structures
+backend
+protein-quest
+models
+deliverables
+data
+sample_data
+coverage.json
+backend_v2/coverage.json
+
+# Local VM / container runtime data
+.colima
+
+# Editor / OS noise
+.DS_Store
+.cursor
+.claude
+.playwright-cli
+.idea
+.vscode
+*.log
+
+# Docs & demo assets not needed at runtime
+docs
+fig
+backups
+examples
+monitoring
+qm-scripts
+alembic
+docker
+README*.md

@@ -1,0 +1,29 @@
+{
+  "description": "Predict a complex structure with Chai-1 from a FASTA input, using ESM embeddings and the hosted MSA server (no local databases needed).",
+  "model": "chai1",
+  "executable": "python",
+  "scheduler": {
+    "job_name": "chai1",
+    "queue": "gpu-bme-liz",
+    "cpus": 8,
+    "gpus": 1
+  },
+  "setup": [
+    "module purge",
+    "source activate /work/bme-sunzr/.conda/envs/chai1"
+  ],
+  "parameters": {
+    "fasta_file": "./input/complex.fasta",
+    "output_dir": "./output",
+    "use_esm_embeddings": true,
+    "use_msa_server": true,
+    "use_templates_server": false,
+    "num_trunk_recycles": 3,
+    "num_diffn_timesteps": 200,
+    "num_diffn_samples": 5,
+    "num_trunk_samples": 1,
+    "seed": 37,
+    "device": "cuda:0",
+    "low_memory": true
+  }
+}

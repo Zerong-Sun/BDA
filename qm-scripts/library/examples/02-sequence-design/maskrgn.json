@@ -1,0 +1,24 @@
+{
+  "description": "Redesign residues on a structure with the local MaskRGN model, keeping selected positions fixed. An alternative sequence-design route to ProteinMPNN.",
+  "model": "maskrgn",
+  "executable": "python /work/bme-sunzr/bda/models/maskrgnn_clean/inference.py",
+  "scheduler": {
+    "job_name": "maskrgn",
+    "queue": "8v100-32-sc",
+    "cpus": 8,
+    "gpus": 1
+  },
+  "setup": [
+    "module purge",
+    "module load cuda/12.4",
+    "source activate /work/bme-sunzr/.conda/envs/maskrgn"
+  ],
+  "parameters": {
+    "pdb_path": "./input/target.pdb",
+    "test_model.path": "/work/bme-sunzr/checkpoints/maskrgnn.pt",
+    "sample_num": 50,
+    "steps": 25,
+    "fixed_positions": "A:1-10",
+    "output_dir": "./output"
+  }
+}

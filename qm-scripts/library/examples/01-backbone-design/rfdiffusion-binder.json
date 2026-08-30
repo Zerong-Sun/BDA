@@ -1,0 +1,21 @@
+{
+  "description": "Generate de novo binder backbones against a target protein with RFdiffusion, guided by target hotspot residues. A good first example.",
+  "model": "rfdiffusion",
+  "executable": "/work/bme-liz/software/RFdiffusion/scripts/run_inference.py",
+  "scheduler": {
+    "job_name": "rfd-binder",
+    "queue": "4v100-16-e5",
+    "cpus": 1,
+    "gpus": 1
+  },
+  "setup": [
+    "source activate /work/bme-liz/miniconda3/envs/SE3nv-gpu"
+  ],
+  "parameters": {
+    "inference.input_pdb": "./input/target.pdb",
+    "contigmap.contigs": ["A1-150/0 70-100"],
+    "ppi.hotspot_res": ["A59", "A83", "A91"],
+    "inference.num_designs": 50,
+    "inference.output_prefix": "./output/binder"
+  }
+}

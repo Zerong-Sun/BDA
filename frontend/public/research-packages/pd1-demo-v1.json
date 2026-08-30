@@ -1,0 +1,1855 @@
+{
+  "package_id": "pd1-demo-v1",
+  "schema_version": "1.1",
+  "version": "1.0.0",
+  "as_of": "2026-08-30",
+  "title": {
+    "zh": "BDA PD-1 合成演示包",
+    "en": "BDA PD-1 synthetic demonstration package"
+  },
+  "description": {
+    "zh": "仅用于展示 BDA 工作流、证据关系和候选结构。候选、指标和结构夹具均为合成演示，不代表真实模型运行或实验结果。",
+    "en": "A synthetic package for demonstrating BDA workflows, evidence relations, and candidate structures. Candidates, metrics, and structure fixtures are not live model outputs or experimental results."
+  },
+  "projects": [
+    {
+      "id": "PD1",
+      "name": {
+        "zh": "PD-1/PD-L1结合与调控网络",
+        "en": "PD-1/PD-L1 binding and regulatory network"
+      },
+      "project_type": "checkpoint_protein_knowledge",
+      "summary": {
+        "zh": "PD-1/PD-L1/PD-L2、SHP-1/2、CD80、糖基化、抗体和神经感觉支路。",
+        "en": "PD-1/PD-L1/PD-L2, SHP-1/2, CD80, glycosylation, antibodies, and neuro-sensory branches."
+      },
+      "project_review": {
+        "zh": "# 项目综述：PD-1/PD-L1及相关结合与调控网络\n\n## 研究目标与决策问题\n\n本项目旨在建立从**细胞外结合界面—顺/反式配体可用性—PD-1 磷酸化与 SHP-2/SHP-1 信号—糖基化与抗体表位—免疫和神经感觉表型**的可追溯网络。当前主目标为 PD-1/PDCD1；核心设计问题不是“是否阻断 PD-1”，而是选择哪个界面、糖型、细胞类型和组织暴露，才能得到预期效应而不把免疫细胞机制错误外推到感觉神经元。\n\n项目优先回答：\n\n1. PD-L1、PD-L2、CD80 和治疗性抗体如何竞争或协同改变 PD-1 可用界面？\n2. 不同糖型是否改变真实亲和力、抗体检测结果或治疗表位，而非仅改变蛋白丰度？\n3. PD-1–SHP-2 经典免疫信号与所提出的 PD-1/SHP-1 神经信号是否由不同细胞和底物网络承担？\n4. 疼痛分支中究竟是神经元 PD-1 正向信号、神经元 PD-L1 反向信号，还是免疫/肿瘤负荷的间接效应？\n\n## 定义与边界\n\n核心实体为 PD-1/PDCD1、PD-L1/CD274、PD-L2/PDCD1LG2；扩展实体包括 SHP-1/PTPN6、SHP-2/PTPN11、CD80、糖基化/泛素化酶、抗体、肽、小分子及潜在神经元信号伙伴。将免疫细胞经典信号与神经元/胶质细胞证据分层，禁止从肿瘤免疫表达直接推断感觉神经元表达。\n\n## 时间线与结构—信号主线\n\nPD-1/PD-L1 和 PD-1/PD-L2 复合物结构确立 IgV 界面和不同配体识别特征（PDB 3BIK 等）。[36,37] PD-1 胞内 ITIM/ITSM 磷酸化后招募并激活 SHP-2 的多价机制得到生化/结构支持。[39] PD-L1 与 CD80 的 cis 互作会改变 trans 可用性和检查点网络解释。[40] N-糖基化影响抗体识别、稳定性与检测，抗体复合物结构为药物表位和逃逸提供证据。[41–44]\n\n## 网络矩阵\n\n| 层级 | 节点/关系 | 证据问题 | 干预 |\n|---|---|---|---|\n| 细胞外结合 | PD-1–PD-L1/PD-L2；PD-L1–CD80 cis | 物种、顺/反式、亲和力、糖型 | 抗体、可溶受体、阻断肽、小分子二聚诱导 |\n| 胞内信号 | pPD-1–SHP-2/SHP-1 | 磷酸位点、化学计量、细胞类型 | 磷酸酶/界面抑制、降解剂 |\n| 蛋白稳态 | 糖基化、泛素化、内吞 | 检测试剂是否受糖型偏倚 | 糖基化特异抗体、E3/去泛素酶调控 |\n| 神经感觉 | PD-L1–PD-1/SHP-1–NaV/TRPV1/TREK2；PD-L1反向信号 | 神经元PD-1表达归属存在冲突 | 肿瘤局部、神经元定向或界面选择性干预 |\n\n## 矛盾与疼痛交叉\n\n肿瘤模型显示 PD-L1 可抑制伤害感受器兴奋性并减轻癌痛，[9,10] 但后续研究未检测到神经元 PD-1，转而支持神经元 PD-L1 的反向信号。[11] 因此当前“PD-L1→神经元PD-1→SHP-1”只能标为受挑战模型；最优先实验不是继续做行为学，而是用 RNAscope、蛋白质组、遗传等位基因、细胞表面蛋白组和配体方向性构建区分 PD-1 正向与 PD-L1 反向信号。\n\n## 方法与质量控制\n\n结构/亲和力（SPR、晶体/冷冻电镜）→ 细胞表面原位互作（FRET/邻近标记）→ 磷酸化与磷酸酶活性→ 单细胞/空间表达→ 细胞特异遗传因果→ 肿瘤免疫与疼痛双终点。抗体研究必须记录克隆、表位、Fc、物种交叉反应和糖基化敏感性；神经元研究必须设置 Pdcd1/Cd274 敲除组织作为抗体特异性阴性对照。\n\n## 代表团队与文献锚点\n\n复合物结构以 Lin/Honjo/Garboczi、Lázár‑Molnár/Almo 和 Cheng/Davis 团队为锚点；PD‑1–SHP‑2 机制以 Marasco/Carlomagno 为锚点；PD‑L1–CD80 cis 以 Robinson/Sansom 等为锚点；糖基化抗体/表位以 Wang、Liu/Gao、Sun/Hung 等工作为锚点。[36–44] 疼痛分支以肿瘤伤害感受器研究与其后表达归属反证并列，而非按引用数决定共识。[9–11]\n\n## 下一步闸门\n\n- **进入界面设计：** 必须标注物种、糖型、顺/反式、亲和力方法和结构状态；单纯共表达不等同于直接结合。\n- **进入神经机制验证：** 用 `Pdcd1`/`Cd274` 遗传阴性组织验证抗体和表面蛋白，再做细胞特异双向上位性。\n- **进入动物干预：** 疼痛、肿瘤负荷和免疫浸润必须并行测量，局部/神经元定向暴露优先。\n- **停止条件：** 若药效只能由肿瘤缩小或免疫抑制解释，不能宣称为直接神经元镇痛机制。\n\n## 参考文献\n\n以下 12 条文献与本项目的研究目标、结构、机制声明或反证直接关联；编号与 References 页签及证据关系中的 `reference_ids` 一致。\n\nR009. PD-L1 inhibits acute and chronic pain by suppressing nociceptive neuron activity via PD-1.. (2017) · [PMID 28530662](https://pubmed.ncbi.nlm.nih.gov/28530662/) · [DOI 10.1038/nn.4571](https://doi.org/10.1038/nn.4571)\nR010. Inhibition of TRPV1 by SHP-1 in nociceptive primary sensory neurons is critical in PD-L1 analgesia.. (2020) · [PMID 32960817](https://pubmed.ncbi.nlm.nih.gov/32960817/) · [DOI 10.1172/jci.insight.137386](https://doi.org/10.1172/jci.insight.137386)\nR011. Neuronally expressed PDL1, not PD1, suppresses acute nociception.. (2022) · [PMID 36089217](https://pubmed.ncbi.nlm.nih.gov/36089217/) · [DOI 10.1016/j.bbi.2022.09.001](https://doi.org/10.1016/j.bbi.2022.09.001)\nR036. The PD-1/PD-L1 complex resembles the antigen-binding Fv domains of antibodies and T cell receptors.. (2008) · [PMID 18287011](https://pubmed.ncbi.nlm.nih.gov/18287011/) · [DOI 10.1073/pnas.0712278105](https://doi.org/10.1073/pnas.0712278105)\nR037. Crystal structure of the complex between programmed death-1 (PD-1) and its ligand PD-L2.. (2008) · [PMID 18641123](https://pubmed.ncbi.nlm.nih.gov/18641123/) · [DOI 10.1073/pnas.0804453105](https://doi.org/10.1073/pnas.0804453105)\nR038. Structure and interactions of the human programmed cell death 1 receptor.. (2013) · [PMID 23417675](https://pubmed.ncbi.nlm.nih.gov/23417675/) · [DOI 10.1074/jbc.m112.448126](https://doi.org/10.1074/jbc.m112.448126)\nR039. Molecular mechanism of SHP2 activation by PD-1 stimulation.. (2020) · [PMID 32064351](https://pubmed.ncbi.nlm.nih.gov/32064351/) · [DOI 10.1126/sciadv.aay4458](https://doi.org/10.1126/sciadv.aay4458)\nR040. Rigid, bivalent CTLA-4 binding to CD80 is required to disrupt the cis CD80/PD-L1 interaction.. (2024) · [PMID 39277860](https://pubmed.ncbi.nlm.nih.gov/39277860/) · [DOI 10.1016/j.celrep.2024.114768](https://doi.org/10.1016/j.celrep.2024.114768)\nR041. Identification of a monoclonal antibody that targets PD-1 in a manner requiring PD-1 Asn58 glycosylation.. (2019) · [PMID 31667366](https://pubmed.ncbi.nlm.nih.gov/31667366/) · [DOI 10.1038/s42003-019-0642-9](https://doi.org/10.1038/s42003-019-0642-9)\nR042. Variable PD-1 glycosylation modulates the activity of immune checkpoint inhibitors.. (2024) · [PMID 38176728](https://pubmed.ncbi.nlm.nih.gov/38176728/) · [DOI 10.26508/lsa.202302368](https://doi.org/10.26508/lsa.202302368)\nR043. N-glycosylation of PD-1 promotes binding of camrelizumab.. (2020) · [PMID 33063473](https://pubmed.ncbi.nlm.nih.gov/33063473/) · [DOI 10.15252/embr.202051444](https://doi.org/10.15252/embr.202051444)\nR044. Targeting Glycosylated PD-1 Induces Potent Antitumor Immunity.. (2020) · [PMID 32156778](https://pubmed.ncbi.nlm.nih.gov/32156778/) · [DOI 10.1158/0008-5472.can-19-3133](https://doi.org/10.1158/0008-5472.can-19-3133)\n",
+        "en": "# Project Review: PD-1/PD-L1 binding and regulation\n\n## Research objective and decisions\nThis project builds a traceable network from extracellular interfaces and cis/trans ligand availability through PD-1 phosphorylation, SHP-2/SHP-1 signaling, glycosylation and antibody epitopes to immune and sensory phenotypes. PD-1/PDCD1 is the primary target. The decision is not simply whether to block PD-1, but which interface, glycoform, cell type and exposure can produce the intended effect without projecting immune-cell mechanisms onto sensory neurons.\n\nPriority questions cover competition among PD-L1, PD-L2, CD80 and antibodies; glycoform effects on affinity versus detection; separation of canonical PD-1–SHP-2 immune signaling from proposed neuronal PD-1/SHP-1 signaling; and whether pain findings reflect neuronal PD-1 forward signaling, neuronal PD-L1 reverse signaling, or indirect immune/tumor effects.\n\n## Boundary\nCore entities are PD-1/PDCD1, PD-L1/CD274, and PD-L2/PDCD1LG2. The extended network includes SHP-1/PTPN6, SHP-2/PTPN11, CD80, glycosylation and ubiquitin enzymes, antibodies, peptides, small molecules, and proposed neuronal partners. Immune-cell evidence must not be projected onto sensory neurons without cell-specific validation.\n\n## Structure and signaling\nPD-1/PD-L1 and PD-1/PD-L2 structures define distinct IgV recognition interfaces [36,37]. Phosphorylated ITIM/ITSM motifs recruit and allosterically activate SHP-2 [39]. PD-L1–CD80 cis binding changes trans ligand availability [40]. Glycosylation affects stability and antibody recognition, while antibody complexes define therapeutic epitopes [41–44].\n\n## Pain intersection and uncertainty\nTumor PD-L1 has been reported to suppress nociceptor excitability through neuronal PD-1/SHP-1, whereas independent work did not detect neuronal PD-1 and proposed PD-L1 reverse signaling [9–11]. Directionality, antibody specificity, tumor burden, and immune effects require decisive genetic epistasis before causal claims or analgesic development.\n\n## Advancement gates\n- **Interface design:** record species, glycoform, cis/trans geometry, affinity method and structural state.\n- **Neural mechanism:** validate reagents in `Pdcd1`/`Cd274` genetic-negative tissue before cell-specific bidirectional epistasis.\n- **In vivo:** measure pain, tumor burden and immune infiltration together; prioritize local or neuron-directed exposure.\n- **Stop:** if tumor shrinkage or systemic immune suppression fully explains efficacy, do not claim direct neuronal analgesia.\n\n## References\n\nThese 12 sources directly support this project's objectives, structures, mechanism claims or counterevidence. IDs match the References tab and evidence `reference_ids`.\n\nR009. PD-L1 inhibits acute and chronic pain by suppressing nociceptive neuron activity via PD-1.. (2017) · [PMID 28530662](https://pubmed.ncbi.nlm.nih.gov/28530662/) · [DOI 10.1038/nn.4571](https://doi.org/10.1038/nn.4571)\nR010. Inhibition of TRPV1 by SHP-1 in nociceptive primary sensory neurons is critical in PD-L1 analgesia.. (2020) · [PMID 32960817](https://pubmed.ncbi.nlm.nih.gov/32960817/) · [DOI 10.1172/jci.insight.137386](https://doi.org/10.1172/jci.insight.137386)\nR011. Neuronally expressed PDL1, not PD1, suppresses acute nociception.. (2022) · [PMID 36089217](https://pubmed.ncbi.nlm.nih.gov/36089217/) · [DOI 10.1016/j.bbi.2022.09.001](https://doi.org/10.1016/j.bbi.2022.09.001)\nR036. The PD-1/PD-L1 complex resembles the antigen-binding Fv domains of antibodies and T cell receptors.. (2008) · [PMID 18287011](https://pubmed.ncbi.nlm.nih.gov/18287011/) · [DOI 10.1073/pnas.0712278105](https://doi.org/10.1073/pnas.0712278105)\nR037. Crystal structure of the complex between programmed death-1 (PD-1) and its ligand PD-L2.. (2008) · [PMID 18641123](https://pubmed.ncbi.nlm.nih.gov/18641123/) · [DOI 10.1073/pnas.0804453105](https://doi.org/10.1073/pnas.0804453105)\nR038. Structure and interactions of the human programmed cell death 1 receptor.. (2013) · [PMID 23417675](https://pubmed.ncbi.nlm.nih.gov/23417675/) · [DOI 10.1074/jbc.m112.448126](https://doi.org/10.1074/jbc.m112.448126)\nR039. Molecular mechanism of SHP2 activation by PD-1 stimulation.. (2020) · [PMID 32064351](https://pubmed.ncbi.nlm.nih.gov/32064351/) · [DOI 10.1126/sciadv.aay4458](https://doi.org/10.1126/sciadv.aay4458)\nR040. Rigid, bivalent CTLA-4 binding to CD80 is required to disrupt the cis CD80/PD-L1 interaction.. (2024) · [PMID 39277860](https://pubmed.ncbi.nlm.nih.gov/39277860/) · [DOI 10.1016/j.celrep.2024.114768](https://doi.org/10.1016/j.celrep.2024.114768)\nR041. Identification of a monoclonal antibody that targets PD-1 in a manner requiring PD-1 Asn58 glycosylation.. (2019) · [PMID 31667366](https://pubmed.ncbi.nlm.nih.gov/31667366/) · [DOI 10.1038/s42003-019-0642-9](https://doi.org/10.1038/s42003-019-0642-9)\nR042. Variable PD-1 glycosylation modulates the activity of immune checkpoint inhibitors.. (2024) · [PMID 38176728](https://pubmed.ncbi.nlm.nih.gov/38176728/) · [DOI 10.26508/lsa.202302368](https://doi.org/10.26508/lsa.202302368)\nR043. N-glycosylation of PD-1 promotes binding of camrelizumab.. (2020) · [PMID 33063473](https://pubmed.ncbi.nlm.nih.gov/33063473/) · [DOI 10.15252/embr.202051444](https://doi.org/10.15252/embr.202051444)\nR044. Targeting Glycosylated PD-1 Induces Potent Antitumor Immunity.. (2020) · [PMID 32156778](https://pubmed.ncbi.nlm.nih.gov/32156778/) · [DOI 10.1158/0008-5472.can-19-3133](https://doi.org/10.1158/0008-5472.can-19-3133)\n"
+      },
+      "primary_target": {
+        "name": {
+          "zh": "Programmed cell death protein 1",
+          "en": "Programmed cell death protein 1"
+        },
+        "gene": "PDCD1",
+        "uniprot": "Q15116",
+        "organism": "Homo sapiens",
+        "pdb_id": "3BIK"
+      },
+      "structures": [
+        {
+          "pdb_id": "3BIK",
+          "name": {
+            "zh": "PD-1/PD-L1复合物",
+            "en": "PD-1/PD-L1 complex"
+          },
+          "method": "X-ray",
+          "resolution": 2.65,
+          "role": {
+            "zh": "经典IgV结合界面",
+            "en": "Canonical IgV binding interface"
+          },
+          "reference_id": "R036",
+          "url": "https://files.rcsb.org/download/3BIK.cif",
+          "rcsb_url": "https://www.rcsb.org/structure/3BIK"
+        },
+        {
+          "pdb_id": "3BP5",
+          "name": {
+            "zh": "PD-1/PD-L2复合物",
+            "en": "PD-1/PD-L2 complex"
+          },
+          "method": "X-ray",
+          "resolution": 1.8,
+          "role": {
+            "zh": "配体特异性识别",
+            "en": "Ligand-specific recognition"
+          },
+          "reference_id": "R037",
+          "url": "https://files.rcsb.org/download/3BP5.cif",
+          "rcsb_url": "https://www.rcsb.org/structure/3BP5"
+        },
+        {
+          "pdb_id": "5IUS",
+          "name": {
+            "zh": "PD-L1/高亲和力PD-1复合物",
+            "en": "PD-L1/high-affinity PD-1 complex"
+          },
+          "method": "X-ray",
+          "resolution": 2.889,
+          "role": {
+            "zh": "工程化亲和力界面",
+            "en": "Engineered affinity interface"
+          },
+          "reference_id": "R038",
+          "url": "https://files.rcsb.org/download/5IUS.cif",
+          "rcsb_url": "https://www.rcsb.org/structure/5IUS"
+        },
+        {
+          "pdb_id": "6JBT",
+          "name": {
+            "zh": "PD-1/特瑞普利单抗Fab复合物",
+            "en": "PD-1/toripalimab Fab complex"
+          },
+          "method": "X-ray",
+          "resolution": 2.47,
+          "role": {
+            "zh": "治疗性抗体表位",
+            "en": "Therapeutic antibody epitope"
+          },
+          "reference_id": "R043",
+          "url": "https://files.rcsb.org/download/6JBT.cif",
+          "rcsb_url": "https://www.rcsb.org/structure/6JBT"
+        }
+      ]
+    }
+  ],
+  "methods": {
+    "zh": "# 证据方法与可复现性约定\n\n本约定适用于本研究包的全部四个项目（CANN、INSECT、PD1、PAIN）。项目专属的实验或设计方法在各自项目下另行给出，本文件只规定所有项目共享的证据模型、分级、可追溯性和记录要求。\n\n## 1. 证据分层\n\n每条知识关系必须标注为下列四类之一，不允许合并或省略：\n\n| 层级 | 含义 | 典型来源 |\n|---|---|---|\n| 既定事实 | 多来源可复现、方法充分披露 | 结构、遗传学、经独立复现的药理 |\n| 证据支持的推断 | 由可靠数据外推，方向明确但未直接测定 | 同源类比、跨模型一致性 |\n| 假说 | 机制合理但缺关键实验 | 仅对接结果、仅相关性、仅表达谱 |\n| 反证 | 与主张相反或使其失效的证据 | 阴性复现、撤稿、方向相反的模型 |\n\n反证与撤稿必须保留在库内并显式链接，不得删除或降级为脚注。仅有对接或高浓度非特异结合的主张固定为假说层，不得因反复引用而升级。\n\n## 2. 可追溯性\n\n- 每条关系记录主语、谓语、宾语、上下文、证据分级、`ref_id` 与可点击的 `source_url`；缺任一项即不入库。\n- 每条参考文献需核验标题、作者、年份、期刊、DOI、PMID/PMCID、撤稿状态与可访问全文链接，并记录核验状态。\n- 结构条目记录 PDB 编号、方法、分辨率、所代表的构象态与对应文献，预测结构必须标明模型来源与置信度，不得与实验结构混列。\n- 标识符（基因、UniProt、NCBI、Ensembl）由权威库解析并记录解析状态，不接受手工推断。\n\n## 3. 计量口径\n\n文献计量必须报告同一检索式、同一截止日期下的历史总量与近五年量，并与检索日志中的查询一一对应。零命中只能表述为“在该口径下未检索到”，不得表述为“从未被研究”。专利计数需专用数据库，缺失时标注为 NA 而非 0。\n\n## 4. 候选评分\n\n候选按证据、新颖性、可操作性、人体相关性、特异性、安全性六轴以 25/25/20/15/10/5 加权。分值是研究优先级的先验，不是临床成功概率；每次数据更新后由脚本重算，人工不得直接改写加权分。同一项目内候选必须机制上互不重复。\n\n## 5. 推进闸门\n\n- **闸门 1 人体相关性：** 有痛/无痛或有效/无效的疾病对照、组织定位与严重度匹配；预期细胞群不被支持则暂停。\n- **闸门 2 分子机制：** 直接结合、占据度、酶活或电生理，且带靶点缺失对照。\n- **闸门 3 细胞与体系因果：** 细胞特异或投射特异扰动配合生理读出，排除间接效应。\n- **闸门 4 干预与安全窗：** 暴露–占据–效应链条打通，并覆盖脱靶、耐受与可逆性终点。\n- **停止条件：** 靶点缺失背景下效应仍存在；方向性回补失败；上游负荷变化足以解释表型；证据仅为对接或非特异结合；论证依赖已撤稿文献。\n\n## 6. 预先声明与否定性结果\n\n每个阶段在执行前写明：主要读出、样本量、随机化与盲法安排、排除标准，以及**会推翻当前机制的否定性结果**。写不出否定性结果的实验不予立项。涉及在体行为的研究须雌雄双性并分别计算效能。\n\n## 7. 记录要求\n\n每条记录长期保留：物种与品系、性别、组织与细胞类型、疾病模型与严重度、样本量、方法与仪器、试剂批次与构建体、软件与权重版本、执行日期、包版本、证据分级与审核状态。版本更新时保留历史版本而非覆盖，以便复算与追责。\n",
+    "en": "# Evidence methods and reproducibility contract\n\nThis contract applies to all four projects in the package (CANN, INSECT, PD1, PAIN). Project-specific experimental or design methods are documented under each project; this file fixes only the evidence model, grading, traceability, and record-keeping that every project shares.\n\n## 1. Evidence stratification\n\nEvery knowledge relation must carry exactly one of four levels. Merging or omitting the level is not permitted:\n\n| Level | Meaning | Typical source |\n|---|---|---|\n| Established fact | Reproducible across sources with methods fully disclosed | Structures, genetics, independently replicated pharmacology |\n| Evidence-based inference | Extrapolated from reliable data; direction is clear but not directly measured | Homology arguments, cross-model consistency |\n| Hypothesis | Mechanistically plausible but missing the decisive experiment | Docking only, correlation only, expression only |\n| Counterevidence | Evidence that contradicts or invalidates a claim | Failed replication, retraction, opposite direction in a model |\n\nCounterevidence and retractions stay in the database and are linked explicitly — never deleted or demoted to a footnote. Claims supported only by docking or by nonspecific high-concentration binding are pinned at the hypothesis level and are not promoted by citation frequency.\n\n## 2. Traceability\n\n- Every relation records subject, predicate, object, context, evidence grade, `ref_id`, and a clickable `source_url`. A relation missing any of these is not admitted.\n- Every reference is verified for title, authors, year, journal, DOI, PMID/PMCID, retraction status, and an accessible full-text link, and the verification status is stored.\n- Structure entries record PDB ID, method, resolution, the conformational state represented, and the corresponding reference. Predicted structures must declare the model source and confidence and are never listed alongside experimental coordinates as equivalents.\n- Identifiers (gene, UniProt, NCBI, Ensembl) are resolved against the authoritative databases with the resolution status recorded; manual inference is not accepted.\n\n## 3. Counting conventions\n\nBibliometric claims must report historical and recent-five-year counts under the same query and the same cutoff date, each traceable to an entry in the search log. Zero hits may only be described as \"not retrieved under this query\", never as \"never studied\". Patent counts require a dedicated database; where unavailable they are marked NA, not 0.\n\n## 4. Candidate scoring\n\nCandidates are scored on six axes — evidence, novelty, tractability, human relevance, specificity, safety — with 25/25/20/15/10/5 weights. Scores are research priors for prioritization, not probabilities of clinical success. They are recomputed by script after every data update; the weighted score is never hand-edited. Within a project, candidates must be mechanistically non-duplicated.\n\n## 5. Advancement gates\n\n- **Gate 1 — Human relevance:** disease controls (painful versus painless, responder versus non-responder), tissue localization, severity matching; pause if the expected cell population is not supported.\n- **Gate 2 — Molecular mechanism:** direct binding, occupancy, enzyme activity, or electrophysiology with a target-null control.\n- **Gate 3 — Cellular and systems causality:** cell-specific or projection-specific perturbation with a physiological readout, excluding indirect effects.\n- **Gate 4 — Intervention and safety window:** exposure–occupancy–effect linkage plus off-target, tolerance, and reversibility endpoints.\n- **Stop:** the effect persists in target-null models; directional rescue fails; a change in upstream burden fully explains the phenotype; the evidence is docking-only or nonspecific binding; the argument depends on a retracted paper.\n\n## 6. Pre-declaration and negative results\n\nBefore execution, each stage states its primary readout, sample size, randomization and blinding plan, exclusion criteria, and **the negative result that would overturn the current mechanism**. An experiment whose negative result cannot be written down is not started. In vivo behavioral work uses both sexes, powered separately.\n\n## 7. Record requirements\n\nEach record retains, for the long term: species and strain, sex, tissue and cell type, disease model and severity, sample size, method and instrument, reagent lot and construct, software and weight versions, execution date, package version, evidence grade, and review status. Updates add a version rather than overwriting one, so results stay recomputable and attributable.\n"
+  },
+  "search_strategy": {
+    "zh": "# 检索、筛选与更新规范（v1.0）\n\n## 范围与日期\n\n- 数据库建库日期：2026-07-19；时间范围：各数据库建库至该日。\n- 机器可复现入口：Europe PMC REST API；引用元数据以 PMID/DOI 精确查询核验。\n- 人工复核入口：PubMed、PMC、期刊全文、RCSB PDB、UniProt、ClinicalTrials.gov；专利建议在 Lens、Espacenet 或 Derwent 中执行相同概念组检索。\n- 本交付是“可复现证据基线”，不是已完成的全量系统综述。`search_log.csv` 的 hit count 是高召回原始结果，尚未去重或逐条筛选。\n\n## 统一概念组\n\n1. 对象：标准名、基因名、常用别名、家族名。\n2. 结合/机制：bind*、interact*、receptor、carrier、structure、domain、mutation、PTM、signaling。\n3. 疼痛：pain、nocicep*、allodynia、hyperalgesia、neuralgia，以及疾病专名。\n4. 细胞/解剖：astrocyte、microglia、macrophage、nociceptor、DRG、trigeminal ganglion、spinal cord、ACC 等。\n\n## 三项目检索式\n\n完整、机器执行过的 Europe PMC 检索式及 URL 位于 `search_log.csv`。迁移到 PubMed 时使用相同概念组并将 `TITLE_ABS:` 转为 `[Title/Abstract]`；结构数据库增加 PDB ID/蛋白名；专利增加 CPC A61K/A61P/C07K/C12N 过滤；临床试验使用靶点别名 AND 疼痛/适应症。\n\n## 候选文献计量\n\n`../data/bibliometrics.csv` 对每个候选和五个经典基准靶点执行同一检索：\n\n`(TARGET_ALIASES) AND (pain OR nocicep* OR allodynia OR hyperalgesia OR neuralgia)`\n\n- 历史计数：数据库建库至 2026-07-19。\n- 近5年：2021-07-19 至 2026-07-19。\n- 综述：在同一查询后加 `PUB_TYPE:review`。\n- 临床试验：ClinicalTrials.gov API v2，`\"target\" AND (pain OR nociception OR neuralgia)`；结果可能含同名歧义，零结果只能表述为“该式未检出”。\n- 专利：未在本包中给出伪精确计数；字段为 `NA/not_counted_without_dedicated_patent_database`，并提供应执行的查询策略。\n\n## 纳入/排除\n\n纳入：有可核验 PMID/DOI/数据库编号；明确研究对象与实验条件；提供结合、表达、因果、结构、药理或临床证据；疼痛候选至少有直接疼痛证据或清楚标为待验证的跨领域推断。排除：仅数据库预测且无验证；无法核验元数据；撤稿论文作为正向证据；相关性被写成因果；无法区分同名基因/蛋白；无实验条件的二手转述。\n\n## PRISMA式状态\n\n当前阶段为“识别 + 种子证据核验”：6条项目级高召回查询已执行；44条关键种子论文元数据已核验；44条进入机制关系清单；0条元数据冲突。尚未完成所有原始结果的去重、双人题录筛选和全文排除，因此不能给出传统 PRISMA 的最终纳入数。后续每条题录应进入 `screening_record`，记录阶段、决定、排除原因、复核人和日期；“未纳入但可能相关”应导出为单独 CSV，而非删除。\n\n## 更新节奏\n\n- 每月：重跑 API，增量抓取新增 PMID/DOI。\n- 每季度：复核撤稿/更正、PDB/UniProt/ClinicalTrials.gov 状态。\n- 每半年：双人复核候选评分、专利族和安全性信号。\n- 版本规则：字段变化升主版本；证据增量升次版本；纯元数据修正升修订版本。\n",
+    "en": "# Search and update strategy\n\nSearch PubMed/Europe PMC, Crossref, UniProt, RCSB PDB, ChEMBL, patents, and clinical-trial registries with versioned, project-specific queries. Record the exact query, database, date range, execution date, hit count, screening decision, exclusion reason, and package version. Verify title, authors, year, DOI, PMID/PMCID, retraction status, and accessible full-text links. Separate established facts, evidence-based inferences, hypotheses, and counterevidence. Literature-density claims must report historical and recent-five-year counts under the same query and cutoff date; zero hits must not be described as never studied."
+  },
+  "database_schema": {
+    "zh": "PRAGMA foreign_keys = ON;\n\nCREATE TABLE project (\n  project_id TEXT PRIMARY KEY, name TEXT NOT NULL, scope_note TEXT NOT NULL,\n  review_version TEXT NOT NULL, as_of_date TEXT NOT NULL\n);\nCREATE TABLE entity (\n  entity_id TEXT PRIMARY KEY, entity_type TEXT NOT NULL,\n  standard_name TEXT NOT NULL, organism_taxid INTEGER, description TEXT,\n  UNIQUE(entity_type, standard_name, organism_taxid)\n);\nCREATE TABLE entity_synonym (\n  entity_id TEXT NOT NULL REFERENCES entity(entity_id), synonym TEXT NOT NULL,\n  synonym_type TEXT, PRIMARY KEY(entity_id, synonym)\n);\nCREATE TABLE entity_identifier (\n  entity_id TEXT NOT NULL REFERENCES entity(entity_id), namespace TEXT NOT NULL,\n  identifier TEXT NOT NULL, version TEXT, url TEXT,\n  PRIMARY KEY(entity_id, namespace, identifier)\n);\nCREATE TABLE context (\n  context_id TEXT PRIMARY KEY, species_taxid INTEGER, tissue TEXT, cell_type TEXT,\n  brain_region TEXT, peripheral_ganglion TEXT, disease TEXT, pain_type TEXT,\n  model TEXT, sex TEXT, age TEXT, experimental_condition TEXT\n);\nCREATE TABLE source_document (\n  source_id TEXT PRIMARY KEY, document_type TEXT NOT NULL,\n  title TEXT NOT NULL, authors TEXT, journal TEXT, publication_year INTEGER,\n  doi TEXT, pmid TEXT, pmcid TEXT, dataset_accession TEXT, patent_id TEXT,\n  clinical_trial_id TEXT, canonical_url TEXT, open_access_status TEXT,\n  metadata_verification TEXT NOT NULL, checked_at TEXT NOT NULL\n);\nCREATE TABLE evidence_record (\n  evidence_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES source_document(source_id),\n  evidence_type TEXT NOT NULL, method TEXT, assay TEXT, sample_size TEXT,\n  effect_direction TEXT, result_summary TEXT NOT NULL, quote_or_locator TEXT,\n  evidence_grade TEXT NOT NULL CHECK(evidence_grade IN ('A','B','C','D')),\n  assertion_class TEXT NOT NULL CHECK(assertion_class IN ('established_fact','evidence_based_inference','hypothesis','counterevidence')),\n  context_id TEXT REFERENCES context(context_id), curator TEXT,\n  entered_at TEXT NOT NULL, database_version TEXT NOT NULL\n);\nCREATE TABLE claim (\n  claim_id TEXT PRIMARY KEY, subject_id TEXT NOT NULL REFERENCES entity(entity_id),\n  predicate TEXT NOT NULL, object_id TEXT NOT NULL REFERENCES entity(entity_id),\n  direction TEXT, context_id TEXT REFERENCES context(context_id),\n  assertion_class TEXT NOT NULL, claim_text TEXT NOT NULL, status TEXT NOT NULL\n);\nCREATE TABLE claim_evidence (\n  claim_id TEXT NOT NULL REFERENCES claim(claim_id),\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id),\n  support_role TEXT NOT NULL CHECK(support_role IN ('supports','contradicts','qualifies')),\n  PRIMARY KEY(claim_id,evidence_id)\n);\nCREATE TABLE interaction (\n  interaction_id TEXT PRIMARY KEY, participant_a TEXT NOT NULL REFERENCES entity(entity_id),\n  participant_b TEXT NOT NULL REFERENCES entity(entity_id), interaction_type TEXT NOT NULL,\n  binding_site TEXT, affinity_value REAL, affinity_unit TEXT,\n  context_id TEXT REFERENCES context(context_id), claim_id TEXT NOT NULL REFERENCES claim(claim_id)\n);\nCREATE TABLE structure_domain (\n  structure_id TEXT PRIMARY KEY, entity_id TEXT NOT NULL REFERENCES entity(entity_id),\n  pdb_id TEXT, domain_name TEXT, residues TEXT, method TEXT, resolution_angstrom REAL,\n  source_id TEXT REFERENCES source_document(source_id)\n);\nCREATE TABLE mutation_ptm (\n  modification_id TEXT PRIMARY KEY, entity_id TEXT NOT NULL REFERENCES entity(entity_id),\n  modification_type TEXT NOT NULL, residue TEXT, functional_effect TEXT,\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE assay_sample (\n  assay_sample_id TEXT PRIMARY KEY, assay_type TEXT NOT NULL, readout TEXT,\n  sample_type TEXT, sample_size TEXT, context_id TEXT REFERENCES context(context_id),\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE intervention (\n  intervention_id TEXT PRIMARY KEY, name TEXT NOT NULL, intervention_type TEXT NOT NULL,\n  target_entity_id TEXT REFERENCES entity(entity_id), mechanism TEXT,\n  route TEXT, safety_toxicity TEXT, development_stage TEXT,\n  evidence_id TEXT REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE neural_circuit (\n  circuit_id TEXT PRIMARY KEY, name TEXT NOT NULL, input_region TEXT,\n  output_region TEXT, cell_population TEXT, phenotype TEXT,\n  evidence_id TEXT REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE review_search (\n  search_id TEXT PRIMARY KEY, project_id TEXT REFERENCES project(project_id),\n  database_name TEXT NOT NULL, query_text TEXT NOT NULL, date_start TEXT,\n  date_end TEXT, executed_at TEXT NOT NULL, hit_count INTEGER,\n  export_path TEXT, notes TEXT\n);\nCREATE TABLE screening_record (\n  screening_id TEXT PRIMARY KEY, search_id TEXT REFERENCES review_search(search_id),\n  source_id TEXT REFERENCES source_document(source_id), stage TEXT NOT NULL,\n  decision TEXT NOT NULL, exclusion_reason TEXT, reviewer TEXT, decided_at TEXT\n);\nCREATE TABLE candidate (\n  candidate_id TEXT PRIMARY KEY, pain_group TEXT NOT NULL, target_name TEXT NOT NULL UNIQUE,\n  gene_symbol TEXT NOT NULL, mechanism_axis TEXT NOT NULL, development_status TEXT,\n  evidence_gap TEXT, falsification_test TEXT\n);\nCREATE TABLE candidate_score (\n  candidate_id TEXT PRIMARY KEY REFERENCES candidate(candidate_id),\n  mechanism_evidence REAL NOT NULL, novelty_sparsity REAL NOT NULL,\n  tractability REAL NOT NULL, human_relevance REAL NOT NULL,\n  cell_circuit_specificity REAL NOT NULL, safety_window REAL NOT NULL,\n  weighted_score REAL NOT NULL, scored_at TEXT NOT NULL, rubric_version TEXT NOT NULL\n);\n\nCREATE VIEW traceable_graph_edges AS\nSELECT c.claim_id, s.standard_name AS subject, c.predicate, o.standard_name AS object,\n       c.assertion_class, e.evidence_id, ce.support_role, d.doi, d.pmid, d.canonical_url\nFROM claim c JOIN entity s ON s.entity_id=c.subject_id\nJOIN entity o ON o.entity_id=c.object_id\nJOIN claim_evidence ce ON ce.claim_id=c.claim_id\nJOIN evidence_record e ON e.evidence_id=ce.evidence_id\nJOIN source_document d ON d.source_id=e.source_id;\n\nCREATE TRIGGER claim_requires_valid_entities BEFORE INSERT ON claim\nBEGIN\n  SELECT CASE WHEN NEW.subject_id=NEW.object_id AND NEW.predicate NOT IN ('self_associates','same_as')\n    THEN RAISE(ABORT,'self-edge requires an explicit self predicate') END;\nEND;\n",
+    "en": "PRAGMA foreign_keys = ON;\n\nCREATE TABLE project (\n  project_id TEXT PRIMARY KEY, name TEXT NOT NULL, scope_note TEXT NOT NULL,\n  review_version TEXT NOT NULL, as_of_date TEXT NOT NULL\n);\nCREATE TABLE entity (\n  entity_id TEXT PRIMARY KEY, entity_type TEXT NOT NULL,\n  standard_name TEXT NOT NULL, organism_taxid INTEGER, description TEXT,\n  UNIQUE(entity_type, standard_name, organism_taxid)\n);\nCREATE TABLE entity_synonym (\n  entity_id TEXT NOT NULL REFERENCES entity(entity_id), synonym TEXT NOT NULL,\n  synonym_type TEXT, PRIMARY KEY(entity_id, synonym)\n);\nCREATE TABLE entity_identifier (\n  entity_id TEXT NOT NULL REFERENCES entity(entity_id), namespace TEXT NOT NULL,\n  identifier TEXT NOT NULL, version TEXT, url TEXT,\n  PRIMARY KEY(entity_id, namespace, identifier)\n);\nCREATE TABLE context (\n  context_id TEXT PRIMARY KEY, species_taxid INTEGER, tissue TEXT, cell_type TEXT,\n  brain_region TEXT, peripheral_ganglion TEXT, disease TEXT, pain_type TEXT,\n  model TEXT, sex TEXT, age TEXT, experimental_condition TEXT\n);\nCREATE TABLE source_document (\n  source_id TEXT PRIMARY KEY, document_type TEXT NOT NULL,\n  title TEXT NOT NULL, authors TEXT, journal TEXT, publication_year INTEGER,\n  doi TEXT, pmid TEXT, pmcid TEXT, dataset_accession TEXT, patent_id TEXT,\n  clinical_trial_id TEXT, canonical_url TEXT, open_access_status TEXT,\n  metadata_verification TEXT NOT NULL, checked_at TEXT NOT NULL\n);\nCREATE TABLE evidence_record (\n  evidence_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES source_document(source_id),\n  evidence_type TEXT NOT NULL, method TEXT, assay TEXT, sample_size TEXT,\n  effect_direction TEXT, result_summary TEXT NOT NULL, quote_or_locator TEXT,\n  evidence_grade TEXT NOT NULL CHECK(evidence_grade IN ('A','B','C','D')),\n  assertion_class TEXT NOT NULL CHECK(assertion_class IN ('established_fact','evidence_based_inference','hypothesis','counterevidence')),\n  context_id TEXT REFERENCES context(context_id), curator TEXT,\n  entered_at TEXT NOT NULL, database_version TEXT NOT NULL\n);\nCREATE TABLE claim (\n  claim_id TEXT PRIMARY KEY, subject_id TEXT NOT NULL REFERENCES entity(entity_id),\n  predicate TEXT NOT NULL, object_id TEXT NOT NULL REFERENCES entity(entity_id),\n  direction TEXT, context_id TEXT REFERENCES context(context_id),\n  assertion_class TEXT NOT NULL, claim_text TEXT NOT NULL, status TEXT NOT NULL\n);\nCREATE TABLE claim_evidence (\n  claim_id TEXT NOT NULL REFERENCES claim(claim_id),\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id),\n  support_role TEXT NOT NULL CHECK(support_role IN ('supports','contradicts','qualifies')),\n  PRIMARY KEY(claim_id,evidence_id)\n);\nCREATE TABLE interaction (\n  interaction_id TEXT PRIMARY KEY, participant_a TEXT NOT NULL REFERENCES entity(entity_id),\n  participant_b TEXT NOT NULL REFERENCES entity(entity_id), interaction_type TEXT NOT NULL,\n  binding_site TEXT, affinity_value REAL, affinity_unit TEXT,\n  context_id TEXT REFERENCES context(context_id), claim_id TEXT NOT NULL REFERENCES claim(claim_id)\n);\nCREATE TABLE structure_domain (\n  structure_id TEXT PRIMARY KEY, entity_id TEXT NOT NULL REFERENCES entity(entity_id),\n  pdb_id TEXT, domain_name TEXT, residues TEXT, method TEXT, resolution_angstrom REAL,\n  source_id TEXT REFERENCES source_document(source_id)\n);\nCREATE TABLE mutation_ptm (\n  modification_id TEXT PRIMARY KEY, entity_id TEXT NOT NULL REFERENCES entity(entity_id),\n  modification_type TEXT NOT NULL, residue TEXT, functional_effect TEXT,\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE assay_sample (\n  assay_sample_id TEXT PRIMARY KEY, assay_type TEXT NOT NULL, readout TEXT,\n  sample_type TEXT, sample_size TEXT, context_id TEXT REFERENCES context(context_id),\n  evidence_id TEXT NOT NULL REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE intervention (\n  intervention_id TEXT PRIMARY KEY, name TEXT NOT NULL, intervention_type TEXT NOT NULL,\n  target_entity_id TEXT REFERENCES entity(entity_id), mechanism TEXT,\n  route TEXT, safety_toxicity TEXT, development_stage TEXT,\n  evidence_id TEXT REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE neural_circuit (\n  circuit_id TEXT PRIMARY KEY, name TEXT NOT NULL, input_region TEXT,\n  output_region TEXT, cell_population TEXT, phenotype TEXT,\n  evidence_id TEXT REFERENCES evidence_record(evidence_id)\n);\nCREATE TABLE review_search (\n  search_id TEXT PRIMARY KEY, project_id TEXT REFERENCES project(project_id),\n  database_name TEXT NOT NULL, query_text TEXT NOT NULL, date_start TEXT,\n  date_end TEXT, executed_at TEXT NOT NULL, hit_count INTEGER,\n  export_path TEXT, notes TEXT\n);\nCREATE TABLE screening_record (\n  screening_id TEXT PRIMARY KEY, search_id TEXT REFERENCES review_search(search_id),\n  source_id TEXT REFERENCES source_document(source_id), stage TEXT NOT NULL,\n  decision TEXT NOT NULL, exclusion_reason TEXT, reviewer TEXT, decided_at TEXT\n);\nCREATE TABLE candidate (\n  candidate_id TEXT PRIMARY KEY, pain_group TEXT NOT NULL, target_name TEXT NOT NULL UNIQUE,\n  gene_symbol TEXT NOT NULL, mechanism_axis TEXT NOT NULL, development_status TEXT,\n  evidence_gap TEXT, falsification_test TEXT\n);\nCREATE TABLE candidate_score (\n  candidate_id TEXT PRIMARY KEY REFERENCES candidate(candidate_id),\n  mechanism_evidence REAL NOT NULL, novelty_sparsity REAL NOT NULL,\n  tractability REAL NOT NULL, human_relevance REAL NOT NULL,\n  cell_circuit_specificity REAL NOT NULL, safety_window REAL NOT NULL,\n  weighted_score REAL NOT NULL, scored_at TEXT NOT NULL, rubric_version TEXT NOT NULL\n);\n\nCREATE VIEW traceable_graph_edges AS\nSELECT c.claim_id, s.standard_name AS subject, c.predicate, o.standard_name AS object,\n       c.assertion_class, e.evidence_id, ce.support_role, d.doi, d.pmid, d.canonical_url\nFROM claim c JOIN entity s ON s.entity_id=c.subject_id\nJOIN entity o ON o.entity_id=c.object_id\nJOIN claim_evidence ce ON ce.claim_id=c.claim_id\nJOIN evidence_record e ON e.evidence_id=ce.evidence_id\nJOIN source_document d ON d.source_id=e.source_id;\n\nCREATE TRIGGER claim_requires_valid_entities BEFORE INSERT ON claim\nBEGIN\n  SELECT CASE WHEN NEW.subject_id=NEW.object_id AND NEW.predicate NOT IN ('self_associates','same_as')\n    THEN RAISE(ABORT,'self-edge requires an explicit self predicate') END;\nEND;\n"
+  },
+  "references": [
+    {
+      "ref_id": "R009",
+      "pmid": "28530662",
+      "role": "PD1_PDL1_pain",
+      "verification_status": "verified_europe_pmc",
+      "title": "PD-L1 inhibits acute and chronic pain by suppressing nociceptive neuron activity via PD-1.",
+      "authors": "Chen G, Kim YH, Li H, Luo H, Liu DL, Zhang ZJ, Lay M, Chang W, Zhang YQ, Ji RR.",
+      "journal": "",
+      "year": "2017",
+      "doi": "10.1038/nn.4571",
+      "pmcid": "PMC5831162",
+      "pub_type": "research-article; Journal Article",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.1038/nn.4571",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/28530662/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5831162/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A28530662+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R010",
+      "pmid": "32960817",
+      "role": "PDL1_SHP1_TRPV1",
+      "verification_status": "verified_europe_pmc",
+      "title": "Inhibition of TRPV1 by SHP-1 in nociceptive primary sensory neurons is critical in PD-L1 analgesia.",
+      "authors": "Liu BL, Cao QL, Zhao X, Liu HZ, Zhang YQ.",
+      "journal": "",
+      "year": "2020",
+      "doi": "10.1172/jci.insight.137386",
+      "pmcid": "PMC7605531",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.1172/jci.insight.137386",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/32960817/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7605531/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A32960817+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R011",
+      "pmid": "36089217",
+      "role": "PD1_PDL1_controversy",
+      "verification_status": "verified_europe_pmc",
+      "title": "Neuronally expressed PDL1, not PD1, suppresses acute nociception.",
+      "authors": "Meerschaert KA, Edwards BS, Epouhe AY, Jefferson B, Friedman R, Babyok OL, Moy JK, Kehinde F, Liu C, Workman CJ, Vignali DAA, Albers KM, Koerber HR, Gold MS, Davis BM, Scheff NN, Saloman JL.",
+      "journal": "",
+      "year": "2022",
+      "doi": "10.1016/j.bbi.2022.09.001",
+      "pmcid": "PMC10343937",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article; Research Support, N.I.H., Extramural",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.1016/j.bbi.2022.09.001",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/36089217/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10343937/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A36089217+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R036",
+      "pmid": "18287011",
+      "role": "PD1_PDL1_structure",
+      "verification_status": "verified_europe_pmc",
+      "title": "The PD-1/PD-L1 complex resembles the antigen-binding Fv domains of antibodies and T cell receptors.",
+      "authors": "Lin DY, Tanaka Y, Iwasaki M, Gittis AG, Su HP, Mikami B, Okazaki T, Honjo T, Minato N, Garboczi DN.",
+      "journal": "",
+      "year": "2008",
+      "doi": "10.1073/pnas.0712278105",
+      "pmcid": "PMC2268576",
+      "pub_type": "Research Support, N.I.H., Intramural; Research Support, Non-U.S. Gov't; research-article; Research Support, U.S. Gov't, Non-P.H.S.; Journal Article",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.1073/pnas.0712278105",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/18287011/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2268576/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A18287011+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R037",
+      "pmid": "18641123",
+      "role": "PD1_PDL2_structure",
+      "verification_status": "verified_europe_pmc",
+      "title": "Crystal structure of the complex between programmed death-1 (PD-1) and its ligand PD-L2.",
+      "authors": "Lázár-Molnár E, Yan Q, Cao E, Ramagopal U, Nathenson SG, Almo SC.",
+      "journal": "",
+      "year": "2008",
+      "doi": "10.1073/pnas.0804453105",
+      "pmcid": "PMC2492495",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article; Research Support, N.I.H., Extramural",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.1073/pnas.0804453105",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/18641123/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2492495/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A18641123+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R038",
+      "pmid": "23417675",
+      "role": "PD1_NMR",
+      "verification_status": "verified_europe_pmc",
+      "title": "Structure and interactions of the human programmed cell death 1 receptor.",
+      "authors": "Cheng X, Veverka V, Radhakrishnan A, Waters LC, Muskett FW, Morgan SH, Huo J, Yu C, Evans EJ, Leslie AJ, Griffiths M, Stubberfield C, Griffin R, Henry AJ, Jansson A, Ladbury JE, Ikemizu S, Carr MD, Davis SJ.",
+      "journal": "",
+      "year": "2013",
+      "doi": "10.1074/jbc.m112.448126",
+      "pmcid": "PMC3636866",
+      "pub_type": "research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.1074/jbc.m112.448126",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/23417675/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3636866/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A23417675+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R039",
+      "doi": "10.1126/sciadv.aay4458",
+      "role": "PD1_SHP2",
+      "verification_status": "verified_europe_pmc",
+      "title": "Molecular mechanism of SHP2 activation by PD-1 stimulation.",
+      "authors": "Marasco M, Berteotti A, Weyershaeuser J, Thorausch N, Sikorska J, Krausze J, Brandt HJ, Kirkpatrick J, Rios P, Schamel WW, Köhn M, Carlomagno T.",
+      "journal": "",
+      "year": "2020",
+      "pmid": "32064351",
+      "pmcid": "PMC6994217",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.1126/sciadv.aay4458",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/32064351/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6994217/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI%3A%2210.1126%2Fsciadv.aay4458%22&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R040",
+      "pmid": "39277860",
+      "role": "PDL1_CD80_cis",
+      "verification_status": "verified_europe_pmc",
+      "title": "Rigid, bivalent CTLA-4 binding to CD80 is required to disrupt the cis CD80/PD-L1 interaction.",
+      "authors": "Robinson MA, Kennedy A, Orozco CT, Chen HC, Waters E, Giovacchini D, Yeung K, Filer L, Hinze C, Lloyd C, Dovedi SJ, Sansom DM.",
+      "journal": "",
+      "year": "2024",
+      "doi": "10.1016/j.celrep.2024.114768",
+      "pmcid": "PMC7618755",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.1016/j.celrep.2024.114768",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/39277860/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7618755/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A39277860+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R041",
+      "pmid": "31667366",
+      "role": "PDL1_glycosylation",
+      "verification_status": "verified_europe_pmc",
+      "title": "Identification of a monoclonal antibody that targets PD-1 in a manner requiring PD-1 Asn58 glycosylation.",
+      "authors": "Wang M, Wang J, Wang R, Jiao S, Wang S, Zhang J, Zhang M.",
+      "journal": "",
+      "year": "2019",
+      "doi": "10.1038/s42003-019-0642-9",
+      "pmcid": "PMC6814707",
+      "pub_type": "research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.1038/s42003-019-0642-9",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/31667366/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6814707/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A31667366+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R042",
+      "pmid": "38176728",
+      "role": "PDL1_glyco_variation",
+      "verification_status": "verified_europe_pmc",
+      "title": "Variable PD-1 glycosylation modulates the activity of immune checkpoint inhibitors.",
+      "authors": "Chu CW, Čaval T, Alisson-Silva F, Tankasala A, Guerrier C, Czerwieniec G, Läubli H, Schwarz F.",
+      "journal": "",
+      "year": "2024",
+      "doi": "10.26508/lsa.202302368",
+      "pmcid": "PMC10766783",
+      "pub_type": "research-article; Journal Article",
+      "is_open_access": "Y",
+      "doi_url": "https://doi.org/10.26508/lsa.202302368",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/38176728/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10766783/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38176728+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R043",
+      "pmid": "33063473",
+      "role": "camrelizumab_structure",
+      "verification_status": "verified_europe_pmc",
+      "title": "N-glycosylation of PD-1 promotes binding of camrelizumab.",
+      "authors": "Liu K, Tan S, Jin W, Guan J, Wang Q, Sun H, Qi J, Yan J, Chai Y, Wang Z, Deng C, Gao GF.",
+      "journal": "",
+      "year": "2020",
+      "doi": "10.15252/embr.202051444",
+      "pmcid": "PMC7726772",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.15252/embr.202051444",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/33063473/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7726772/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A33063473+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    },
+    {
+      "ref_id": "R044",
+      "pmid": "32156778",
+      "role": "PD1_glyco_targeting",
+      "verification_status": "verified_europe_pmc",
+      "title": "Targeting Glycosylated PD-1 Induces Potent Antitumor Immunity.",
+      "authors": "Sun L, Li CW, Chung EM, Yang R, Kim YS, Park AH, Lai YJ, Yang Y, Wang YH, Liu J, Qiu Y, Khoo KH, Yao J, Hsu JL, Cha JH, Chan LC, Hsu JM, Lee HH, Yoo SS, Hung MC.",
+      "journal": "",
+      "year": "2020",
+      "doi": "10.1158/0008-5472.can-19-3133",
+      "pmcid": "PMC7272274",
+      "pub_type": "Research Support, Non-U.S. Gov't; research-article; Journal Article; Research Support, N.I.H., Extramural",
+      "is_open_access": "N",
+      "doi_url": "https://doi.org/10.1158/0008-5472.can-19-3133",
+      "pubmed_url": "https://pubmed.ncbi.nlm.nih.gov/32156778/",
+      "pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7272274/",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A32156778+AND+SRC%3AMED&format=json&resultType=core&pageSize=5",
+      "project_ids": [
+        "PD1"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "claim_id": "CL301",
+      "project": "PD1",
+      "subject": "PD-1",
+      "predicate": "binds",
+      "object": "PD-L1",
+      "context": {
+        "zh": "PDB 3BIK；IgV界面",
+        "en": "PDB 3BIK; IgV interface"
+      },
+      "assertion": "established_fact",
+      "grade": "A",
+      "ref_id": "R036",
+      "summary": {
+        "zh": "PD-1/PD-L1复合物结构界定了经典IgV结构域界面。",
+        "en": "The PD-1/PD-L1 complex structure defines the canonical IgV-domain interface."
+      },
+      "doi": "10.1073/pnas.0712278105",
+      "pmid": "18287011",
+      "pmcid": "PMC2268576",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18287011/",
+      "metadata_verification": "verified_europe_pmc",
+      "entered_at": "2026-07-19",
+      "database_version": "1.0.0"
+    },
+    {
+      "claim_id": "CL302",
+      "project": "PD1",
+      "subject": "PD-1",
+      "predicate": "binds",
+      "object": "PD-L2",
+      "context": {
+        "zh": "晶体结构",
+        "en": "crystal structure"
+      },
+      "assertion": "established_fact",
+      "grade": "A",
+      "ref_id": "R037",
+      "summary": {
+        "zh": "结构分析界定了PD-1/PD-L2识别方式。",
+        "en": "Structural analysis defines PD-1/PD-L2 recognition."
+      },
+      "doi": "10.1073/pnas.0804453105",
+      "pmid": "18641123",
+      "pmcid": "PMC2492495",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18641123/",
+      "metadata_verification": "verified_europe_pmc",
+      "entered_at": "2026-07-19",
+      "database_version": "1.0.0"
+    },
+    {
+      "claim_id": "CL303",
+      "project": "PD1",
+      "subject": "phosphorylated PD-1 tail",
+      "predicate": "activates",
+      "object": "SHP-2",
+      "context": {
+        "zh": "T细胞抑制信号",
+        "en": "T-cell inhibitory signaling"
+      },
+      "assertion": "established_fact",
+      "grade": "A",
+      "ref_id": "R039",
+      "summary": {
+        "zh": "PD-1磷酸酪氨酸基序通过多价结合变构激活SHP-2。",
+        "en": "PD-1 phosphotyrosine motifs allosterically activate SHP-2 through multivalent engagement."
+      },
+      "doi": "10.1126/sciadv.aay4458",
+      "pmid": "32064351",
+      "pmcid": "PMC6994217",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/32064351/",
+      "metadata_verification": "verified_europe_pmc",
+      "entered_at": "2026-07-19",
+      "database_version": "1.0.0"
+    },
+    {
+      "claim_id": "CL304",
+      "project": "PD1",
+      "subject": "PD-L1",
+      "predicate": "binds",
+      "object": "CD80 in cis",
+      "context": {
+        "zh": "抗原呈递细胞",
+        "en": "antigen-presenting cells"
+      },
+      "assertion": "established_fact",
+      "grade": "B",
+      "ref_id": "R040",
+      "summary": {
+        "zh": "PD-L1/CD80顺式相互作用重塑检查点配体可用性和信号。",
+        "en": "PD-L1/CD80 cis interactions reshape checkpoint-ligand availability and signaling."
+      },
+      "doi": "10.1016/j.celrep.2024.114768",
+      "pmid": "39277860",
+      "pmcid": "PMC7618755",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/39277860/",
+      "metadata_verification": "verified_europe_pmc",
+      "entered_at": "2026-07-19",
+      "database_version": "1.0.0"
+    }
+  ],
+  "candidates": [],
+  "bibliometrics": [
+    {
+      "id": "C07",
+      "target": "神经元PD-1/PD-L1–SHP-1",
+      "historical_count": 518,
+      "recent_5y_count": 367,
+      "review_count": 69,
+      "as_of": "2026-07-19",
+      "database": "Europe PMC",
+      "historical_query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29&format=json&pageSize=1",
+      "recent_query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+FIRST_PDATE%3A%5B2021-07-19+TO+2026-07-19%5D&format=json&pageSize=1",
+      "review_query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+PUB_TYPE%3Areview&format=json&pageSize=1",
+      "clinical_trial_count": 0,
+      "clinical_trial_query_url": "https://clinicaltrials.gov/api/v2/studies?query.term=%22%E7%A5%9E%E7%BB%8F%E5%85%83PD-1%2FPD-L1%E2%80%93SHP-1%22+AND+%28pain+OR+nociception+OR+neuralgia%29&pageSize=1&countTotal=true&format=json",
+      "patent_count": "NA",
+      "patent_status": "not_counted_without_dedicated_patent_database"
+    }
+  ],
+  "identifiers": [
+    {
+      "gene": "PDCD1",
+      "uniprot_accession": "Q15116",
+      "uniprot_entry": "PDCD1_HUMAN",
+      "protein_name": "Programmed cell death protein 1",
+      "length": 288,
+      "ncbi_gene_ids": "5133",
+      "ensembl_ids": "ENST00000334409.10;ENST00000618185.3",
+      "organism": "Homo sapiens",
+      "taxid": 9606,
+      "verification_status": "verified_uniprot_2026-07-19",
+      "uniprot_url": "https://www.uniprot.org/uniprotkb/Q15116/entry",
+      "query_url": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APDCD1%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+    },
+    {
+      "gene": "CD274",
+      "uniprot_accession": "Q9NZQ7",
+      "uniprot_entry": "PD1L1_HUMAN",
+      "protein_name": "Programmed cell death 1 ligand 1",
+      "length": 290,
+      "ncbi_gene_ids": "29126",
+      "ensembl_ids": "ENST00000381573.8;ENST00000381577.4",
+      "organism": "Homo sapiens",
+      "taxid": 9606,
+      "verification_status": "verified_uniprot_2026-07-19",
+      "uniprot_url": "https://www.uniprot.org/uniprotkb/Q9NZQ7/entry",
+      "query_url": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3ACD274%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+    },
+    {
+      "gene": "PTPN6",
+      "uniprot_accession": "P29350",
+      "uniprot_entry": "PTN6_HUMAN",
+      "protein_name": "Tyrosine-protein phosphatase non-receptor type 6",
+      "length": 595,
+      "ncbi_gene_ids": "5777",
+      "ensembl_ids": "ENST00000318974.14;ENST00000399448.5;ENST00000456013.5;ENST00000877771.1;ENST00000877772.1;ENST00000911913.1",
+      "organism": "Homo sapiens",
+      "taxid": 9606,
+      "verification_status": "verified_uniprot_2026-07-19",
+      "uniprot_url": "https://www.uniprot.org/uniprotkb/P29350/entry",
+      "query_url": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APTPN6%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+    }
+  ],
+  "search_log": [
+    {
+      "search_id": "S-PD1-01",
+      "project_id": "PD1",
+      "database": "Europe PMC",
+      "query": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:PDCD1 OR TITLE_ABS:\"PD-L1\" OR TITLE_ABS:CD274) AND (TITLE_ABS:bind* OR TITLE_ABS:interact* OR TITLE_ABS:structure OR TITLE_ABS:signal*)",
+      "time_range": "database inception–2026-07-19",
+      "executed_at": "2026-07-19",
+      "hit_count": "19234",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-L1%22+OR+TITLE_ABS%3ACD274%29+AND+%28TITLE_ABS%3Abind%2A+OR+TITLE_ABS%3Ainteract%2A+OR+TITLE_ABS%3Astructure+OR+TITLE_ABS%3Asignal%2A%29&format=json&pageSize=1",
+      "screening_status": "machine-counted; full title/abstract screening pending"
+    },
+    {
+      "search_id": "S-PD1-02",
+      "project_id": "PD1",
+      "database": "Europe PMC",
+      "query": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:\"PD-L1\") AND (TITLE_ABS:pain OR TITLE_ABS:nocicep* OR TITLE_ABS:neuron*)",
+      "time_range": "database inception–2026-07-19",
+      "executed_at": "2026-07-19",
+      "hit_count": "777",
+      "query_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aneuron%2A%29&format=json&pageSize=1",
+      "screening_status": "machine-counted; full title/abstract screening pending"
+    }
+  ],
+  "field_dictionary": [
+    {
+      "table": "entity",
+      "field": "entity_id",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "",
+      "description": "稳定内部标识"
+    },
+    {
+      "table": "entity",
+      "field": "entity_type",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "Protein|Gene|Isoform|Organism|Ligand|Binder|Cell|Tissue|Region|Disease|PainType|Phenotype|Circuit|Drug|Antibody|Peptide",
+      "description": "实体类别"
+    },
+    {
+      "table": "entity",
+      "field": "standard_name",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "",
+      "description": "标准名称"
+    },
+    {
+      "table": "entity_identifier",
+      "field": "namespace",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "UniProt|NCBI Gene|Ensembl|PDB|ChEMBL|ClinicalTrials.gov|DOI|PMID|PMCID",
+      "description": "外部标识体系"
+    },
+    {
+      "table": "context",
+      "field": "cell_type",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "Cell Ontology preferred",
+      "description": "实验或机制所属细胞"
+    },
+    {
+      "table": "context",
+      "field": "brain_region",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "UBERON preferred",
+      "description": "脑区"
+    },
+    {
+      "table": "context",
+      "field": "peripheral_ganglion",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "UBERON preferred",
+      "description": "外周神经节"
+    },
+    {
+      "table": "source_document",
+      "field": "metadata_verification",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "verified_europe_pmc|verified_crossref|verified_registry|unresolved",
+      "description": "元数据核验状态"
+    },
+    {
+      "table": "evidence_record",
+      "field": "evidence_grade",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "A|B|C|D",
+      "description": "A人体因果/强临床；B多方法体内因果；C单模型或关联；D假说/计算"
+    },
+    {
+      "table": "evidence_record",
+      "field": "assertion_class",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "established_fact|evidence_based_inference|hypothesis|counterevidence",
+      "description": "结论性质"
+    },
+    {
+      "table": "evidence_record",
+      "field": "quote_or_locator",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "",
+      "description": "原文短摘录或图表/页/段定位"
+    },
+    {
+      "table": "claim",
+      "field": "predicate",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "见ontology_relations.csv",
+      "description": "关系谓词"
+    },
+    {
+      "table": "claim_evidence",
+      "field": "support_role",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "supports|contradicts|qualifies",
+      "description": "证据对结论的作用"
+    },
+    {
+      "table": "interaction",
+      "field": "affinity_value",
+      "type": "real",
+      "required": "no",
+      "controlled_vocabulary": "",
+      "description": "结合常数数值"
+    },
+    {
+      "table": "interaction",
+      "field": "affinity_unit",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "M|mM|uM|nM|pM",
+      "description": "亲和力单位"
+    },
+    {
+      "table": "candidate_score",
+      "field": "weighted_score",
+      "type": "real",
+      "required": "yes",
+      "controlled_vocabulary": "0-100",
+      "description": "按25/25/20/15/10/5权重计算"
+    },
+    {
+      "table": "review_search",
+      "field": "query_text",
+      "type": "text",
+      "required": "yes",
+      "controlled_vocabulary": "",
+      "description": "可复现完整检索式"
+    },
+    {
+      "table": "screening_record",
+      "field": "exclusion_reason",
+      "type": "text",
+      "required": "no",
+      "controlled_vocabulary": "",
+      "description": "排除原因"
+    }
+  ],
+  "ontology_relations": [
+    {
+      "predicate": "binds",
+      "domain": "Protein|Ligand",
+      "range": "Protein|Ligand",
+      "inverse": "bound_by",
+      "definition": "直接物理结合"
+    },
+    {
+      "predicate": "expressed_in",
+      "domain": "Protein",
+      "range": "Cell",
+      "inverse": "expresses",
+      "definition": "在特定实验条件检测到表达"
+    },
+    {
+      "predicate": "located_in",
+      "domain": "Cell",
+      "range": "Tissue|Region|Ganglion",
+      "inverse": "contains",
+      "definition": "解剖定位"
+    },
+    {
+      "predicate": "secreted_by",
+      "domain": "Protein",
+      "range": "Cell",
+      "inverse": "secretes",
+      "definition": "由该细胞分泌"
+    },
+    {
+      "predicate": "modulates",
+      "domain": "Protein",
+      "range": "Circuit",
+      "inverse": "modulated_by",
+      "definition": "影响回路活动"
+    },
+    {
+      "predicate": "drives",
+      "domain": "Circuit",
+      "range": "PainType",
+      "inverse": "driven_by",
+      "definition": "因果促进疼痛表型"
+    },
+    {
+      "predicate": "inhibits",
+      "domain": "Intervention",
+      "range": "Protein|Interaction",
+      "inverse": "inhibited_by",
+      "definition": "抑制靶点或互作"
+    },
+    {
+      "predicate": "activates",
+      "domain": "Protein|Ligand",
+      "range": "Protein|Cell",
+      "inverse": "activated_by",
+      "definition": "促进活化"
+    },
+    {
+      "predicate": "phosphorylates",
+      "domain": "Protein",
+      "range": "Protein",
+      "inverse": "phosphorylated_by",
+      "definition": "磷酸化"
+    },
+    {
+      "predicate": "glycosylated_at",
+      "domain": "Protein",
+      "range": "PTM",
+      "inverse": "modifies",
+      "definition": "位点糖基化"
+    },
+    {
+      "predicate": "supported_by",
+      "domain": "Claim",
+      "range": "Evidence",
+      "inverse": "supports",
+      "definition": "证据支持结论"
+    },
+    {
+      "predicate": "contradicted_by",
+      "domain": "Claim",
+      "range": "Evidence",
+      "inverse": "contradicts",
+      "definition": "证据反驳或限制结论"
+    }
+  ],
+  "validation_report": {
+    "zh": "PD1-only 公开演示包：项目、文献、结构和证据关系已做引用闭合校验；候选及指标仅由独立 synthetic fixture manifest 提供。",
+    "en": "PD1-only public demo package with closed project/reference/structure/claim links. Candidate metrics are supplied only by the separate synthetic fixture manifest."
+  },
+  "generation_template": {
+    "system_role": "生物医学信息学、蛋白互作、结构生物学和神经回路研究团队",
+    "required_outputs": [
+      "执行摘要",
+      "独立项目综述",
+      "字段字典和知识关系",
+      "候选评分排名",
+      "逐候选研究卡",
+      "实验路线图",
+      "参考文献与筛选记录",
+      "CSV/JSON模板"
+    ],
+    "quality_gates": [
+      "PMID/DOI元数据核验",
+      "事实/推断/假说分层",
+      "每条关系可追溯",
+      "撤稿与反证保留",
+      "候选不重复",
+      "同口径文献计量",
+      "否定性实验"
+    ]
+  },
+  "display_data": {
+    "bibliometrics": [
+      {
+        "id": {
+          "zh": "C07",
+          "en": "C07"
+        },
+        "target": {
+          "zh": "神经元PD-1/PD-L1–SHP-1",
+          "en": "Neuronal PD-1/PD-L1–SHP-1"
+        },
+        "historical_count": {
+          "zh": "518",
+          "en": "518"
+        },
+        "recent_5y_count": {
+          "zh": "367",
+          "en": "367"
+        },
+        "review_count": {
+          "zh": "69",
+          "en": "69"
+        },
+        "as_of": {
+          "zh": "2026-07-19",
+          "en": "2026-07-19"
+        },
+        "database": {
+          "zh": "Europe PMC",
+          "en": "Europe PMC"
+        },
+        "historical_query_url": {
+          "zh": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29&format=json&pageSize=1",
+          "en": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29&format=json&pageSize=1"
+        },
+        "recent_query_url": {
+          "zh": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+FIRST_PDATE%3A%5B2021-07-19+TO+2026-07-19%5D&format=json&pageSize=1",
+          "en": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+FIRST_PDATE%3A%5B2021-07-19+TO+2026-07-19%5D&format=json&pageSize=1"
+        },
+        "review_query_url": {
+          "zh": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+PUB_TYPE%3Areview&format=json&pageSize=1",
+          "en": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDL1+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aallodynia+OR+TITLE_ABS%3Ahyperalgesia+OR+TITLE_ABS%3Aneuralgia%29+AND+PUB_TYPE%3Areview&format=json&pageSize=1"
+        },
+        "clinical_trial_count": {
+          "zh": "0",
+          "en": "0"
+        },
+        "clinical_trial_query_url": {
+          "zh": "https://clinicaltrials.gov/api/v2/studies?query.term=%22%E7%A5%9E%E7%BB%8F%E5%85%83PD-1%2FPD-L1%E2%80%93SHP-1%22+AND+%28pain+OR+nociception+OR+neuralgia%29&pageSize=1&countTotal=true&format=json",
+          "en": "https://clinicaltrials.gov/api/v2/studies?query.term=%22%E7%A5%9E%E7%BB%8F%E5%85%83PD-1%2FPD-L1%E2%80%93SHP-1%22+AND+%28pain+OR+nociception+OR+neuralgia%29&pageSize=1&countTotal=true&format=json"
+        },
+        "patent_count": {
+          "zh": "NA",
+          "en": "NA"
+        },
+        "patent_status": {
+          "zh": "not_counted_without_dedicated_patent_database",
+          "en": "not_counted_without_dedicated_patent_database"
+        }
+      }
+    ],
+    "identifiers": [
+      {
+        "gene": {
+          "zh": "PDCD1",
+          "en": "PDCD1"
+        },
+        "uniprot_accession": {
+          "zh": "Q15116",
+          "en": "Q15116"
+        },
+        "uniprot_entry": {
+          "zh": "PDCD1_HUMAN",
+          "en": "PDCD1_HUMAN"
+        },
+        "protein_name": {
+          "zh": "Programmed cell death protein 1",
+          "en": "Programmed cell death protein 1"
+        },
+        "length": {
+          "zh": "288",
+          "en": "288"
+        },
+        "ncbi_gene_ids": {
+          "zh": "5133",
+          "en": "5133"
+        },
+        "ensembl_ids": {
+          "zh": "ENST00000334409.10;ENST00000618185.3",
+          "en": "ENST00000334409.10;ENST00000618185.3"
+        },
+        "organism": {
+          "zh": "Homo sapiens",
+          "en": "Homo sapiens"
+        },
+        "taxid": {
+          "zh": "9606",
+          "en": "9606"
+        },
+        "verification_status": {
+          "zh": "verified_uniprot_2026-07-19",
+          "en": "verified_uniprot_2026-07-19"
+        },
+        "uniprot_url": {
+          "zh": "https://www.uniprot.org/uniprotkb/Q15116/entry",
+          "en": "https://www.uniprot.org/uniprotkb/Q15116/entry"
+        },
+        "query_url": {
+          "zh": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APDCD1%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength",
+          "en": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APDCD1%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+        }
+      },
+      {
+        "gene": {
+          "zh": "CD274",
+          "en": "CD274"
+        },
+        "uniprot_accession": {
+          "zh": "Q9NZQ7",
+          "en": "Q9NZQ7"
+        },
+        "uniprot_entry": {
+          "zh": "PD1L1_HUMAN",
+          "en": "PD1L1_HUMAN"
+        },
+        "protein_name": {
+          "zh": "Programmed cell death 1 ligand 1",
+          "en": "Programmed cell death 1 ligand 1"
+        },
+        "length": {
+          "zh": "290",
+          "en": "290"
+        },
+        "ncbi_gene_ids": {
+          "zh": "29126",
+          "en": "29126"
+        },
+        "ensembl_ids": {
+          "zh": "ENST00000381573.8;ENST00000381577.4",
+          "en": "ENST00000381573.8;ENST00000381577.4"
+        },
+        "organism": {
+          "zh": "Homo sapiens",
+          "en": "Homo sapiens"
+        },
+        "taxid": {
+          "zh": "9606",
+          "en": "9606"
+        },
+        "verification_status": {
+          "zh": "verified_uniprot_2026-07-19",
+          "en": "verified_uniprot_2026-07-19"
+        },
+        "uniprot_url": {
+          "zh": "https://www.uniprot.org/uniprotkb/Q9NZQ7/entry",
+          "en": "https://www.uniprot.org/uniprotkb/Q9NZQ7/entry"
+        },
+        "query_url": {
+          "zh": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3ACD274%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength",
+          "en": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3ACD274%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+        }
+      },
+      {
+        "gene": {
+          "zh": "PTPN6",
+          "en": "PTPN6"
+        },
+        "uniprot_accession": {
+          "zh": "P29350",
+          "en": "P29350"
+        },
+        "uniprot_entry": {
+          "zh": "PTN6_HUMAN",
+          "en": "PTN6_HUMAN"
+        },
+        "protein_name": {
+          "zh": "Tyrosine-protein phosphatase non-receptor type 6",
+          "en": "Tyrosine-protein phosphatase non-receptor type 6"
+        },
+        "length": {
+          "zh": "595",
+          "en": "595"
+        },
+        "ncbi_gene_ids": {
+          "zh": "5777",
+          "en": "5777"
+        },
+        "ensembl_ids": {
+          "zh": "ENST00000318974.14;ENST00000399448.5;ENST00000456013.5;ENST00000877771.1;ENST00000877772.1;ENST00000911913.1",
+          "en": "ENST00000318974.14;ENST00000399448.5;ENST00000456013.5;ENST00000877771.1;ENST00000877772.1;ENST00000911913.1"
+        },
+        "organism": {
+          "zh": "Homo sapiens",
+          "en": "Homo sapiens"
+        },
+        "taxid": {
+          "zh": "9606",
+          "en": "9606"
+        },
+        "verification_status": {
+          "zh": "verified_uniprot_2026-07-19",
+          "en": "verified_uniprot_2026-07-19"
+        },
+        "uniprot_url": {
+          "zh": "https://www.uniprot.org/uniprotkb/P29350/entry",
+          "en": "https://www.uniprot.org/uniprotkb/P29350/entry"
+        },
+        "query_url": {
+          "zh": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APTPN6%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength",
+          "en": "https://rest.uniprot.org/uniprotkb/search?query=%28gene_exact%3APTPN6%29+AND+%28organism_id%3A9606%29+AND+%28reviewed%3Atrue%29&format=json&size=1&fields=accession%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Cxref_geneid%2Cxref_ensembl%2Clength"
+        }
+      }
+    ],
+    "search_log": [
+      {
+        "search_id": {
+          "zh": "S-PD1-01",
+          "en": "S-PD1-01"
+        },
+        "project_id": {
+          "zh": "PD1",
+          "en": "PD1"
+        },
+        "database": {
+          "zh": "Europe PMC",
+          "en": "Europe PMC"
+        },
+        "query": {
+          "zh": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:PDCD1 OR TITLE_ABS:\"PD-L1\" OR TITLE_ABS:CD274) AND (TITLE_ABS:bind* OR TITLE_ABS:interact* OR TITLE_ABS:structure OR TITLE_ABS:signal*)",
+          "en": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:PDCD1 OR TITLE_ABS:\"PD-L1\" OR TITLE_ABS:CD274) AND (TITLE_ABS:bind* OR TITLE_ABS:interact* OR TITLE_ABS:structure OR TITLE_ABS:signal*)"
+        },
+        "time_range": {
+          "zh": "database inception–2026-07-19",
+          "en": "database inception–2026-07-19"
+        },
+        "executed_at": {
+          "zh": "2026-07-19",
+          "en": "2026-07-19"
+        },
+        "hit_count": {
+          "zh": "19234",
+          "en": "19234"
+        },
+        "query_url": {
+          "zh": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-L1%22+OR+TITLE_ABS%3ACD274%29+AND+%28TITLE_ABS%3Abind%2A+OR+TITLE_ABS%3Ainteract%2A+OR+TITLE_ABS%3Astructure+OR+TITLE_ABS%3Asignal%2A%29&format=json&pageSize=1",
+          "en": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3APDCD1+OR+TITLE_ABS%3A%22PD-L1%22+OR+TITLE_ABS%3ACD274%29+AND+%28TITLE_ABS%3Abind%2A+OR+TITLE_ABS%3Ainteract%2A+OR+TITLE_ABS%3Astructure+OR+TITLE_ABS%3Asignal%2A%29&format=json&pageSize=1"
+        },
+        "screening_status": {
+          "zh": "machine-counted; full title/abstract screening pending",
+          "en": "machine-counted; full title/abstract screening pending"
+        }
+      },
+      {
+        "search_id": {
+          "zh": "S-PD1-02",
+          "en": "S-PD1-02"
+        },
+        "project_id": {
+          "zh": "PD1",
+          "en": "PD1"
+        },
+        "database": {
+          "zh": "Europe PMC",
+          "en": "Europe PMC"
+        },
+        "query": {
+          "zh": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:\"PD-L1\") AND (TITLE_ABS:pain OR TITLE_ABS:nocicep* OR TITLE_ABS:neuron*)",
+          "en": "(TITLE_ABS:\"PD-1\" OR TITLE_ABS:\"PD-L1\") AND (TITLE_ABS:pain OR TITLE_ABS:nocicep* OR TITLE_ABS:neuron*)"
+        },
+        "time_range": {
+          "zh": "database inception–2026-07-19",
+          "en": "database inception–2026-07-19"
+        },
+        "executed_at": {
+          "zh": "2026-07-19",
+          "en": "2026-07-19"
+        },
+        "hit_count": {
+          "zh": "777",
+          "en": "777"
+        },
+        "query_url": {
+          "zh": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aneuron%2A%29&format=json&pageSize=1",
+          "en": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE_ABS%3A%22PD-1%22+OR+TITLE_ABS%3A%22PD-L1%22%29+AND+%28TITLE_ABS%3Apain+OR+TITLE_ABS%3Anocicep%2A+OR+TITLE_ABS%3Aneuron%2A%29&format=json&pageSize=1"
+        },
+        "screening_status": {
+          "zh": "machine-counted; full title/abstract screening pending",
+          "en": "machine-counted; full title/abstract screening pending"
+        }
+      }
+    ],
+    "field_dictionary": [
+      {
+        "table": {
+          "zh": "entity",
+          "en": "entity"
+        },
+        "field": {
+          "zh": "entity_id",
+          "en": "entity_id"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "稳定内部标识",
+          "en": "Stable internal identifier"
+        }
+      },
+      {
+        "table": {
+          "zh": "entity",
+          "en": "entity"
+        },
+        "field": {
+          "zh": "entity_type",
+          "en": "entity_type"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "Protein|Gene|Isoform|Organism|Ligand|Binder|Cell|Tissue|Region|Disease|PainType|Phenotype|Circuit|Drug|Antibody|Peptide",
+          "en": "Protein|Gene|Isoform|Organism|Ligand|Binder|Cell|Tissue|Region|Disease|PainType|Phenotype|Circuit|Drug|Antibody|Peptide"
+        },
+        "description": {
+          "zh": "实体类别",
+          "en": "Entity category"
+        }
+      },
+      {
+        "table": {
+          "zh": "entity",
+          "en": "entity"
+        },
+        "field": {
+          "zh": "standard_name",
+          "en": "standard_name"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "标准名称",
+          "en": "Preferred name"
+        }
+      },
+      {
+        "table": {
+          "zh": "entity_identifier",
+          "en": "entity_identifier"
+        },
+        "field": {
+          "zh": "namespace",
+          "en": "namespace"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "UniProt|NCBI Gene|Ensembl|PDB|ChEMBL|ClinicalTrials.gov|DOI|PMID|PMCID",
+          "en": "UniProt|NCBI Gene|Ensembl|PDB|ChEMBL|ClinicalTrials.gov|DOI|PMID|PMCID"
+        },
+        "description": {
+          "zh": "外部标识体系",
+          "en": "External identifier system"
+        }
+      },
+      {
+        "table": {
+          "zh": "context",
+          "en": "context"
+        },
+        "field": {
+          "zh": "cell_type",
+          "en": "cell_type"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "Cell Ontology preferred",
+          "en": "Cell Ontology preferred"
+        },
+        "description": {
+          "zh": "实验或机制所属细胞",
+          "en": "Cell associated with the experiment or mechanism"
+        }
+      },
+      {
+        "table": {
+          "zh": "context",
+          "en": "context"
+        },
+        "field": {
+          "zh": "brain_region",
+          "en": "brain_region"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "UBERON preferred",
+          "en": "UBERON preferred"
+        },
+        "description": {
+          "zh": "脑区",
+          "en": "Brain region"
+        }
+      },
+      {
+        "table": {
+          "zh": "context",
+          "en": "context"
+        },
+        "field": {
+          "zh": "peripheral_ganglion",
+          "en": "peripheral_ganglion"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "UBERON preferred",
+          "en": "UBERON preferred"
+        },
+        "description": {
+          "zh": "外周神经节",
+          "en": "Peripheral ganglion"
+        }
+      },
+      {
+        "table": {
+          "zh": "source_document",
+          "en": "source_document"
+        },
+        "field": {
+          "zh": "metadata_verification",
+          "en": "metadata_verification"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "verified_europe_pmc|verified_crossref|verified_registry|unresolved",
+          "en": "verified_europe_pmc|verified_crossref|verified_registry|unresolved"
+        },
+        "description": {
+          "zh": "元数据核验状态",
+          "en": "Metadata verification status"
+        }
+      },
+      {
+        "table": {
+          "zh": "evidence_record",
+          "en": "evidence_record"
+        },
+        "field": {
+          "zh": "evidence_grade",
+          "en": "evidence_grade"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "A|B|C|D",
+          "en": "A|B|C|D"
+        },
+        "description": {
+          "zh": "A人体因果/强临床；B多方法体内因果；C单模型或关联；D假说/计算",
+          "en": "A human causality/strong clinical; B multi-method in-vivo causality; C single-model or association; D hypothesis/computation"
+        }
+      },
+      {
+        "table": {
+          "zh": "evidence_record",
+          "en": "evidence_record"
+        },
+        "field": {
+          "zh": "assertion_class",
+          "en": "assertion_class"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "established_fact|evidence_based_inference|hypothesis|counterevidence",
+          "en": "established_fact|evidence_based_inference|hypothesis|counterevidence"
+        },
+        "description": {
+          "zh": "结论性质",
+          "en": "Assertion class"
+        }
+      },
+      {
+        "table": {
+          "zh": "evidence_record",
+          "en": "evidence_record"
+        },
+        "field": {
+          "zh": "quote_or_locator",
+          "en": "quote_or_locator"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "原文短摘录或图表/页/段定位",
+          "en": "Short source excerpt or figure/page/section locator"
+        }
+      },
+      {
+        "table": {
+          "zh": "claim",
+          "en": "claim"
+        },
+        "field": {
+          "zh": "predicate",
+          "en": "predicate"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "见ontology_relations.csv",
+          "en": "See ontology_relations.csv"
+        },
+        "description": {
+          "zh": "关系谓词",
+          "en": "Relationship predicate"
+        }
+      },
+      {
+        "table": {
+          "zh": "claim_evidence",
+          "en": "claim_evidence"
+        },
+        "field": {
+          "zh": "support_role",
+          "en": "support_role"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "supports|contradicts|qualifies",
+          "en": "supports|contradicts|qualifies"
+        },
+        "description": {
+          "zh": "证据对结论的作用",
+          "en": "How evidence affects the conclusion"
+        }
+      },
+      {
+        "table": {
+          "zh": "interaction",
+          "en": "interaction"
+        },
+        "field": {
+          "zh": "affinity_value",
+          "en": "affinity_value"
+        },
+        "type": {
+          "zh": "real",
+          "en": "real"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "结合常数数值",
+          "en": "Binding-constant value"
+        }
+      },
+      {
+        "table": {
+          "zh": "interaction",
+          "en": "interaction"
+        },
+        "field": {
+          "zh": "affinity_unit",
+          "en": "affinity_unit"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "M|mM|uM|nM|pM",
+          "en": "M|mM|uM|nM|pM"
+        },
+        "description": {
+          "zh": "亲和力单位",
+          "en": "Affinity unit"
+        }
+      },
+      {
+        "table": {
+          "zh": "candidate_score",
+          "en": "candidate_score"
+        },
+        "field": {
+          "zh": "weighted_score",
+          "en": "weighted_score"
+        },
+        "type": {
+          "zh": "real",
+          "en": "real"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "0-100",
+          "en": "0-100"
+        },
+        "description": {
+          "zh": "按25/25/20/15/10/5权重计算",
+          "en": "Calculated with 25/25/20/15/10/5 weights"
+        }
+      },
+      {
+        "table": {
+          "zh": "review_search",
+          "en": "review_search"
+        },
+        "field": {
+          "zh": "query_text",
+          "en": "query_text"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "yes",
+          "en": "yes"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "可复现完整检索式",
+          "en": "Fully reproducible search query"
+        }
+      },
+      {
+        "table": {
+          "zh": "screening_record",
+          "en": "screening_record"
+        },
+        "field": {
+          "zh": "exclusion_reason",
+          "en": "exclusion_reason"
+        },
+        "type": {
+          "zh": "text",
+          "en": "text"
+        },
+        "required": {
+          "zh": "no",
+          "en": "no"
+        },
+        "controlled_vocabulary": {
+          "zh": "",
+          "en": ""
+        },
+        "description": {
+          "zh": "排除原因",
+          "en": "Exclusion reason"
+        }
+      }
+    ],
+    "ontology_relations": [
+      {
+        "predicate": {
+          "zh": "binds",
+          "en": "binds"
+        },
+        "domain": {
+          "zh": "Protein|Ligand",
+          "en": "Protein|Ligand"
+        },
+        "range": {
+          "zh": "Protein|Ligand",
+          "en": "Protein|Ligand"
+        },
+        "inverse": {
+          "zh": "bound_by",
+          "en": "bound_by"
+        },
+        "definition": {
+          "zh": "直接物理结合",
+          "en": "Direct physical binding"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "expressed_in",
+          "en": "expressed_in"
+        },
+        "domain": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "range": {
+          "zh": "Cell",
+          "en": "Cell"
+        },
+        "inverse": {
+          "zh": "expresses",
+          "en": "expresses"
+        },
+        "definition": {
+          "zh": "在特定实验条件检测到表达",
+          "en": "Detected expression under the specified experimental conditions"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "located_in",
+          "en": "located_in"
+        },
+        "domain": {
+          "zh": "Cell",
+          "en": "Cell"
+        },
+        "range": {
+          "zh": "Tissue|Region|Ganglion",
+          "en": "Tissue|Region|Ganglion"
+        },
+        "inverse": {
+          "zh": "contains",
+          "en": "contains"
+        },
+        "definition": {
+          "zh": "解剖定位",
+          "en": "Anatomical localization"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "secreted_by",
+          "en": "secreted_by"
+        },
+        "domain": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "range": {
+          "zh": "Cell",
+          "en": "Cell"
+        },
+        "inverse": {
+          "zh": "secretes",
+          "en": "secretes"
+        },
+        "definition": {
+          "zh": "由该细胞分泌",
+          "en": "Secreted by this cell"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "modulates",
+          "en": "modulates"
+        },
+        "domain": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "range": {
+          "zh": "Circuit",
+          "en": "Circuit"
+        },
+        "inverse": {
+          "zh": "modulated_by",
+          "en": "modulated_by"
+        },
+        "definition": {
+          "zh": "影响回路活动",
+          "en": "Modulates circuit activity"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "drives",
+          "en": "drives"
+        },
+        "domain": {
+          "zh": "Circuit",
+          "en": "Circuit"
+        },
+        "range": {
+          "zh": "PainType",
+          "en": "PainType"
+        },
+        "inverse": {
+          "zh": "driven_by",
+          "en": "driven_by"
+        },
+        "definition": {
+          "zh": "因果促进疼痛表型",
+          "en": "Causally promotes a pain phenotype"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "inhibits",
+          "en": "inhibits"
+        },
+        "domain": {
+          "zh": "Intervention",
+          "en": "Intervention"
+        },
+        "range": {
+          "zh": "Protein|Interaction",
+          "en": "Protein|Interaction"
+        },
+        "inverse": {
+          "zh": "inhibited_by",
+          "en": "inhibited_by"
+        },
+        "definition": {
+          "zh": "抑制靶点或互作",
+          "en": "Inhibits a target or interaction"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "activates",
+          "en": "activates"
+        },
+        "domain": {
+          "zh": "Protein|Ligand",
+          "en": "Protein|Ligand"
+        },
+        "range": {
+          "zh": "Protein|Cell",
+          "en": "Protein|Cell"
+        },
+        "inverse": {
+          "zh": "activated_by",
+          "en": "activated_by"
+        },
+        "definition": {
+          "zh": "促进活化",
+          "en": "Promotes activation"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "phosphorylates",
+          "en": "phosphorylates"
+        },
+        "domain": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "range": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "inverse": {
+          "zh": "phosphorylated_by",
+          "en": "phosphorylated_by"
+        },
+        "definition": {
+          "zh": "磷酸化",
+          "en": "Phosphorylates"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "glycosylated_at",
+          "en": "glycosylated_at"
+        },
+        "domain": {
+          "zh": "Protein",
+          "en": "Protein"
+        },
+        "range": {
+          "zh": "PTM",
+          "en": "PTM"
+        },
+        "inverse": {
+          "zh": "modifies",
+          "en": "modifies"
+        },
+        "definition": {
+          "zh": "位点糖基化",
+          "en": "Site-specific glycosylation"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "supported_by",
+          "en": "supported_by"
+        },
+        "domain": {
+          "zh": "Claim",
+          "en": "Claim"
+        },
+        "range": {
+          "zh": "Evidence",
+          "en": "Evidence"
+        },
+        "inverse": {
+          "zh": "supports",
+          "en": "supports"
+        },
+        "definition": {
+          "zh": "证据支持结论",
+          "en": "Evidence supports the conclusion"
+        }
+      },
+      {
+        "predicate": {
+          "zh": "contradicted_by",
+          "en": "contradicted_by"
+        },
+        "domain": {
+          "zh": "Claim",
+          "en": "Claim"
+        },
+        "range": {
+          "zh": "Evidence",
+          "en": "Evidence"
+        },
+        "inverse": {
+          "zh": "contradicts",
+          "en": "contradicts"
+        },
+        "definition": {
+          "zh": "证据反驳或限制结论",
+          "en": "Evidence contradicts or limits the conclusion"
+        }
+      }
+    ]
+  },
+  "license": "CC-BY-4.0",
+  "synthetic_demo": true,
+  "disclaimer": {
+    "zh": "不得将本包用于科研结论、医疗判断或候选优先级决策。",
+    "en": "Do not use this package for scientific conclusions, medical decisions, or candidate prioritization."
+  }
+}

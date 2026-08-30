@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend
+spec:
+  replicas: {{ .Values.replicas.frontend }}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-frontend}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-frontend}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontendImage.repository }}:{{ .Values.frontendImage.tag }}"
+          imagePullPolicy: {{ .Values.frontendImage.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /, port: http}, initialDelaySeconds: 3}
+          livenessProbe: {httpGet: {path: /, port: http}, initialDelaySeconds: 10}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend
+spec:
+  selector: {app: {{ .Release.Name }}-frontend}
+  ports: [{name: http, port: {{ .Values.service.frontendPort }}, targetPort: http}]

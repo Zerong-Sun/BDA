@@ -1,0 +1,1 @@
+"""Iterative design campaign domain."""

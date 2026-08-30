@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci(deps)"
+
+  - package-ecosystem: "pip"
+    directory: "/backend_v2"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(backend)"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(frontend)"
+
+  - package-ecosystem: "docker"
+    directory: "/backend_v2"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(docker)"

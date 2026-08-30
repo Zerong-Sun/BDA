@@ -1,0 +1,34 @@
+{
+  "manifest_schema_version": "1.0",
+  "package_id": "pd1-demo-v1",
+  "package_version": "1.0.0",
+  "license": "CC-BY-4.0",
+  "synthetic_demo": true,
+  "package_file": "frontend/public/research-packages/pd1-demo-v1.json",
+  "package_file_sha256": "abb93a3fd67daa13af2829e04fdf8ea18980751013ee9131a3e94397a47f0cbd",
+  "package_semantic_sha256": "484e5077390906df5a3c96449d77778a525a4c8daecec28dd12f7f1d9dada007",
+  "candidates": [
+    {
+      "candidate_id": "a0172",
+      "classification": "synthetic_demo",
+      "metrics": {"demo_rank": 1, "demo_confidence": 0.82},
+      "structure": {"path": "structures/PD1Binder_a0172.pdb", "sha256": "a8c0275b94aafbf228d50818b62676dde9f5bb777f85114305f3714a6ff13735"},
+      "complex": {"path": "complexes/PD1Binder_a0172_complex.pdb", "sha256": "a1f69bcb55932270d7cabac0355840ddf1ba6fac29700569b6d4de63ec93d256"}
+    },
+    {
+      "candidate_id": "b1923",
+      "classification": "synthetic_demo",
+      "metrics": {"demo_rank": 2, "demo_confidence": 0.74},
+      "structure": {"path": "structures/PD1Binder_b1923.pdb", "sha256": "2a11593ec0b3d62914917d03d69e6a635ca337f9be55d6f6d1319b4a5cc6f0b9"},
+      "complex": {"path": "complexes/PD1Binder_b1923_complex.pdb", "sha256": "209eefbefd577c468a7ce9cd30101beabb0ac04c82b8a4596244c7c39c7e9651"}
+    },
+    {
+      "candidate_id": "c4361",
+      "classification": "synthetic_demo",
+      "metrics": {"demo_rank": 3, "demo_confidence": 0.67},
+      "structure": {"path": "structures/PD1Binder_c4361.pdb", "sha256": "e4aded1d0e353056d735b0c708a5f59b8ba3b29607ff7dcf252f2ada4d224225"},
+      "complex": {"path": "complexes/PD1Binder_c4361_complex.pdb", "sha256": "1093167a7cecd2a818fd2bed4bcb398bda50d8eab7741c06dd11eed2f17a4470"}
+    }
+  ],
+  "disclaimer": "Precomputed synthetic demo only; not a model run or experimental conclusion."
+}

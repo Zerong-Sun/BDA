@@ -1,0 +1,87 @@
+image:
+  repository: bda/backend-v2
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontendImage:
+  repository: bda/frontend-v2
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas:
+  api: 2
+  frontend: 2
+  worker: 2
+  researchWorker: 2
+  copilotWorker: 2
+
+service:
+  port: 8200
+  frontendPort: 80
+
+existingSecret: bda-v2-secrets
+
+ingress:
+  enabled: true
+  className: nginx
+  host: bda.example.invalid
+  tlsSecret: bda-tls
+config:
+  environment: production
+  databasePoolSize: "20"
+  databaseMaxOverflow: "20"
+  minioSecure: "true"
+  minioPublicEndpoint: artifacts.bda.example.invalid
+  minioRegion: us-east-1
+  computeBackend: lsf
+  exposeDocs: "false"
+  writesEnabled: "false"
+  # Where the API writes BYOK provider keys and the LLM workers read them. Must be inside
+  # the mounted claim below, because every pod's root filesystem is read-only.
+  llmSecretDir: /var/lib/bda/secrets
+  # Site-specific; the chart refuses to render with computeBackend "lsf" until these and a
+  # credential are supplied, rather than deploying something that cannot dispatch.
+  lsf:
+    sshHost: ""
+    sshUser: ""
+    sshPort: "22"
+    remoteRoot: ""
+    queue: normal
+    connectTimeoutSeconds: "10"
+    # ssh: the worker stages inputs and retrieves outputs over SFTP, so compute nodes need
+    # no route to the object store. presigned: the job fetches from object storage itself.
+    stagingMode: ssh
+    uploadWrapper: /usr/local/bin/bda-minio-upload
+
+# Mounted read-only into the pod that dispatches to the cluster. The application resolves
+# the credential through a `file:` reference, so the value must be a real path, never an
+# environment variable.
+lsfCredentials:
+  secretName: bda-v2-lsf
+  mountPath: /var/run/secrets/bda/lsf
+  # Set exactly one, matching a key in the secret.
+  keyFile: ""
+  passwordFile: ""
+
+# BYOK keys outlive a pod and are shared between the API and the LLM workers, so an
+# emptyDir is not sufficient: a key saved via one replica must be readable by the others.
+byokStorage:
+  enabled: true
+  existingClaim: ""
+  size: 1Gi
+  storageClassName: ""
+  accessMode: ReadWriteMany
+
+resources:
+  api:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  worker:
+    requests: {cpu: 500m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
+  researchWorker:
+    requests: {cpu: 500m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
+  copilotWorker:
+    requests: {cpu: 500m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}

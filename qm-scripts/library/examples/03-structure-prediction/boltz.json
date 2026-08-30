@@ -1,0 +1,26 @@
+{
+  "description": "Predict a complex structure with Boltz-2 from a YAML input, using the hosted MSA server so no local databases are required.",
+  "model": "boltz",
+  "executable": "boltz",
+  "scheduler": {
+    "job_name": "boltz2",
+    "queue": "gpu-bme-liz",
+    "cpus": 8,
+    "gpus": 1
+  },
+  "setup": [
+    "module purge",
+    "source activate /work/bme-sunzr/.conda/envs/boltz"
+  ],
+  "parameters": {
+    "input_path": "./input/complex.yaml",
+    "out_dir": "./output",
+    "model": "boltz2",
+    "use_msa_server": true,
+    "recycling_steps": 3,
+    "sampling_steps": 200,
+    "diffusion_samples": 5,
+    "output_format": "mmcif",
+    "seed": 37
+  }
+}

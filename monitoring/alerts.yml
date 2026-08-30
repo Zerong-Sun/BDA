@@ -1,0 +1,22 @@
+groups:
+  - name: bda-api-availability
+    rules:
+      - alert: ApiDown
+        expr: up{job="bda-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BDA API is down"
+          description: "Prometheus has not been able to scrape the BDA API for over 1 minute."
+
+  - name: bda-infra
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target missing ({{ $labels.job }})"
+          description: "A scrape target has been unreachable for more than 2 minutes."

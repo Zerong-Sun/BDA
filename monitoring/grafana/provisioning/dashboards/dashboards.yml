@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: BDA
+    orgId: 1
+    folder: BDA
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

@@ -1,0 +1,26 @@
+{
+  "description": "Design amino-acid sequences for a fixed backbone with ProteinMPNN (inverse folding). Run this after generating or choosing a backbone.",
+  "model": "proteinmpnn",
+  "executable": "/work/bme-liz/software/proteinmpnn-main/protein_mpnn_run.py",
+  "scheduler": {
+    "job_name": "proteinmpnn",
+    "queue": "4v100-16-e5",
+    "cpus": 1,
+    "gpus": 1
+  },
+  "setup": [
+    "source activate /work/bme-liz/miniconda3/envs/mlfold"
+  ],
+  "parameters": {
+    "jsonl_path": "./input/parsed_pdbs.jsonl",
+    "chain_id_jsonl": "./input/assigned_pdbs.jsonl",
+    "fixed_positions_jsonl": "./input/fixed_pdbs.jsonl",
+    "out_folder": "./output",
+    "num_seq_per_target": 10,
+    "sampling_temp": "0.1 0.2",
+    "batch_size": 1,
+    "seed": 37,
+    "save_score": 1,
+    "save_probs": 1
+  }
+}

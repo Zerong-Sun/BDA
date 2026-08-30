@@ -1,0 +1,29 @@
+{
+  "description": "Predict a complex structure with AlphaFold3 from a fold-input JSON, running both the data pipeline and inference.",
+  "model": "alphafold3",
+  "executable": "python /share/apps/alphafold3-v3.0.1/run_alphafold.py",
+  "scheduler": {
+    "job_name": "alphafold3",
+    "queue": "gpu-bme-liz",
+    "cpus": 16,
+    "gpus": 1
+  },
+  "setup": [
+    "module purge",
+    "module load cuda/12.6",
+    "source /share/apps/anaconda3/bin/activate /share/apps/anaconda3/envs/alphafold3-v3.0.1",
+    "export XLA_FLAGS=--xla_gpu_enable_triton_gemm=false",
+    "export XLA_PYTHON_CLIENT_PREALLOCATE=true",
+    "export XLA_CLIENT_MEM_FRACTION=0.95"
+  ],
+  "parameters": {
+    "json_path": "./input/fold_input.json",
+    "output_dir": "./output",
+    "model_dir": "/work/bme-liz/db/af3/models",
+    "db_dir": ["/share/apps/alphafold3-data"],
+    "run_data_pipeline": true,
+    "run_inference": true,
+    "num_recycles": 10,
+    "num_diffusion_samples": 5
+  }
+}

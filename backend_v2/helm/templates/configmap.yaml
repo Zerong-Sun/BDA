@@ -1,0 +1,48 @@
+{{- include "bda.validateLsf" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  BDA_V2_ENVIRONMENT: {{ .Values.config.environment | quote }}
+  BDA_V2_DATABASE_POOL_SIZE: {{ .Values.config.databasePoolSize | quote }}
+  BDA_V2_DATABASE_MAX_OVERFLOW: {{ .Values.config.databaseMaxOverflow | quote }}
+  BDA_V2_MINIO_SECURE: {{ .Values.config.minioSecure | quote }}
+  BDA_V2_MINIO_PUBLIC_ENDPOINT: {{ required "config.minioPublicEndpoint is required" .Values.config.minioPublicEndpoint | quote }}
+  BDA_V2_MINIO_REGION: {{ .Values.config.minioRegion | quote }}
+  BDA_V2_COMPUTE_BACKEND: {{ .Values.config.computeBackend | quote }}
+  BDA_V2_EXPOSE_DOCS: {{ .Values.config.exposeDocs | quote }}
+  BDA_V2_WRITES_ENABLED: {{ .Values.config.writesEnabled | quote }}
+  BDA_V2_LLM_LOCAL_SECRET_DIR: {{ .Values.config.llmSecretDir | quote }}
+  BDA_V2_LSF_SSH_HOST: {{ .Values.config.lsf.sshHost | quote }}
+  BDA_V2_LSF_SSH_PORT: {{ .Values.config.lsf.sshPort | quote }}
+  BDA_V2_LSF_REMOTE_ROOT: {{ .Values.config.lsf.remoteRoot | quote }}
+  BDA_V2_LSF_QUEUE: {{ .Values.config.lsf.queue | quote }}
+  BDA_V2_LSF_CONNECT_TIMEOUT_SECONDS: {{ .Values.config.lsf.connectTimeoutSeconds | quote }}
+  BDA_V2_LSF_STAGING_MODE: {{ .Values.config.lsf.stagingMode | quote }}
+  BDA_V2_LSF_UPLOAD_WRAPPER: {{ .Values.config.lsf.uploadWrapper | quote }}
+  {{- if .Values.config.lsf.sshUser }}
+  BDA_V2_LSF_SSH_USER: {{ .Values.config.lsf.sshUser | quote }}
+  {{- end }}
+  {{- if .Values.lsfCredentials.keyFile }}
+  BDA_V2_LSF_SSH_KEY_PATH: {{ printf "%s/%s" .Values.lsfCredentials.mountPath .Values.lsfCredentials.keyFile | quote }}
+  {{- end }}
+  {{- if .Values.lsfCredentials.passwordFile }}
+  {{- /* A file: reference, never the value: env is visible in every child process. */}}
+  BDA_V2_LSF_SSH_PASSWORD_REF: {{ printf "file:%s/%s" .Values.lsfCredentials.mountPath .Values.lsfCredentials.passwordFile | quote }}
+  {{- end }}
+{{- if and .Values.byokStorage.enabled (not .Values.byokStorage.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-byok
+spec:
+  accessModes: [{{ .Values.byokStorage.accessMode }}]
+  resources:
+    requests:
+      storage: {{ .Values.byokStorage.size }}
+  {{- if .Values.byokStorage.storageClassName }}
+  storageClassName: {{ .Values.byokStorage.storageClassName }}
+  {{- end }}
+{{- end }}

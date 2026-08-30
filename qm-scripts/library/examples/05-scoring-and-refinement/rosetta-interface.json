@@ -1,0 +1,27 @@
+{
+  "description": "Score and refine a protein-protein complex with Rosetta scripts (interface analysis). Run this to rank designed complexes after prediction.",
+  "model": "rosetta",
+  "executable": "mpirun -np 24 /work/ccse-yangyc/apps/il/rosetta/source/bin/rosetta_scripts.mpi.linuxgccrelease",
+  "scheduler": {
+    "job_name": "rosetta-interface",
+    "queue": "v3-64",
+    "cpus": 24,
+    "gpus": 0
+  },
+  "setup": [
+    "module purge"
+  ],
+  "parameters": {
+    "application": "rosetta_scripts",
+    "s": "./input/complex.pdb",
+    "parser:protocol": "./input/score.xml",
+    "nstruct": 1,
+    "score:weights": "beta_nov16",
+    "ex1": true,
+    "ex2": true,
+    "overwrite": true,
+    "out:path:all": "./output",
+    "out:file:scorefile": "./output/score.sc",
+    "ignore_unrecognized_res": true
+  }
+}

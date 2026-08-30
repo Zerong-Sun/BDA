@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least-privilege default token; jobs opt into more only if needed.
+permissions:
+  contents: read
+
+jobs:
+  backend-v2:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bda_v2
+          POSTGRES_USER: bda
+          POSTGRES_PASSWORD: bda-test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bda -d bda_v2"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:bda-test@localhost:5432/bda_v2
+      BDA_V2_RUN_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend_v2/pyproject.toml
+      - name: Install v2 dependencies
+        run: pip install -e './backend_v2[dev]'
+      # Separate steps, each running even after an earlier one fails. Combined in
+      # one `run:` block these masked each other: bash -e stops at the first
+      # failure, so ruff hid mypy, and the failed step hid the test run entirely.
+      # Three layers of breakage stayed invisible that way for months.
+      - name: Lint
+        run: ruff check backend_v2
+      - name: Type check
+        if: ${{ !cancelled() }}
+        run: mypy backend_v2/app backend_v2/scripts
+      - name: Upgrade schema
+        if: ${{ !cancelled() }}
+        run: alembic -c backend_v2/alembic.ini upgrade head
+      - name: Test v2
+        if: ${{ !cancelled() }}
+        run: >-
+          pytest backend_v2/tests
+          --cov=backend_v2/app
+          --cov-report=term-missing --cov-report=json:backend_v2/coverage.json
+      - name: Enforce coverage gates
+        run: python backend_v2/scripts/check_coverage.py backend_v2/coverage.json
+      - name: Enforce research package branch coverage
+        run: >-
+          pytest backend_v2/tests/test_research_package_validation.py
+          --cov=backend_v2.app.research.package_validation --cov-branch
+          --cov-report=term-missing --cov-fail-under=95
+      - name: Reject OpenAPI contract drift
+        run: |
+          PYTHONPATH=. python backend_v2/scripts/export_openapi.py backend_v2/openapi.json
+          git diff --exit-code -- backend_v2/openapi.json
+      - name: Validate v2 data-flow matrix and write permissions
+        run: PYTHONPATH=. python backend_v2/scripts/check_flow_matrix.py contracts/v2-flow-matrix.yaml
+      - name: Reject plugin catalog drift
+        run: |
+          PYTHONPATH=. python backend_v2/scripts/check_plugin_catalog_drift.py qm-scripts/library/catalog.json
+          python qm-scripts/plugins/generate_docs.py --check
+      - name: Validate documentation inventory and links
+        run: PYTHONPATH=. python backend_v2/scripts/check_document_inventory.py
+      - name: Reject unexplained slot reservations
+        run: PYTHONPATH=. python backend_v2/scripts/check_plugin_cpu_declarations.py
+      - name: Reject model/migration drift
+        run: alembic -c backend_v2/alembic.ini check
+      - name: Verify downgrade
+        run: alembic -c backend_v2/alembic.ini downgrade base
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Install browser for vertical slice smoke
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Reject generated API type drift
+        working-directory: frontend
+        run: |
+          npm run generate:api
+          git diff --exit-code -- src/lib/api/generated
+      - name: Enforce generated v2 transport boundary
+        run: |
+          if rg -n 'apiRequest' frontend/src; then
+            echo 'Ordinary REST calls must use the generated v2 SDK.' >&2
+            exit 1
+          fi
+          if rg -n -P '\bfetch\(' frontend/src \
+            --glob '!frontend/src/lib/api/client.ts' \
+            --glob '!frontend/src/lib/api/generatedTransport.ts' \
+            --glob '!frontend/src/lib/api/generated/**' \
+            --glob '!frontend/src/lib/api/artifacts.ts' \
+            --glob '!frontend/src/lib/api/copilot.ts' \
+            --glob '!frontend/src/lib/api/sse.ts' \
+            --glob '!frontend/src/lib/api/researchPackages.ts' \
+            --glob '!frontend/src/features/pdb-viewer/structureLoader.ts' \
+            --glob '!**/*.test.*'; then
+            echo 'Raw fetch is limited to transport, SSE, presigned object transfer, and structure URLs.' >&2
+            exit 1
+          fi
+      - name: Test
+        working-directory: frontend
+        run: npm test
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Reject retired runtime contracts
+        run: |
+          ! rg '/api/v1|submit-to-compute|/jobs/.*/sync|experiment-results/upload|copilot/literature' frontend/src backend_v2/app docker-compose.yml nginx backend_v2/helm
+          ! rg 'docker\.sock|sqlite:///' docker-compose.yml nginx backend_v2/helm backend_v2/app
+      - name: Browser vertical slice smoke
+        working-directory: frontend
+        run: npm run test:browser
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Python dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend_v2/requirements.txt
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Node dependency audit
+        working-directory: frontend
+        run: npm audit --omit=dev
+      - name: Filesystem & config vulnerability scan (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Build v2 container
+        run: docker build -f backend_v2/Dockerfile -t bda-backend-v2:ci .
+      # The image ships without pip or setuptools. A library that reaches for pkg_resources
+      # at import time would fail only at runtime, which no other step here would catch.
+      - name: Verify the runtime image imports without build tooling
+        run: >-
+          docker run --rm --entrypoint python bda-backend-v2:ci -c
+          "import backend_v2.app.main, backend_v2.app.compute.tasks, backend_v2.app.core.celery_app,
+          alembic, uvicorn; print('runtime imports ok')"
+      - name: Scan v2 container (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: bda-backend-v2:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Build frontend v2 container
+        run: docker build -f frontend/Dockerfile --build-arg VITE_API_BASE=/api/v2 -t bda-frontend-v2:ci .
+      - name: Scan frontend v2 container (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: bda-frontend-v2:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  # No deploy job is defined until a real staging target, credentials, and
+  # rollback path exist. A successful placeholder deploy is worse than no deploy.

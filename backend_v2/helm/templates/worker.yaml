@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+spec:
+  replicas: {{ .Values.replicas.worker }}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-worker}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-worker}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend_v2.app.compute.tasks.celery_app", "worker", "-Q", "dispatch,poll,collect,maintenance", "--loglevel=info"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          envFrom:
+            - configMapRef: {name: {{ .Release.Name }}-config}
+            - secretRef: {name: {{ .Values.existingSecret }}}
+          resources: {{- toYaml .Values.resources.worker | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "bda.lsfVolumeMount" . | nindent 12 }}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        {{- include "bda.lsfVolume" . | nindent 8 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-research-worker
+spec:
+  replicas: {{ .Values.replicas.researchWorker }}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-research-worker}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-research-worker}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: research-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend_v2.app.compute.tasks.celery_app", "worker", "-Q", "research", "--loglevel=info"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          envFrom:
+            - configMapRef: {name: {{ .Release.Name }}-config}
+            - secretRef: {name: {{ .Values.existingSecret }}}
+          resources: {{- toYaml .Values.resources.researchWorker | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "bda.byokVolumeMount" . | nindent 12 }}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        {{- include "bda.byokVolume" . | nindent 8 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-copilot-worker
+spec:
+  replicas: {{ .Values.replicas.copilotWorker }}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-copilot-worker}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-copilot-worker}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: copilot-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend_v2.app.compute.tasks.celery_app", "worker", "-Q", "copilot", "--loglevel=info"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          envFrom:
+            - configMapRef: {name: {{ .Release.Name }}-config}
+            - secretRef: {name: {{ .Values.existingSecret }}}
+          resources: {{- toYaml .Values.resources.copilotWorker | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "bda.byokVolumeMount" . | nindent 12 }}
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        {{- include "bda.byokVolume" . | nindent 8 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-beat}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-beat}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: beat
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["celery", "-A", "backend_v2.app.compute.tasks.celery_app", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          envFrom:
+            - configMapRef: {name: {{ .Release.Name }}-config}
+            - secretRef: {name: {{ .Values.existingSecret }}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
