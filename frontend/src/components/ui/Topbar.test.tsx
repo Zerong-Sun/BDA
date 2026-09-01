@@ -49,7 +49,7 @@ describe('Topbar logout', () => {
 
   afterEach(cleanup)
 
-  it('clears only authentication session data', () => {
+  it('clears authentication and project-scoped browser state while preserving preferences', () => {
     sessionStorage.setItem('bda_token', 'token')
     sessionStorage.setItem(
       'bda_user',
@@ -63,7 +63,7 @@ describe('Topbar logout', () => {
 
     expect(sessionStorage.getItem('bda_token')).toBeNull()
     expect(sessionStorage.getItem('bda_user')).toBeNull()
-    expect(useAppStore.getState().activeProjectId).toBe('proj_live')
+    expect(useAppStore.getState().activeProjectId).toBe('')
     expect(useAppStore.getState().language).toBe('zh')
     expect(useAppStore.getState().copilotOpen).toBe(false)
     expect(window.location.hash).toContain('/login')

@@ -34,6 +34,7 @@ from .service import (
     create_project_prompt_draft,
     dedupe_builtin_research_projects,
     require_project,
+    require_project_permission,
     require_project_prompt_draft,
     soft_delete_project,
     update_project,
@@ -160,7 +161,11 @@ def patch_project(
     user: User = Depends(require_command),
 ) -> ProjectResponse:
     project = update_project(
-        session, require_project(session, project_id, user), payload, user, _version_header(if_match)
+        session,
+        require_project_permission(session, project_id, user, "write"),
+        payload,
+        user,
+        _version_header(if_match),
     )
     response.headers["ETag"] = f'W/"{project.version}"'
     return ProjectResponse.model_validate(project)
@@ -172,7 +177,7 @@ def delete_project(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> DeleteResponse:
-    project = require_project(session, project_id, user)
+    project = require_project_permission(session, project_id, user, "manage")
     soft_delete_project(session, project, user)
     return DeleteResponse(id=project.id, deleted=True)
 

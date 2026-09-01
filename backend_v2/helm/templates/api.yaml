@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-api
+  labels: {app: {{ .Release.Name }}-api}
 spec:
   replicas: {{ .Values.replicas.api }}
   selector:
@@ -18,7 +19,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: api
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "bda.backendImage" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["uvicorn", "backend_v2.app.main:app", "--host", "0.0.0.0", "--port", "8200"]
           securityContext:

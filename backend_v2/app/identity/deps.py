@@ -6,7 +6,7 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.problem import DomainError
 from .models import User
 from .repository import IdentityRepository
@@ -29,6 +29,7 @@ def _resolve_user(
     user = IdentityRepository(session).user_by_id(user_id)
     if user is None or not user.enabled:
         raise DomainError("invalid_token", "Access token user is unavailable", status_code=401)
+    set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
     return user
 
 

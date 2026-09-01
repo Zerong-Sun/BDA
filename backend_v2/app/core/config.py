@@ -17,9 +17,15 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = "postgresql+psycopg://bda:bda@localhost:5433/bda_v2"
-    database_pool_size: int = Field(default=20, ge=5, le=100)
-    database_max_overflow: int = Field(default=20, ge=0, le=100)
+    database_pool_size: int = Field(default=5, ge=1, le=100)
+    database_max_overflow: int = Field(default=5, ge=0, le=100)
     redis_url: str = "redis://localhost:6380/0"
+    rate_limit_enabled: bool = True
+    rate_limit_fail_closed: bool = False
+    rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600)
+    rate_limit_login: int = Field(default=10, ge=1, le=10_000)
+    rate_limit_write: int = Field(default=120, ge=1, le=100_000)
+    rate_limit_expensive: int = Field(default=30, ge=1, le=100_000)
     celery_broker_url: str = "redis://localhost:6380/1"
     jwt_secret: str = "development-only-change-this-bda-v2-secret"
     jwt_issuer: str = "bda-v2"
@@ -65,6 +71,12 @@ class Settings(BaseSettings):
     # working directory happened to be or failed outright on a read-only root filesystem.
     llm_local_secret_dir: str = "/var/lib/bda/secrets"
     external_research_sources_json: str = "{}"
+    research_package_dir: str = "frontend/public/research-packages"
+    allow_legacy_research_package_payload: bool = False
+    build_revision: str = "development"
+    schema_revision: str = "0049_autopilot_formalization"
+    worker_queues: str = ""
+    required_worker_queues: str = ""
     writes_enabled: bool = True
     oidc_providers_json: str = "{}"
     otel_endpoint: str | None = None
@@ -77,6 +89,14 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def worker_queue_list(self) -> list[str]:
+        return [item.strip() for item in self.worker_queues.split(",") if item.strip()]
+
+    @property
+    def required_worker_queue_list(self) -> list[str]:
+        return [item.strip() for item in self.required_worker_queues.split(",") if item.strip()]
 
     @property
     def oidc_providers(self) -> dict[str, dict[str, str]]:
@@ -127,6 +147,8 @@ class Settings(BaseSettings):
         if self.is_production:
             if len(self.jwt_secret) < 32 or "development" in self.jwt_secret:
                 raise ValueError("production jwt_secret must be a strong secret")
+            if not self.rate_limit_enabled or not self.rate_limit_fail_closed:
+                raise ValueError("production rate limiting must be enabled and fail closed")
             if not self.cors_origins_list or "*" in self.cors_origins_list:
                 raise ValueError("production cors_origins must be an explicit allowlist")
             if self.compute_backend == "demo":

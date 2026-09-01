@@ -8,12 +8,28 @@ a row, so they need no fixture at all.
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
+from unittest.mock import Mock
+
+from backend_v2.app.artifacts.models import Artifact
+from backend_v2.app.candidates.models import Candidate
+from backend_v2.app.compute.models import OutboxEvent
+from backend_v2.app.literature.models import LiteratureDocument
+from backend_v2.app.platform.models import Operation
 from backend_v2.app.projects.models import Project
+from backend_v2.app.research.models import ResearchFinding
 from backend_v2.app.research.package_import import (
     BUILTIN_RESEARCH_PACKAGE_PREFIXES,
+    _candidate_card,
     _managed_package_match,
+    _project_completeness_score,
     _project_package_meta,
+    _reconcile_managed_project,
+    _structure_operations,
+    _upsert_candidates,
 )
+from backend_v2.app.targets.models import Target
 
 
 def _project(localized_content: object) -> Project:
@@ -62,3 +78,214 @@ def test_managed_match_treats_versions_in_one_builtin_family_as_managed() -> Non
 def test_managed_match_handles_a_missing_row_value() -> None:
     assert _managed_package_match(None, "pkg-42") is False
     assert _managed_package_match(None, f"{BUILTIN_RESEARCH_PACKAGE_PREFIXES[0]}-x") is False
+
+
+def test_candidate_card_extracts_one_markdown_section() -> None:
+    review = {
+        "en": "# Review\n## C-1\nFirst card\n\n## C-2\nSecond card",
+        "zh": "# 综述\n## C-1\n第一张卡",
+    }
+
+    assert _candidate_card(review, "C-1", "en") == "## C-1\nFirst card"
+    assert _candidate_card(review, "missing", "en") == ""
+
+
+def test_project_completeness_score_is_stable_and_total_ordered() -> None:
+    session = Mock()
+    session.scalar.side_effect = [3, 2, 4, 5, 6]
+    project_id = uuid.uuid4()
+    updated_at = datetime(2026, 8, 30, tzinfo=UTC)
+    project = Project(id=project_id, primary_target_id=uuid.uuid4(), updated_at=updated_at)
+
+    assert _project_completeness_score(session, project) == (
+        3,
+        2,
+        4,
+        5,
+        6,
+        1,
+        updated_at.isoformat(),
+        str(project_id),
+    )
+
+
+def _pain_package() -> tuple[dict, dict]:
+    candidate = {
+        "candidate_id": "C-1",
+        "target": {"zh": "候选一", "en": "Candidate one"},
+        "pain_group": {"zh": "炎症", "en": "Inflammation"},
+        "protein_type": {"zh": "受体", "en": "Receptor"},
+        "localization": {"zh": "膜", "en": "Membrane"},
+        "axis": {"zh": "免疫", "en": "Immune"},
+        "rank_in_group": 1,
+        "gene": "GENE1",
+        "reference_ids": "R1;R2",
+        "weighted_score": 9.5,
+        "evidence": 4,
+        "novelty": 3,
+        "tractability": 5,
+        "human": 4,
+        "specificity": 3,
+        "safety": 2,
+        "scored_at": "2026-08-30",
+        "rubric_version": "v1",
+    }
+    package = {
+        "package_id": "protein-knowledge-pain-targets-v1",
+        "schema_version": "1.0",
+        "candidates": [candidate],
+        "bibliometrics": [{"id": "C-1", "paper_count": 7}],
+    }
+    source = {
+        "project_review": {
+            "zh": "## C-1\n中文卡片",
+            "en": "## C-1\nEnglish card",
+        }
+    }
+    return package, source
+
+
+def test_pain_candidate_upsert_covers_create_update_and_non_pain_paths() -> None:
+    package, source = _pain_package()
+    project = Project(id=uuid.uuid4(), source_project_key="PAIN")
+    session = Mock()
+    session.scalars.return_value = []
+
+    assert _upsert_candidates(session, project, package, source) == 1
+    created = session.add.call_args.args[0]
+    assert isinstance(created, Candidate)
+    assert created.rank == 1
+    assert created.properties["bibliometrics"]["paper_count"] == 7
+    assert created.properties["localized_content"]["research_card"]["en"].startswith("## C-1")
+
+    existing = Candidate(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        candidate_key="C-1",
+        name="old",
+        candidate_kind="design_candidate",
+        status="draft",
+        rank=9,
+        score=1.0,
+        scores={},
+        properties={},
+        version=1,
+    )
+    session.scalars.return_value = [existing]
+    assert _upsert_candidates(session, project, package, source) == 1
+    assert existing.name == "候选一"
+    assert existing.version == 2
+
+    project.source_project_key = "PD1"
+    assert _upsert_candidates(session, project, package, source) == 0
+
+
+def test_reconcile_removes_only_stale_package_managed_rows() -> None:
+    project_id = uuid.uuid4()
+    target = Target(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        name="Target",
+        structure_artifact_id=uuid.uuid4(),
+        structure_status="available",
+        version=1,
+    )
+    project = Project(id=project_id, primary_target_id=target.id)
+    stale_finding = ResearchFinding(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        evidence={"package_id": "pd1-demo-old", "claim_id": "STALE"},
+    )
+    stale_candidate = Candidate(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        candidate_key="STALE",
+        properties={"source_package_id": "pd1-demo-old"},
+    )
+    stale_document = LiteratureDocument(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        external_id="STALE",
+        metadata_json={"package_id": "pd1-demo-old"},
+    )
+    stale_artifact = Artifact(
+        id=target.structure_artifact_id,
+        project_id=project_id,
+        artifact_type="target_structure",
+        deleted_at=None,
+        lineage={"source_package_id": "pd1-demo-old", "pdb_id": "OLD1"},
+        version=1,
+    )
+    stale_operation = Operation(
+        id=uuid.uuid4(),
+        project_id=project_id,
+        kind="target.structure.import",
+        status="pending",
+        progress={"source_package_id": "pd1-demo-old", "pdb_id": "OLD2"},
+        version=1,
+    )
+    event = OutboxEvent(id=stale_operation.id, published_at=None)
+    session = Mock()
+    session.scalars.side_effect = [
+        [stale_finding],
+        [stale_candidate],
+        [stale_document],
+        [stale_artifact],
+        [stale_operation],
+    ]
+    session.get.side_effect = lambda model, _id: target if model is Target else event
+    package = {
+        "package_id": "pd1-demo-v1",
+        "edges": [{"project": "PD1", "claim_id": "CURRENT"}],
+        "candidates": [],
+        "references": [{"project_ids": ["PD1"], "ref_id": "CURRENT"}],
+        "projects": [{"id": "PD1", "structures": [{"pdb_id": "NEW1"}]}],
+    }
+
+    _reconcile_managed_project(session, project, package, "PD1")
+
+    deleted = [call.args[0] for call in session.delete.call_args_list]
+    assert {stale_finding, stale_candidate, stale_document, event}.issubset(set(deleted))
+    assert stale_artifact.deleted_at is not None
+    assert target.structure_artifact_id is None
+    assert stale_operation.status == "cancelled"
+
+
+def test_structure_operations_skip_blank_existing_and_pending_structures(monkeypatch) -> None:
+    project = Project(id=uuid.uuid4(), organization_id=uuid.uuid4())
+    target = Target(id=uuid.uuid4(), project_id=project.id, name="Target")
+    existing = Artifact(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        artifact_type="target_structure",
+        lineage={"pdb_id": "EXIST"},
+        version=1,
+    )
+    pending = Operation(progress={"pdb_id": "WAIT"})
+    session = Mock()
+    session.scalars.side_effect = [[existing], [pending]]
+    enqueue = Mock()
+    monkeypatch.setattr("backend_v2.app.research.package_import.enqueue_operation", enqueue)
+    source = {
+        "id": "PD1",
+        "primary_target": {"pdb_id": "WAIT"},
+        "structures": [
+            {"pdb_id": ""},
+            {"pdb_id": "exist", "name": "Existing", "method": "demo"},
+            {"pdb_id": "wait"},
+        ],
+    }
+
+    result = _structure_operations(
+        session,
+        project,
+        target,
+        source,
+        {"package_id": "pd1-demo-v1", "schema_version": "1.0"},
+        Mock(id=uuid.uuid4()),
+    )
+
+    assert result == []
+    assert existing.lineage["source_package_id"] == "pd1-demo-v1"
+    assert existing.version == 2
+    enqueue.assert_not_called()

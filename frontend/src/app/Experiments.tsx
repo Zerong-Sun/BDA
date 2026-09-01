@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { PlayCircle, X } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/reui/alert'
@@ -20,7 +20,7 @@ import { WorkflowProgress } from '../features/experiments/WorkflowProgress'
 import { ProjectLibrary } from '../features/experiments/ProjectLibrary'
 import { ManageProjectDrawer } from '../features/experiments/ManageProjectDrawer'
 import { CampaignPanel } from '../features/research/CampaignPanel'
-import { findDemoProject } from '../features/tour'
+import { findDemoProject, isDemoProject } from '../features/tour'
 
 export function ExperimentsPage() {
   const { t, format, language } = useI18n()
@@ -81,6 +81,14 @@ export function ExperimentsPage() {
             <Button type="button" onClick={openCreate}>
               {t.common.newExperiment}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!projectId}
+              render={projectId ? <Link to={`/autopilot?project=${encodeURIComponent(projectId)}`} /> : undefined}
+            >
+              Autopilot
+            </Button>
           </div>
         }
       />
@@ -89,6 +97,16 @@ export function ExperimentsPage() {
         <Alert className="mb-5" variant="warning">
           <AlertTitle>{t.demoMode}</AlertTitle>
           <AlertDescription>{t.workflowExt.toolbar.demoMode}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {activeProject && isDemoProject(activeProject) ? (
+        <Alert className="mb-5" variant="warning">
+          <AlertDescription>
+            {language === 'zh'
+              ? 'PD‑1 项目仅包含预计算的合成演示数据；它不是实时模型运行、真实实验结果或科研结论。'
+              : 'The PD-1 project contains precomputed synthetic demo data only; it is not a live model run, experimental result, or research conclusion.'}
+          </AlertDescription>
         </Alert>
       ) : null}
 

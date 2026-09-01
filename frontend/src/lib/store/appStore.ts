@@ -109,6 +109,7 @@ interface AppState {
   restartTour: () => void
   completeTour: () => void
   setTourMenuOpen: (open: boolean) => void
+  resetAuthenticatedState: () => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -240,21 +241,28 @@ export const useAppStore = create<AppState>()(
         tourMenuOpen: false,
       })),
       setTourMenuOpen: (tourMenuOpen) => set({ tourMenuOpen }),
+      resetAuthenticatedState: () => set({
+        appMode: 'application',
+        activeProjectId: '',
+        copilotMessages: [],
+        copilotSessions: {},
+        copilotDraft: '',
+        copilotSelectedEntityIds: [],
+        copilotOpen: false,
+        settingsOpen: false,
+        activityOpen: false,
+        targetIntakeOpen: false,
+        deletingProjectId: null,
+        workflowSeed: null,
+        tourMenuOpen: false,
+      }),
     }),
     {
       name: 'bda-app-store',
       partialize: (state) => ({
         language: state.language,
-        appMode: state.appMode,
         uiDensity: state.uiDensity,
         themePreference: state.themePreference,
-        activeProjectId: state.activeProjectId,
-        copilotMessages: state.copilotMessages,
-        copilotSessions: state.copilotSessions,
-        copilotOpen: state.copilotOpen,
-        settingsOpen: state.settingsOpen,
-        copilotWidth: state.copilotWidth,
-        targetIntakeOpen: state.targetIntakeOpen,
         tourState: state.tourState,
       }),
     },

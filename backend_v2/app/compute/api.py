@@ -13,9 +13,10 @@ from sse_starlette.sse import EventSourceResponse
 from ..core.database import SessionFactory, get_session
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
+from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
 from ..workflows.repository import WorkflowRepository
 from .repository import ComputeRepository
 from .schemas import (
@@ -94,7 +95,7 @@ def submit_workflow(
     workflow = WorkflowRepository(session).get(workflow_id)
     if workflow is None:
         raise DomainError("workflow_not_found", "Workflow run was not found", status_code=404)
-    project = require_project(session, workflow.project_id, user)
+    project = require_project_permission(session, workflow.project_id, user, "compute")
     submission, jobs = create_submission(
         session,
         workflow=workflow,
@@ -195,7 +196,7 @@ def cancel_job(
     job = ComputeRepository(session).job(job_id)
     if job is None:
         raise DomainError("job_not_found", "Job was not found", status_code=404)
-    project = require_project(session, job.project_id, user)
+    project = require_project_permission(session, job.project_id, user, "compute")
     request_cancel(session, job, project, user)
     return CancelResponse(id=job.id, status=job.status)
 
@@ -214,7 +215,7 @@ def retry_failed_job(
     job = ComputeRepository(session).job(job_id)
     if job is None:
         raise DomainError("job_not_found", "Job was not found", status_code=404)
-    project = require_project(session, job.project_id, user)
+    project = require_project_permission(session, job.project_id, user, "compute")
     return JobResponse.model_validate(retry_job(session, job, project, user))
 
 
@@ -250,7 +251,7 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
                 return
             await asyncio.sleep(1)
 
-    return EventSourceResponse(stream())
+    return EventSourceResponse(observed_sse("jobs", stream()))
 
 
 @router.post(
@@ -262,7 +263,7 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
 def post_compute_draft(
     payload: ComputeDraftCreate, session: Session = Depends(get_session), user: User = Depends(require_command)
 ) -> ComputeDraftResponse:
-    require_project(session, payload.project_id, user)
+    require_project_permission(session, payload.project_id, user, "compute")
     row = create_compute_draft(session, payload, user)
     return ComputeDraftResponse.model_validate(row)
 
@@ -279,6 +280,6 @@ def confirm_compute_draft(
     row = ComputeRepository(session).draft(draft_id)
     if row is None:
         raise DomainError("compute_draft_not_found", "Compute draft was not found", status_code=404)
-    project = require_project(session, row.project_id, user)
+    project = require_project_permission(session, row.project_id, user, "compute")
     confirm_draft(session, row, project, user)
     return ComputeDraftResponse.model_validate(row)

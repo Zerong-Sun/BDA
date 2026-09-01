@@ -75,9 +75,7 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
   ]
   const degradedMode =
     copilotConfig.data?.api_key_configured === false ||
-    lastMode === 'rule_based_demo' ||
-    (typeof window !== 'undefined' &&
-      sessionStorage.getItem('bda_copilot_last_mode') === 'rule_based_demo')
+    lastMode === 'rule_based_demo'
 
   const handleSend = async () => {
     const trimmed = input.trim()

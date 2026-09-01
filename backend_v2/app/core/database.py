@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
@@ -62,3 +62,27 @@ def session_scope() -> Generator[Session]:
         except Exception:
             session.rollback()
             raise
+
+
+def set_request_rls_context(session: Session, *, user_id: object, is_global_admin: bool) -> None:
+    """Set transaction-local values consumed by PostgreSQL RLS policies."""
+    if session.bind is None or session.bind.dialect.name != "postgresql":
+        return
+    session.execute(
+        text("select set_config('bda.user_id', :user_id, true)"),
+        {"user_id": str(user_id)},
+    )
+    session.execute(
+        text("select set_config('bda.is_global_admin', :is_admin, true)"),
+        {"is_admin": "true" if is_global_admin else "false"},
+    )
+
+
+def set_worker_rls_context(session: Session, *, project_id: object) -> None:
+    """Fence a worker transaction to the project carried by its operation."""
+    if session.bind is None or session.bind.dialect.name != "postgresql":
+        return
+    session.execute(
+        text("select set_config('bda.worker_project_id', :project_id, true)"),
+        {"project_id": str(project_id)},
+    )

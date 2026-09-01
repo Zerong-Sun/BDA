@@ -10,7 +10,7 @@ from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
 from .repository import ArtifactRepository
 from .schemas import (
     ArtifactLineageEdgeResponse,
@@ -45,7 +45,7 @@ def post_upload(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> UploadResponse:
-    project = require_project(session, payload.project_id, user)
+    project = require_project_permission(session, payload.project_id, user, "artifact")
     upload, url = create_upload(session, project, payload, user)
     return UploadResponse(
         id=upload.id,
@@ -71,7 +71,7 @@ def post_complete(
     upload = ArtifactRepository(session).upload(upload_id, for_update=True)
     if upload is None:
         raise DomainError("upload_not_found", "Artifact upload was not found", status_code=404)
-    project = require_project(session, upload.project_id, user)
+    project = require_project_permission(session, upload.project_id, user, "artifact")
     return _response(complete_upload(session, upload, payload, project, user), with_url=True)
 
 

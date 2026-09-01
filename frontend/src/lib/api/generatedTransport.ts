@@ -35,7 +35,6 @@ async function generatedFetch(input: RequestInfo | URL, init?: RequestInit): Pro
       request = new Request(original, { headers })
       response = await fetch(request)
     } catch {
-      sessionStorage.removeItem('bda_token')
       notifyUnauthorized()
     }
   }

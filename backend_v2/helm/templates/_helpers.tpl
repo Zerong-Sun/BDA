@@ -23,6 +23,22 @@ at the first BYOK save or the first dispatch to the cluster.
 {{- end }}
 {{- end -}}
 
+{{- define "bda.backendImage" -}}
+{{- if .Values.image.digest -}}
+{{- printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "bda.frontendImage" -}}
+{{- if .Values.frontendImage.digest -}}
+{{- printf "%s@%s" .Values.frontendImage.repository .Values.frontendImage.digest -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.frontendImage.repository .Values.frontendImage.tag -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "bda.byokVolumeMount" -}}
 {{- if .Values.byokStorage.enabled -}}
 - name: byok-secrets

@@ -18,7 +18,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: frontend
-          image: "{{ .Values.frontendImage.repository }}:{{ .Values.frontendImage.tag }}"
+          image: {{ include "bda.frontendImage" . | quote }}
           imagePullPolicy: {{ .Values.frontendImage.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

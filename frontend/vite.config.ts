@@ -36,6 +36,7 @@ export default defineConfig({
     exclude: ['molstar'],
   },
   build: {
+    manifest: true,
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {

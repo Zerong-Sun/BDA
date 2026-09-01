@@ -89,8 +89,13 @@ class DockerAdapter:
                 raise RuntimeError("docker_socket_forbidden_in_production")
             self.client = docker.from_env()  # type: ignore[attr-defined]
         else:
+            client_cert: tuple[str, str] | None = None
+            if settings.docker_tls_cert and settings.docker_tls_key:
+                client_cert = (settings.docker_tls_cert, settings.docker_tls_key)
+            elif settings.docker_tls_cert or settings.docker_tls_key:
+                raise RuntimeError("docker_tls_cert_and_key_must_be_configured_together")
             tls = TLSConfig(
-                client_cert=(settings.docker_tls_cert, settings.docker_tls_key),
+                client_cert=client_cert,
                 ca_cert=settings.docker_tls_ca,
                 verify=settings.docker_tls_verify,
             )

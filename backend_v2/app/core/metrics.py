@@ -21,6 +21,34 @@ OUTBOX_DEAD_LETTERED = Gauge(
     "bda_v2_outbox_dead_lettered",
     "Outbox events that exhausted their delivery attempts and need an operator",
 )
+JOB_QUEUE_LAG_SECONDS = Gauge(
+    "bda_v2_job_queue_lag_seconds",
+    "Age of the oldest queued compute job",
+    ("backend",),
+)
+MISSING_WORKER_QUEUES = Gauge(
+    "bda_v2_missing_worker_queues",
+    "Required queues without a current build/schema-compatible worker heartbeat",
+)
+STUCK_OPERATIONS = Gauge(
+    "bda_v2_stuck_operations",
+    "Pending, running or cancel-requested operations with no update inside the threshold",
+)
+ARTIFACT_CHECKSUM_FAILURES = Counter(
+    "bda_v2_artifact_checksum_failures_total",
+    "Artifact uploads or compute outputs rejected because a checksum did not match",
+    ("source",),
+)
+LSF_FAILURES = Counter(
+    "bda_v2_lsf_failures_total",
+    "LSF adapter failures by lifecycle phase",
+    ("phase",),
+)
+SSE_STREAM_OUTCOMES = Counter(
+    "bda_v2_sse_stream_outcomes_total",
+    "SSE stream completion, disconnection and failure outcomes",
+    ("stream", "outcome"),
+)
 DATABASE_POOL_CHECKED_OUT = Gauge(
     "bda_v2_database_pool_checked_out",
     "Database connections currently checked out of the API pool",

@@ -12,7 +12,7 @@ from ..candidates.models import Candidate
 from ..projects.models import Project
 from ..targets.models import Target
 from ..workflows.models import WorkflowRun
-from .models import MigrationRun, Operation
+from .models import MigrationRun, Operation, WorkerHeartbeat
 
 
 class PlatformRepository:
@@ -94,3 +94,9 @@ class PlatformRepository:
 
     def ping(self) -> None:
         self.session.execute(text("SELECT 1"))
+
+    def schema_revision(self) -> str | None:
+        return self.session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
+
+    def recent_worker_heartbeats(self, cutoff: datetime) -> list[WorkerHeartbeat]:
+        return list(self.session.scalars(select(WorkerHeartbeat).where(WorkerHeartbeat.last_seen_at >= cutoff)))

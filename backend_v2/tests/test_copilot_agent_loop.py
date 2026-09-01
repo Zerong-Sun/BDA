@@ -20,7 +20,7 @@ from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.copilot import agent_loop, agent_runs
 from backend_v2.app.copilot.models import CopilotAgentRun, CopilotAgentTask
 from backend_v2.app.core.models import Base
-from backend_v2.app.identity.models import Organization, User
+from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project
 from backend_v2.app.registry.models import LLMProvider
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
@@ -50,6 +50,8 @@ def _project(session: Session) -> tuple[Project, User]:
     user = User(username=f"loop-{n}", display_name="L", role="editor", enabled=True)
     organization = Organization(name=f"Loop Org {n}")
     session.add_all([user, organization])
+    session.flush()
+    session.add(OrganizationMember(organization_id=organization.id, user_id=user.id, role="owner"))
     session.flush()
     project = Project(
         organization_id=organization.id,

@@ -1,11 +1,13 @@
 image:
   repository: bda/backend-v2
-  tag: latest
+  tag: v0.1.0-alpha.1
+  digest: ""
   pullPolicy: IfNotPresent
 
 frontendImage:
   repository: bda/frontend-v2
-  tag: latest
+  tag: v0.1.0-alpha.1
+  digest: ""
   pullPolicy: IfNotPresent
 
 replicas:
@@ -28,8 +30,12 @@ ingress:
   tlsSecret: bda-tls
 config:
   environment: production
-  databasePoolSize: "20"
-  databaseMaxOverflow: "20"
+  databasePoolSize: "5"
+  databaseMaxOverflow: "5"
+  workerConcurrency: "2"
+  # Inject the exact image Git SHA in staging CD; this placeholder intentionally
+  # prevents the chart from claiming a verified production revision.
+  buildRevision: staging-build-revision-required
   minioSecure: "true"
   minioPublicEndpoint: artifacts.bda.example.invalid
   minioRegion: us-east-1
@@ -85,3 +91,9 @@ resources:
   copilotWorker:
     requests: {cpu: 500m, memory: 512Mi}
     limits: {cpu: "2", memory: 2Gi}
+
+monitoring:
+  enabled: false
+  serviceMonitorInterval: 30s
+  queueLagSeconds: 900
+  stuckOperationMinutes: 15

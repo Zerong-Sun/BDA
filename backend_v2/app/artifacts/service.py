@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
 from ..core.config import get_settings
+from ..core.metrics import ARTIFACT_CHECKSUM_FAILURES
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
@@ -112,6 +113,7 @@ def complete_upload(
             session.commit()
         raise DomainError("file_too_large", "Uploaded object exceeds the size limit", status_code=413)
     if checksum.lower() != payload.checksum_sha256.lower():
+        ARTIFACT_CHECKSUM_FAILURES.labels("upload").inc()
         failed = repo.upload(upload_id, for_update=True)
         if failed:
             failed.status = "failed"

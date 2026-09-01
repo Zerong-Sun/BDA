@@ -901,6 +901,15 @@ function createStrictRoutes({ scenario, routeId }) {
     service: 'bda-v2',
     checks: { postgresql: 'ok', redis: 'ok', object_storage: 'ok' },
   }))
+  add('GET', '/api/v2/research-packages', {}, () => ok([{
+    package_id: 'pd1-demo-v1',
+    version: '1.0.0',
+    display_name: localized('PD-1 synthetic demonstration', 'PD-1 合成演示'),
+    license: 'CC BY 4.0',
+    checksum: 'a'.repeat(64),
+    size: 4096,
+    installed: true,
+  }]))
   add('GET', '/api/v2/projects', { limit: '200' }, () => ok({
     items: empty && routeId === 'experiments' ? [] : [project],
     next_cursor: null,

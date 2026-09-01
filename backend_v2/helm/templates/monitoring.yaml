@@ -1,0 +1,60 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-api
+  endpoints:
+    - port: http
+      path: /internal/metrics
+      interval: {{ .Values.monitoring.serviceMonitorInterval }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  groups:
+    - name: bda-v2-reliability
+      rules:
+        - alert: BDAOutboxDeadLettered
+          expr: bda_v2_outbox_dead_lettered > 0
+          for: 2m
+          labels: {severity: critical}
+          annotations: {summary: "BDA outbox contains dead-lettered events"}
+        - alert: BDAWorkerQueueMissing
+          expr: bda_v2_missing_worker_queues > 0
+          for: 2m
+          labels: {severity: critical}
+          annotations: {summary: "A required BDA worker queue has no compatible heartbeat"}
+        - alert: BDAComputeQueueLag
+          expr: max(bda_v2_job_queue_lag_seconds) > {{ .Values.monitoring.queueLagSeconds }}
+          for: 5m
+          labels: {severity: warning}
+          annotations: {summary: "BDA compute queue lag exceeds its staging budget"}
+        - alert: BDAStuckOperation
+          expr: bda_v2_stuck_operations > 0
+          for: {{ .Values.monitoring.stuckOperationMinutes }}m
+          labels: {severity: warning}
+          annotations: {summary: "A BDA operation has stopped making progress"}
+        - alert: BDADatabasePoolSaturated
+          expr: bda_v2_database_pool_checked_out >= bda_v2_database_pool_size
+          for: 5m
+          labels: {severity: warning}
+          annotations: {summary: "BDA API database pool is saturated"}
+        - alert: BDAArtifactChecksumFailure
+          expr: increase(bda_v2_artifact_checksum_failures_total[10m]) > 0
+          labels: {severity: warning}
+          annotations: {summary: "BDA rejected an artifact checksum"}
+        - alert: BDALsfFailureBurst
+          expr: increase(bda_v2_lsf_failures_total[10m]) > 2
+          labels: {severity: warning}
+          annotations: {summary: "BDA LSF integration is failing repeatedly"}
+        - alert: BDASSEDegradation
+          expr: increase(bda_v2_sse_stream_outcomes_total{outcome=~"disconnected|failed"}[10m]) > 10
+          labels: {severity: warning}
+          annotations: {summary: "BDA SSE streams are degrading"}
+{{- end }}

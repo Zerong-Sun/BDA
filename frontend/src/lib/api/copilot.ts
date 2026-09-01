@@ -410,6 +410,12 @@ export function sendCopilotMessage(payload: CopilotChatRequest) {
 
 export type CopilotStreamStatus = 'connecting' | 'thinking' | 'streaming' | 'done' | `tool:${string}`
 
+let latestCopilotMode: string | null = null
+
+export function getLatestCopilotMode(): string | null {
+  return latestCopilotMode
+}
+
 export async function streamCopilotMessage(
   payload: CopilotChatRequest,
   onChunk: (text: string) => void,
@@ -510,7 +516,7 @@ export async function streamCopilotMessage(
         try {
           const payload = JSON.parse(data)
           if (payload?.mode) {
-            sessionStorage.setItem('bda_copilot_last_mode', String(payload.mode))
+            latestCopilotMode = String(payload.mode)
           }
         } catch {
           // Ignore malformed done payloads.

@@ -6,7 +6,18 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..core.models import Base, UUIDVersionMixin
+from ..core.models import Base, UUIDVersionMixin, utcnow
+
+
+class WorkerHeartbeat(Base):
+    __tablename__ = "worker_heartbeats"
+
+    instance_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    service: Mapped[str] = mapped_column(String(80), index=True)
+    queues: Mapped[list[str]] = mapped_column(JSON, default=list)
+    build_revision: Mapped[str] = mapped_column(String(80), index=True)
+    schema_revision: Mapped[str] = mapped_column(String(80), index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class Operation(UUIDVersionMixin, Base):

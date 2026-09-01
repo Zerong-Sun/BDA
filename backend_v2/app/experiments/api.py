@@ -12,7 +12,7 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
 from .repository import ExperimentRepository
 from .schemas import (
     ExperimentResultBatch,
@@ -72,7 +72,7 @@ def post_results(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> list[ExperimentResultResponse]:
-    project = require_project(session, project_id, user)
+    project = require_project_permission(session, project_id, user, "experiment")
     return [ExperimentResultResponse.model_validate(item) for item in create_results(session, project, payload, user)]
 
 
@@ -88,7 +88,7 @@ def import_results(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ExperimentResultImportAccepted:
-    project = require_project(session, project_id, user)
+    project = require_project_permission(session, project_id, user, "experiment")
     artifact = ArtifactRepository(session).artifact(payload.artifact_id)
     if artifact is None or artifact.project_id != project.id or artifact.status != "available":
         raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)

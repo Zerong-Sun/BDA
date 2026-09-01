@@ -5,17 +5,20 @@ import uuid
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
+from ..core.config import get_settings
 from ..core.database import get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.repository import ProjectRepository
+from ..projects.service import require_project, require_project_permission
 from . import goals
 from .copilot_import import import_copilot_research_result, validation_response
 from .generation import create_research_generation, import_research_generation, require_research_generation
 from .models import ResearchGoal
+from .package_catalog import catalog_packages, load_catalog_package
 from .package_import import import_research_package
 from .repository import ResearchRepository
 from .schemas import (
@@ -46,6 +49,8 @@ from .schemas import (
     ResearchGoalTree,
     ResearchGoalUpdate,
     ResearchOverview,
+    ResearchPackageCatalogImportCreate,
+    ResearchPackageDescriptor,
     ResearchPackageImportCreate,
     ResearchPackageImportResponse,
     ResearchWorkspaceResponse,
@@ -63,6 +68,30 @@ from .workspace import build_research_workspace
 router = APIRouter(tags=["research"])
 
 
+@router.get("/research-packages", response_model=list[ResearchPackageDescriptor])
+def get_research_packages(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> list[ResearchPackageDescriptor]:
+    visible = {
+        project.source_package_id
+        for project in ProjectRepository(session).list_visible(user, after=None, limit=10_000)
+        if project.source_package_id
+    }
+    return [
+        ResearchPackageDescriptor(
+            package_id=package["package_id"],
+            version=package["version"],
+            display_name=package["title"],
+            license=package["license"],
+            checksum=checksum,
+            size=size,
+            installed=package["package_id"] in visible,
+        )
+        for package, checksum, size in catalog_packages()
+    ]
+
+
 @router.post(
     "/projects/{project_id}/research-generations",
     response_model=ResearchGenerationAccepted,
@@ -75,7 +104,12 @@ def post_research_generation(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ResearchGenerationAccepted:
-    return create_research_generation(session, require_project(session, project_id, user), payload, user)
+    return create_research_generation(
+        session,
+        require_project_permission(session, project_id, user, "research_import"),
+        payload,
+        user,
+    )
 
 
 @router.get("/research-generations/{generation_id}", response_model=ResearchGenerationResponse)
@@ -138,10 +172,37 @@ def post_copilot_research_import(
     openapi_extra={"x-permission": "research.package.import"},
 )
 def post_research_package_import(
+    payload: ResearchPackageCatalogImportCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> ResearchPackageImportResponse:
+    package, _, _ = load_catalog_package(payload.package_id, payload.version, payload.checksum)
+    return import_research_package(
+        session,
+        ResearchPackageImportCreate(organization_id=payload.organization_id, package=package),
+        user,
+    )
+
+
+@router.post(
+    "/research-package-imports/legacy-payload",
+    response_model=ResearchPackageImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    deprecated=True,
+    openapi_extra={"x-permission": "research.package.import"},
+)
+def post_legacy_research_package_import(
     payload: ResearchPackageImportCreate,
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ResearchPackageImportResponse:
+    settings = get_settings()
+    if settings.is_production and not settings.allow_legacy_research_package_payload:
+        raise DomainError(
+            "legacy_research_package_payload_disabled",
+            "Raw research package payloads are disabled in production",
+            status_code=403,
+        )
     return import_research_package(session, payload, user)
 
 
@@ -178,7 +239,7 @@ def post_research_gap_resolution(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ResearchGapResolutionAccepted:
-    project = require_project(session, project_id, user)
+    project = require_project_permission(session, project_id, user, "research_import")
     return request_gap_resolution(session, project, research_target_id, payload, user)
 
 
@@ -195,7 +256,7 @@ def post_brief(
     user: User = Depends(require_command),
 ) -> BriefResponse:
     return BriefResponse.model_validate(
-        create_brief(session, require_project(session, project_id, user), payload, user)
+        create_brief(session, require_project_permission(session, project_id, user, "write"), payload, user)
     )
 
 
@@ -247,7 +308,7 @@ def patch_brief(
     row = ResearchRepository(session).brief(brief_id)
     if row is None:
         raise DomainError("research_brief_not_found", "Research brief was not found", status_code=404)
-    project = require_project(session, row.project_id, user)
+    project = require_project_permission(session, row.project_id, user, "write")
     updated = update_brief(session, project, row, payload, user, parse_if_match(if_match))
     response.headers["ETag"] = etag(updated.version)
     return BriefResponse.model_validate(updated)
@@ -267,7 +328,7 @@ def delete_brief(
     row = ResearchRepository(session).brief(brief_id)
     if row is None:
         raise DomainError("research_brief_not_found", "Research brief was not found", status_code=404)
-    project = require_project(session, row.project_id, user)
+    project = require_project_permission(session, row.project_id, user, "write")
     response = BriefResponse.model_validate(row)
     delete_research_resource(session, project, row, user, parse_if_match(if_match))
     return response
@@ -286,7 +347,7 @@ def post_finding(
     user: User = Depends(require_command),
 ) -> FindingResponse:
     return FindingResponse.model_validate(
-        create_finding(session, require_project(session, project_id, user), payload, user)
+        create_finding(session, require_project_permission(session, project_id, user, "write"), payload, user)
     )
 
 
@@ -338,7 +399,7 @@ def patch_finding(
     row = ResearchRepository(session).finding(finding_id)
     if row is None:
         raise DomainError("research_finding_not_found", "Research finding was not found", status_code=404)
-    project = require_project(session, row.project_id, user)
+    project = require_project_permission(session, row.project_id, user, "write")
     updated = update_finding(session, project, row, payload, user, parse_if_match(if_match))
     response.headers["ETag"] = etag(updated.version)
     return FindingResponse.model_validate(updated)
@@ -358,7 +419,7 @@ def delete_finding(
     row = ResearchRepository(session).finding(finding_id)
     if row is None:
         raise DomainError("research_finding_not_found", "Research finding was not found", status_code=404)
-    project = require_project(session, row.project_id, user)
+    project = require_project_permission(session, row.project_id, user, "write")
     response = FindingResponse.model_validate(row)
     delete_research_resource(session, project, row, user, parse_if_match(if_match))
     return response
@@ -369,7 +430,7 @@ def delete_finding(
 
 def _require_goal(session: Session, goal_id: uuid.UUID, user: User) -> ResearchGoal:
     goal = goals.require_goal(session, goal_id)
-    require_project(session, goal.project_id, user)
+    require_project_permission(session, goal.project_id, user, "write")
     return goal
 
 
@@ -413,7 +474,7 @@ def post_research_goal(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ResearchGoalResponse:
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "write")
     goal = goals.create_goal(
         session,
         project_id,
