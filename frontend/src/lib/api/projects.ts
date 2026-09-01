@@ -139,11 +139,24 @@ export async function waitForProjectPromptDraft(draftId: string): Promise<Projec
   throw new ApiError('Prompt generation did not finish within two minutes.', 408)
 }
 
-export async function updateProjectPrompt(projectId: string, prompt: string, expectedVersion: number): Promise<Project> {
+/**
+ * Rewrite the project's design prompt.
+ *
+ * `reason` is required by the server whenever the text actually changes and the project
+ * already had one, because the prompt is what the goal tree and the open branches were
+ * derived from - it becomes the body of a timeline decision recording what changed and
+ * why. Omitting it comes back as a 422, not a silent overwrite.
+ */
+export async function updateProjectPrompt(
+  projectId: string,
+  prompt: string,
+  expectedVersion: number,
+  reason?: string,
+): Promise<Project> {
   const updated = await patchProjectApiV2ProjectsProjectIdPatch<true>({
     path: { project_id: projectId },
     headers: { 'If-Match': `W/"${expectedVersion}"` },
-    body: { prompt },
+    body: { prompt, prompt_change_reason: reason },
     throwOnError: true,
   })
   return ProjectSchema.parse(updated.data)

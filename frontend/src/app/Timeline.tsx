@@ -5,12 +5,14 @@ import { ProjectTimeline } from '../features/timeline/ProjectTimeline'
 
 export default function TimelinePage() {
   const { t } = useI18n()
-  const { projectId } = useProjectContext()
+  const { projectId, activeProject } = useProjectContext()
 
   return (
     <div className="space-y-4">
       <PageHead eyebrow={t.timeline.subtitle} title={t.timeline.title} />
-      {projectId ? <ProjectTimeline projectId={projectId} /> : null}
+      {projectId ? (
+        <ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} />
+      ) : null}
     </div>
   )
 }

@@ -23,6 +23,13 @@ class ProjectUpdate(BaseModel):
     prompt: str | None = Field(default=None, max_length=20000)
     status: str | None = Field(default=None, pattern="^(draft|active|paused|completed)$")
     localized_content: dict | None = None
+    #: Why the design prompt is being changed. Required when `prompt` actually differs
+    #: from the stored one, and not stored on the project: it becomes the body of the
+    #: timeline decision that records the change. The prompt is the project's brief, so
+    #: rewriting it silently detaches every downstream goal and decision from the thing
+    #: they were derived from - which is what used to happen, since the previous text was
+    #: simply overwritten.
+    prompt_change_reason: str | None = Field(default=None, max_length=4000)
 
 
 class ProjectResponse(BaseModel):

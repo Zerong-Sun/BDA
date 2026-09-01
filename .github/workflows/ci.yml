@@ -75,6 +75,8 @@ jobs:
           python qm-scripts/plugins/generate_docs.py --check
       - name: Validate documentation inventory and links
         run: PYTHONPATH=. python backend_v2/scripts/check_document_inventory.py
+      - name: Reject decision-record drift
+        run: PYTHONPATH=. python backend_v2/scripts/check_decision_coverage.py contracts/decision-records.yaml
       - name: Reject unexplained slot reservations
         run: PYTHONPATH=. python backend_v2/scripts/check_plugin_cpu_declarations.py
       - name: Reject model/migration drift

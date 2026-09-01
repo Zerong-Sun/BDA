@@ -235,6 +235,7 @@ def publish_outbox(batch_size: int = 100) -> dict:
             "project.prompt_generate": "bda_v2.project_prompt_generate",
             "research.generate": "bda_v2.research_generate",
             "research.gaps.resolve": "bda_v2.research_gaps_resolve",
+            "research.decision_tree_draft": "bda_v2.research_decision_tree_draft",
             "ligand.import": "bda_v2.ligand_import",
             "compute_draft.confirm": "bda_v2.compute_draft_confirm",
             "autopilot.execute": "bda_v2.autopilot_execute",
