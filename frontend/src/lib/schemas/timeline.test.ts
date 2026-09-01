@@ -62,3 +62,13 @@ describe('groupByPhase', () => {
     expect(grouped[0].phase).toBe('')
   })
 })
+
+describe('TimelineEntrySchema', () => {
+  it('rejects unknown entry types instead of silently weakening the API contract', () => {
+    expect(() => entry({ entry_type: 'search_method' as TimelineEntry['entry_type'] })).toThrow()
+  })
+
+  it('rejects unknown outcomes instead of rendering an unclassified status', () => {
+    expect(() => entry({ outcome: 'probably' as TimelineEntry['outcome'] })).toThrow()
+  })
+})

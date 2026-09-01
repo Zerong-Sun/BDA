@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '../../components/reui/frame'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
+import { Button } from '../../components/ui/Button'
 import { StatusPill } from '../../components/ui/StatusPill'
 import type { StatusTone } from '../../components/ui/statusTone'
 import { listAllTimeline } from '../../lib/api/timeline'
@@ -19,12 +20,22 @@ function outcomeTone(outcome: string): StatusTone {
   return 'neutral'
 }
 
-function DecisionNode({ entry, isLast }: { entry: TimelineEntry; isLast: boolean }) {
+function DecisionNode({
+  entry,
+  entriesById,
+  isLast,
+}: {
+  entry: TimelineEntry
+  entriesById: ReadonlyMap<string, TimelineEntry>
+  isLast: boolean
+}) {
   const { t } = useI18n()
   const tl = t.timeline
   const refs = provenanceRefs(entry)
   const type = tl.type[entry.entry_type as keyof typeof tl.type] ?? entry.entry_type
   const outcome = tl.outcome[entry.outcome as keyof typeof tl.outcome] ?? entry.outcome
+  const superseded = entry.supersedes_id ? entriesById.get(entry.supersedes_id) : undefined
+  const cause = entry.caused_by_id ? entriesById.get(entry.caused_by_id) : undefined
 
   return (
     <li className="relative pl-7">
@@ -44,10 +55,28 @@ function DecisionNode({ entry, isLast }: { entry: TimelineEntry; isLast: boolean
         <h4 className="mt-2 text-sm font-semibold text-foreground">{entry.title}</h4>
         {entry.summary ? <p className="mt-1 text-xs text-muted-foreground">{entry.summary}</p> : null}
         <div className="mt-2 flex flex-wrap gap-1">
-          {entry.supersedes_id ? <Badge variant="secondary" size="xs">{tl.supersedes}</Badge> : null}
-          {entry.caused_by_id ? <Badge variant="secondary" size="xs">{tl.causedBy}</Badge> : null}
           {entry.tags.map((tag, index) => <Badge key={`${tag}:${index}`} variant="secondary" size="xs">#{tag}</Badge>)}
         </div>
+        {entry.supersedes_id || entry.caused_by_id ? (
+          <dl className="mt-2 grid gap-1 rounded-md border border-border bg-muted/30 px-2 py-1.5 text-[11px]">
+            {entry.supersedes_id ? (
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0 text-muted-foreground">{tl.supersedes}:</dt>
+                <dd className="truncate font-medium text-foreground" title={superseded?.title ?? entry.supersedes_id}>
+                  {superseded?.title ?? entry.supersedes_id}
+                </dd>
+              </div>
+            ) : null}
+            {entry.caused_by_id ? (
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0 text-muted-foreground">{tl.causedBy}:</dt>
+                <dd className="truncate font-medium text-foreground" title={cause?.title ?? entry.caused_by_id}>
+                  {cause?.title ?? entry.caused_by_id}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
         {entry.body ? (
           <Accordion className="mt-3 border-t border-border" defaultValue={[]}>
             <AccordionItem value={entry.id} className="border-0">
@@ -87,6 +116,10 @@ export function DryLabDecisionTree({ projectId }: { projectId: string }) {
     staleTime: 60_000,
   })
   const branches = useMemo(() => groupByPhase(query.data ?? []), [query.data])
+  const entriesById = useMemo(
+    () => new Map((query.data ?? []).map((entry) => [entry.id, entry])),
+    [query.data],
+  )
 
   return (
     <Frame data-tour-id="dry-lab-decision-tree">
@@ -99,7 +132,16 @@ export function DryLabDecisionTree({ projectId }: { projectId: string }) {
           <FrameDescription>{copy.decisionTreeDescription}</FrameDescription>
         </FrameHeader>
         {query.isLoading ? <p className="text-sm text-muted-foreground" role="status">{tl.loading}</p> : null}
-        {query.isError ? <Alert variant="destructive"><AlertDescription>{tl.loadFailed}</AlertDescription></Alert> : null}
+        {query.isError ? (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>
+              <p>{tl.loadFailed}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => query.refetch()}>
+                {t.common.retry}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {!query.isLoading && !query.isError && !branches.length ? (
           <Alert><AlertDescription>{copy.decisionTreeEmpty}</AlertDescription></Alert>
         ) : null}
@@ -123,7 +165,12 @@ export function DryLabDecisionTree({ projectId }: { projectId: string }) {
                   <ArrowDownIcon aria-hidden="true" className="mx-auto mb-2 text-muted-foreground" />
                   <ol className="grid gap-4">
                     {branch.entries.map((entry, index) => (
-                      <DecisionNode key={entry.id} entry={entry} isLast={index === branch.entries.length - 1} />
+                      <DecisionNode
+                        key={entry.id}
+                        entry={entry}
+                        entriesById={entriesById}
+                        isLast={index === branch.entries.length - 1}
+                      />
                     ))}
                   </ol>
                 </section>
