@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ARG BDA_BUILD_REVISION=development
 ARG BDA_SCHEMA_REVISION=0051_worker_project_rls
