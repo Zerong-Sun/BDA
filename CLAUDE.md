@@ -73,6 +73,7 @@ Other gates, each with a script you can run locally:
 - **Flow matrix** — every table must be declared in `contracts/v2-flow-matrix.yaml` with its domain, producers, consumers, api_paths, and ui. New table ⇒ new entry. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_flow_matrix.py contracts/v2-flow-matrix.yaml`.
 - **Coverage** — 85% overall, plus 95% on `identity/service.py`, `identity/deps.py`, `compute/service.py`, `artifacts/service.py`, `research/package_import.py`, `research/package_validation.py`, and `migration/`. Thresholds live in `backend_v2/scripts/check_coverage.py`. `research/package_validation.py` additionally needs 95% *branch* coverage. On a machine with no PostgreSQL the DB-gated tests skip and the numbers come out below CI's — `check_coverage.py` says so rather than letting it read as a regression.
 - **Slot declarations** — a plugin may declare `cpus > 1` only with a `cpus_evidence` string naming the measurement or upstream thread flag that supports it. The cluster treats a job holding unused cores as a violation, so an unreviewable number is not allowed to sit in the registry. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_plugin_cpu_declarations.py`.
+- **Decision coverage** — every numbered decision in a project's `DECISIONS.md` must either have a `decision_ref` row in that project's timeline seeder or be a gap declared in `contracts/decision-records.yaml` with the decision that declared it. `recorded_baseline` is a ratchet and fails in both directions, so improving coverage means raising it. This exists because `D080–D099` were made on the cluster, cited by submit scripts, and never written back — and nothing noticed. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_decision_coverage.py`.
 - **Migration reversibility** — CI runs `alembic check` (model/migration drift) then `alembic downgrade base`. Every migration needs a working downgrade.
 - **Retired-runtime grep** — CI greps the tree and fails on `/api/v1`, `submit-to-compute`, `/jobs/.*/sync`, `experiment-results/upload`, `copilot/literature`, `docker.sock`, and `sqlite:///`. These paths are deliberately dead.
 - **Frontend transport boundary** — see below.
@@ -92,7 +93,7 @@ complete unattended loop are not. Keep that boundary aligned with
 FastAPI modular monolith under `backend_v2/app/`, one package per domain
 (identity, projects, targets, workflows, compute, artifacts, candidates,
 experiments, campaigns, research, knowledge, timeline, literature,
-intelligence, registry, delivery, copilot, autopilot, ligands, audit,
+intelligence, registry, delivery, copilot, autopilot, wetlab, ligands, audit,
 platform). Each follows the same four-file convention:
 
 | File | Responsibility |
@@ -102,7 +103,7 @@ platform). Each follows the same four-file convention:
 | `repository.py` | persistence only |
 | `models.py` / `schemas.py` | SQLAlchemy ORM / external contract — kept separate |
 
-Cross-domain writes go through another domain's service or through an outbox event, never directly into a foreign repository. Copilot orchestrates domain services and owns no domain rules; compute never touches the campaign repository.
+Cross-domain writes go through another domain's service or through an outbox event, never directly into a foreign repository. The project decision record lives in `timeline` (`project_timeline_entries`), and the tree it hangs off is `research_goals` + `research_goal_links`. What qualifies as a decision node, and how the dry and wet halves join, is a research-record question and lives with the private decision records. Copilot orchestrates domain services and owns no domain rules; compute never touches the campaign repository.
 
 **Registering a new module takes three edits**, and forgetting any one produces a confusing failure: add the model import to `app/all_models.py` (Alembic reads metadata from there, so an unregistered model silently produces an empty migration), add the router to the tuple in `app/main.py`, and add the table to the flow matrix.
 
