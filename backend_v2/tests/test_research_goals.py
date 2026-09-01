@@ -154,6 +154,28 @@ def test_attaching_the_same_thing_twice_is_idempotent(session: Session) -> None:
     assert len(goals.links_for(session, [goal.id])[goal.id]) == 1
 
 
+def test_a_decision_hangs_off_the_goals_it_constrains(session: Session) -> None:
+    """What makes the goal tree a *decision* tree.
+
+    A judgement routinely serves more than one goal - the sweet-protein D109 used dry
+    re-analysis to revoke a wet expression authorisation, which constrains both "produce
+    an expressible candidate" and "safety". A `parent_id` on the timeline itself would
+    have forced one of those two relationships into prose; the many-to-many link keeps
+    both, and keeps them queryable from either end.
+    """
+    project_id, user_id = _project(session)
+    expressible = goals.create_goal(session, project_id, user_id, title="expressible candidate")
+    safety = goals.create_goal(session, project_id, user_id, title="safety")
+    decision_id = uuid.uuid4()
+
+    goals.attach(session, expressible, user_id, resource_type="timeline_entry", resource_id=decision_id)
+    goals.attach(session, safety, user_id, resource_type="timeline_entry", resource_id=decision_id)
+
+    grouped = goals.links_for(session, [expressible.id, safety.id])
+    assert grouped[expressible.id][0].resource_type == "timeline_entry"
+    assert grouped[safety.id][0].resource_id == decision_id
+
+
 def test_unknown_link_types_are_rejected(session: Session) -> None:
     project_id, user_id = _project(session)
     goal = goals.create_goal(session, project_id, user_id, title="g")

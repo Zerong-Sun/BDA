@@ -29,6 +29,11 @@ from .schemas import (
     CopilotResearchImportResponse,
     CopilotResearchResultCreate,
     CopilotResearchValidationResponse,
+    DecisionTreeDraftAccepted,
+    DecisionTreeDraftCreate,
+    DecisionTreeDraftResponse,
+    DecisionTreeImportResponse,
+    DecisionTreeProposal,
     FindingCreate,
     FindingPage,
     FindingResponse,
@@ -535,6 +540,60 @@ def delete_research_goal(
     goal = _require_goal(session, goal_id, user)
     removed = goals.delete_goal(session, goal)
     return ResearchGoalDeleteResponse(id=goal_id, removed_goals=removed)
+
+
+@router.post(
+    "/projects/{project_id}/decision-tree-drafts",
+    response_model=DecisionTreeDraftAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={"x-permission": "research.goal.update"},
+)
+def post_decision_tree_draft(
+    project_id: uuid.UUID,
+    payload: DecisionTreeDraftCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionTreeDraftAccepted:
+    project = require_project(session, project_id, user)
+    return goals.create_decision_tree_draft(session, project, user, payload)
+
+
+@router.get("/decision-tree-drafts/{draft_id}", response_model=DecisionTreeDraftResponse)
+def get_decision_tree_draft(
+    draft_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> DecisionTreeDraftResponse:
+    draft = goals.require_decision_tree_draft(session, draft_id)
+    require_project(session, draft.project_id, user)
+    return DecisionTreeDraftResponse.model_validate(draft)
+
+
+@router.post(
+    "/projects/{project_id}/decision-tree",
+    response_model=DecisionTreeImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={"x-permission": "research.goal.update"},
+)
+def post_decision_tree(
+    project_id: uuid.UUID,
+    payload: DecisionTreeProposal,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionTreeImportResponse:
+    """Land a reviewed tree.
+
+    Takes a proposal, never a draft id. There is deliberately no endpoint that commits a
+    stored draft: the per-item review cannot be skipped because no path skips it.
+    """
+    project = require_project(session, project_id, user)
+    created_goals, entries = goals.import_decision_tree(session, project, user, payload)
+    return DecisionTreeImportResponse(
+        goals_created=len(created_goals),
+        branches_created=len(entries),
+        goal_ids=[goal.id for goal in created_goals],
+        entry_ids=[entry.id for entry in entries],
+    )
 
 
 @router.post(

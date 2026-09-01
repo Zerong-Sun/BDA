@@ -466,3 +466,97 @@ def research_generate(generation_id: str) -> dict:
             "checksum": row.checksum,
             "counts": (row.draft or {}).get("counts", {}),
         }
+
+
+DECISION_TREE_SYSTEM_PROMPT = (
+    "You read a protein-design project's kickoff brief and propose the starting shape of "
+    "its decision record: a small tree of research goals, and the open questions the "
+    "project has not decided yet.\n\n"
+    "Return ONLY a JSON object, no prose and no code fence, of the form:\n"
+    '{"goals": [{"title": "...", "detail": "...", "children": [...]}], '
+    '"branches": [{"title": "...", "summary": "...", "lane": "dry|wet|both", '
+    '"goal_title": "<title of one goal above>", '
+    '"alternatives": [{"option": "...", "rejected_because": "..."}]}]}\n\n'
+    "Rules that matter more than coverage:\n"
+    "- At most 12 goals in total, at most 3 levels deep, at most 12 branches. A reviewer "
+    "who cannot read the whole proposal in one sitting stops reviewing and starts accepting.\n"
+    "- Goal titles must be unique; every branch's goal_title must match one exactly.\n"
+    "- A branch is a QUESTION, not a conclusion. Never state an answer, a ranking, or a "
+    "recommendation. Do not claim any result.\n"
+    "- `lane` is where the question will be ANSWERED: `dry` for computation, `wet` for "
+    "bench work, `both` when the evidence comes from one half and the consequence lands "
+    "in the other. Getting this right on day one is cheap; reconstructing it later is not.\n"
+    "- `alternatives` is optional and only for approaches the brief itself already rules "
+    "out, with the brief's own reason. Never invent a rejection.\n"
+    "- Computational scores do not establish biological function; if the brief implies a "
+    "functional claim, that belongs in a `wet` or `both` branch, not a `dry` one."
+)
+
+
+@celery_app.task(name="bda_v2.research_decision_tree_draft")
+def research_decision_tree_draft(draft_id: str) -> dict:
+    """Draft a starting tree, and store it only if it validates.
+
+    Validation is not politeness. The draft is handed to a person to review item by item,
+    and a malformed or over-large proposal makes that review worse, not merely uglier: an
+    unmatched `goal_title` would silently reparent a branch, and forty items would not be
+    read. Failing here with the parse error is more useful than storing something that
+    looks reviewable and is not.
+    """
+    import json
+
+    import httpx
+
+    from ..core.problem import DomainError
+    from ..projects.tasks import _select_llm_provider
+    from .models import DecisionTreeDraft
+    from .schemas import DecisionTreeProposal
+
+    parsed = uuid.UUID(draft_id)
+    with session_scope() as session:
+        row = session.get(DecisionTreeDraft, parsed)
+        if row is None:
+            return {"draft_id": draft_id, "status": "missing"}
+
+        request = row.request or {}
+        provider = _select_llm_provider(session, request.get("llm_provider_id"))
+        if provider is None:
+            row.status = "failed"
+            row.error = "no_llm_provider_configured"
+            row.version += 1
+            return {"draft_id": draft_id, "status": row.status}
+
+        user_message = (
+            f"Project type: {request.get('project_type') or ''}\n\n"
+            f"Design brief:\n{request.get('prompt') or ''}"
+        )
+        try:
+            from ..copilot.provider import complete
+
+            text = complete(
+                provider,
+                [
+                    {"role": "system", "content": DECISION_TREE_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+            )
+            proposal = DecisionTreeProposal.model_validate(json.loads(_strip_fence(text)))
+        except (DomainError, ValueError, json.JSONDecodeError, httpx.HTTPError) as exc:
+            row.status = "failed"
+            row.error = str(exc)[:4000]
+            row.version += 1
+            return {"draft_id": draft_id, "status": row.status}
+
+        row.status = "ready"
+        row.draft = proposal.model_dump(mode="json")
+        row.version += 1
+        return {"draft_id": draft_id, "status": row.status}
+
+
+def _strip_fence(text: str) -> str:
+    """Models fence JSON even when told not to; that is not worth a failed draft."""
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    body = stripped.split("\n", 1)[1] if "\n" in stripped else ""
+    return body.rsplit("```", 1)[0].strip()

@@ -64,6 +64,7 @@ celery_app.conf.update(
         "bda_v2.project_prompt_generate": {"queue": "copilot"},
         "bda_v2.research_generate": {"queue": "research"},
         "bda_v2.research_gaps_resolve": {"queue": "research"},
+        "bda_v2.research_decision_tree_draft": {"queue": "research"},
         "bda_v2.literature_ingest": {"queue": "research"},
         "bda_v2.literature_search": {"queue": "research"},
         "bda_v2.subscription_run": {"queue": "research"},

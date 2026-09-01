@@ -223,6 +223,26 @@ export type AktaAnalysisRequest = {
 };
 
 /**
+ * Alternative
+ *
+ * A branch that was considered and closed off.
+ *
+ * `rejected_because` is required and non-empty on purpose: an alternative listed
+ * without a reason is decoration, and re-reading it later tells you nothing about
+ * whether the reason still holds.
+ */
+export type Alternative = {
+    /**
+     * Option
+     */
+    option: string;
+    /**
+     * Rejected Because
+     */
+    rejected_because: string;
+};
+
+/**
  * AnalysisResponse
  *
  * The recorded row, plus enough of the analysis to render without refetching.
@@ -2170,6 +2190,92 @@ export type DecisionReview = {
 };
 
 /**
+ * DecisionTreeDraftAccepted
+ */
+export type DecisionTreeDraftAccepted = {
+    /**
+     * Draft Id
+     */
+    draft_id: string;
+};
+
+/**
+ * DecisionTreeDraftCreate
+ */
+export type DecisionTreeDraftCreate = {
+    /**
+     * Llm Provider Id
+     */
+    llm_provider_id?: string | null;
+};
+
+/**
+ * DecisionTreeDraftResponse
+ */
+export type DecisionTreeDraftResponse = {
+    /**
+     * Draft
+     */
+    draft: {
+        [key: string]: unknown;
+    };
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * DecisionTreeImportResponse
+ */
+export type DecisionTreeImportResponse = {
+    /**
+     * Branches Created
+     */
+    branches_created: number;
+    /**
+     * Entry Ids
+     */
+    entry_ids: Array<string>;
+    /**
+     * Goal Ids
+     */
+    goal_ids: Array<string>;
+    /**
+     * Goals Created
+     */
+    goals_created: number;
+};
+
+/**
+ * DecisionTreeProposal
+ *
+ * The shape both the LLM draft and the human-submitted import must satisfy.
+ */
+export type DecisionTreeProposal = {
+    /**
+     * Branches
+     */
+    branches?: Array<DraftBranch>;
+    /**
+     * Goals
+     */
+    goals?: Array<DraftGoal>;
+};
+
+/**
  * DecisionUpdate
  */
 export type DecisionUpdate = {
@@ -2421,6 +2527,74 @@ export type DocumentResponse = {
      * Version
      */
     version: number;
+};
+
+/**
+ * DraftAlternative
+ */
+export type DraftAlternative = {
+    /**
+     * Option
+     */
+    option: string;
+    /**
+     * Rejected Because
+     */
+    rejected_because: string;
+};
+
+/**
+ * DraftBranch
+ *
+ * A proposed open question: something the project has not decided yet.
+ *
+ * `outcome` and `provenance` are absent by construction - a bootstrapped branch is a
+ * question, and giving it a conclusion or evidence it does not have is the one thing
+ * this whole mechanism exists to prevent. `lane` is required: whether a branch will
+ * ultimately be answered at a bench or on a cluster is knowable on day one, and is far
+ * cheaper to state then than to reconstruct after the fact.
+ */
+export type DraftBranch = {
+    /**
+     * Alternatives
+     */
+    alternatives?: Array<DraftAlternative>;
+    /**
+     * Goal Title
+     */
+    goal_title: string;
+    /**
+     * Lane
+     */
+    lane: string;
+    /**
+     * Summary
+     */
+    summary?: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * DraftGoal
+ *
+ * A proposed goal, and its proposed children.
+ */
+export type DraftGoal = {
+    /**
+     * Children
+     */
+    children?: Array<DraftGoal>;
+    /**
+     * Detail
+     */
+    detail?: string;
+    /**
+     * Title
+     */
+    title: string;
 };
 
 /**
@@ -5174,6 +5348,10 @@ export type ProjectUpdate = {
      */
     prompt?: string | null;
     /**
+     * Prompt Change Reason
+     */
+    prompt_change_reason?: string | null;
+    /**
      * Status
      */
     status?: string | null;
@@ -7622,6 +7800,10 @@ export type TargetUpsert = {
  */
 export type TimelineEntryCreate = {
     /**
+     * Alternatives
+     */
+    alternatives?: Array<Alternative>;
+    /**
      * Body
      */
     body?: string;
@@ -7634,6 +7816,10 @@ export type TimelineEntryCreate = {
      */
     code_refs?: Array<CodeRef>;
     /**
+     * Decision Ref
+     */
+    decision_ref?: string | null;
+    /**
      * Entry Key
      */
     entry_key?: string | null;
@@ -7641,6 +7827,10 @@ export type TimelineEntryCreate = {
      * Entry Type
      */
     entry_type?: string;
+    /**
+     * Lane
+     */
+    lane?: string;
     /**
      * Occurred At
      */
@@ -7710,6 +7900,10 @@ export type TimelineEntryPage = {
  */
 export type TimelineEntryResponse = {
     /**
+     * Alternatives
+     */
+    alternatives: Array<unknown>;
+    /**
      * Body
      */
     body: string;
@@ -7730,6 +7924,10 @@ export type TimelineEntryResponse = {
      */
     created_by: string | null;
     /**
+     * Decision Ref
+     */
+    decision_ref: string | null;
+    /**
      * Entry Key
      */
     entry_key: string | null;
@@ -7741,6 +7939,10 @@ export type TimelineEntryResponse = {
      * Id
      */
     id: string;
+    /**
+     * Lane
+     */
+    lane: string;
     /**
      * Occurred At
      */
@@ -7794,6 +7996,10 @@ export type TimelineEntryResponse = {
  */
 export type TimelineEntryUpdate = {
     /**
+     * Alternatives
+     */
+    alternatives?: Array<Alternative> | null;
+    /**
      * Body
      */
     body?: string | null;
@@ -7806,9 +8012,17 @@ export type TimelineEntryUpdate = {
      */
     code_refs?: Array<CodeRef> | null;
     /**
+     * Decision Ref
+     */
+    decision_ref?: string | null;
+    /**
      * Entry Type
      */
     entry_type?: string | null;
+    /**
+     * Lane
+     */
+    lane?: string | null;
     /**
      * Occurred At
      */
@@ -26131,6 +26345,319 @@ export type ListSkillsApiV2CopilotSkillsGetResponses = {
 };
 
 export type ListSkillsApiV2CopilotSkillsGetResponse = ListSkillsApiV2CopilotSkillsGetResponses[keyof ListSkillsApiV2CopilotSkillsGetResponses];
+
+export type GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Draft Id
+         */
+        draft_id: string;
+    };
+    query?: never;
+    url: '/api/v2/decision-tree-drafts/{draft_id}';
+};
+
+export type GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetError = GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetErrors[keyof GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetErrors];
+
+export type GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: DecisionTreeDraftResponse;
+};
+
+export type GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetResponse = GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetResponses[keyof GetDecisionTreeDraftApiV2DecisionTreeDraftsDraftIdGetResponses];
 
 export type GetDeliveryApiV2DeliveryPackagesPackageIdGetData = {
     body?: never;
@@ -45383,6 +45910,632 @@ export type PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromo
 };
 
 export type PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponse = PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponses[keyof PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponses];
+
+export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostData = {
+    body: DecisionTreeProposal;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v2/projects/{project_id}/decision-tree';
+};
+
+export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostError = PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostErrors[keyof PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostErrors];
+
+export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostResponses = {
+    /**
+     * Successful Response
+     */
+    201: DecisionTreeImportResponse;
+};
+
+export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostResponse = PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostResponses[keyof PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostResponses];
+
+export type PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostData = {
+    body: DecisionTreeDraftCreate;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v2/projects/{project_id}/decision-tree-drafts';
+};
+
+export type PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostError = PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostErrors[keyof PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostErrors];
+
+export type PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostResponses = {
+    /**
+     * Successful Response
+     */
+    202: DecisionTreeDraftAccepted;
+};
+
+export type PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostResponse = PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostResponses[keyof PostDecisionTreeDraftApiV2ProjectsProjectIdDecisionTreeDraftsPostResponses];
 
 export type ListDeliveryApiV2ProjectsProjectIdDeliveryPackagesGetData = {
     body?: never;

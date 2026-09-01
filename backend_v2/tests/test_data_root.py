@@ -101,3 +101,22 @@ def test_resolve_recorded_keeps_repository_paths_and_rejects_escape(
     assert _data_root.resolve_recorded("deliverables/file.txt") == tmp_path / "data/deliverables/file.txt"
     with pytest.raises(ValueError, match="safe"):
         _data_root.resolve_recorded("../secret")
+def test_resolve_recorded_sends_the_local_label_to_the_local_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A recorded `BDA_LOCAL_ROOT/...` label reads back on a machine that stores it elsewhere.
+
+    Cluster downloads are pinned by SHA-256 but never enter version control, so the
+    result documents that cite them record a label instead of a home directory.
+    """
+    monkeypatch.setattr(_data_root, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.setenv("BDA_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv("BDA_LOCAL_ROOT", str(tmp_path / "elsewhere"))
+
+    assert _data_root.resolve_recorded("BDA_LOCAL_ROOT/backups/run/model.cif") == (
+        tmp_path / "elsewhere/backups/run/model.cif"
+    )
+    # The label is only special as the leading component.
+    assert _data_root.resolve_recorded("backend_v2/BDA_LOCAL_ROOT/x") == (
+        tmp_path / "repo/backend_v2/BDA_LOCAL_ROOT/x"
+    )

@@ -20,6 +20,11 @@ from ..literature.models import LiteratureDocument
 from ..platform.operations import enqueue_operation
 from ..research.models import ResearchBrief, ResearchFinding
 from ..targets.repository import TargetRepository
+
+# Through the timeline domain's own service, never into its table: a prompt rewrite is
+# a decision on the project record, and this is the write that makes it non-optional.
+from ..timeline.schemas import TimelineEntryCreate
+from ..timeline.service import create_entry as create_timeline_entry
 from ..workflows.models import WorkflowRun
 from .models import Project, ProjectMember, ProjectPromptDraft
 from .repository import ProjectRepository
@@ -192,14 +197,59 @@ def require_project_prompt_draft(session: Session, draft_id: uuid.UUID, user: Us
     return draft
 
 
+def _record_prompt_change(session: Session, project: Project, previous: str | None, reason: str, user: User) -> None:
+    """A rewritten brief becomes a decision on the record, not a silent overwrite.
+
+    The prompt is what the goal tree and the open branches were derived from. Changing it
+    without a trace leaves everything downstream pointing at text that no longer exists,
+    and the previous wording - which is the only way to see what the change actually did -
+    is gone. The old text goes into the body for exactly that reason.
+
+    Written through the timeline domain's own service rather than into its table, and
+    left `unspecified` on both lane and outcome: this records that the brief changed and
+    why, and claims nothing about whether the change was right.
+    """
+    create_timeline_entry(
+        session,
+        project,
+        TimelineEntryCreate(
+            occurred_at=datetime.now(UTC),
+            entry_type="decision",
+            title="设计任务书（prompt）变更",
+            summary=reason[:2000],
+            body=(
+                f"**变更理由**\n\n{reason}\n\n"
+                "**变更前的任务书**\n\n"
+                + (previous if previous else "（此前没有任务书）")
+            ),
+            tags=["prompt"],
+        ),
+        user,
+    )
+
+
 def update_project(
     session: Session, project: Project, payload: ProjectUpdate, user: User, expected_version: int
 ) -> Project:
     if project.version != expected_version:
         raise DomainError("version_conflict", "Project was modified by another request", status_code=412)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    reason = (changes.pop("prompt_change_reason", None) or "").strip()
+    previous_prompt = project.prompt
+    # Only a real difference counts. Re-saving the same text from a form that round-trips
+    # the whole object is not a change and must not demand a justification for one.
+    prompt_changed = "prompt" in changes and (changes["prompt"] or "") != (previous_prompt or "")
+    if prompt_changed and previous_prompt and not reason:
+        raise DomainError(
+            "project_prompt_change_reason_required",
+            "Changing the design prompt requires `prompt_change_reason`; it is recorded on the project timeline",
+            status_code=422,
+        )
+    for field, value in changes.items():
         setattr(project, field, value)
     project.version += 1
+    if prompt_changed and previous_prompt:
+        _record_prompt_change(session, project, previous_prompt, reason, user)
     record_audit(
         session,
         action="project.update",

@@ -15,6 +15,10 @@ export function DesignPromptCard({ project }: { project: Project }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draftText, setDraftText] = useState('')
+  // Required by the server once the project has a prompt, and asked for here rather
+  // than surfaced as a 422: the reason becomes a decision on the project timeline, so
+  // it has to be written while the person still remembers why they are editing.
+  const [reason, setReason] = useState('')
 
   const generate = useMutation({
     mutationFn: async () => {
@@ -31,25 +35,30 @@ export function DesignPromptCard({ project }: { project: Project }) {
   })
 
   const save = useMutation({
-    mutationFn: () => updateProjectPrompt(project.id, draftText.trim(), project.version),
+    mutationFn: () => updateProjectPrompt(project.id, draftText.trim(), project.version, reason.trim()),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['project-overview', project.id] })
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
       await queryClient.invalidateQueries({ queryKey: ['project-library'] })
       setEditing(false)
+      setReason('')
       generate.reset()
     },
   })
 
   const startEditing = () => {
     setDraftText(project.prompt ?? '')
+    setReason('')
     generate.reset()
     save.reset()
     setEditing(true)
   }
 
+  const hadPrompt = Boolean(project.prompt)
+
   const cancelEditing = () => {
     setEditing(false)
+    setReason('')
     generate.reset()
     save.reset()
   }
@@ -101,6 +110,21 @@ export function DesignPromptCard({ project }: { project: Project }) {
               placeholder={t.projects.projectChooser.promptPlaceholder}
               aria-label={t.experimentsExt.overview.designPromptTitle}
             />
+            {hadPrompt ? (
+              <div className="grid gap-1">
+                <label className="text-xs text-text-secondary" htmlFor="prompt-change-reason">
+                  {t.experimentsExt.overview.designPromptReasonLabel}
+                </label>
+                <Textarea
+                  id="prompt-change-reason"
+                  rows={2}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={t.experimentsExt.overview.designPromptReasonPlaceholder}
+                />
+                <p className="text-xs text-text-muted">{t.experimentsExt.overview.designPromptReasonHint}</p>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" disabled={generate.isPending} onClick={() => generate.mutate()}>
                 <MagicWand aria-hidden="true" />
@@ -111,7 +135,12 @@ export function DesignPromptCard({ project }: { project: Project }) {
               <Button
                 type="button"
                 size="sm"
-                disabled={!draftText.trim() || save.isPending}
+                disabled={
+                  !draftText.trim() ||
+                  save.isPending ||
+                  // Unchanged text is not a change and needs no justification.
+                  (hadPrompt && draftText.trim() !== (project.prompt ?? '') && !reason.trim())
+                }
                 onClick={() => save.mutate()}
               >
                 {t.experimentsExt.overview.designPromptSave}

@@ -469,8 +469,120 @@ class ResearchGoalUpdate(BaseModel):
     parent_id: uuid.UUID | None = None
 
 
+# --- The decision-tree bootstrap: prompt -> proposed goals and open branches ----------
+#
+# Bounded on purpose. An LLM asked for "the goal tree" will happily return forty nodes,
+# and a reviewer facing forty items stops reviewing and starts accepting - which defeats
+# the only safeguard here. Small enough to read in one sitting is a correctness property,
+# not a performance one.
+MAX_DRAFT_GOALS = 12
+MAX_DRAFT_BRANCHES = 12
+MAX_DRAFT_DEPTH = 3
+
+
+class DraftAlternative(BaseModel):
+    option: str = Field(min_length=1, max_length=300)
+    rejected_because: str = Field(min_length=1, max_length=2000)
+
+
+class DraftGoal(BaseModel):
+    """A proposed goal, and its proposed children."""
+
+    title: str = Field(min_length=1, max_length=300)
+    detail: str = Field(default="", max_length=4000)
+    children: list[DraftGoal] = Field(default_factory=list)
+
+
+class DraftBranch(BaseModel):
+    """A proposed open question: something the project has not decided yet.
+
+    `outcome` and `provenance` are absent by construction - a bootstrapped branch is a
+    question, and giving it a conclusion or evidence it does not have is the one thing
+    this whole mechanism exists to prevent. `lane` is required: whether a branch will
+    ultimately be answered at a bench or on a cluster is knowable on day one, and is far
+    cheaper to state then than to reconstruct after the fact.
+    """
+
+    title: str = Field(min_length=1, max_length=300)
+    summary: str = Field(default="", max_length=2000)
+    lane: str = Field(pattern="^(dry|wet|both)$")
+    #: Which proposed goal this branch sits under, by title. Unmatched titles are
+    #: rejected at import rather than silently dropping the branch to the root.
+    goal_title: str = Field(min_length=1, max_length=300)
+    alternatives: list[DraftAlternative] = Field(default_factory=list)
+
+
+def _goal_depth(goals: list[DraftGoal], depth: int = 1) -> int:
+    return max((_goal_depth(g.children, depth + 1) for g in goals if g.children), default=depth)
+
+
+def _count_goals(goals: list[DraftGoal]) -> int:
+    return sum(1 + _count_goals(goal.children) for goal in goals)
+
+
+class DecisionTreeProposal(BaseModel):
+    """The shape both the LLM draft and the human-submitted import must satisfy."""
+
+    goals: list[DraftGoal] = Field(default_factory=list)
+    branches: list[DraftBranch] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _bounded_and_consistent(self) -> DecisionTreeProposal:
+        total = _count_goals(self.goals)
+        if total > MAX_DRAFT_GOALS:
+            raise ValueError(f"at most {MAX_DRAFT_GOALS} goals; got {total}")
+        if len(self.branches) > MAX_DRAFT_BRANCHES:
+            raise ValueError(f"at most {MAX_DRAFT_BRANCHES} branches; got {len(self.branches)}")
+        if self.goals and _goal_depth(self.goals) > MAX_DRAFT_DEPTH:
+            raise ValueError(f"goal tree is deeper than {MAX_DRAFT_DEPTH} levels")
+
+        titles: list[str] = []
+
+        def walk(goals: list[DraftGoal]) -> None:
+            for goal in goals:
+                titles.append(goal.title)
+                walk(goal.children)
+
+        walk(self.goals)
+        duplicates = sorted({t for t in titles if titles.count(t) > 1})
+        if duplicates:
+            # Branches attach by title, so two goals sharing one makes the attachment
+            # ambiguous - and an ambiguous attachment silently picks a parent.
+            raise ValueError(f"goal titles must be unique; repeated: {', '.join(duplicates)}")
+        known = set(titles)
+        unknown = sorted({b.goal_title for b in self.branches if b.goal_title not in known})
+        if unknown:
+            raise ValueError(f"branch goal_title has no matching goal: {', '.join(unknown)}")
+        return self
+
+
+class DecisionTreeDraftCreate(BaseModel):
+    llm_provider_id: uuid.UUID | None = None
+
+
+class DecisionTreeDraftAccepted(BaseModel):
+    draft_id: uuid.UUID
+
+
+class DecisionTreeDraftResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    status: str
+    draft: dict
+    error: str | None
+
+
+class DecisionTreeImportResponse(BaseModel):
+    goals_created: int
+    branches_created: int
+    goal_ids: list[uuid.UUID]
+    entry_ids: list[uuid.UUID]
+
+
 class ResearchGoalLinkCreate(BaseModel):
-    resource_type: str = Field(pattern="^(experiment_result|finding|candidate|job|protein)$")
+    resource_type: str = Field(pattern="^(experiment_result|finding|candidate|job|protein|timeline_entry)$")
     resource_id: uuid.UUID
     note: str = ""
 

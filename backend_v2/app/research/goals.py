@@ -9,12 +9,19 @@ the owning domain's own table.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..core.problem import DomainError
-from .models import GOAL_LINK_TYPES, GOAL_STATUSES, ResearchGoal, ResearchGoalLink
+from .models import (
+    GOAL_LINK_TYPES,
+    GOAL_STATUSES,
+    DecisionTreeDraft,
+    ResearchGoal,
+    ResearchGoalLink,
+)
 
 #: How deep a goal tree may go. Not a storage limit - a guard against a cycle
 #: introduced by a bad re-parent turning every read into an infinite walk.
@@ -249,3 +256,126 @@ def links_for(session: Session, goal_ids: list[uuid.UUID]) -> dict[uuid.UUID, li
     ):
         grouped[link.goal_id].append(link)
     return grouped
+
+
+def import_decision_tree(
+    session: Session,
+    project,
+    user,
+    proposal,
+) -> tuple[list[ResearchGoal], list]:
+    """Land a reviewed proposal as goals, open decisions, and the links between them.
+
+    Takes the tree the *person* submitted, never a stored draft id. That is the whole
+    mechanism: the per-item review cannot be skipped because no endpoint accepts a draft
+    directly. What a model proposed and what a project committed to are different things,
+    and this project's writer invariant says only the orchestrator turns one into the
+    other.
+
+    Every branch lands as ``outcome="unspecified"`` with empty provenance and no
+    ``decision_ref``. They are questions, not conclusions: the tree view already marks
+    them "no evidence linked", which is the correct reading of a branch nobody has
+    answered yet, and decision numbers are the orchestrator's to allocate.
+    """
+    from ..timeline.schemas import TimelineEntryCreate
+    from ..timeline.service import create_entry as create_timeline_entry
+
+    created_goals: dict[str, ResearchGoal] = {}
+    ordered: list[ResearchGoal] = []
+
+    def plant(nodes, parent_id: uuid.UUID | None) -> None:
+        for index, node in enumerate(nodes):
+            goal = create_goal(
+                session,
+                project.id,
+                user.id,
+                title=node.title,
+                detail=node.detail,
+                parent_id=parent_id,
+            )
+            goal.sort_order = index
+            created_goals[node.title] = goal
+            ordered.append(goal)
+            plant(node.children, goal.id)
+
+    plant(proposal.goals, None)
+    session.flush()
+
+    entries = []
+    for branch in proposal.branches:
+        entry = create_timeline_entry(
+            session,
+            project,
+            TimelineEntryCreate(
+                occurred_at=datetime.now(UTC),
+                entry_type="decision",
+                lane=branch.lane,
+                title=branch.title,
+                summary=branch.summary,
+                outcome="unspecified",
+                alternatives=[a.model_dump() for a in branch.alternatives],
+                tags=["bootstrap"],
+            ),
+            user,
+        )
+        entries.append(entry)
+        # `goal_title` was checked against the proposal's own goals by the schema, so a
+        # missing key here would be a bug in `plant`, not bad input.
+        attach(
+            session,
+            created_goals[branch.goal_title],
+            user.id,
+            resource_type="timeline_entry",
+            resource_id=entry.id,
+        )
+    session.flush()
+    return ordered, entries
+
+
+def require_decision_tree_draft(session: Session, draft_id: uuid.UUID) -> DecisionTreeDraft:
+    draft = session.get(DecisionTreeDraft, draft_id)
+    if draft is None:
+        raise DomainError("decision_tree_draft_not_found", "Decision tree draft was not found", status_code=404)
+    return draft
+
+
+def create_decision_tree_draft(session: Session, project, user, payload):
+    """Queue a draft of the starting tree, derived from the project's own prompt.
+
+    Refuses without a prompt rather than asking a model to invent goals from a project
+    name. The prompt is the brief; a tree drafted from anything less is a guess wearing
+    the same shape as a plan.
+    """
+    from ..platform.operations import enqueue_operation
+    from .schemas import DecisionTreeDraftAccepted
+
+    if not (project.prompt or "").strip():
+        raise DomainError(
+            "project_prompt_missing",
+            "This project has no design prompt yet; write one before drafting its decision tree",
+            status_code=409,
+        )
+    draft = DecisionTreeDraft(
+        project_id=project.id,
+        created_by=user.id,
+        request={
+            "llm_provider_id": str(payload.llm_provider_id) if payload.llm_provider_id else None,
+            "project_type": project.project_type,
+            # The prompt is copied in, not referenced: a draft has to stay interpretable
+            # after the prompt it came from is rewritten, and rewriting is now a recorded
+            # decision precisely because it happens.
+            "prompt": project.prompt,
+        },
+    )
+    session.add(draft)
+    session.flush()
+    enqueue_operation(
+        session,
+        topic="research.decision_tree_draft",
+        resource_type="research_decision_tree_draft",
+        resource_id=draft.id,
+        organization_id=project.organization_id,
+        user=user,
+        payload={"draft_id": str(draft.id)},
+    )
+    return DecisionTreeDraftAccepted(draft_id=draft.id)

@@ -50,6 +50,14 @@ ENTRY_TYPES = (
 # be answerable across both tables with one query and one set of values.
 OUTCOMES = ("supported", "refuted", "inconclusive", "unspecified")
 
+# Which half of the loop a moment belongs to. Three real values plus an explicit
+# "not stated": a decision that spans both halves is the interesting case, not an
+# awkward one - the sweet-protein D109 used dry re-analysis to revoke a *wet*
+# authorisation, and forcing it into one bucket would lose the half that made it
+# matter. `unspecified` exists so rows written before this column keep saying what
+# they actually said, rather than being silently labelled `dry` in bulk.
+LANES = ("dry", "wet", "both", "unspecified")
+
 
 class ProjectTimelineEntry(UUIDVersionMixin, Base):
     __tablename__ = "project_timeline_entries"
@@ -72,6 +80,17 @@ class ProjectTimelineEntry(UUIDVersionMixin, Base):
         # a separate index would be dead weight on every write and buy nothing on read.
         # `outcome` keeps its own index because "what did we rule out" is asked across
         # projects, where project_id is not in the predicate at all.
+        #
+        # One row per numbered decision, per project. This is what makes a coverage
+        # check possible at all: without it, "is D064 recorded" has no answer, and two
+        # rows could each claim to be the record of it. NULL for the majority of
+        # entries, which are not numbered decisions, and Postgres treats NULLs as
+        # distinct - so the constraint disciplines the numbered ones without forcing a
+        # number onto every observation.
+        UniqueConstraint("project_id", "decision_ref", name="uq_timeline_decision_ref"),
+        # No index on `lane`: it is only ever filtered inside one project, where
+        # ix_timeline_project_occurred already leads with project_id, and the row count
+        # per project is small. Same reasoning as the single-column indexes above.
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
@@ -93,6 +112,19 @@ class ProjectTimelineEntry(UUIDVersionMixin, Base):
     # Full reasoning, markdown. The part that would otherwise only exist in a doc.
     body: Mapped[str] = mapped_column(Text, default="")
     outcome: Mapped[str] = mapped_column(String(40), default="unspecified", index=True)
+    # The project's own decision number, e.g. "D064" - the identifier the researchers
+    # actually use in submission scripts, docs and conversation. Stored in a column
+    # rather than mentioned in `body`, because a number that only exists in prose is a
+    # number nothing can check: the sweet-protein project lost D080-D099 exactly that
+    # way, with cluster scripts citing numbers the repository had never heard of.
+    decision_ref: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Dry (computational), wet (bench), both, or not stated. See LANES.
+    lane: Mapped[str] = mapped_column(String(16), default="unspecified")
+    # The branches that were NOT taken: [{"option": ..., "rejected_because": ...}].
+    # A record that only shows the path taken is a flowchart; what makes it a decision
+    # is the option it closed off, and that is the part that gets re-opened later by
+    # someone who cannot see why it was closed.
+    alternatives: Mapped[list] = mapped_column(JSON, default=list)
     # Identifiers, not names mentioned in prose - the same discipline research_findings
     # applies: {"job_ids": [...], "candidate_ids": [...], "artifact_ids": [...],
     # "workflow_run_ids": [...], "finding_ids": [...], "external_refs": [...]}.

@@ -23,7 +23,7 @@ from backend_v2.app.core.pagination import decode_time_cursor, encode_time_curso
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, User
 from backend_v2.app.projects.models import Project, ProjectMember
-from backend_v2.app.timeline.models import ENTRY_TYPES, OUTCOMES, ProjectTimelineEntry
+from backend_v2.app.timeline.models import ENTRY_TYPES, LANES, OUTCOMES, ProjectTimelineEntry
 from backend_v2.app.timeline.repository import TimelineRepository
 from backend_v2.app.timeline.schemas import TimelineEntryCreate, TimelineEntryUpdate
 from backend_v2.app.timeline.service import create_entry, update_entry
@@ -204,3 +204,214 @@ def test_model_and_migration_declare_the_same_indexes() -> None:
     for index in ProjectTimelineEntry.__table__.indexes:
         assert index.name in migration_source, f"index {index.name} is in the model but not the migration"
     assert module.TABLE == ProjectTimelineEntry.__tablename__
+
+
+# --------------------------------------------------------------------------------------
+# Decision-tree fields: the number, the lane, and the branches not taken (migration 0047)
+# --------------------------------------------------------------------------------------
+
+
+def test_decision_number_is_unique_within_a_project_but_free_across_projects() -> None:
+    """Two rows both claiming to be D064 makes "is D064 recorded" unanswerable."""
+    engine = enforce_foreign_keys(create_engine("sqlite+pysqlite://"))
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        user = User(username="dr", display_name="DR", role="admin", enabled=True)
+        org = Organization(name="DR Org")
+        session.add_all([user, org])
+        session.flush()
+        a = Project(organization_id=org.id, owner_id=user.id, name="A", project_type="design")
+        b = Project(organization_id=org.id, owner_id=user.id, name="B", project_type="design")
+        session.add_all([a, b])
+        session.flush()
+
+        create_entry(session, a, TimelineEntryCreate(title="first", occurred_at=BASE, decision_ref="D064"), user)
+        session.flush()
+
+        with pytest.raises(DomainError) as excinfo:
+            create_entry(
+                session, a, TimelineEntryCreate(title="second", occurred_at=BASE, decision_ref="D064"), user
+            )
+        assert excinfo.value.error_code == "timeline_decision_ref_taken"
+
+        # The cannabinoid project numbering its own decisions must not collide with the
+        # sweet-protein one; they share the table, not the numbering space.
+        create_entry(session, b, TimelineEntryCreate(title="other project", occurred_at=BASE, decision_ref="D064"), user)
+        session.flush()
+    engine.dispose()
+
+
+def test_blank_decision_ref_is_stored_as_null_not_as_empty_string(env) -> None:
+    """An empty form field must not make every unnumbered entry collide."""
+    for title, ref in (("a", ""), ("b", "   "), ("c", None)):
+        _add(env, title=title, occurred_at=BASE, decision_ref=ref)
+    env["session"].flush()
+    rows = TimelineRepository(env["session"]).list_project(env["project"].id, None, 50)
+    assert [r.decision_ref for r in rows] == [None, None, None]
+
+
+def test_decision_ref_lookup_finds_the_recording_entry(env) -> None:
+    entry = _add(env, title="D105", occurred_at=BASE, decision_ref="D105")
+    _add(env, title="unrelated", occurred_at=BASE)
+    env["session"].flush()
+    repo = TimelineRepository(env["session"])
+    assert repo.find_by_decision_ref(env["project"].id, "D105").id == entry.id
+    assert repo.find_by_decision_ref(env["project"].id, "D106") is None
+
+
+def test_settled_wet_lane_decision_must_cite_bench_evidence(env) -> None:
+    """The provenance keys existed for months and the seeders filled job_ids once.
+
+    An optional field is a field nobody fills, so the bench keys are required by the
+    only entries that claim to rest on bench work.
+    """
+    with pytest.raises(ValueError, match="bench evidence"):
+        TimelineEntryCreate(
+            title="wet call", occurred_at=BASE, entry_type="decision", lane="wet", outcome="supported"
+        )
+
+    with pytest.raises(ValueError, match="bench evidence"):
+        # Present but empty is the same as absent - an empty list cites nothing.
+        TimelineEntryCreate(
+            title="wet call",
+            occurred_at=BASE,
+            entry_type="decision",
+            lane="both",
+            outcome="refuted",
+            provenance={"experiment_result_ids": []},
+        )
+
+    ok = TimelineEntryCreate(
+        title="revoke the expression release",
+        occurred_at=BASE,
+        entry_type="decision",
+        lane="both",
+        outcome="refuted",
+        provenance={"protein_ids": ["p1"], "job_ids": ["j1"]},
+    )
+    assert ok.lane == "both"
+
+
+def test_an_open_branch_may_be_wet_without_evidence_it_does_not_have_yet(env) -> None:
+    """An unsettled decision has closed nothing, so it owes nothing.
+
+    Requiring evidence here would make it impossible to write down a question before
+    answering it - and writing questions down is exactly what the tree bootstrap does.
+    Whether a branch will be answered at a bench is knowable on day one; its answer is not.
+    """
+    branch = TimelineEntryCreate(
+        title="does it activate the human receptor?",
+        occurred_at=BASE,
+        entry_type="decision",
+        lane="wet",
+        outcome="unspecified",
+    )
+    assert branch.provenance == {}
+
+    # ...but settling it later does owe evidence.
+    entry = _add(env, title="branch", occurred_at=BASE, entry_type="decision", lane="wet")
+    env["session"].flush()
+    with pytest.raises(DomainError) as excinfo:
+        update_entry(
+            env["session"], env["project"], entry, TimelineEntryUpdate(outcome="supported"), entry.version
+        )
+    assert excinfo.value.error_code == "timeline_lane_evidence_missing"
+
+
+def test_lane_rule_applies_only_to_decisions(env) -> None:
+    """A plan is written before the data exists; a result carries its own evidence."""
+    for entry_type in ("plan", "result", "problem", "method", "milestone", "resolution"):
+        payload = TimelineEntryCreate(
+            title=entry_type, occurred_at=BASE, entry_type=entry_type, lane="wet", outcome="supported"
+        )
+        assert payload.lane == "wet"
+
+
+def test_patch_is_judged_on_the_merged_row_not_on_the_submitted_fields(env) -> None:
+    """Clearing provenance breaks a wet decision as surely as setting the lane does."""
+    entry = _add(
+        env,
+        title="bench call",
+        occurred_at=BASE,
+        entry_type="decision",
+        lane="wet",
+        outcome="supported",
+        provenance={"experiment_result_ids": ["e1"]},
+    )
+    env["session"].flush()
+
+    with pytest.raises(DomainError) as excinfo:
+        update_entry(
+            env["session"], env["project"], entry, TimelineEntryUpdate(provenance={}), entry.version
+        )
+    assert excinfo.value.error_code == "timeline_lane_evidence_missing"
+
+    # Turning a dry decision wet without adding evidence is the same failure from the
+    # other side; neither request mentions both fields.
+    dry = _add(env, title="dry call", occurred_at=BASE, entry_type="decision", lane="dry", outcome="supported")
+    env["session"].flush()
+    with pytest.raises(DomainError) as excinfo:
+        update_entry(env["session"], env["project"], dry, TimelineEntryUpdate(lane="both"), dry.version)
+    assert excinfo.value.error_code == "timeline_lane_evidence_missing"
+
+
+def test_lane_vocabulary_is_closed(env) -> None:
+    with pytest.raises(ValueError):
+        TimelineEntryCreate(title="x", occurred_at=BASE, lane="in-silico")
+    # entry_type="result" so the sweep tests the vocabulary and not the bench-evidence
+    # rule, which only applies to decisions.
+    for value in LANES:
+        payload = TimelineEntryCreate(
+            title="x", occurred_at=BASE, entry_type="result", lane=value, outcome="supported"
+        )
+        assert payload.lane == value
+
+
+def test_alternatives_require_a_reason(env) -> None:
+    """An option listed without why it was rejected tells a later reader nothing."""
+    with pytest.raises(ValueError):
+        TimelineEntryCreate(
+            title="x",
+            occurred_at=BASE,
+            alternatives=[{"option": "keep the empty-MSA contract", "rejected_because": ""}],
+        )
+    entry = _add(
+        env,
+        title="per-family fold contract",
+        occurred_at=BASE,
+        entry_type="decision",
+        lane="dry",
+        alternatives=[
+            {"option": "keep the empty-MSA contract", "rejected_because": "thaumatin 12.55 A, ruled out by measurement"},
+            {"option": "drop thaumatin from the family set", "rejected_because": "it is the only direct human-receptor endpoint"},
+        ],
+    )
+    env["session"].flush()
+    assert [a["option"] for a in entry.alternatives] == [
+        "keep the empty-MSA contract",
+        "drop thaumatin from the family set",
+    ]
+
+
+def test_wet_provenance_keys_are_accepted_and_unknown_ones_still_are_not(env) -> None:
+    ok = TimelineEntryCreate(
+        title="x",
+        occurred_at=BASE,
+        provenance={"experiment_result_ids": ["e"], "protein_ids": ["p"]},
+    )
+    assert set(ok.provenance) == {"experiment_result_ids", "protein_ids"}
+    with pytest.raises(ValueError):
+        TimelineEntryCreate(title="x", occurred_at=BASE, provenance={"assay_ids": ["e"]})
+
+
+def test_migration_0052_declares_every_column_and_constraint_the_model_has() -> None:
+    """Same drift guard as 0035, extended to the fields the tree view depends on."""
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0052_decision_tree_fields.py"
+    source = path.read_text()
+    for column in ("decision_ref", "lane", "alternatives"):
+        assert column in ProjectTimelineEntry.__table__.columns, f"{column} missing from the model"
+        assert source.count(column) >= 2, f"{column} is not both added and dropped in 0047"
+    assert "uq_timeline_decision_ref" in source
+    assert "uq_timeline_decision_ref" in {c.name for c in ProjectTimelineEntry.__table__.constraints}

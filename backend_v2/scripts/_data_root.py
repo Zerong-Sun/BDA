@@ -37,6 +37,9 @@ _MOVED = {
 STORE_NAME = "BDA-data"
 LOCAL_STORE_NAME = "BDA-local"
 
+#: Prefix used in recorded paths to name a file in the machine-local store.
+LOCAL_ROOT_LABEL = "BDA_LOCAL_ROOT"
+
 
 def _primary_checkout_data_root() -> Path | None:
     """Return the data-store sibling of Git's primary checkout, if available.
@@ -125,11 +128,18 @@ def resolve_recorded(recorded: str) -> Path:
     before the split; the ones naming moved directories now resolve into the data
     store, and everything else stays repo-relative. Use this to *read* a recorded
     path — `data_path` assumes the store and would send `backend_v2/...` there too.
+
+    A recorded path may also start with ``BDA_LOCAL_ROOT/``. That label names the
+    machine-local evidence store, which holds cluster downloads that are pinned by
+    SHA-256 but never enter version control. Recording the label rather than a home
+    directory is what lets one result document be read on another machine.
     """
     logical = Path(recorded)
     if not logical.parts or logical.is_absolute() or ".." in logical.parts:
         raise ValueError("expected a safe, non-empty recorded path")
-    head = logical.parts[0]
+    head, *rest = logical.parts
+    if head == LOCAL_ROOT_LABEL:
+        return local_root().joinpath(*rest)
     if head in _MOVED:
         return data_path(recorded)
     return REPO_ROOT / recorded
@@ -140,8 +150,8 @@ def display_path(path: Path) -> str:
 
     Paths inside the repository render relative to it, as they always have.
     Paths in the data store render under their **pre-split** name — a file now at
-    `<store>/research-projects/example/x.pdb` still records as
-    `research projects/example/x.pdb`.
+    `<store>/research-projects/MANUKA/x.pdb` still records as
+    `research projects/MANUKA/x.pdb`.
 
     That is deliberate: these strings go into manifests that are checksummed and
     compared against ones generated before the split. Recording the new location

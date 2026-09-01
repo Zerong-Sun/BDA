@@ -52,3 +52,12 @@ class TimelineRepository:
 
     def get(self, entry_id: uuid.UUID) -> ProjectTimelineEntry | None:
         return self.session.get(ProjectTimelineEntry, entry_id)
+
+    def find_by_decision_ref(self, project_id: uuid.UUID, decision_ref: str) -> ProjectTimelineEntry | None:
+        """The one row that records a numbered decision, if it exists yet."""
+        return self.session.scalar(
+            select(ProjectTimelineEntry).where(
+                ProjectTimelineEntry.project_id == project_id,
+                ProjectTimelineEntry.decision_ref == decision_ref,
+            )
+        )

@@ -8,7 +8,7 @@ from ..identity.models import User
 from ..projects.models import Project
 from .models import ProjectTimelineEntry
 from .repository import TimelineRepository
-from .schemas import TimelineEntryCreate, TimelineEntryUpdate
+from .schemas import TimelineEntryCreate, TimelineEntryUpdate, check_lane_evidence
 
 
 def _check_link(session: Session, project: Project, entry_id, field: str) -> None:
@@ -28,13 +28,40 @@ def _check_link(session: Session, project: Project, entry_id, field: str) -> Non
         )
 
 
+def _check_decision_ref_free(
+    session: Session, project: Project, decision_ref: str | None, *, excluding=None
+) -> None:
+    """One row per decision number, per project.
+
+    The unique constraint already guarantees this, but reaching it raises an
+    IntegrityError at flush time - a 500 with no useful body, in a code path whose whole
+    point is that the numbering is checkable. Asking first turns it into a 409 that says
+    which entry already holds the number.
+    """
+    if decision_ref is None:
+        return
+    held = TimelineRepository(session).find_by_decision_ref(project.id, decision_ref)
+    if held is not None and held.id != excluding:
+        raise DomainError(
+            "timeline_decision_ref_taken",
+            f"decision_ref {decision_ref!r} is already recorded by entry {held.id}",
+            status_code=409,
+        )
+
+
+def _dump(items) -> list:
+    return [item.model_dump() if hasattr(item, "model_dump") else item for item in items]
+
+
 def create_entry(
     session: Session, project: Project, payload: TimelineEntryCreate, user: User
 ) -> ProjectTimelineEntry:
     _check_link(session, project, payload.supersedes_id, "supersedes_id")
     _check_link(session, project, payload.caused_by_id, "caused_by_id")
+    _check_decision_ref_free(session, project, payload.decision_ref)
     data = payload.model_dump()
-    data["code_refs"] = [ref.model_dump() if hasattr(ref, "model_dump") else ref for ref in payload.code_refs]
+    data["code_refs"] = _dump(payload.code_refs)
+    data["alternatives"] = _dump(payload.alternatives)
     row = ProjectTimelineEntry(project_id=project.id, created_by=user.id, **data)
     session.add(row)
     session.flush()
@@ -61,10 +88,27 @@ def update_entry(
             if changes[field] == entry.id:
                 raise DomainError("timeline_self_link", f"{field} cannot point at the entry itself", status_code=422)
             _check_link(session, project, changes[field], field)
-    if "code_refs" in changes and changes["code_refs"] is not None:
-        changes["code_refs"] = [
-            ref.model_dump() if hasattr(ref, "model_dump") else ref for ref in changes["code_refs"]
-        ]
+    for field in ("code_refs", "alternatives"):
+        if changes.get(field) is not None:
+            changes[field] = _dump(changes[field])
+    if "decision_ref" in changes:
+        _check_decision_ref_free(session, project, changes["decision_ref"], excluding=entry.id)
+    # The lane rule is a cross-field one, so a PATCH has to be judged on the row as it
+    # will be, not on the fields that happen to be in this request. Three separate ways
+    # in: clearing provenance on a settled wet decision, turning a dry one wet, and
+    # settling an open one - and no request mentions more than one of the three fields.
+    merged = {
+        "entry_type": changes.get("entry_type", entry.entry_type),
+        "lane": changes.get("lane", entry.lane),
+        "outcome": changes.get("outcome", entry.outcome),
+        "provenance": changes.get("provenance", entry.provenance) or {},
+    }
+    try:
+        check_lane_evidence(
+            merged["entry_type"], merged["lane"], merged["outcome"], merged["provenance"]
+        )
+    except ValueError as exc:
+        raise DomainError("timeline_lane_evidence_missing", str(exc), status_code=422) from exc
     for field, value in changes.items():
         setattr(entry, field, value)
     entry.version += 1

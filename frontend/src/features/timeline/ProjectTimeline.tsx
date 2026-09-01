@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listAllTimeline } from '../../lib/api/timeline'
+import { listResearchGoals } from '../../lib/api/researchGoals'
 import {
   TIMELINE_ENTRY_TYPES,
+  TIMELINE_LANES,
   TIMELINE_OUTCOMES,
   groupByPhase,
+  isUnbound,
+  openQuestions,
   provenanceRefs,
   type TimelineEntry,
 } from '../../lib/schemas/timeline'
+import { DecisionTreeBootstrap } from './DecisionTreeBootstrap'
+import { DecisionTreeView } from './DecisionTreeView'
 import { AppFrame } from '../../components/ui/AppFrame'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { Button } from '../../components/ui/Button'
@@ -26,8 +32,16 @@ import { useI18n } from '../../lib/i18n'
 const ALL = '__all__'
 const NO_PHASE = '__nophase__'
 
+/** Three readings of one record, not three records. `tree` answers "why did the project
+ *  end up here", `timeline` answers "what happened recently", and `open` answers "what
+ *  are we standing on" - the last of which NEXT_PLAN currently re-writes by hand. */
+const VIEWS = ['tree', 'timeline', 'open'] as const
+type View = (typeof VIEWS)[number]
+
 interface ProjectTimelineProps {
   projectId: string
+  /** Whether the project has a design prompt. The bootstrap needs one to draft from. */
+  hasPrompt?: boolean
 }
 
 /** Outcome maps onto the shared StatusPill vocabulary rather than raw colours, so the
@@ -67,10 +81,27 @@ function EntryCard({ entry }: { entry: TimelineEntry }) {
         <time className="font-mono text-xs text-text-secondary" dateTime={entry.occurred_at}>
           {entry.occurred_at.slice(0, 16).replace('T', ' ')}
         </time>
+        {entry.decision_ref ? (
+          <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-text-primary">
+            {entry.decision_ref}
+          </span>
+        ) : null}
         <span className="rounded-full border border-border-soft px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary">
           {typeLabel}
         </span>
         <StatusPill label={outcomeLabel} tone={outcomeTone(entry.outcome)} />
+        {entry.lane !== 'unspecified' ? (
+          <span className="rounded border border-border-soft px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary">
+            {entry.lane === 'both' ? `${tl.laneDry}+${tl.laneWet}` : entry.lane === 'wet' ? tl.laneWet : tl.laneDry}
+          </span>
+        ) : null}
+        {/* Same rule as the tree view: a decision resting on nothing resolvable is
+            marked rather than rendered as if it were settled. */}
+        {isUnbound(entry) ? (
+          <span className="rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning" title={tl.unboundHelp}>
+            {tl.unbound}
+          </span>
+        ) : null}
       </div>
 
       <h3 className="mt-1 font-semibold text-text-primary">{entry.title}</h3>
@@ -138,17 +169,28 @@ function EntryCard({ entry }: { entry: TimelineEntry }) {
   )
 }
 
-export function ProjectTimeline({ projectId }: ProjectTimelineProps) {
+export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelineProps) {
   const { t, format } = useI18n()
   const tl = t.timeline
+  const [view, setView] = useState<View>('tree')
   const [phase, setPhase] = useState('')
   const [entryType, setEntryType] = useState('')
   const [outcome, setOutcome] = useState('')
+  const [lane, setLane] = useState('')
 
   const query = useQuery({
     queryKey: ['project-timeline', projectId],
     queryFn: () => listAllTimeline(projectId),
     staleTime: 60_000,
+  })
+
+  // The goal tree is the vertical structure the decisions hang off. Fetched only for
+  // the tree view; the other two read the timeline alone.
+  const goalsQuery = useQuery({
+    queryKey: ['research-goals', projectId],
+    queryFn: () => listResearchGoals(projectId),
+    staleTime: 60_000,
+    enabled: view === 'tree',
   })
 
   const entries = useMemo(() => query.data ?? [], [query.data])
@@ -165,12 +207,16 @@ export function ProjectTimeline({ projectId }: ProjectTimelineProps) {
         (entry) =>
           (!phase || entry.phase === phase || (phase === NO_PHASE && !entry.phase)) &&
           (!entryType || entry.entry_type === entryType) &&
-          (!outcome || entry.outcome === outcome),
+          (!outcome || entry.outcome === outcome) &&
+          // `both` is deliberately included by a dry *or* a wet filter: a decision that
+          // spans the two halves is relevant to whoever is looking at either.
+          (!lane || entry.lane === lane || (entry.lane === 'both' && lane !== 'unspecified')),
       ),
-    [entries, phase, entryType, outcome],
+    [entries, phase, entryType, outcome, lane],
   )
 
   const grouped = useMemo(() => groupByPhase(visible), [visible])
+  const open = useMemo(() => openQuestions(visible), [visible])
 
   if (query.isLoading) {
     return (
@@ -181,7 +227,15 @@ export function ProjectTimeline({ projectId }: ProjectTimelineProps) {
     return <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.loadFailed}</AppFrame>
   }
   if (!entries.length) {
-    return <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.empty}</AppFrame>
+    // The emptiest the record ever is, and therefore the one moment the bootstrap is
+    // worth offering. Once there is any history, this stops being a first step and the
+    // tree view takes over.
+    return (
+      <div className="grid gap-3">
+        <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.empty}</AppFrame>
+        <DecisionTreeBootstrap projectId={projectId} hasPrompt={hasPrompt} />
+      </div>
+    )
   }
 
   return (
@@ -196,7 +250,36 @@ export function ProjectTimeline({ projectId }: ProjectTimelineProps) {
         </span>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label={tl.title}>
+        {VIEWS.map((value) => (
+          <Button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            variant={view === value ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setView(value)}
+          >
+            {value === 'tree' ? tl.viewTree : value === 'timeline' ? tl.viewTimeline : tl.viewOpen}
+          </Button>
+        ))}
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-2">
+        <Select value={lane || ALL} onValueChange={(value) => setLane(value === ALL ? '' : (value ?? ''))}>
+          <SelectTrigger aria-label={tl.allLanes} className="min-w-36">
+            <SelectValue placeholder={tl.allLanes} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{tl.allLanes}</SelectItem>
+            {TIMELINE_LANES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {tl.lane[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={phase || ALL} onValueChange={(value) => setPhase(value === ALL ? '' : (value ?? ''))}>
           <SelectTrigger aria-label={tl.allPhases} className="min-w-36">
             <SelectValue placeholder={tl.allPhases} />
@@ -238,20 +321,44 @@ export function ProjectTimeline({ projectId }: ProjectTimelineProps) {
         </Select>
       </div>
 
-      <div className="space-y-5">
-        {grouped.map((group) => (
-          <section key={group.phase || '_'}>
-            <h3 className="mb-2 text-xs uppercase tracking-wide text-accent">
-              {group.phase || tl.noPhase}
-            </h3>
+      {view === 'tree' ? (
+        goalsQuery.isLoading ? (
+          <p className="text-sm text-text-secondary">{tl.loading}</p>
+        ) : (
+          // A failed goal fetch degrades to an empty goal list rather than blanking the
+          // page: every decision then shows under "not attached to any goal", which is
+          // the truth about what is known right now.
+          <DecisionTreeView goals={goalsQuery.data ?? []} entries={visible} />
+        )
+      ) : view === 'open' ? (
+        <div className="space-y-3">
+          <p className="text-sm text-text-secondary">{tl.openQuestionsHelp}</p>
+          {open.length ? (
             <ol className="space-y-2">
-              {group.entries.map((entry) => (
+              {open.map((entry) => (
                 <EntryCard key={entry.id} entry={entry} />
               ))}
             </ol>
-          </section>
-        ))}
-      </div>
+          ) : (
+            <p className="text-sm text-text-secondary">{tl.openQuestionsEmpty}</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {grouped.map((group) => (
+            <section key={group.phase || '_'}>
+              <h3 className="mb-2 text-xs uppercase tracking-wide text-accent">
+                {group.phase || tl.noPhase}
+              </h3>
+              <ol className="space-y-2">
+                {group.entries.map((entry) => (
+                  <EntryCard key={entry.id} entry={entry} />
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
+      )}
     </AppFrame>
   )
 }

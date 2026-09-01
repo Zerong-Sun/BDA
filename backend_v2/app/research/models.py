@@ -90,7 +90,45 @@ GOAL_STATUSES = ("open", "answered", "abandoned")
 
 #: What a goal can gather. Values match the owning table, so a link resolves
 #: without a discriminator column per resource type.
-GOAL_LINK_TYPES = ("experiment_result", "finding", "candidate", "job", "protein")
+#:
+#: `timeline_entry` is what makes this a decision tree rather than a goal list: the
+#: goals carry the vertical structure, and the judgements that closed off options hang
+#: off them. Kept here rather than given a `parent_id` on the timeline itself because a
+#: decision routinely serves more than one goal - the sweet-protein D109 constrains both
+#: "produce an expressible candidate" and "safety", and a single parent would force one
+#: of those relationships into prose.
+GOAL_LINK_TYPES = ("experiment_result", "finding", "candidate", "job", "protein", "timeline_entry")
+
+
+class DecisionTreeDraft(UUIDVersionMixin, Base):
+    """An LLM's proposed starting tree for a project, before anyone has agreed to it.
+
+    A project's prompt is its brief, and until now nothing downstream consumed it: the
+    goal tree and the decisions were written by hand, or not at all. This drafts both
+    from the prompt - but a draft is the whole point of the separation. Landing it
+    directly would mean the model, not the orchestrator, deciding what the project's
+    goals are and which questions are open, and this project's own writer invariant says
+    only the orchestrator does that.
+
+    So the draft is stored, and nothing imports it. The import endpoint takes the tree
+    the *person* submits, which is why there is no "commit draft N" call anywhere: the
+    per-item review cannot be skipped because there is no path that skips it. Same shape
+    as ``ProjectPromptDraft`` and ``ResearchGeneration`` - request in, status polled,
+    validated payload out - deliberately, rather than a third mechanism.
+    """
+
+    __tablename__ = "research_decision_tree_drafts"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40), default="pending", index=True)
+    #: What was asked for, including the prompt text the draft was derived from - so a
+    #: draft stays interpretable after the project's prompt is rewritten.
+    request: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: The validated proposal: {"goals": [...], "branches": [...]}. Written only after it
+    #: parses against the schema, so a caller never has to guess whether it is well formed.
+    draft: Mapped[dict] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ResearchGoal(UUIDVersionMixin, Base):
