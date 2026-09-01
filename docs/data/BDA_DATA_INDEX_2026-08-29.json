@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "logical_root": "BDA_DATA_ROOT",
-  "snapshot": "analysis/2026-08-29",
-  "manifest": "analysis/2026-08-29/SHA256SUMS",
-  "manifest_sha256": "fc68f3a2a04ce6ecb4747cde733d9191d96069a0540907cb4397319f41fe080b",
-  "payload_count": 544,
-  "source_index": "analysis/2026-08-29/SOURCES.json"
-}

@@ -58,13 +58,9 @@ def test_trust_manifest_survives_browser_json_round_trip() -> None:
     assert TRUSTED_BUILTIN_PACKAGE_CHECKSUMS[package["package_id"]] == research_package_checksum(posted)
 
 
-def test_builtin_package_families_do_not_cross_match() -> None:
+def test_public_builtin_package_family_does_not_match_private_packages() -> None:
     assert _managed_package_match("pd1-demo-v1", "pd1-demo-v2")
-    assert _managed_package_match(
-        "protein-knowledge-pain-targets-20260701",
-        "protein-knowledge-pain-targets-20260719",
-    )
-    assert not _managed_package_match("protein-knowledge-pain-targets-20260719", "pd1-demo-v1")
+    assert not _managed_package_match("private-package-v1", "pd1-demo-v1")
     assert _project_package_meta(
         SimpleNamespace(localized_content={"package": {"id": "package"}})
     ) == {"id": "package"}

@@ -38,8 +38,16 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 def main() -> int:
     with Session(engine) as session:
         project = session.scalar(
-            select(Project).where(Project.name == "SweetProtein_RFdiffusion_100x2_20260626")
-        ) or session.scalar(select(Project).order_by(Project.created_at.desc()))
+            select(Project)
+            .join(Artifact, Artifact.project_id == Project.id)
+            .where(
+                Artifact.artifact_type.in_(["backbone_set", "target_structure"]),
+                Artifact.status == "available",
+                Artifact.deleted_at.is_(None),
+            )
+            .order_by(Project.created_at.desc())
+            .limit(1)
+        )
         user = session.scalar(select(User).where(User.enabled.is_(True)).order_by(User.created_at))
         rfd = session.scalar(select(ModelPlugin).where(ModelPlugin.plugin_key == "RFdiffusion"))
         mpnn = session.scalar(select(ModelPlugin).where(ModelPlugin.plugin_key == "ProteinMPNN"))

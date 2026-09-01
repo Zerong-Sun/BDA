@@ -110,8 +110,22 @@ class ComputeRepository:
         }
         return [found[item] for item in parsed if item in found]
 
-    def enqueue(self, topic: str, aggregate_id: uuid.UUID, payload: dict | None = None) -> None:
-        self.session.add(OutboxEvent(topic=topic, aggregate_id=aggregate_id, payload=payload or {}))
+    def enqueue(
+        self,
+        topic: str,
+        aggregate_id: uuid.UUID,
+        *,
+        project_id: uuid.UUID,
+        payload: dict | None = None,
+    ) -> None:
+        """Queue project work with the RLS fence required by restricted workers."""
+        self.session.add(
+            OutboxEvent(
+                topic=topic,
+                aggregate_id=aggregate_id,
+                payload={**(payload or {}), "project_id": str(project_id)},
+            )
+        )
 
     def has_outbox_event(self, topic: str, aggregate_id: uuid.UUID) -> bool:
         return (

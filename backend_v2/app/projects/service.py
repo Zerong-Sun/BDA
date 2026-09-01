@@ -36,28 +36,29 @@ from .schemas import (
     TargetReadinessResponse,
 )
 
-BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo", "protein-knowledge-pain-targets")
+BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo",)
 BUILTIN_RESEARCH_PROJECT_NAMES = {
-    "CANN": {"大麻素结合蛋白", "Cannabinoid-binding proteins"},
-    "INSECT": {"杀虫/昆虫毒素蛋白与多肽", "Insecticidal proteins and toxin peptides"},
     "PD1": {"PD-1/PD-L1结合与调控网络", "PD-1/PD-L1 binding and regulatory network"},
-    "PAIN": {"慢性疼痛新型结合蛋白与回路", "Emerging binding proteins and circuits in chronic pain"},
 }
 BUILTIN_RESEARCH_PROJECT_TYPES = {
-    "CANN": "protein_binding_knowledge",
-    "INSECT": "insecticidal_protein_knowledge",
     "PD1": "checkpoint_protein_knowledge",
-    "PAIN": "pain_target_discovery",
 }
 
 
-def require_project(session: Session, project_id: uuid.UUID, user: User) -> Project:
+def _require_project_access(session: Session, project_id: uuid.UUID, user: User) -> Project:
     repo = ProjectRepository(session)
     project = repo.get(project_id)
     if project is None:
         raise DomainError("project_not_found", "Project was not found", status_code=404)
     if not repo.user_can_access(project, user):
         raise DomainError("forbidden", "The current user cannot access this project", status_code=403)
+    return project
+
+
+def require_project(session: Session, project_id: uuid.UUID, user: User) -> Project:
+    project = _require_project_access(session, project_id, user)
+    if getattr(user, "_bda_project_write_required", False):
+        return _authorize_project_action(session, project, user, "write")
     return project
 
 
@@ -84,7 +85,16 @@ def require_project_permission(
     Project membership can only narrow the organization role. It can never turn
     an organization viewer into a writer.
     """
-    project = require_project(session, project_id, user)
+    project = _require_project_access(session, project_id, user)
+    return _authorize_project_action(session, project, user, action)
+
+
+def _authorize_project_action(
+    session: Session,
+    project: Project,
+    user: User,
+    action: str,
+) -> Project:
     role = ProjectRepository(session).effective_project_role(project, user)
     ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
     minimum = PROJECT_PERMISSION_MINIMUMS.get(action)

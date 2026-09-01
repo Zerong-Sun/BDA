@@ -24,34 +24,16 @@ interface RepresentativeStructure {
 }
 
 const REPRESENTATIVE_STRUCTURES: Record<string, RepresentativeStructure> = {
-  CANN: {
-    kind: 'molecule',
-    name: { zh: 'CB1–配体复合物', en: 'CB1–ligand complex' },
-    detail: { zh: '大麻素受体 · PDB 5TGZ', en: 'Cannabinoid receptor · PDB 5TGZ' },
-    pdbId: '5TGZ',
-  },
-  INSECT: {
-    kind: 'toxin',
-    name: { zh: 'Cry3A 毒素', en: 'Cry3A toxin' },
-    detail: { zh: '三结构域杀虫蛋白 · PDB 1CIY', en: 'Three-domain insecticidal protein · PDB 1CIY' },
-    pdbId: '1CIY',
-  },
   PD1: {
     kind: 'complex',
     name: { zh: 'PD-1 · 特瑞普利单抗', en: 'PD-1 · toripalimab' },
     detail: { zh: '抗体 Fab 结合界面 · PDB 6JBT', en: 'Antibody Fab interface · PDB 6JBT' },
     pdbId: '6JBT',
   },
-  PAIN: {
-    kind: 'membrane',
-    name: { zh: 'GPR37', en: 'GPR37' },
-    detail: { zh: '疼痛相关七跨膜受体', en: 'Pain-associated seven-pass receptor' },
-  },
   sweet_protein_design: {
     kind: 'protein',
-    name: { zh: 'Brazzein 折叠', en: 'Brazzein fold' },
-    detail: { zh: '天然甜味蛋白 · PDB 4HE7', en: 'Natural sweet protein · PDB 4HE7' },
-    pdbId: '4HE7',
+    name: { zh: '甜味蛋白设计', en: 'Sweet-protein design' },
+    detail: { zh: '项目结构由目标与制品决定', en: 'Project structure comes from its target and artifacts' },
   },
   binder_design: {
     kind: 'complex',
@@ -80,73 +62,14 @@ const REPRESENTATIVE_STRUCTURES: Record<string, RepresentativeStructure> = {
   },
 }
 
-const PROJECT_SPECIFIC_STRUCTURES: Array<{ pattern: RegExp; structure: RepresentativeStructure }> = [
-  {
-    pattern: /cannabinoid.*(specific|binding)|大麻素.*(特异|结合)/,
-    structure: {
-      kind: 'complex',
-      name: { zh: '抗 THC Fab · THC', en: 'Anti-THC Fab · THC' },
-      detail: { zh: '已有结合蛋白复合物 · PDB 3LS4', en: 'Existing binder complex · PDB 3LS4' },
-      pdbId: '3LS4',
-    },
-  },
-  {
-    pattern: /manuka|monellin|mnei|单链甜味蛋白/,
-    structure: {
-      kind: 'protein',
-      name: { zh: '单链 Monellin', en: 'Single-chain monellin' },
-      detail: { zh: '当前重设计支架 · PDB 2O9U', en: 'Current redesign scaffold · PDB 2O9U' },
-      pdbId: '2O9U',
-    },
-  },
-  {
-    pattern: /botrytis|cinerea|chitin synthase|灰霉|几丁质合酶/,
-    structure: {
-      kind: 'membrane-enzyme',
-      name: { zh: 'BcChs 几丁质合酶', en: 'BcChs chitin synthase' },
-      detail: { zh: '多跨膜受体酶与胞质催化域', en: 'Multi-pass membrane enzyme with catalytic domain' },
-    },
-  },
-  {
-    pattern: /aroma|flavor|odor|olfact|芳香|风味|嗅觉/,
-    structure: {
-      kind: 'barrel',
-      name: { zh: '风味分子结合蛋白', en: 'Flavor-molecule binding protein' },
-      detail: { zh: 'β-桶状配体结合腔', en: 'β-barrel ligand-binding cavity' },
-    },
-  },
-  {
-    pattern: /nanocage|nano.?cage|capsid|纳米笼|衣壳/,
-    structure: {
-      kind: 'nanocage',
-      name: { zh: '自组装蛋白纳米笼', en: 'Self-assembling protein nanocage' },
-      detail: { zh: '多聚体递送支架', en: 'Multimeric delivery scaffold' },
-    },
-  },
-  {
-    pattern: /antifungal|defensin|抗真菌|防御素/,
-    structure: {
-      kind: 'antifungal',
-      name: { zh: '抗真菌结合蛋白', en: 'Antifungal binding protein' },
-      detail: { zh: '富二硫键 α/β 折叠', en: 'Disulfide-rich α/β fold' },
-    },
-  },
-]
-
 function representativeForProject(project: Project): RepresentativeStructure {
   const sourceKey = project.source_project_key?.toUpperCase()
-  if (sourceKey && REPRESENTATIVE_STRUCTURES[sourceKey]) return REPRESENTATIVE_STRUCTURES[sourceKey]
+  if (sourceKey === 'PD1') return REPRESENTATIVE_STRUCTURES.PD1
 
   const searchable = `${project.name} ${project.summary ?? ''}`.toLowerCase()
-  const projectSpecific = PROJECT_SPECIFIC_STRUCTURES.find(({ pattern }) => pattern.test(searchable))
-  if (projectSpecific) return projectSpecific.structure
-  if (/cannabinoid|thc|cbd|大麻素/.test(searchable)) return REPRESENTATIVE_STRUCTURES.CANN
   if (/pd[-_ ]?1|pd[-_ ]?l1|checkpoint|检查点/.test(searchable)) return REPRESENTATIVE_STRUCTURES.PD1
-  if (/insect|toxin|bt\/cry|cry\d|vip\d|杀虫|毒素/.test(searchable)) return REPRESENTATIVE_STRUCTURES.INSECT
-  if (/chronic pain|pain target|疼痛/.test(searchable)) return REPRESENTATIVE_STRUCTURES.PAIN
   if (REPRESENTATIVE_STRUCTURES[project.project_type]) return REPRESENTATIVE_STRUCTURES[project.project_type]
   if (/enzyme|cataly|酶|催化/.test(searchable)) return REPRESENTATIVE_STRUCTURES.enzyme_design
-  if (/membrane|receptor|gpcr|受体|膜蛋白|pain|疼痛/.test(searchable)) return REPRESENTATIVE_STRUCTURES.PAIN
   if (/binder|antibody|complex|结合|抗体|复合物/.test(searchable)) return REPRESENTATIVE_STRUCTURES.binder_design
   if (/material|collagen|silk|材料|胶原|丝/.test(searchable)) return REPRESENTATIVE_STRUCTURES.biomaterial_design
   return REPRESENTATIVE_STRUCTURES.protein_design

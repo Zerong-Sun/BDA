@@ -262,6 +262,16 @@ def publish_outbox(batch_size: int = 100) -> dict:
                 # every tick and eventually filled the batch, starving every real event.
                 _defer_event(event, f"unknown_topic:{event.topic}")
                 continue
+            operation = session.get(Operation, event.id)
+            project_id = event.payload.get("project_id")
+            if not project_id and operation is not None and operation.project_id is not None:
+                project_id = str(operation.project_id)
+            if not project_id and event.topic.startswith("job."):
+                project_id = session.scalar(select(Job.project_id).where(Job.id == event.aggregate_id))
+            project_scoped = not event.topic.startswith("registry.")
+            if project_scoped and not project_id:
+                _defer_event(event, "missing_project_context")
+                continue
             try:
                 args: list[object] = [str(event.aggregate_id)]
                 if event.topic in {"target.structure.import", "research.gaps.resolve"}:
@@ -269,15 +279,15 @@ def publish_outbox(batch_size: int = 100) -> dict:
                 elif event.topic == "experiment_results.import":
                     args.append(bool(event.payload.get("dry_run")))
                 names = (subscribers,) if isinstance(subscribers, str) else subscribers
+                message_headers = {"bda_project_id": str(project_id)} if project_id else None
                 for index, task_name in enumerate(names):
                     # The first subscriber keeps the event id, because an Operation
                     # row is keyed on it. Any further subscriber gets a task id
                     # derived from that same id, so redelivery of the event still
                     # deduplicates per subscriber instead of colliding between them.
                     task_id = str(event.id) if index == 0 else str(uuid.uuid5(event.id, task_name))
-                    celery_app.send_task(task_name, args=args, task_id=task_id)
+                    celery_app.send_task(task_name, args=args, task_id=task_id, headers=message_headers)
                 event.published_at = datetime.now(UTC)
-                operation = session.get(Operation, event.id)
                 if operation is not None and operation.status == "pending":
                     operation.status = "queued"
                     operation.version += 1
@@ -399,7 +409,12 @@ def poll_due_jobs(batch_size: int = 100) -> dict:
             )
         )
         for job in jobs:
-            celery_app.send_task("bda_v2.poll_job", args=[str(job.id)], queue="poll")
+            celery_app.send_task(
+                "bda_v2.poll_job",
+                args=[str(job.id)],
+                queue="poll",
+                headers={"bda_project_id": str(job.project_id)},
+            )
             job.next_poll_at = now + timedelta(seconds=15)
             queued += 1
     return {"queued": queued}
@@ -431,7 +446,11 @@ def poll_job(self, job_id: str) -> dict:
             transition_job(session, job, "running")
         elif live.status == "succeeded" and job.status in {"queued", "running"}:
             transition_job(session, job, "collecting")
-            ComputeRepository(session).enqueue("job.collect", job.id)
+            ComputeRepository(session).enqueue(
+                "job.collect",
+                job.id,
+                project_id=job.project_id,
+            )
         elif live.status == "failed":
             job.error_code = "compute_failed"
             job.error_message = live.error
@@ -938,7 +957,12 @@ def compute_draft_confirm(draft_id: str) -> dict:
         repo = ComputeRepository(session)
         repo.append_event(job, "job.pending", {"compute_draft_id": draft_id})
         _mirror_status_onto_node(session, job)
-        repo.enqueue("job.dispatch", job.id, {"job_id": str(job.id)})
+        repo.enqueue(
+            "job.dispatch",
+            job.id,
+            project_id=job.project_id,
+            payload={"job_id": str(job.id)},
+        )
         draft.confirmed_job_id = job.id
         draft.status = "submitted"
         draft.version += 1

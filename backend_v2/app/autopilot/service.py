@@ -251,7 +251,12 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
             if job and job.status not in {"succeeded", "failed", "cancelled"}:
                 if job.status != "cancel_requested":
                     transition_job(session, job, "cancel_requested")
-                    ComputeRepository(session).enqueue("job.cancel", job.id, {"job_id": str(job.id)})
+                    ComputeRepository(session).enqueue(
+                        "job.cancel",
+                        job.id,
+                        project_id=job.project_id,
+                        payload={"job_id": str(job.id)},
+                    )
         if stage.resource_type == "research_generation" and stage.resource_id:
             generation = session.get(ResearchGeneration, stage.resource_id)
             if generation and generation.status not in {"succeeded", "failed", "cancelled"}:

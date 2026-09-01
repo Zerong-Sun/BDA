@@ -1,11 +1,8 @@
 """Δ between conditions must be storable, queryable, and never silently overwritten.
 
-Modelled on the cannabinoid binder project: the same candidate scored against THC and
-against CBD, where the only thing that says "selective" is the gap between them
-(docs/CANNABINOID_DESIGN_REASONING.md §2.7). Before this, `_record_metrics` matched an
-existing row on (candidate, key, method, variant) without `condition`, so the CBD score
-silently overwrote the THC score instead of accumulating beside it - the panel a
-selectivity check depends on could never actually form.
+Before this, `_record_metrics` matched an existing row on (candidate, key, method,
+variant) without `condition`, so a control score silently overwrote the target score
+instead of accumulating beside it; a selectivity panel could never form.
 """
 
 from __future__ import annotations
@@ -87,7 +84,7 @@ def test_mismatched_units_are_not_compared() -> None:
 
 
 def test_different_methods_are_kept_separate() -> None:
-    """Boltz's self-assessed ipTM(THC) must not be diffed against AF3's ipTM(CBD)."""
+    """One model's target score must not be diffed against another model's control."""
     metrics = [
         _metric(condition="ligand:TCI", method="boltz2", value=0.87),
         _metric(condition="ligand:P0T", method="alphafold3", value=0.73),

@@ -16,12 +16,16 @@ replicas:
   worker: 2
   researchWorker: 2
   copilotWorker: 2
+  schedulerWorker: 1
 
 service:
   port: 8200
   frontendPort: 80
 
 existingSecret: bda-v2-secrets
+migrationSecret: bda-v2-migration
+workerSecret: bda-v2-worker
+maintenanceSecret: bda-v2-maintenance
 
 ingress:
   enabled: true

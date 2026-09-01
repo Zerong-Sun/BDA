@@ -104,4 +104,34 @@ describe('bundled PD1 demo research package', () => {
 
     expect(() => BundledResearchPackageSchema.parse(bundle)).not.toThrow()
   })
+
+  it('accepts a generic project ID and binds candidates to that project', () => {
+    const bundle = JSON.parse(JSON.stringify(raw))
+    bundle.projects[0].id = 'PRIVATE1'
+    for (const reference of bundle.references) reference.project_ids = ['PRIVATE1']
+    for (const edge of bundle.edges) edge.project = 'PRIVATE1'
+    bundle.candidates = [{
+      candidate_id: 'TARGET1',
+      project_id: 'PRIVATE1',
+      group: { zh: '优先组', en: 'Priority group' },
+      target: { zh: '候选靶点', en: 'Candidate target' },
+      gene: 'GENE1',
+      protein_type: 'Protein',
+      localization: 'Membrane',
+      axis: 'Pathway',
+      weighted_score: 80,
+      evidence: 4,
+      novelty: 4,
+      tractability: 4,
+      human: 4,
+      specificity: 4,
+      safety: 4,
+      reference_ids: bundle.references[0].ref_id,
+    }]
+
+    const parsed = BundledResearchPackageSchema.parse(bundle)
+
+    expect(parsed.projects[0].id).toBe('PRIVATE1')
+    expect(parsed.candidates[0].project_id).toBe('PRIVATE1')
+  })
 })

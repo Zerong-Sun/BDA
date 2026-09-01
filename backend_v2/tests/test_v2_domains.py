@@ -11,7 +11,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.core.database import get_session
 from backend_v2.app.core.models import Base
-from backend_v2.app.identity.deps import current_user, require_command
+from backend_v2.app.identity.deps import current_user
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.intelligence.models import (
     DesignRoute,
@@ -72,7 +72,6 @@ def domain_client() -> Generator[tuple[TestClient, dict[str, uuid.UUID]]]:
 
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[current_user] = user_override
-    app.dependency_overrides[require_command] = user_override
     try:
         yield TestClient(app, raise_server_exceptions=True), ids
     finally:
@@ -94,7 +93,7 @@ def test_project_target_workflow_candidate_loop(domain_client) -> None:
         == 200
     )
 
-    first = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "Monellin", "sequence": "MKT"}).json()
+    first = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "Example protein", "sequence": "MKT"}).json()
     second = client.post(f"/api/v2/projects/{project_id}/targets", json={"name": "PD-L1", "sequence": "QDK"}).json()
     assert len(client.get(f"/api/v2/projects/{project_id}/targets").json()["items"]) == 2
     assert (

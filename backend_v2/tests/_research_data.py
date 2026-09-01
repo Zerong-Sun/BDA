@@ -1,9 +1,8 @@
 """Locate the research data store, and gate the tests that need it.
 
-A number of tests read receptor structures, job configs and deliverable
-bundles that are **not in git** — they are research working data that lived
-under `research projects/` and `deliverables/` and moved to a sibling store in
-the v3 split (see `docs/refactor/REPO_SPLIT.md`).
+A number of private-environment tests read receptor structures, job configs and
+deliverable bundles that are **not in public Git**. They are optional research
+fixtures resolved through the external data boundary.
 
 Those tests were silently broken in CI long before the split: the paths were
 gitignored, so a clone never had them, and the failures were masked by the
@@ -49,7 +48,7 @@ research_data = pytest.mark.skipif(
     not research_data_available(),
     reason=(
         "Requires the research data store (research-projects/, deliverables/), "
-        "which is not part of a clone. Set BDA_DATA_ROOT if it lives outside "
-        "../BDA-data, or BDA_V2_REQUIRE_RESEARCH_FIXTURES=1 to fail instead of skip."
+        "which is not part of a public clone. Set BDA_DATA_ROOT to an authorized "
+        "store, or BDA_V2_REQUIRE_RESEARCH_FIXTURES=1 to fail instead of skip."
     ),
 )

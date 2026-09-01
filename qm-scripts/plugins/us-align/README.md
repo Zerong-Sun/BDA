@@ -10,7 +10,7 @@ This page records how this plugin is written for the SUSTech QM cluster and what
 - Documented versions: `20260527`
 - Submission state: `enabled`
 - Direct submission authorized: `yes`
-- Runtime: direct script /work/bme-sunzr/software/USalign/USalign
+- Runtime: direct script /opt/bda/software/USalign/USalign
 - LSF resources: CPU only, 1 slot with ptile=1, 4 GB, walltime 120 min
 - Site-wide rules: [`docs/QM_CLUSTER_OPERATION_RULES.md`](../../../docs/QM_CLUSTER_OPERATION_RULES.md)
 - At submission time, the selected ModelPlugin snapshot remains authoritative for the exact command, ports, runtime setup and resources.

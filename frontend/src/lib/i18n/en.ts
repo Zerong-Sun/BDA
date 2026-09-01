@@ -302,7 +302,7 @@ export const en: TranslationDict = {
     overviewEmpty: 'No overview data for this project yet.',
     targetStructureTitle: 'Target protein',
     targetStructureLoading: 'Loading target structure…',
-    builtinSyncing: 'Synchronizing the built-in research package: four projects, 12 pain targets, and PDB structures…',
+    builtinSyncing: 'Synchronizing the built-in PD1 demonstration package and its verified structures…',
     researchTargetsCount: '{count} research targets',
     pdbCount: '{count} PDB structures',
     referencesCount: '{count} references',

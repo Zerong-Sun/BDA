@@ -38,7 +38,7 @@ describe('findDemoProject', () => {
       isDemoProject(
         project({
           id: 'dc5cbf4f-4283-5366-bac0-690f30158a4d',
-          name: 'SweetProtein_RFdiffusion_100x2_20260626',
+          name: 'Binder_validation_live_project',
         }),
       ),
     ).toBe(false)

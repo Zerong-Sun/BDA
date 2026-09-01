@@ -23,7 +23,7 @@ const project = {
   name: 'Research redesign project',
   legacy_id: null,
   organization_id: 'org_test',
-  project_type: 'sweet_protein_design',
+  project_type: 'binder_design',
   status: 'active',
   owner_id: 'user_admin',
   summary: 'Verify the research workspace.',

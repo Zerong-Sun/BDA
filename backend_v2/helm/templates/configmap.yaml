@@ -16,8 +16,8 @@ data:
   BDA_V2_EXPOSE_DOCS: {{ .Values.config.exposeDocs | quote }}
   BDA_V2_WRITES_ENABLED: {{ .Values.config.writesEnabled | quote }}
   BDA_V2_BUILD_REVISION: {{ required "config.buildRevision is required" .Values.config.buildRevision | quote }}
-  BDA_V2_SCHEMA_REVISION: "0049_autopilot_formalization"
-  BDA_V2_REQUIRED_WORKER_QUEUES: "dispatch,poll,collect,maintenance,research,copilot"
+  BDA_V2_SCHEMA_REVISION: "0051_worker_project_rls"
+  BDA_V2_REQUIRED_WORKER_QUEUES: "dispatch,poll,collect,maintenance,research,copilot,scheduler"
   BDA_V2_LLM_LOCAL_SECRET_DIR: {{ .Values.config.llmSecretDir | quote }}
   BDA_V2_LSF_SSH_HOST: {{ .Values.config.lsf.sshHost | quote }}
   BDA_V2_LSF_SSH_PORT: {{ .Values.config.lsf.sshPort | quote }}

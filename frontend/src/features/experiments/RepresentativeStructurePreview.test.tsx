@@ -24,22 +24,18 @@ function project(name: string, projectType = 'protein_design', sourceProjectKey:
 }
 
 describe('RepresentativeStructurePreview', () => {
-  it('uses distinct, project-specific proteins instead of one project-type thumbnail', () => {
+  it('uses project types without inferring private research identities from names', () => {
     render(
       <>
-        <RepresentativeStructurePreview project={project('Cannabinoid_specific_binding_protein_20260706')} />
-        <RepresentativeStructurePreview project={project('Botrytis_cinerea_antifungal_protein_20260705')} />
-        <RepresentativeStructurePreview project={project('Novel_Aroma_Flavor_Proteins_20260724')} />
-        <RepresentativeStructurePreview project={project('Nanocage_delivery_0518', 'multimer_design')} />
-        <RepresentativeStructurePreview project={project('manuka', 'sweet_protein_design')} />
+        <RepresentativeStructurePreview project={project('Project A', 'binder_design')} />
+        <RepresentativeStructurePreview project={project('Project B', 'enzyme_design')} />
+        <RepresentativeStructurePreview project={project('Project C', 'sweet_protein_design')} />
       </>,
     )
 
-    expect(screen.getByRole('img', { name: /Anti-THC Fab · THC/ })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /BcChs chitin synthase/ })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /Flavor-molecule binding protein/ })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /Self-assembling protein nanocage/ })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /Single-chain monellin/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Binder · target/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Enzyme · substrate/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Sweet-protein design/ })).toBeInTheDocument()
   })
 
   it('uses the matching RCSB structure image when a verified PDB example exists', () => {

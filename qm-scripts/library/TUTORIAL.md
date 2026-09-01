@@ -235,7 +235,7 @@ When you have real cluster access, upload the bundle and submit it yourself:
 bash upload_to_cluster.sh jobs/my-rfd-job <ssh-host>
 
 # Review the printed command, then submit:
-ssh <ssh-host> "cd /work/bme-sunzr/bda/qm-script-library/my-rfd-job && bsub < submit.lsf"
+ssh <ssh-host> "cd /opt/bda/bda/qm-script-library/my-rfd-job && bsub < submit.lsf"
 ```
 
 Before submitting, replace the `/work/...` paths in the config with the paths

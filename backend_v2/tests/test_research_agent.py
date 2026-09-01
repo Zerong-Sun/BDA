@@ -495,7 +495,7 @@ def test_computational_experiment_review_receives_the_run_packet(monkeypatch) ->
     assert captured["tools"] is None
     system = captured["messages"][0]["content"]
     # The rules this prompt exists for, each traceable to a real failure on the
-    # cannabinoid project.
+    # ligand-screening project fixture.
     assert "Self-assessment is not corroboration" in system
     assert "assessor and its condition" in system
     assert "negative results as results" in system

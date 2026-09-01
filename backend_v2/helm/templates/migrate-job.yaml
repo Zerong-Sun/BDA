@@ -21,5 +21,8 @@ spec:
           env:
             - {name: BDA_V2_ENVIRONMENT, value: {{ .Values.config.environment | quote }}}
             - {name: BDA_V2_COMPUTE_BACKEND, value: {{ .Values.config.computeBackend | quote }}}
+            - {name: BDA_V2_REQUIRE_MAINTENANCE_DATABASE_URL, value: "true"}
+            - {name: BDA_V2_MAINTENANCE_DATABASE_ROLE, value: "bda_migrator"}
           envFrom:
             - secretRef: {name: {{ .Values.existingSecret }}}
+            - secretRef: {name: {{ .Values.migrationSecret }}}

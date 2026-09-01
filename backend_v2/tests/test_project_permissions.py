@@ -4,6 +4,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.core.models import Base
 from backend_v2.app.core.problem import DomainError
+from backend_v2.app.identity.deps import require_command
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.projects.service import require_project, require_project_permission
@@ -23,14 +24,16 @@ def test_project_permissions_are_deny_first_and_capped_by_organization_role() ->
             organization = Organization(name="Permission Org")
             admin = User(username="global-admin", display_name="Admin", role="admin")
             viewer_owner = User(username="viewer-owner", display_name="Viewer Owner", role="researcher")
+            global_viewer = User(username="global-viewer", display_name="Global Viewer", role="viewer")
             narrowed = User(username="narrowed", display_name="Narrowed", role="researcher")
             researcher = User(username="org-researcher", display_name="Researcher", role="researcher")
             outsider = User(username="project-only", display_name="Project Only", role="researcher")
-            session.add_all([organization, admin, viewer_owner, narrowed, researcher, outsider])
+            session.add_all([organization, admin, viewer_owner, global_viewer, narrowed, researcher, outsider])
             session.flush()
             session.add_all(
                 [
                     OrganizationMember(organization_id=organization.id, user_id=viewer_owner.id, role="viewer"),
+                    OrganizationMember(organization_id=organization.id, user_id=global_viewer.id, role="owner"),
                     OrganizationMember(organization_id=organization.id, user_id=narrowed.id, role="researcher"),
                     OrganizationMember(organization_id=organization.id, user_id=researcher.id, role="researcher"),
                 ]
@@ -64,6 +67,17 @@ def test_project_permissions_are_deny_first_and_capped_by_organization_role() ->
             ):
                 with pytest.raises(DomainError, match="Project permission"):
                     require_project_permission(session, project.id, user, action)
+
+            # Explicit permission checks cannot let an organization role promote a
+            # globally read-only account.
+            with pytest.raises(DomainError, match="Project permission"):
+                require_project_permission(session, project.id, global_viewer, "autopilot")
+
+            # Legacy write routes still using require_command must respect a project
+            # role that narrows an organization researcher to viewer.
+            require_command(narrowed)
+            with pytest.raises(DomainError, match="Project permission"):
+                require_project(session, project.id, narrowed)
 
             with pytest.raises(DomainError, match="cannot access"):
                 require_project(session, project.id, outsider)

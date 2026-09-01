@@ -9,7 +9,7 @@ fi
 
 LOCAL_DIR="$(cd "$1" && pwd)"
 SSH_HOST="$2"
-REMOTE_ROOT="${3:-/work/bme-sunzr/bda/qm-script-library}"
+REMOTE_ROOT="${3:-/opt/bda/bda/qm-script-library}"
 JOB_NAME="$(basename "$LOCAL_DIR")"
 REMOTE_DIR="${REMOTE_ROOT%/}/${JOB_NAME}"
 FIX_PATH="$(cat "${LOCAL_DIR}/EDIT_THIS_PATH.txt" 2>/dev/null || printf '%s' "${LOCAL_DIR}/config.resolved.json")"

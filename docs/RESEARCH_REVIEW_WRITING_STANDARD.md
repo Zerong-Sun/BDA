@@ -4,7 +4,7 @@
 
 最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
 
-权威范围：本文标题所述主题；当前平台与科研总状态以 docs/refactor/CURRENT_STATE_2026-08-29.md 为准。
+权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
@@ -74,7 +74,7 @@ Do not use section names as titles. Do not truncate titles at abbreviations such
 
 | Bad | Good |
 |-----|------|
-| `The platform value is high because...` | Diagnostic cannabinoid immunoassays require sub-μM binders with metabolite selectivity in hydrophobic pocket contexts. |
+| `The platform value is high because...` | The design objective requires sub-μM affinity while preserving selectivity against structurally related off-targets. |
 | `For small de novo binders, screen E` (truncated) | Title: `Expression system to build small de novo binders` |
 | `anti-THC Fab gives a concrete precedent` (one line) | Full structured read for PDB 3LS4 with pocket geometry, CDR contacts, metabolite gaps |
 | `freeze a target packet containing sequence boundaries...` (generic) | Project-specific: THC vs THC-COOH chemistry, 3LS4 chain IDs, protected CDR framework residues |

@@ -1,7 +1,7 @@
 """Let a target be a small molecule, and be ready without a protein structure.
 
-The cannabinoid project designs binders against Delta9-THC. Its primary target is
-therefore a molecule, and the readiness gate - confirmed protein identity plus an uploaded
+Some binder projects use a small molecule as their primary target. The readiness gate -
+confirmed protein identity plus an uploaded
 structure artifact - can never be satisfied by one: a small molecule has no UniProt
 accession and no sequence, so `identity_status` never leaves "unconfirmed", and the
 Workflow page stays read-only forever. The project worked around it by keeping a receptor

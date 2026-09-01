@@ -1,10 +1,9 @@
 """What actually differs between two runs.
 
 A causal claim in this platform is always a comparison: this run against that one, with a
-stated set of parameters changed. The cannabinoid binder project rested entirely on such
-comparisons - 90 against 50, a replicate at identical settings, an arm differing only by a
-contact constraint - and the only evidence that any of them was single-variable was a diff
-its author ran by hand and pasted into a document.
+stated set of parameters changed. A replicate at identical settings or an arm differing
+by one constraint is only a controlled comparison when the stored parameter diff confirms
+that claim.
 
 Computing the diff here, from the stored node parameters, moves that from testimony to
 observation: the platform states what changed because it looked, and an author who claims a

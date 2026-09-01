@@ -300,7 +300,7 @@ export const zh: TranslationDict = {
     overviewEmpty: '该项目暂无概览数据。',
     targetStructureTitle: '靶点蛋白',
     targetStructureLoading: '正在加载靶点结构…',
-    builtinSyncing: '正在同步内置研究包：4 个项目、12 个疼痛候选和 PDB 结构…',
+    builtinSyncing: '正在同步内置 PD1 演示包及其已校验结构…',
     researchTargetsCount: '{count} 个研究靶点',
     pdbCount: '{count} 个 PDB 结构',
     referencesCount: '{count} 篇参考文献',

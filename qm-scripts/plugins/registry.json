@@ -57,7 +57,7 @@
       "renderer": "platform",
       "qm_job_model": null,
       "example": null,
-      "runtime": "conda /work/bme-sunzr/.conda/envs/bda-tools",
+      "runtime": "conda /opt/bda/.conda/envs/bda-tools",
       "resources": "CPU only, 1 slot with ptile=1, 16 GB, walltime 240 min",
       "rules": [
         "PDB2PQR requires a full-atom structure; backbone-only input is rejected.",
@@ -157,7 +157,7 @@
       "renderer": "platform",
       "qm_job_model": null,
       "example": null,
-      "runtime": "conda /work/bme-sunzr/.conda/envs/bda-tools; Foldseek 10.941cd33",
+      "runtime": "conda /opt/bda/.conda/envs/bda-tools; Foldseek 10.941cd33",
       "resources": "CPU only, 8 slots with ptile=8, 16 GB, walltime 240 min; command must pass --threads $BDA_CPUS",
       "rules": [
         "Bind both query structures and the reviewed reference database.",
@@ -319,7 +319,7 @@
       "renderer": "platform",
       "qm_job_model": null,
       "example": null,
-      "runtime": "direct script /work/bme-sunzr/software/USalign/USalign",
+      "runtime": "direct script /opt/bda/software/USalign/USalign",
       "resources": "CPU only, 1 slot with ptile=1, 4 GB, walltime 120 min",
       "rules": [
         "Use one explicit query/reference pair per invocation; do not pass the crashing empty -dir1 form.",

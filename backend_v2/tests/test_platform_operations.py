@@ -93,7 +93,23 @@ def test_finishing_an_operation_announces_it(session: Session) -> None:
     events = _settled(session, operation)
     assert len(events) == 1
     assert events[0].payload["status"] == "succeeded"
+    assert events[0].payload["project_id"] == str(operation.project_id)
     assert events[0].payload["kind"] == "literature.search"
+
+
+def test_queued_operation_carries_its_rls_scope(session: Session) -> None:
+    operation = _queue(session)
+
+    event = session.scalar(
+        select(OutboxEvent).where(
+            OutboxEvent.id == operation.id,
+            OutboxEvent.topic == "literature.search",
+        )
+    )
+
+    assert event is not None
+    assert event.payload["project_id"] == str(operation.project_id)
+    assert event.payload["organization_id"] == str(operation.organization_id)
 
 
 def test_a_failed_operation_is_announced_the_same_way(session: Session) -> None:

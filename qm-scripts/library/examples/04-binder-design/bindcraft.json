@@ -1,7 +1,7 @@
 {
   "description": "Run the end-to-end BindCraft binder design pipeline (backbone + sequence + filtering in one job) against a target and hotspot residues.",
   "model": "bindcraft",
-  "executable": "python -u /work/bme-sunzr/software/BindCraft/bindcraft.py",
+  "executable": "python -u /opt/bda/software/BindCraft/bindcraft.py",
   "scheduler": {
     "job_name": "bindcraft",
     "queue": "gpu-bme-liz",
@@ -10,7 +10,7 @@
   },
   "setup": [
     "module purge",
-    "source activate /work/bme-sunzr/.conda/envs/BindCraft"
+    "source activate /opt/bda/.conda/envs/BindCraft"
   ],
   "parameters": {
     "design_path": "./output",

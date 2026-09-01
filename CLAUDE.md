@@ -49,7 +49,11 @@ backend_v2/.venv/bin/alembic -c backend_v2/alembic.ini upgrade head
 
 Tests marked with `BDA_V2_RUN_DB_TESTS != "1"` skip by default (`test_database_flow.py`, part of `test_candidate_metrics.py`). Set `BDA_V2_RUN_DB_TESTS=1` plus `BDA_V2_DATABASE_URL` to run them. There is no `conftest.py`; tests construct their own fixtures.
 
-Tests that read research working data (receptor structures, job configs, deliverable bundles) are gated on that data being present, via `backend_v2/tests/_research_data.py`. The data is not in git — it lives in the sibling store (see below) — so these run on a machine that has the store and skip on a clone, and a green run means "everything runnable passed". Set `BDA_V2_REQUIRE_RESEARCH_FIXTURES=1` to turn a missing store into a failure instead of a skip.
+Tests that read optional external research fixtures are gated through
+`backend_v2/tests/_research_data.py`. They skip when an authorized fixture store
+is absent; the public PD1 package and release gates must not depend on that store.
+Set `BDA_V2_REQUIRE_RESEARCH_FIXTURES=1` only in a private validation environment
+that deliberately requires those fixtures.
 
 `mypy` is invoked by CI **without** `--config-file`, from the repo root. The Celery imports carry inline `# type: ignore` comments rather than a config override specifically so behavior is identical either way — keep it that way rather than adding `[[tool.mypy.overrides]]` sections.
 
@@ -75,11 +79,21 @@ Other gates, each with a script you can run locally:
 
 ## Version scope
 
-The repository and released contracts remain **BDA v2 / 2.0.0**. `platform-v3` names the internal restructuring milestone merged in PR #281; it is not a published v3 product or API. Do not rename `/api/v2`, `backend_v2`, `BDA_V2_*`, package versions, or frontend branding on that basis. Autopilot campaigns remain isolated on `codex/autopilot-campaigns-wip-20260829` until their new-baseline gates pass and must not be described here as a mainline capability.
+The repository and released contracts remain **BDA v2 / 2.0.0**. Internal
+restructuring labels are not published product or API versions. Do not rename
+`/api/v2`, `backend_v2`, `BDA_V2_*`, package versions, or frontend branding on
+that basis. Autopilot draft, confirmation, budget reservation and cancellation
+are mainline capabilities; stage-specific research/compute adapters and the
+complete unattended loop are not. Keep that boundary aligned with
+`docs/AUTOPILOT_CAMPAIGNS.md`.
 
 ## Backend architecture
 
-FastAPI modular monolith under `backend_v2/app/`, one package per domain (identity, projects, targets, workflows, compute, artifacts, candidates, experiments, campaigns, research, knowledge, journal, literature, intelligence, registry, delivery, copilot, ligands, audit, platform). Each follows the same four-file convention:
+FastAPI modular monolith under `backend_v2/app/`, one package per domain
+(identity, projects, targets, workflows, compute, artifacts, candidates,
+experiments, campaigns, research, knowledge, timeline, literature,
+intelligence, registry, delivery, copilot, autopilot, ligands, audit,
+platform). Each follows the same four-file convention:
 
 | File | Responsibility |
 |---|---|
@@ -142,11 +156,23 @@ Qiming access is permanent: **the user logs in by typing the password in their o
 
 ## Documentation
 
-`docs/README.md` is the complete categorized index. `docs/refactor/CURRENT_STATE_2026-08-29.md` is the unique current-status entry, and `docs/DATA_CATALOG.md` is the only logical entry for external research output. The two architecture references worth reading before substantial work are `docs/BACKEND_V2.md` and `docs/FRONTEND_V2.md`; both are in Chinese and are more current than this file on domain detail. `docs/archive/` holds retired-runtime material for migration archaeology only — it is not an operational guide.
+`README.md` is the platform overview and maturity statement;
+`docs/README.md` is the complete categorized index, and
+`docs/DATA_CATALOG.md` defines the public/private data boundary. The two
+architecture references worth reading before substantial work are
+`docs/BACKEND_V2.md` and `docs/FRONTEND_V2.md`. Retired v1 documents that
+contain private paths or research runs belong only in the private recovery
+archive; do not recreate them in the public tree.
 
 ## Repository hygiene
 
-- `.claude/worktrees/` is excluded via `.git/info/exclude` (not `.gitignore`), so worktrees are invisible to `git status` but real to `git worktree list`.
-- A long-lived stash from `codex/recoverprojects` sits at `stash@{0}`. A bare `git stash pop` will detonate it — use a worktree instead.
-- **This repository holds code only.** Research data (`research projects/`, `deliverables/`, `fig/`) moved to a sibling store, `../BDA-data` by default; large local-only artifacts (model checkpoints, database dumps) moved to `../BDA-local` and exist in no repository at all. See `docs/refactor/REPO_SPLIT.md`.
-- Anything that reads research data must resolve it through `backend_v2/scripts/_data_root.py` (`data_path("deliverables/…")`), never a hardcoded repo-relative path, and honour `BDA_DATA_ROOT`. Resolution first checks filesystem ancestors, then Git's common directory to find the primary checkout's sibling store. This matters for Codex worktrees that live outside the primary checkout's directory tree; both plain `REPO_ROOT.parent` and ancestor walking alone are wrong there.
+- Treat every linked worktree and stash as user-owned state. Inspect before
+  modifying, and create a verified recovery bundle before consolidation or
+  deletion.
+- **The public repository contains software and the reviewed PD1 demo only.**
+  Private research data, model checkpoints, database dumps and run archives
+  belong outside public Git.
+- Offline scripts that read authorized external research data must resolve it
+  through `backend_v2/scripts/_data_root.py` and honor `BDA_DATA_ROOT`; they
+  must not hardcode a user directory or publish a private manifest, checksum
+  inventory or worktree path.

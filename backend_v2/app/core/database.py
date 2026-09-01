@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -20,6 +21,7 @@ engine = create_engine(
     max_overflow=settings.database_max_overflow,
 )
 SessionFactory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+_worker_project_id: ContextVar[str | None] = ContextVar("bda_worker_project_id", default=None)
 
 
 @event.listens_for(engine, "checkout")
@@ -35,6 +37,18 @@ def _database_connection_checked_in(*_args: object) -> None:
 
 
 update_database_pool_capacity_metrics(engine.pool)
+
+
+@event.listens_for(SessionFactory.class_, "after_begin")
+def _apply_worker_project_context(_session: Session, _transaction: object, connection) -> None:
+    """Apply the Celery message's project fence to every worker transaction."""
+    project_id = _worker_project_id.get()
+    if not project_id or connection.dialect.name != "postgresql":
+        return
+    connection.execute(
+        text("select set_config('bda.worker_project_id', :project_id, true)"),
+        {"project_id": project_id},
+    )
 
 # Register every mapped table before any request, worker, script, or isolated
 # integration test starts using the session factory.  Importing models only from
@@ -86,3 +100,11 @@ def set_worker_rls_context(session: Session, *, project_id: object) -> None:
         text("select set_config('bda.worker_project_id', :project_id, true)"),
         {"project_id": str(project_id)},
     )
+
+
+def bind_worker_project_context(project_id: object | None) -> Token[str | None]:
+    return _worker_project_id.set(str(project_id) if project_id else None)
+
+
+def reset_worker_project_context(token: Token[str | None]) -> None:
+    _worker_project_id.reset(token)

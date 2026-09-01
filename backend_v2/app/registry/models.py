@@ -89,6 +89,14 @@ class ModelPlugin(UUIDVersionMixin, Base):
     runtime_validation_evidence: Mapped[dict] = mapped_column(
         JSON, default=dict, server_default=text("'{}'")
     )
+    # New definitions are installed from a checksum-pinned manifest. Rows without a
+    # checksum are explicitly legacy and may be used during the compatibility window,
+    # but cannot be presented as immutable catalog deployments.
+    manifest_id: Mapped[str | None] = mapped_column(String(240), nullable=True, index=True)
+    manifest_schema_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    manifest_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    deployment_status: Mapped[str] = mapped_column(String(32), default="legacy", server_default="legacy")
+    site_overrides: Mapped[dict] = mapped_column(JSON, default=dict, server_default=text("'{}'"))
 
 
 class MethodPlugin(UUIDVersionMixin, Base):

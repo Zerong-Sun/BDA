@@ -1,9 +1,8 @@
 """A ligand-only project must be able to reach a runnable workflow.
 
-The cannabinoid project designs a binder against a small molecule: there is no protein
-target, no accession, and - by design - no uploaded coordinates, because the model
-resolves the ligand from its own component library at run time. Two defects together
-made that project's Workflow page permanently read-only:
+A small-molecule design project may have no protein target, accession or uploaded target
+coordinates because the model resolves the ligand from its component library at run
+time. Two defects together made that workflow permanently read-only:
 
 1. `upsert_target` never persisted `target_kind` / `chemical_identity`, so a
    small-molecule target was stored as a protein with no chemical identity;

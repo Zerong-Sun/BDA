@@ -1,7 +1,7 @@
 """Give a project somewhere to keep its decision record.
 
-The cannabinoid project produced a genuinely valuable chain of reasoning - what was
-tried, what was ruled out, which conclusions were later overturned - and all of it lived
+An early multi-arm study produced a valuable chain of reasoning - what was tried, what
+was ruled out, which conclusions were later overturned - and all of it lived
 in hand-written markdown. That is unqueryable, unlinked to the jobs and candidates it
 describes, and free to drift from the data it claims to summarise. Meanwhile the
 platform stored plenty of *outputs* (jobs, candidates, metrics) and plenty of *system*

@@ -65,22 +65,6 @@ export async function fetchPdb(
   return response.data
 }
 
-export interface LigandPreset {
-  key: string
-  label: string
-  pubchem_name: string
-  cid: number
-}
-
-export const CANNABINOID_LIGANDS: LigandPreset[] = [
-  { key: 'thc', label: 'THC', pubchem_name: 'delta-9-tetrahydrocannabinol', cid: 16078 },
-  { key: 'cbd', label: 'CBD', pubchem_name: 'cannabidiol', cid: 644019 },
-  { key: 'cbn', label: 'CBN', pubchem_name: 'cannabinol', cid: 2543 },
-  { key: 'cbg', label: 'CBG', pubchem_name: 'cannabigerol', cid: 5315659 },
-  { key: 'thc-cooh', label: 'THC-COOH', pubchem_name: '11-nor-9-carboxy-delta-9-tetrahydrocannabinol', cid: 107885 },
-  { key: '11-oh-thc', label: '11-OH-THC', pubchem_name: '11-hydroxy-delta-9-tetrahydrocannabinol', cid: 644094 },
-]
-
 export function fetchLigand(name: string, projectId: string, source: string): Promise<LigandImportAccepted> {
   return postLigandImportApiV2ProjectsProjectIdLigandImportsPost<true>({
     path: { project_id: projectId },

@@ -325,9 +325,9 @@ export function getCurrentWorkflowRun(projectId: string) {
   return listProjectWorkflowRuns(projectId).then((runs) => {
     const active = runs.filter((run) => !isTerminalWorkflowRun(run.status))
     const drawable = active.filter(hasWorkflowNodes)
-    // Recency alone is the wrong default twice over, and manuka hit both: two stray empty
-    // `New workflow` drafts blanked the canvas, and registering a new planned route (Route
-    // 0) would then have hidden the run that carries the actual results. So: prefer a run
+    // Recency alone is the wrong default twice over: stray empty `New workflow` drafts can
+    // blank the canvas, and registering a new planned route can then hide the run carrying
+    // actual results. So prefer a run
     // that has both nodes and a status past `draft`, i.e. one that has actually started.
     const current =
       drawable.find((run) => run.status !== 'draft') ?? drawable[0] ?? active[0] ?? runs[0]

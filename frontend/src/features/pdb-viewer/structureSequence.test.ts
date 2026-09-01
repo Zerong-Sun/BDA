@@ -17,11 +17,11 @@ describe('formatFasta', () => {
     const sequence = 'ACDEFGHIKL'.repeat(7)
     const fasta = formatFasta(
       [{ chainId: 'A', sequence, residueCount: sequence.length }],
-      'Brazzein 4HE7',
+      'Reference Protein 1ABC',
     )
     const lines = fasta.split('\n')
 
-    expect(lines[0]).toBe('>Brazzein_4HE7|Chain_A|70aa')
+    expect(lines[0]).toBe('>Reference_Protein_1ABC|Chain_A|70aa')
     expect(lines[1]).toHaveLength(60)
     expect(lines[2]).toBe(sequence.slice(60))
     expect(lines).toHaveLength(3)

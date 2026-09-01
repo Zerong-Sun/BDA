@@ -73,9 +73,9 @@ def main() -> int:
             "BDA_V2_COMPUTE_BACKEND": "lsf",
             "BDA_V2_LSF_SSH_HOST": os.environ.get("QM_HOST", "172.18.6.10"),
             "BDA_V2_LSF_SSH_PORT": os.environ.get("QM_PORT", "18188"),
-            "BDA_V2_LSF_SSH_USER": os.environ.get("QM_USER", "bme-sunzr"),
+            "BDA_V2_LSF_SSH_USER": os.environ.get("QM_USER", "bda-user"),
             "BDA_V2_LSF_SSH_PASSWORD_REF": f"file:{secret_path}",
-            "BDA_V2_LSF_REMOTE_ROOT": os.environ.get("QM_ROOT", "/work/bme-sunzr/bda-v2"),
+            "BDA_V2_LSF_REMOTE_ROOT": os.environ.get("QM_ROOT", "/opt/bda/bda-v2"),
             "BDA_V2_LSF_QUEUE": os.environ.get("QM_QUEUE", "v3-64"),
             "BDA_V2_LSF_STAGING_MODE": "ssh",
         }

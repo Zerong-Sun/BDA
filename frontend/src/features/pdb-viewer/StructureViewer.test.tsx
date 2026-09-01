@@ -216,7 +216,7 @@ describe('StructureViewer lifecycle', () => {
       { chainId: 'B', sequence: 'GHIK', residueCount: 4 },
     ])
     renderWithProviders(
-      <StructureViewer source={{ url: '/api/v2/structures/a.pdb', proteinName: 'Brazzein' }} />,
+      <StructureViewer source={{ url: '/api/v2/structures/a.pdb', proteinName: 'Reference protein' }} />,
     )
 
     const copy = await screen.findByRole('button', { name: 'Copy FASTA' })
@@ -225,7 +225,7 @@ describe('StructureViewer lifecycle', () => {
 
     await waitFor(() =>
       expect(mocks.copyTextToClipboard).toHaveBeenCalledWith(
-        '>Brazzein|Chain_A|5aa\nACDEF\n>Brazzein|Chain_B|4aa\nGHIK',
+        '>Reference_protein|Chain_A|5aa\nACDEF\n>Reference_protein|Chain_B|4aa\nGHIK',
       ),
     )
     await waitFor(() =>

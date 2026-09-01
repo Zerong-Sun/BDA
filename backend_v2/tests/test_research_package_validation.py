@@ -87,7 +87,8 @@ def duplicate_structures(package: dict) -> None:
 def candidate_payload(*, candidate_id: str = "C01", reference_ids: str = "R001") -> dict:
     return {
         "candidate_id": candidate_id,
-        "pain_group": "Neuropathic pain",
+        "project_id": "BASE",
+        "group": "Priority group",
         "target": "Target",
         "gene": "GENE",
         "protein_type": "Protein",
@@ -105,8 +106,6 @@ def candidate_payload(*, candidate_id: str = "C01", reference_ids: str = "R001")
 
 
 def duplicate_candidates(package: dict) -> None:
-    package["projects"][0]["id"] = "PAIN"
-    package["references"][0]["project_ids"] = ["PAIN"]
     candidate = candidate_payload()
     package["candidates"] = [candidate, copy.deepcopy(candidate)]
 
@@ -225,19 +224,73 @@ def test_project_without_references_is_rejected() -> None:
 )
 def test_candidate_references_must_be_unique_and_visible(reference_ids: str) -> None:
     package = minimal_package()
-    package["projects"][0]["id"] = "PAIN"
-    package["references"][0]["project_ids"] = ["PAIN"]
     package["candidates"] = [candidate_payload(reference_ids=reference_ids)]
 
     with pytest.raises(ResearchPackageValidationError):
         validate_research_package(package)
 
 
-def test_candidates_require_the_pain_project() -> None:
+def test_candidates_require_a_declared_project() -> None:
     package = minimal_package()
-    package["candidates"] = [candidate_payload()]
+    package["candidates"] = [{**candidate_payload(), "project_id": "MISSING"}]
 
-    with pytest.raises(ResearchPackageValidationError, match="require a PAIN project"):
+    with pytest.raises(ResearchPackageValidationError, match="unknown project MISSING"):
+        validate_research_package(package)
+
+
+def test_legacy_candidate_infers_project_and_group_from_references() -> None:
+    package = minimal_package()
+    legacy_candidate = candidate_payload()
+    legacy_candidate.pop("project_id")
+    legacy_candidate["pain_group"] = legacy_candidate.pop("group")
+    package["candidates"] = [legacy_candidate]
+
+    normalized, _ = normalize_research_package(package)
+
+    assert normalized["candidates"][0]["project_id"] == "BASE"
+    assert normalized["candidates"][0]["group"] == "Priority group"
+    assert "pain_group" not in normalized["candidates"][0]
+
+
+def test_legacy_candidate_rejects_references_without_one_project() -> None:
+    package = minimal_package()
+    second = copy.deepcopy(package["projects"][0])
+    second["id"] = "SECOND"
+    package["projects"].append(second)
+    package["references"][0]["project_ids"] = ["BASE", "SECOND"]
+    candidate = candidate_payload()
+    candidate.pop("project_id")
+    package["candidates"] = [candidate]
+
+    with pytest.raises(ResearchPackageValidationError, match="must declare project_id"):
+        validate_research_package(package)
+
+
+def test_legacy_candidate_rejects_an_unknown_reference() -> None:
+    package = minimal_package()
+    candidate = candidate_payload(reference_ids="R999")
+    candidate.pop("project_id")
+    package["candidates"] = [candidate]
+
+    with pytest.raises(ResearchPackageValidationError, match="must declare project_id"):
+        validate_research_package(package)
+
+
+def test_persisted_edge_title_limit_is_enforced() -> None:
+    package = minimal_package()
+    edge = duplicate_edge_payload()
+    edge["subject"] = "x" * 300
+    package["edges"] = [edge]
+
+    with pytest.raises(ResearchPackageValidationError, match="persisted title limit"):
+        validate_research_package(package)
+
+
+def test_package_id_rejects_surrounding_whitespace() -> None:
+    package = minimal_package()
+    package["package_id"] = " package "
+
+    with pytest.raises(ResearchPackageValidationError, match="surrounding whitespace"):
         validate_research_package(package)
 
 

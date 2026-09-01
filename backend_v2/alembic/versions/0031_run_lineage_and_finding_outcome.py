@@ -1,10 +1,9 @@
 """Record how runs relate to each other, and how findings resolve.
 
-Both gaps were found by trying to load a real project - the cannabinoid binder work - into
-the platform and discovering the parts that had nowhere to go. See
-docs/RESEARCH_RECORD_STRUCTURE.md.
+Both gaps were found while mapping a multi-arm binder study into the platform and
+discovering the parts that had nowhere to go.
 
-Workflow lineage. Every causal statement in that project came from comparing two runs:
+Workflow lineage. Every causal statement in the study came from comparing two runs:
 `percent_x` 90 against 50, an independent replicate of the same settings, and an arm that
 differed only by a contact constraint. Nothing recorded that those runs were related, so
 "only one parameter changed" survived as a sentence in a document rather than as a fact the
@@ -13,7 +12,7 @@ submission rather than typed by the author, which is what turns a single-variabl
 from a claim into an observation. `arm_label` follows from the same diff: no baseline is a
 baseline, an empty diff is a replicate, anything else is a variant.
 
-Finding outcome. The most valuable results in that project were a refutation - the designs
+Finding outcome. The most valuable results in the study were a refutation - the designs
 have no selectivity - and a superseded intermediate conclusion: high ipTM looked like it
 inherently required high alanine until `percent_x=50` disproved it. A free-text `content`
 field holds the prose but cannot answer "show me what we ruled out" or "which conclusion

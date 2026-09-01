@@ -1065,6 +1065,15 @@ async function exerciseResearchGrids(page, diagnostics) {
   if ((await datasetTable.locator('tbody tr[data-row-id]').count()) !== 1) {
     throw new Error('Dataset search did not restore the matching bilingual fixture row.')
   }
+  const methodsTab = page.getByRole('tab', { name: /Research Methods/i })
+  await methodsTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
+  await methodsTab.click()
+  await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
+  await expectVisible(page.getByText('Advance the restrained backbone route'), 'decision tree node')
+  const decisionDocument = page.getByRole('button', { name: /View decision document/i })
+  await decisionDocument.click()
+  await expectVisible(page.getByText('Browser decision basis'), 'expanded decision document')
+  diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded document'
 }
 
 async function exerciseDisclosure(page, containerSelector, label) {
@@ -1169,7 +1178,7 @@ function assertControlAcceptance(testCase, diagnostics) {
     workflow: [],
     candidates: ['candidateSort', 'candidateSelection', 'candidatePagination'],
     results: ['resultsSort'],
-    research: ['researchSort'],
+    research: ['researchSort', 'researchDecisionTree'],
     faq: ['faqDisclosure'],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {

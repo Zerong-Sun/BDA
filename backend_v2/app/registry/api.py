@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..artifacts.repository import ArtifactRepository
+from ..audit.service import record_audit
+from ..core.config import get_settings
 from ..core.database import get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
@@ -23,6 +26,7 @@ from .models import (
     RegistryServer,
     ScriptAsset,
 )
+from .plugin_manifest import PluginManifestCatalog
 from .repository import RegistryRepository
 from .schemas import (
     ComputeNodeCreate,
@@ -39,6 +43,9 @@ from .schemas import (
     ModelPluginResponse,
     ParameterCatalogPage,
     ParameterCatalogResponse,
+    PluginDeploymentCreate,
+    PluginManifestDescriptor,
+    PluginManifestPage,
     PluginSnapshot,
     RegistryDeactivateResponse,
     RegistryOperationAccepted,
@@ -52,6 +59,7 @@ from .schemas import (
 )
 from .service import (
     create_resource,
+    deploy_plugin_manifest,
     disable_resource,
     update_resource,
 )
@@ -60,6 +68,11 @@ from .service import (
 )
 
 router = APIRouter(prefix="/registry", tags=["registry"])
+settings = get_settings()
+
+
+def _plugin_catalog() -> PluginManifestCatalog:
+    return PluginManifestCatalog(Path(settings.plugin_manifest_dir))
 
 
 def _rows(session: Session, model: Any, cursor: str | None, limit: int) -> tuple[list[Any], str | None]:
@@ -239,7 +252,62 @@ def list_model_plugins(
 def create_model_plugin(
     payload: ModelPluginCreate, session: Session = Depends(get_session), user: User = Depends(require_roles("admin"))
 ) -> ModelPluginResponse:
+    if settings.is_production and not settings.allow_legacy_plugin_definition:
+        raise DomainError(
+            "legacy_plugin_definition_disabled",
+            "Install a checksum-pinned model-plugin manifest instead of posting a mutable definition",
+            status_code=410,
+        )
     row = create_resource(session, "model_plugin", payload.model_dump())
+    return ModelPluginResponse.model_validate(row)
+
+
+@router.get("/model-plugin-manifests", response_model=PluginManifestPage)
+def list_model_plugin_manifests(
+    user: User = Depends(current_user),
+) -> PluginManifestPage:
+    return PluginManifestPage(
+        items=[
+            PluginManifestDescriptor(
+                manifest_id=item.manifest_id,
+                plugin_key=item.plugin_key,
+                plugin_version=item.plugin_version,
+                display_name=item.display_name,
+                schema_version=item.schema_version,
+                checksum_sha256=item.checksum_sha256,
+                runtime_mode=item.runtime.mode,
+            )
+            for item in _plugin_catalog().manifests()
+        ]
+    )
+
+
+@router.post(
+    "/model-plugin-deployments",
+    response_model=ModelPluginResponse,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={"x-permission": "registry.model_plugin.deploy"},
+)
+def create_model_plugin_deployment(
+    payload: PluginDeploymentCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_roles("admin")),
+) -> ModelPluginResponse:
+    manifest = _plugin_catalog().require(payload.manifest_id, payload.plugin_version, payload.checksum)
+    row = deploy_plugin_manifest(session, manifest, payload)
+    record_audit(
+        session,
+        action="registry.model_plugin.deploy",
+        entity_type="model_plugin",
+        entity_id=row.id,
+        actor_id=user.id,
+        payload={
+            "manifest_id": manifest.manifest_id,
+            "plugin_version": manifest.plugin_version,
+            "checksum_sha256": manifest.checksum_sha256,
+            "deployment_status": row.deployment_status,
+        },
+    )
     return ModelPluginResponse.model_validate(row)
 
 

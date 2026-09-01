@@ -4199,6 +4199,10 @@ export type ModelPluginResponse = {
      */
     created_at: string;
     /**
+     * Deployment Status
+     */
+    deployment_status?: string;
+    /**
      * Enabled
      */
     enabled?: boolean;
@@ -4216,6 +4220,18 @@ export type ModelPluginResponse = {
     input_ports?: Array<{
         [key: string]: unknown;
     }>;
+    /**
+     * Manifest Checksum
+     */
+    manifest_checksum?: string | null;
+    /**
+     * Manifest Id
+     */
+    manifest_id?: string | null;
+    /**
+     * Manifest Schema Version
+     */
+    manifest_schema_version?: string | null;
     /**
      * Name
      */
@@ -4278,6 +4294,12 @@ export type ModelPluginResponse = {
      * Runtime Validation Status
      */
     runtime_validation_status?: string;
+    /**
+     * Site Overrides
+     */
+    site_overrides?: {
+        [key: string]: unknown;
+    };
     /**
      * Updated At
      */
@@ -4570,6 +4592,120 @@ export type ParameterCatalogResponse = {
      * Version
      */
     version: number;
+};
+
+/**
+ * PluginDeploymentCreate
+ */
+export type PluginDeploymentCreate = {
+    /**
+     * Checksum
+     */
+    checksum: string;
+    /**
+     * Enabled
+     */
+    enabled?: boolean;
+    /**
+     * Manifest Id
+     */
+    manifest_id: string;
+    /**
+     * Plugin Version
+     */
+    plugin_version: string;
+    site_overrides?: PluginSiteOverrides;
+};
+
+/**
+ * PluginManifestDescriptor
+ */
+export type PluginManifestDescriptor = {
+    /**
+     * Checksum Sha256
+     */
+    checksum_sha256: string;
+    /**
+     * Display Name
+     */
+    display_name: string;
+    /**
+     * Manifest Id
+     */
+    manifest_id: string;
+    /**
+     * Plugin Key
+     */
+    plugin_key: string;
+    /**
+     * Plugin Version
+     */
+    plugin_version: string;
+    /**
+     * Runtime Mode
+     */
+    runtime_mode: string;
+    /**
+     * Schema Version
+     */
+    schema_version: string;
+};
+
+/**
+ * PluginManifestPage
+ */
+export type PluginManifestPage = {
+    /**
+     * Items
+     */
+    items: Array<PluginManifestDescriptor>;
+};
+
+/**
+ * PluginResourceLimits
+ */
+export type PluginResourceLimits = {
+    /**
+     * Cpu Cores
+     */
+    cpu_cores?: number | null;
+    /**
+     * Gpu Count
+     */
+    gpu_count?: number | null;
+    /**
+     * Memory Mb
+     */
+    memory_mb?: number | null;
+    /**
+     * Walltime Seconds
+     */
+    walltime_seconds?: number | null;
+};
+
+/**
+ * PluginSiteOverrides
+ */
+export type PluginSiteOverrides = {
+    /**
+     * Environment
+     */
+    environment?: {
+        [key: string]: string;
+    };
+    /**
+     * Module Names
+     */
+    module_names?: Array<string>;
+    /**
+     * Queue
+     */
+    queue?: string | null;
+    resource_limits?: PluginResourceLimits | null;
+    /**
+     * Runtime Root
+     */
+    runtime_root?: string | null;
 };
 
 /**
@@ -66770,6 +66906,622 @@ export type PatchMethodPluginApiV2RegistryMethodPluginsPluginIdPatchResponses = 
 };
 
 export type PatchMethodPluginApiV2RegistryMethodPluginsPluginIdPatchResponse = PatchMethodPluginApiV2RegistryMethodPluginsPluginIdPatchResponses[keyof PatchMethodPluginApiV2RegistryMethodPluginsPluginIdPatchResponses];
+
+export type CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostData = {
+    body: PluginDeploymentCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v2/registry/model-plugin-deployments';
+};
+
+export type CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostError = CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostErrors[keyof CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostErrors];
+
+export type CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: ModelPluginResponse;
+};
+
+export type CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostResponse = CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostResponses[keyof CreateModelPluginDeploymentApiV2RegistryModelPluginDeploymentsPostResponses];
+
+export type ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v2/registry/model-plugin-manifests';
+};
+
+export type ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetError = ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetErrors[keyof ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetErrors];
+
+export type ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: PluginManifestPage;
+};
+
+export type ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetResponse = ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetResponses[keyof ListModelPluginManifestsApiV2RegistryModelPluginManifestsGetResponses];
 
 export type ListModelPluginsApiV2RegistryModelPluginsGetData = {
     body?: never;

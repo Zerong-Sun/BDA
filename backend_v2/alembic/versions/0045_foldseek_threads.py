@@ -7,7 +7,7 @@ known - ``--threads "$BDA_CPUS"`` - and deliberately not written, because a flag
 never been run cannot be verified from a laptop; that is exactly how 0039's dead ``seq``
 parameter happened.
 
-Checked on qm (2026-08-28, foldseek 10.941cd33 in ``/work/bme-sunzr/.conda/envs/bda-tools``)::
+Checked on qm (2026-08-28, foldseek 10.941cd33 in ``/opt/bda/.conda/envs/bda-tools``)::
 
     $ foldseek easy-search --help
     common:
