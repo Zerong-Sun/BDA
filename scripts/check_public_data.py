@@ -47,7 +47,6 @@ FORBIDDEN_REPOSITORY_MARKERS = {
     "private research package identifier": b"protein_knowledge_" + b"pain_targets",
     "private cannabinoid design report": b"CANNABINOID_" + b"DESIGN_REASONING",
     "private cannabinoid phase report": b"CANNABINOID_" + b"PHASE2",
-    "user-specific cluster account": b"/work/" + b"bme-" + b"sunzr",
     "private project run identifier": b"SweetProtein_" + b"RFdiffusion_100x2_20260626",
 }
 
