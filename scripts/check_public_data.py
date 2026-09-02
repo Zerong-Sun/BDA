@@ -47,7 +47,6 @@ FORBIDDEN_REPOSITORY_MARKERS = {
     "private research package identifier": b"protein_knowledge_" + b"pain_targets",
     "private cannabinoid design report": b"CANNABINOID_" + b"DESIGN_REASONING",
     "private cannabinoid phase report": b"CANNABINOID_" + b"PHASE2",
-    "user-specific cluster account": b"/work/" + b"bme-" + b"sunzr",
     "private project run identifier": b"SweetProtein_" + b"RFdiffusion_100x2_20260626",
 }
 
@@ -79,11 +78,76 @@ def validate_publication_text(path: Path, content: bytes, errors: list[str]) -> 
             errors.append(f"{description} is forbidden in public documentation: {path}")
 
 
+#: Any personal cluster account, not just this project owner's. The rule was always
+#: "a user-specific cluster account is forbidden", but it was written as one literal
+#: string, so three other people's accounts passed it and shipped in v0.1.0-alpha.1 and
+#: v0.1.0-alpha.2. They are deliberately not spelled out here: this file is itself
+#: scanned, and naming them would be one more public copy.
+CLUSTER_ACCOUNT = re.compile(rb"/work/bme-[a-z]+")
+
+#: Where those accounts already are, recorded 2026-09-02 with the count at that date.
+#: This is a freeze, not an approval: the paths are still someone's account name in a
+#: public repository, and the fix is to supply them as site configuration - see
+#: `docs/QM_CLUSTER_OPERATION_RULES.md` section 8. Listing them here stops the set from growing while
+#: that work is scoped, and every entry has to be deleted rather than edited, so the
+#: exemption cannot quietly widen.
+#:
+#: The alembic files are the reason this is a freeze at all. They are applied history:
+#: rewriting a migration that has run against a database breaks `alembic check` and
+#: leaves every migrated deployment describing a revision that no longer exists. The
+#: paths there are inside executed command templates, so removing them is a change to
+#: how dispatch resolves software roots, not a text edit.
+CLUSTER_ACCOUNT_EXEMPT: dict[str, int] = {
+    "backend_v2/alembic/versions/0021_register_proteinhunter.py": 5,
+    "backend_v2/alembic/versions/0024_plugins_point_at_qm.py": 14,
+    "backend_v2/alembic/versions/0025_qm_paths_verified.py": 13,
+    "backend_v2/alembic/versions/0026_rfd3_and_af3.py": 4,
+    "backend_v2/alembic/versions/0028_superfold_af3_real_runs.py": 2,
+    "backend_v2/alembic/versions/0029_proteinhunter_sampling.py": 2,
+    "backend_v2/alembic/versions/0046_workflow_plugin_ports.py": 5,
+    "backend_v2/tests/test_qm_plugin_commands.py": 6,
+    "backend_v2/tests/test_workflow_plugin_ports_migration.py": 2,
+    "qm-scripts/library/TUTORIAL.md": 4,
+    "qm-scripts/library/catalog.json": 2,
+    "qm-scripts/library/examples/01-backbone-design/rfdiffusion-binder.json": 2,
+    "qm-scripts/library/examples/02-sequence-design/proteinmpnn.json": 2,
+    "qm-scripts/library/examples/03-structure-prediction/alphafold2.json": 7,
+    "qm-scripts/library/examples/03-structure-prediction/alphafold3.json": 1,
+    "qm-scripts/plugins/bindcraft/README.md": 1,
+    "qm-scripts/plugins/boltz/README.md": 2,
+    "qm-scripts/plugins/proteinhunter-boltz/README.md": 2,
+    "qm-scripts/plugins/proteinmpnn/README.md": 1,
+    "qm-scripts/plugins/registry.json": 12,
+    "qm-scripts/plugins/rfdiffusion/README.md": 2,
+    "qm-scripts/plugins/rfdiffusion3/README.md": 2,
+    "qm-scripts/plugins/rosetta/README.md": 1,
+    "qm-scripts/plugins/superfold/README.md": 1,
+}
+
+
 def validate_repository_text(path: Path, content: bytes, errors: list[str]) -> None:
     """Reject exact private identifiers while allowing generic research capabilities."""
     for description, marker in FORBIDDEN_REPOSITORY_MARKERS.items():
         if marker in content:
             errors.append(f"{description} is forbidden in the public repository: {path}")
+
+    found = len(CLUSTER_ACCOUNT.findall(content))
+    if not found:
+        return
+    allowed = CLUSTER_ACCOUNT_EXEMPT.get(path.as_posix())
+    if allowed is None:
+        errors.append(
+            f"personal cluster account is forbidden in the public repository: {path}. "
+            "Cluster software roots are site configuration; do not commit an account path. "
+            "See docs/QM_CLUSTER_OPERATION_RULES.md section 8."
+        )
+    elif found > allowed:
+        # A ratchet in one direction only: the recorded count may fall, and when it
+        # reaches zero the entry is deleted. It may never rise.
+        errors.append(
+            f"{path}: personal cluster account references grew from {allowed} to {found}. "
+            "This set is frozen and may only shrink."
+        )
 
 
 def validate_package(errors: list[str]) -> None:
