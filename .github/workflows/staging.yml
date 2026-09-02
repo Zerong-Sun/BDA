@@ -126,7 +126,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     env:
-      KUBECONFIG: ${{ runner.temp }}/bda-staging-kubeconfig
+      # KUBECONFIG is set by the first step, not here: `runner` is not one of the
+      # contexts available to `jobs.<id>.env` (github, needs, strategy, matrix, vars,
+      # secrets, inputs are), and referencing it made the whole file fail to start.
       BACKEND_IMAGE: ${{ needs.supply-chain.outputs.backend-image }}
       BACKEND_DIGEST: ${{ needs.supply-chain.outputs.backend-digest }}
       FRONTEND_IMAGE: ${{ needs.supply-chain.outputs.frontend-image }}
@@ -139,6 +141,8 @@ jobs:
       LSF_KEY_FILE: ${{ vars.BDA_STAGING_LSF_KEY_FILE }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Resolve the kubeconfig path
+        run: echo "KUBECONFIG=${{ runner.temp }}/bda-staging-kubeconfig" >> "$GITHUB_ENV"
       - name: Load staging kubeconfig
         env:
           KUBECONFIG_B64: ${{ secrets.BDA_STAGING_KUBECONFIG_B64 }}
