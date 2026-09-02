@@ -81,6 +81,27 @@ bsub -q <approved-queue> < submit.lsf
 - `collect()` 拒绝路径穿越，并在同一数据库事务中登记 artifact、lineage、candidate 和 result。
 - 原始输出进入开启 versioning 的 MinIO，Git 只保存小型 manifest 和公开许可允许的数据。
 
+## 8. 软件根目录是站点配置，不是仓库常量
+
+集群上的模型软件装在个人账户下（conda env、`software/` 目录、checkpoint 目录）。**这些路径是站点配置：
+它们随集群、随安装者而变，而且是别人的账户名。**
+
+`scripts/check_public_data.py` 拒绝任何新出现的 `/work/bme-<account>` 路径。已存在的一批被逐文件
+逐条冻结在 `CLUSTER_ACCOUNT_EXEMPT` 里，计数只允许下降，不允许上升；某个文件降到 0 就把该条删掉。
+
+**冻结不是批准。** 剩下的工作是把这些路径改成部署时提供的配置，分两类，难度不同：
+
+- **文档与示例**（`registry.json` 的 `runtime` 说明、插件 runbook、`library/examples/`、`TUTORIAL.md`）：
+  `runtime` 只是给人读的说明，没有代码解析它，`check_plugin_catalog_drift.py` 也不比较该字段。
+  换成占位符是安全的文本改动。
+- **被执行的命令模板**（`backend_v2/alembic/versions/` 里写进 `model_plugins` 的命令、
+  `library/catalog.json` 的参数 `default`）：这些在渲染 LSF 脚本时会被真正执行。改动它们等于改变
+  dispatch 如何解析软件根目录，**必须在真实集群上冒烟验证过才能合并** —— 而集群登录只能由所有者本人完成，
+  agent 不自动登录。没有那次验证之前不要改。
+
+已应用的 alembic 迁移**不重写**：改一个跑过的迁移会让 `alembic check` 失败，并让每个已迁移的数据库
+指向一个不再存在的 revision。正确做法是新增一个迁移去更新那些行。
+
 ## 7. 故障与验收
 
 网络中断或 LSF 暂时无法回答时，适配器返回非终态 `unknown`，由 job deadline 决定最终失败；不得把“查不到”映射为成功，也不得无界轮询。Redis 故障时 outbox 保留提交意图，恢复后再发布；worker 重启后依靠确定性 job identity 与外部状态恢复。
