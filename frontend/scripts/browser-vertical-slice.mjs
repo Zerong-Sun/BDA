@@ -1070,17 +1070,24 @@ async function exerciseResearchGrids(page, diagnostics) {
   await methodsTab.click()
   await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
   await expectVisible(page.getByText('Advance the restrained backbone route'), 'decision tree node')
+  // The tree shows decisions. A `problem` entry like the interface-drift one is part of
+  // the same record but belongs to the timeline view, so asserting it here would be
+  // asserting that the decision tree is not a decision tree.
   await expectVisible(
-    page.getByText('Interface geometry drifted outside the preregistered gate').last(),
-    'decision relationship target',
+    page.locator('[data-tour-id="dry-lab-decision-tree"]').getByText('Show reasoning').first(),
+    'decision tree node reasoning toggle',
   )
+  // The research panel and the timeline page render the same DecisionTreeView, so the
+  // node is a tree card (<li>) with a "Show reasoning" toggle, not the phase-column
+  // <article> the panel used to draw for itself.
   const decisionNode = page
-    .locator('[data-tour-id="dry-lab-decision-tree"] article')
+    .locator('[data-tour-id="dry-lab-decision-tree"] li')
     .filter({ hasText: 'Advance the restrained backbone route' })
-  const decisionDocument = decisionNode.getByRole('button', { name: /View decision document/i })
+    .first()
+  const decisionDocument = decisionNode.getByRole('button', { name: /Show reasoning/i })
   await decisionDocument.click()
   await expectVisible(page.getByText('Browser decision basis'), 'expanded decision document')
-  diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded document'
+  diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded reasoning'
   diagnostics.interactions.researchDecisionTreeOverflow = await assertNoPageOverflow(page)
 }
 
