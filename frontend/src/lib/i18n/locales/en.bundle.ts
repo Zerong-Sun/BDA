@@ -352,8 +352,6 @@ export const bundleEn = {
       methodsOperations: 'Curated knowledge editor',
       decisionTreeTitle: 'Computational Decision Evidence Tree',
       decisionTreeDescription: 'Trace plans, methods, results, and decisions by project phase; each node retains its full rationale, data lineage, and code references.',
-      decisionTreeEmpty: 'No structured computational decisions have been recorded for this project. Future project timeline entries will form branches here.',
-      decisionTreeBranchCount: '{count} evidence nodes in this branch',
       tabEvidence: 'Review & Evidence',
       tabEvidenceDescription: 'Read the review and validate claims',
       tabReferences: 'References',
