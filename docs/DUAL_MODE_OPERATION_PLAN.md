@@ -201,7 +201,7 @@
 
 ---
 
-### M2 — stage adapter：自动侧接上主干
+### M2 — stage adapter：自动侧接上主干（已完成，2026-09-05）
 
 **差额**：`resource_type` / `resource_id` 已存在但无人写；`execute_campaign` 止于 first stage ready。
 
@@ -233,11 +233,14 @@
 **验收**：自动启动一条 supervised campaign，在 **Workflow 页**打开它跑出来的 run，
 在 **Candidates 页**看到它产出的候选 —— 全程不访问 Autopilot 页。
 
-**前置**：第 9 节问题三（构建网络）必须先解决，否则没有能跑真实 adapter 的验收环境。
+**已达成的部分**：`compute` / `design` 阶段产出真实 `workflow_runs` 行，
+Autopilot 页每个阶段直达 `/workflow?run=<id>`；重投与「worker 中途崩溃后 stage 指针丢失」
+两种情况都只产生一条 run（测试清空 `resource_id` 后重跑，仍找回同一条）。
+**未达成的部分**：候选物 —— 那要等 collect 阶段的 adapter，而 collect 的产物依赖真实计算完成。
 
 ---
 
-### M3 — 接管与回填
+### M3 — 接管与回填（部分完成，2026-09-05）
 
 **目标**：人能改自动跑出来的东西，且改动对自动侧可见。
 
@@ -260,16 +263,29 @@
 **验收**：自动产出的候选被人工标为 rejected 后，下一阶段的输入集合确实少了那一条，
 且 ledger 能读出是谁、何时、为何。
 
+**已达成**：接管本身 —— 状态、时间、人、ledger（由用户署名）、幂等、已取消不可接管、
+跨项目拒绝，以及「接管后 worker 不再推进」。
+**未达成**：候选层面的回填闭环，与 M2 未达成的部分同因：还没有产出候选的 adapter。
+
 ---
 
-### M4 — 无人值守闭环与预算实拨对账
+### M4 — 无人值守闭环与预算实拨对账（部分完成，2026-09-05）
 
 - 结果回写、候选漏斗、实验复盘的自动路径；
 - 预算从 `reserved` 到 `committed` 的实拨对账；
 - `AUTOPILOT_CAMPAIGNS.md` §6 列的完整验收：并发预留、超额拒绝、重复 idempotency key、
   取消级联、worker 重投、跨项目权限与 RLS、adapter 故障恢复。
 
-**只有 M4 全部通过之后**，才能把 Autopilot 描述为完整自动执行闭环。在此之前不得如此描述。
+**已达成**：预算 `reserved → committed` 实拨对账（`settle_reservation`）——
+按预留封顶，超出部分作为 `unbilled_overrun_gpu_seconds` 记进 ledger 而不是抛异常；
+重投幂等；已被取消释放的预留不再结算。
+加上重复 idempotency key、超额拒绝、取消级联、adapter 故障恢复、跨项目权限，
+`AUTOPILOT_CAMPAIGNS.md` §6 的清单已覆盖大半。
+
+**未达成的三项**：并发预留的真实竞争（需要多进程，不是单会话能证明的）、
+RLS 在 worker 上下文中的完整验证、以及在真实计算上跑通的端到端闭环。
+
+**只有这三项也通过之后**，才能把 Autopilot 描述为完整自动执行闭环。在此之前不得如此描述。
 
 ---
 
@@ -337,9 +353,29 @@ stage 级接管会造出一个权限混合的 campaign，自动路径可能推�
 但「脚本写入与 UI 写入在权限与审计上等价」不能靠约定，
 让两者走同一条服务层代码路径，等价性就是结构性的而不是承诺性的（M1 第 6 项）。
 
-## 9. 仍需裁定
+## 9. 已裁定：构建网络
 
-**问题三：本地构建网络（阻塞 M2）。**
+**问题三：选路线 1 —— 给 Docker 构建配置宿主代理。** 依据是实测而不是偏好：
+用 `http_proxy` / `https_proxy` 两个**小写** build arg 指向 `host.docker.internal:1082`，
+`apt-get` 与 `npm ci` 都恢复正常，`docker compose build api-v2 frontend` 完整通过。
+大写的那一对不够 —— apt 和 npm 读的是小写。
+
+落地方式是 `docker-compose.yml` 里的 `BDA_BUILD_PROXY`，**默认空**，
+所以 CI 与任何直连网络的机器行为完全不变；只有需要它的机器才设置：
+
+```bash
+BDA_BUILD_PROXY=http://host.docker.internal:1082 docker compose build
+```
+
+没有选路线 2（推本地 registry）是因为它把一次构建变成两台机器的协作，
+而问题其实只是几个环境变量；没有选路线 3（脚本化覆盖层）是因为它验证不了
+`requirements.lock` 与 `package-lock.json` 的变更，那正是构建应该验证的东西。
+
+**M2 的前置因此解除**，覆盖层镜像的做法退役。
+
+### 原文（问题三的记录）
+
+**本地构建网络。**
 本机 Docker 构建拿不到网络 —— VPN 的 TUN 把包管理源解析进 `198.18.0.0/15`，
 `apt-get update` 与 `npm ci` 在构建阶段都失败。
 2026-09-05 的绕过方式是宿主机构建 + 代码覆盖层镜像（`FROM <已构建镜像>` + `COPY`），
