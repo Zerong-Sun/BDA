@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
 import { StatusPill } from '../../components/ui/StatusPill'
+import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { Button } from '../../components/ui/Button'
 import type { StatusTone } from '../../components/ui/statusTone'
 import { useI18n } from '../../lib/i18n'
@@ -16,6 +17,18 @@ import {
   type DecisionNode,
   type GoalNode,
 } from './decisionTree'
+
+/** What a card may do besides being read.
+ *
+ *  Passed through context rather than down every `GoalBranch`: the tree is recursive, so
+ *  prop-drilling two values would touch every level for the benefit of the leaves. Absent
+ *  means read-only, which is how the browser harness and the research panel render it. */
+interface TreeActions {
+  projectId: string
+  onEdit: (entry: TimelineEntry) => void
+}
+
+const TreeActionsContext = createContext<TreeActions | null>(null)
 
 /**
  * The decision tree: goals down the page, the judgements that closed off options hung
@@ -75,6 +88,7 @@ function LaneMarks({ entry }: { entry: TimelineEntry }) {
 }
 
 function DecisionCard({ node }: { node: DecisionNode }) {
+  const actions = useContext(TreeActionsContext)
   const { t, format } = useI18n()
   const tl = t.timeline
   const [open, setOpen] = useState(false)
@@ -131,6 +145,28 @@ function DecisionCard({ node }: { node: DecisionNode }) {
           >
             {open ? tl.hideDetail : tl.showDetail}
           </Button>
+        ) : null}
+        {actions ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 py-0 text-[11px]"
+              onClick={() => actions.onEdit(entry)}
+            >
+              {tl.editorEdit}
+            </Button>
+            {/* The tree is the default view, so the control that moves a decision out of
+                "not attached to any goal" has to be reachable from here - offering it
+                only on the timeline tab would leave the fix one tab away from the
+                problem it fixes. */}
+            <AttachToGoalButton
+              projectId={actions.projectId}
+              resourceType="timeline_entry"
+              resourceId={entry.id}
+            />
+          </>
         ) : null}
       </div>
 
@@ -205,9 +241,11 @@ function GoalBranch({ node }: { node: GoalNode }) {
 interface DecisionTreeViewProps {
   goals: ResearchGoal[]
   entries: TimelineEntry[]
+  /** Omit to render the tree read-only. */
+  actions?: TreeActions
 }
 
-export function DecisionTreeView({ goals, entries }: DecisionTreeViewProps) {
+export function DecisionTreeView({ goals, entries, actions }: DecisionTreeViewProps) {
   const { t } = useI18n()
   const tl = t.timeline
   const tree = useMemo(() => buildDecisionTree(goals, entries), [goals, entries])
@@ -217,6 +255,7 @@ export function DecisionTreeView({ goals, entries }: DecisionTreeViewProps) {
   }
 
   return (
+    <TreeActionsContext.Provider value={actions ?? null}>
     <div className="space-y-5">
       {tree.roots.length ? (
         <ul className="space-y-4">
@@ -238,5 +277,6 @@ export function DecisionTreeView({ goals, entries }: DecisionTreeViewProps) {
         </section>
       ) : null}
     </div>
+    </TreeActionsContext.Provider>
   )
 }

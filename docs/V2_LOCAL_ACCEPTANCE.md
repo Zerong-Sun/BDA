@@ -33,7 +33,7 @@
 
 ## 3. 数据库迁移
 
-迁移链当前从 base 单线前进至 `0051_worker_project_rls`。本轮在独立的临时 PostgreSQL 17 实例中实际完成：
+本轮验收时迁移链从 base 单线前进至 `0051_worker_project_rls`。此后 `0052_decision_tree_fields` 与 `0053_decision_tree_drafts` 于 2026-09-02 落地，head 已是 `0053_decision_tree_drafts`；下列五项是对 0051 head 做的，**尚未在 0053 上重跑**，本文不代为宣称。本轮在独立的临时 PostgreSQL 17 实例中实际完成：
 
 1. 空 PostgreSQL 执行 `base → head`；
 2. 执行 `head → base → head` round trip；

@@ -20,6 +20,23 @@ export const TIMELINE_LANES = ['dry', 'wet', 'both', 'unspecified'] as const
 
 export type TimelineLane = (typeof TIMELINE_LANES)[number]
 
+/** Every key `provenance` may carry, in step with backend `app/timeline/schemas.py`.
+ *  The backend rejects anything else rather than storing it, so an editor must offer
+ *  these by name: the whole point of the restriction is that nobody invents a ninth
+ *  spelling of "job_ids" that no reader will ever look for. */
+export const PROVENANCE_KEYS = [
+  'job_ids',
+  'candidate_ids',
+  'artifact_ids',
+  'workflow_run_ids',
+  'finding_ids',
+  'experiment_result_ids',
+  'protein_ids',
+  'external_refs',
+] as const
+
+export type ProvenanceKey = (typeof PROVENANCE_KEYS)[number]
+
 /** The provenance keys that point at bench work. The backend requires one of them on a
  *  wet-lane decision; the UI uses the same set to say which half a row's evidence is in. */
 export const WET_PROVENANCE_KEYS = ['experiment_result_ids', 'protein_ids'] as const

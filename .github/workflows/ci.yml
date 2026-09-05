@@ -76,7 +76,11 @@ jobs:
       - name: Validate documentation inventory and links
         run: PYTHONPATH=. python backend_v2/scripts/check_document_inventory.py
       - name: Reject decision-record drift
-        run: PYTHONPATH=. python backend_v2/scripts/check_decision_coverage.py contracts/decision-records.yaml
+        # The contract lives under private/, where the sync policy put the research
+        # records. Pointed at contracts/ it printed "nothing to check" and exited 0,
+        # so this gate passed without reading anything. In the public repo, where
+        # private/ does not exist, that same tolerated-absence path still applies.
+        run: PYTHONPATH=. python backend_v2/scripts/check_decision_coverage.py private/contracts/decision-records.yaml
       - name: Reject unexplained slot reservations
         run: PYTHONPATH=. python backend_v2/scripts/check_plugin_cpu_declarations.py
       - name: Reject model/migration drift
@@ -171,7 +175,7 @@ jobs:
         run: >-
           docker build -f backend_v2/Dockerfile
           --build-arg BDA_BUILD_REVISION=${GITHUB_SHA}
-          --build-arg BDA_SCHEMA_REVISION=0051_worker_project_rls
+          --build-arg BDA_SCHEMA_REVISION=0054_autopilot_takeover
           -t bda-backend-v2:ci .
       # The image ships without pip or setuptools. A library that reaches for pkg_resources
       # at import time would fail only at runtime, which no other step here would catch.

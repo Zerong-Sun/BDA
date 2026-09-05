@@ -26,7 +26,7 @@ from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.timeline.models import ENTRY_TYPES, LANES, OUTCOMES, ProjectTimelineEntry
 from backend_v2.app.timeline.repository import TimelineRepository
 from backend_v2.app.timeline.schemas import TimelineEntryCreate, TimelineEntryUpdate
-from backend_v2.app.timeline.service import create_entry, update_entry
+from backend_v2.app.timeline.service import create_entry, delete_entry, update_entry
 from backend_v2.tests._sqlite import enforce_foreign_keys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -149,7 +149,7 @@ def test_entry_cannot_supersede_itself(env) -> None:
     with pytest.raises(DomainError) as excinfo:
         update_entry(
             env["session"], env["project"], entry,
-            TimelineEntryUpdate(supersedes_id=entry.id), entry.version,
+            TimelineEntryUpdate(supersedes_id=entry.id), entry.version, actor=env["user"],
         )
     assert excinfo.value.error_code == "timeline_self_link"
 
@@ -185,7 +185,8 @@ def test_version_conflict_is_refused(env) -> None:
     env["session"].flush()
     with pytest.raises(DomainError) as excinfo:
         update_entry(
-            env["session"], env["project"], entry, TimelineEntryUpdate(title="y"), entry.version + 1
+            env["session"], env["project"], entry, TimelineEntryUpdate(title="y"), entry.version + 1,
+            actor=env["user"],
         )
     assert excinfo.value.error_code == "version_conflict"
 
@@ -313,7 +314,8 @@ def test_an_open_branch_may_be_wet_without_evidence_it_does_not_have_yet(env) ->
     env["session"].flush()
     with pytest.raises(DomainError) as excinfo:
         update_entry(
-            env["session"], env["project"], entry, TimelineEntryUpdate(outcome="supported"), entry.version
+            env["session"], env["project"], entry, TimelineEntryUpdate(outcome="supported"), entry.version,
+            actor=env["user"],
         )
     assert excinfo.value.error_code == "timeline_lane_evidence_missing"
 
@@ -342,7 +344,8 @@ def test_patch_is_judged_on_the_merged_row_not_on_the_submitted_fields(env) -> N
 
     with pytest.raises(DomainError) as excinfo:
         update_entry(
-            env["session"], env["project"], entry, TimelineEntryUpdate(provenance={}), entry.version
+            env["session"], env["project"], entry, TimelineEntryUpdate(provenance={}), entry.version,
+            actor=env["user"],
         )
     assert excinfo.value.error_code == "timeline_lane_evidence_missing"
 
@@ -351,7 +354,10 @@ def test_patch_is_judged_on_the_merged_row_not_on_the_submitted_fields(env) -> N
     dry = _add(env, title="dry call", occurred_at=BASE, entry_type="decision", lane="dry", outcome="supported")
     env["session"].flush()
     with pytest.raises(DomainError) as excinfo:
-        update_entry(env["session"], env["project"], dry, TimelineEntryUpdate(lane="both"), dry.version)
+        update_entry(
+            env["session"], env["project"], dry, TimelineEntryUpdate(lane="both"), dry.version,
+            actor=env["user"],
+        )
     assert excinfo.value.error_code == "timeline_lane_evidence_missing"
 
 
@@ -415,3 +421,27 @@ def test_migration_0052_declares_every_column_and_constraint_the_model_has() -> 
         assert source.count(column) >= 2, f"{column} is not both added and dropped in 0047"
     assert "uq_timeline_decision_ref" in source
     assert "uq_timeline_decision_ref" in {c.name for c in ProjectTimelineEntry.__table__.constraints}
+
+
+def test_every_write_leaves_an_audit_row(env) -> None:
+    """Create, update and delete are equally traceable.
+
+    Only `create` recorded an audit row until the UI could write entries at all; an edit
+    that silently rewrites a decision - or a delete that frees its number - is precisely
+    the change someone will later need to attribute.
+    """
+    from backend_v2.app.audit.models import AuditLog
+
+    entry = _add(env, title="a call", occurred_at=BASE, entry_type="decision")
+    update_entry(
+        env["session"], env["project"], entry, TimelineEntryUpdate(title="a revised call"),
+        entry.version, actor=env["user"],
+    )
+    delete_entry(env["session"], env["project"], entry, entry.version, actor=env["user"])
+    env["session"].flush()
+
+    actions = {
+        row.action
+        for row in env["session"].query(AuditLog).filter(AuditLog.entity_type == "project_timeline_entry")
+    }
+    assert actions == {"timeline.create", "timeline.update", "timeline.delete"}

@@ -71,6 +71,15 @@ services:
     build:
       context: .
       dockerfile: backend_v2/Dockerfile
+      # Empty by default, which is exactly today's behaviour. Set BDA_BUILD_PROXY when
+      # the host reaches the network through a proxy that the build cannot see: a VPN in
+      # TUN mode resolves deb.debian.org and registry.npmjs.org into 198.18.0.0/15 and
+      # the build hangs there, while the host itself is fine.
+      #   BDA_BUILD_PROXY=http://host.docker.internal:1082 docker compose build
+      # Lower-case names on purpose: apt and npm read those, not the upper-case pair.
+      args:
+        http_proxy: ${BDA_BUILD_PROXY:-}
+        https_proxy: ${BDA_BUILD_PROXY:-}
     env_file: .env
     environment: &v2_environment
       BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
@@ -86,7 +95,7 @@ services:
       BDA_V2_DATABASE_POOL_SIZE: "5"
       BDA_V2_DATABASE_MAX_OVERFLOW: "5"
       BDA_V2_BUILD_REVISION: local
-      BDA_V2_SCHEMA_REVISION: 0051_worker_project_rls
+      BDA_V2_SCHEMA_REVISION: 0054_autopilot_takeover
       BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot
     command: >-
       sh -c "BDA_V2_DATABASE_URL=postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@postgres-v2:5432/bda_v2
@@ -172,6 +181,9 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE: /api/v2
+        # See api-v2 above.
+        http_proxy: ${BDA_BUILD_PROXY:-}
+        https_proxy: ${BDA_BUILD_PROXY:-}
     expose:
       - "8080"
     healthcheck:

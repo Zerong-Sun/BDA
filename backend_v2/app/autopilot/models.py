@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.models import Base, UUIDVersionMixin, utcnow
 
@@ -66,6 +66,20 @@ class AutopilotCampaign(UUIDVersionMixin, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_operation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("operations.id", ondelete="SET NULL"), nullable=True
+    )
+    # Set together, by `take_over_campaign`. Nullable rather than defaulted: most
+    # campaigns are never taken over, and a default would claim a handover that never
+    # happened. The frozen spec stays frozen either way - what changes hands is authority
+    # over the products, not the protocol.
+    taken_over_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    taken_over_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Ordered by position because the API serialises them straight through and a stage
+    # list out of order reads as a different protocol.
+    stages: Mapped[list[AutopilotStage]] = relationship(
+        back_populates="campaign", order_by="AutopilotStage.position", lazy="selectin"
     )
 
 
@@ -131,6 +145,8 @@ class AutopilotStage(UUIDVersionMixin, Base):
     )
     resource_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     resource_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+
+    campaign: Mapped[AutopilotCampaign] = relationship(back_populates="stages")
 
 
 class AutopilotLedgerEntry(Base):

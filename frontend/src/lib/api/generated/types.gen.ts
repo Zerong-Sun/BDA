@@ -574,6 +574,10 @@ export type AutopilotCampaignResponse = {
      */
     project_id: string;
     /**
+     * Stages
+     */
+    stages?: Array<AutopilotStageResponse>;
+    /**
      * Started At
      */
     started_at: string | null;
@@ -581,6 +585,14 @@ export type AutopilotCampaignResponse = {
      * Status
      */
     status: string;
+    /**
+     * Taken Over At
+     */
+    taken_over_at?: string | null;
+    /**
+     * Taken Over By
+     */
+    taken_over_by?: string | null;
     /**
      * Version
      */
@@ -684,6 +696,43 @@ export type AutopilotOperationAccepted = {
      * Operation Id
      */
     operation_id: string;
+    /**
+     * Status
+     */
+    status: string;
+};
+
+/**
+ * AutopilotStageResponse
+ *
+ * A stage, and the object on the main trunk it produced.
+ *
+ * `resource_type` / `resource_id` are the whole point of exposing this: without them
+ * the Autopilot page can say a stage is running but not where to go and look, which is
+ * how an automatic campaign ends up being something you watch rather than something you
+ * can inspect and correct.
+ */
+export type AutopilotStageResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Resource Id
+     */
+    resource_id: string | null;
+    /**
+     * Resource Type
+     */
+    resource_type: string | null;
+    /**
+     * Stage Key
+     */
+    stage_key: string;
     /**
      * Status
      */
@@ -13126,6 +13175,325 @@ export type PostStartApiV2AutopilotCampaignsCampaignIdStartPostResponses = {
 };
 
 export type PostStartApiV2AutopilotCampaignsCampaignIdStartPostResponse = PostStartApiV2AutopilotCampaignsCampaignIdStartPostResponses[keyof PostStartApiV2AutopilotCampaignsCampaignIdStartPostResponses];
+
+export type PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostData = {
+    body?: never;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'If-Match'?: string | null;
+    };
+    path: {
+        /**
+         * Campaign Id
+         */
+        campaign_id: string;
+    };
+    query?: never;
+    url: '/api/v2/autopilot-campaigns/{campaign_id}/takeover';
+};
+
+export type PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostError = PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostErrors[keyof PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostErrors];
+
+export type PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: AutopilotCampaignResponse;
+};
+
+export type PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostResponse = PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostResponses[keyof PostTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPostResponses];
 
 export type PostDraftApiV2AutopilotDraftsPostData = {
     body: AutopilotDraftCreate;

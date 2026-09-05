@@ -1,6 +1,11 @@
 import './generatedTransport'
-import { listTimelineApiV2ProjectsProjectIdTimelineGet } from './generated/sdk.gen'
-import { TimelineEntryPageSchema, type TimelineEntry } from '../schemas/timeline'
+import {
+  deleteTimelineEntryApiV2TimelineEntryIdDelete,
+  listTimelineApiV2ProjectsProjectIdTimelineGet,
+  patchTimelineEntryApiV2TimelineEntryIdPatch,
+  postTimelineEntryApiV2ProjectsProjectIdTimelinePost,
+} from './generated/sdk.gen'
+import { TimelineEntrySchema, TimelineEntryPageSchema, type TimelineEntry } from '../schemas/timeline'
 
 export interface TimelineQuery {
   entry_type?: string
@@ -49,4 +54,60 @@ export async function listAllTimeline(
     cursor = result.next_cursor
   }
   throw new Error(`Timeline pagination exceeded ${MAX_TIMELINE_PAGES} pages.`)
+}
+
+/** The body both writes take. Built by `features/timeline/timelineEntryForm`, which owns
+ *  the field rules; this module owns only the transport. */
+export interface TimelineEntryBody {
+  occurred_at: string
+  entry_type: string
+  decision_ref: string | null
+  lane: string
+  phase: string
+  title: string
+  summary: string
+  body: string
+  outcome: string
+  provenance: Record<string, string[]>
+  alternatives: Array<{ option: string; rejected_because: string }>
+  code_refs: Array<{ path: string; role: string }>
+  tags: string[]
+}
+
+export async function createTimelineEntry(
+  projectId: string,
+  body: TimelineEntryBody,
+): Promise<TimelineEntry> {
+  const created = await postTimelineEntryApiV2ProjectsProjectIdTimelinePost<true>({
+    path: { project_id: projectId },
+    body: body as never,
+    throwOnError: true,
+  })
+  return TimelineEntrySchema.parse(created.data)
+}
+
+/** 412 here means someone else edited the entry between the load and the save; the
+ *  caller reloads and never overwrites. */
+export async function updateTimelineEntry(
+  entryId: string,
+  version: number,
+  body: TimelineEntryBody,
+): Promise<TimelineEntry> {
+  const updated = await patchTimelineEntryApiV2TimelineEntryIdPatch<true>({
+    path: { entry_id: entryId },
+    headers: { 'If-Match': `W/"${version}"` },
+    body: body as never,
+    throwOnError: true,
+  })
+  return TimelineEntrySchema.parse(updated.data)
+}
+
+/** Deleting a decision removes a number from the record, so the version has to match:
+ *  a stale tab must not be able to drop an entry someone else has since edited. */
+export async function deleteTimelineEntry(entryId: string, version: number): Promise<void> {
+  await deleteTimelineEntryApiV2TimelineEntryIdDelete<true>({
+    path: { entry_id: entryId },
+    headers: { 'If-Match': `W/"${version}"` },
+    throwOnError: true,
+  })
 }

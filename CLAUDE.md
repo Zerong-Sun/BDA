@@ -32,8 +32,10 @@ backend_v2/.venv/bin/pytest backend_v2/tests/test_compute_service.py::test_name 
 ```
 
 ```bash
-npx --prefix frontend vitest run src/lib/api/workflow.test.ts -t "case name"
+npx --prefix frontend vitest run --root frontend src/lib/api/workflow.test.ts -t "case name"
 ```
+
+`--root frontend` is not optional: without it vitest never finds `frontend/vitest.config.ts`, and every test that imports `@/...` fails with a misleading `Cannot find package '@/components/...'`.
 
 Local stack (frontend on `:8080`, MinIO console on `:9003`, Postgres on `:5433`):
 

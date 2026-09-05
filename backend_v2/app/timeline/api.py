@@ -108,7 +108,7 @@ def patch_timeline_entry(
     user: User = Depends(require_command),
 ) -> TimelineEntryResponse:
     entry, project = _entry(session, entry_id, user)
-    update_entry(session, project, entry, payload, parse_if_match(if_match))
+    update_entry(session, project, entry, payload, parse_if_match(if_match), actor=user)
     response.headers["ETag"] = etag(entry.version)
     return TimelineEntryResponse.model_validate(entry)
 
@@ -124,6 +124,6 @@ def delete_timeline_entry(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> TimelineEntryDeleteResponse:
-    entry, _ = _entry(session, entry_id, user)
-    delete_entry_service(session, entry, parse_if_match(if_match))
+    entry, project = _entry(session, entry_id, user)
+    delete_entry_service(session, project, entry, parse_if_match(if_match), actor=user)
     return TimelineEntryDeleteResponse(id=entry.id)

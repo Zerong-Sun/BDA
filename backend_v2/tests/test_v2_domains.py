@@ -38,7 +38,7 @@ from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture
-def domain_client() -> Generator[tuple[TestClient, dict[str, uuid.UUID]]]:
+def domain_client() -> Generator[tuple[TestClient, dict]]:
     engine = enforce_foreign_keys(create_engine("sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool))
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
@@ -56,6 +56,9 @@ def domain_client() -> Generator[tuple[TestClient, dict[str, uuid.UUID]]]:
         session.add(ProjectMember(project_id=project.id, user_id=user.id, role="owner"))
         session.commit()
         ids = {"user": user.id, "organization": organization.id, "project": project.id}
+        # Handed out so a test can inspect rows the API does not expose - a Celery
+        # task's effects, for instance. Same engine, so it sees what the client wrote.
+        ids["session_factory"] = factory
 
     def session_override() -> Generator[Session]:
         with factory() as session:

@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-08-30（Asia/Shanghai）
+最后核验：2026-09-05（Asia/Shanghai；stage adapter 与人工接管落地后复核）
 
 权威范围：当前公开 BDA 的 Autopilot 数据模型、API、用户流程与已知边界。
 
@@ -19,6 +19,8 @@ Autopilot 因此不负责“猜测并立即运行”。它先把需求保存为 
 ## 2. 与人工 campaign 的关系
 
 人工 `campaigns` 保存设计—实验—复盘流程；`autopilot_campaigns` 保存冻结协议和自动执行状态。两者保持不同模型，因为人工轮次允许研究者持续增加评价和决策，而已经确认的自动协议必须保持不可变。
+
+**"不可变"的宾语是 frozen spec，不是 campaign 产出的任何领域对象。** 这一句在 stage adapter 落地后必须说清楚：预算与权限校验建立在 spec 不变之上，所以 spec 冻结；而 stage 产出的 workflow run、job、候选物都落在与人工完全相同的主干表上，**必须可以被人修正**——一条自动跑出来的错误结论如果改不了，平台就只是在更快地累积错误。改产物的授权通过 §3.5 的人工接管显式移交，不是靠绕过状态机。
 
 确认 Autopilot draft 时可以提供 `manual_campaign_id`。该外键只允许连接同一项目的人工 campaign，用于记录人工设计如何交接到自动协议；它不会合并两个状态机，也不会把人工 campaign 的权限或预算隐式授予 Autopilot。
 
@@ -52,7 +54,15 @@ Autopilot 因此不负责“猜测并立即运行”。它先把需求保存为 
 
 成功启动返回 `202` 和 operation ID。当前 worker 会验证 reservation、记录受限 service principal 的 ledger 事件，并把第一个 pending stage 转为 `ready`。
 
-### 3.4 取消与恢复
+### 3.4 人工接管
+
+`POST /api/v2/autopilot-campaigns/{campaign_id}/takeover` 必须携带 `If-Match`，把 campaign 置为 `manual_takeover`，记录 `taken_over_at` / `taken_over_by`，并写一条**由用户而非 service principal 署名**的 ledger 事件。
+
+三点同时成立：自动推进停止（`execute_campaign` 见到 `manual_takeover` 直接返回，与见到 `cancelled` 一样）；谁、何时留在行上；协议仍然冻结。接管是**幂等**的——重复调用返回同一条记录，不写第二次移交，因为两条移交记录会让"谁在负责"这个问题重新变得无法回答。
+
+已取消的 campaign 不能接管（409）：没有东西可接。
+
+### 3.5 取消与恢复
 
 `POST /api/v2/autopilot-campaigns/{campaign_id}/cancel` 是幂等操作。同步事务把活动 stage 标记为 cancelled，并对运行中的 operation、research generation 和 job 发出 cancel request；异步对账任务随后释放尚未 committed 的预算 reservation。
 
@@ -68,8 +78,13 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 | 异步 operation 与 append-only ledger | 已实现 | `service.py`、`tasks.py` |
 | 幂等取消和预算释放 | 已实现 | `service.py`、`tasks.py` |
 | Prompt-first 前端和结构化预览 | 已实现 | `frontend/src/app/Autopilot.tsx` |
-| 具体 research/compute stage adapter | 尚未完整实现 | 当前 execute task 只完成 durable handoff 和首阶段 ready |
-| 自动结果回写、候选漏斗和实验复盘 | 尚未实现 | 需要 stage adapter、领域事件与新界面 |
+| workflow_run stage adapter | 已实现 | `backend_v2/app/autopilot/adapters.py`；`compute` / `design` 阶段产出真实 `workflow_runs` 行，幂等键写在 `legacy_id` |
+| stage 产物指针与前端深链 | 已实现 | `autopilot_stages.resource_type` / `resource_id`；Autopilot 页每个阶段直达 Workflow 页 |
+| 人工接管（`manual_takeover`） | 已实现 | 迁移 `0054`、`service.take_over_campaign`、`POST …/takeover` |
+| 预算 reserved → committed 实拨对账 | 已实现 | `tasks.settle_reservation`；按预留封顶，超出部分记为 `unbilled_overrun_gpu_seconds` |
+| research / collect / review stage adapter | 尚未实现 | 这些阶段的产物依赖真实计算完成后的回写，不能凭 spec 生成 |
+| 自动结果回写、候选漏斗和实验复盘 | 尚未实现 | 需要上一行的 adapter、领域事件与新界面 |
+| 完整无人值守闭环 | 尚未达成 | 见 §6：真实 adapter 的故障恢复已有测试，但端到端闭环未在真实计算上跑通 |
 
 ## 5. 操作约束
 
@@ -88,4 +103,8 @@ backend_v2/.venv/bin/pytest backend_v2/tests/test_autopilot_formalization.py
 npm --prefix frontend test
 ```
 
-完整验收还应覆盖并发预算预留、超额拒绝、重复 idempotency key、取消级联、worker 重投、跨项目权限与 RLS，以及真实 stage adapter 的故障恢复。后四项在接入具体执行 adapter 后必须通过，才能把 Autopilot 描述为完整自动执行闭环。
+完整验收还应覆盖并发预算预留、超额拒绝、重复 idempotency key、取消级联、worker 重投、跨项目权限与 RLS，以及真实 stage adapter 的故障恢复。
+
+其中**已覆盖**：重复 idempotency key、超额拒绝、取消级联、settle 的重投幂等、预留超支的封顶与记账、adapter 在 worker 中途崩溃后的复用（清空 stage 指针后仍找回同一条 run）、跨项目接管拒绝。
+
+**仍未覆盖**：并发预留的真实竞争（需要多进程而非单会话）、RLS 在 worker 上下文中的完整验证，以及在真实计算上跑通的端到端闭环。**这三项没通过之前，不得把 Autopilot 描述为完整自动执行闭环。**

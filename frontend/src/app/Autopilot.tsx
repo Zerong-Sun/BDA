@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useMutation } from '@tanstack/react-query'
 import { Alert, AlertDescription, AlertTitle } from '@/components/reui/alert'
 import { AppFrame } from '@/components/ui/AppFrame'
@@ -11,7 +12,9 @@ import {
   cancelAutopilotCampaign,
   confirmAutopilotDraft,
   createAutopilotDraft,
+  getAutopilotCampaign,
   startAutopilotCampaign,
+  takeOverAutopilotCampaign,
 } from '../lib/api/autopilot'
 import type { AutopilotCampaignResponse, AutopilotDraftResponse } from '../lib/api/generated/types.gen'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
@@ -54,7 +57,23 @@ export function AutopilotPage() {
     mutationFn: () => cancelAutopilotCampaign(campaign!.id),
     onSuccess: (accepted) => setOperationId(accepted.operation_id),
   })
-  const error = draftMutation.error ?? confirmMutation.error ?? startMutation.error ?? cancelMutation.error
+  // Re-read after starting: the stages only acquire their trunk resources once the worker
+  // has run the adapter, and the deep links below are the point of showing them at all.
+  const refreshMutation = useMutation({
+    mutationFn: () => getAutopilotCampaign(campaign!.id),
+    onSuccess: setCampaign,
+  })
+  const takeoverMutation = useMutation({
+    mutationFn: () => takeOverAutopilotCampaign(campaign!.id, campaign!.version),
+    onSuccess: setCampaign,
+  })
+  const error =
+    draftMutation.error ??
+    confirmMutation.error ??
+    startMutation.error ??
+    cancelMutation.error ??
+    refreshMutation.error ??
+    takeoverMutation.error
 
   return (
     <section className="mx-auto max-w-5xl">
@@ -106,7 +125,52 @@ export function AutopilotPage() {
           <span className="text-sm">{campaign.name} · {campaign.status}</span>
           <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>{language === 'zh' ? '预留预算并启动' : 'Reserve budget and start'}</Button>
           <Button type="button" variant="outline" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>{language === 'zh' ? '幂等取消' : 'Idempotent cancel'}</Button>
+          <Button type="button" variant="outline" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>{language === 'zh' ? '刷新阶段' : 'Refresh stages'}</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => takeoverMutation.mutate()}
+            disabled={takeoverMutation.isPending || campaign.status === 'manual_takeover' || campaign.status === 'cancelled'}
+          >
+            {language === 'zh' ? '人工接管' : 'Take over'}
+          </Button>
           {operationId ? <span className="text-xs text-muted-foreground">operation: {operationId}</span> : null}
+        </AppFrame>
+      ) : null}
+      {campaign?.status === 'manual_takeover' ? (
+        <Alert className="mt-5" variant="info">
+          <AlertTitle>{language === 'zh' ? '已由人工接管' : 'Under manual control'}</AlertTitle>
+          <AlertDescription>
+            {language === 'zh'
+              ? '协议仍然冻结，但自动推进已停止，产物改由人工编辑。接管记录写在 ledger 上。'
+              : 'The protocol stays frozen, automatic advance has stopped, and the products are now edited by hand. The handover is on the ledger.'}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {campaign?.stages?.length ? (
+        <AppFrame className="mt-5" heading={language === 'zh' ? '4. 阶段与产物' : '4. Stages and their products'} panelClassName="p-5">
+          <p className="mb-3 text-xs text-muted-foreground">
+            {language === 'zh'
+              ? '每个阶段的产物落在与人工完全相同的表上，因此可以直接在 Workflow 页打开、检查和修改。'
+              : 'Each stage lands on the same tables manual work does, so its product opens in the Workflow page like any other run.'}
+          </p>
+          <ol className="space-y-2">
+            {campaign.stages.map((stage) => (
+              <li key={stage.id} className="flex flex-wrap items-baseline gap-2 border-l-2 border-l-border pl-3 text-sm">
+                <span className="font-medium">{stage.stage_key}</span>
+                <span className="text-xs text-muted-foreground">{stage.status}</span>
+                {stage.resource_type === 'workflow_run' && stage.resource_id ? (
+                  <Link className="text-xs underline" to={`/workflow?run=${stage.resource_id}`}>
+                    {language === 'zh' ? '在 Workflow 页打开' : 'Open in Workflow'}
+                  </Link>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {language === 'zh' ? '这一阶段没有自动产物，需要人工完成' : 'no automatic product — a human step'}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
         </AppFrame>
       ) : null}
       {error ? <Alert className="mt-5" variant="destructive"><AlertDescription>{error instanceof Error ? error.message : String(error)}</AlertDescription></Alert> : null}

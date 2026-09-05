@@ -14,6 +14,8 @@ import {
 } from '../../lib/schemas/timeline'
 import { DecisionTreeBootstrap } from './DecisionTreeBootstrap'
 import { DecisionTreeView } from './DecisionTreeView'
+import { TimelineEntryEditor } from './TimelineEntryEditor'
+import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { AppFrame } from '../../components/ui/AppFrame'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { Button } from '../../components/ui/Button'
@@ -67,7 +69,16 @@ function outcomeRule(outcome: string): string {
   return outcome === 'unspecified' ? 'border-l-border-soft' : 'border-l-accent'
 }
 
-function EntryCard({ entry }: { entry: TimelineEntry }) {
+function EntryCard({
+  entry,
+  projectId,
+  onEdit,
+}: {
+  entry: TimelineEntry
+  projectId: string
+  /** Absent in read-only contexts; the card then renders exactly as it used to. */
+  onEdit?: (entry: TimelineEntry) => void
+}) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const tl = t.timeline
@@ -136,6 +147,18 @@ function EntryCard({ entry }: { entry: TimelineEntry }) {
         </div>
       ) : null}
 
+      {onEdit ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          <Button type="button" variant="ghost" size="sm" className="px-0 text-xs" onClick={() => onEdit(entry)}>
+            {tl.editorEdit}
+          </Button>
+          {/* The same control the candidate, protein and job rows carry. A decision that
+              cannot be hung on the question it answers is why every entry in this
+              project reads as "not attached to any goal". */}
+          <AttachToGoalButton projectId={projectId} resourceType="timeline_entry" resourceId={entry.id} />
+        </div>
+      ) : null}
+
       {refs.length || entry.code_refs.length ? (
         <div className="mt-2 grid gap-2 text-[11px] md:grid-cols-2">
           {refs.length ? (
@@ -177,6 +200,10 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
   const [entryType, setEntryType] = useState('')
   const [outcome, setOutcome] = useState('')
   const [lane, setLane] = useState('')
+  // `null` means the editor is closed; `{}` opens it for a new entry, and an entry
+  // opens it for that row. One editor at a time, so two half-written records cannot
+  // both claim the same decision number.
+  const [editing, setEditing] = useState<{ entry?: TimelineEntry } | null>(null)
 
   const query = useQuery({
     queryKey: ['project-timeline', projectId],
@@ -232,7 +259,16 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
     // tree view takes over.
     return (
       <div className="grid gap-3">
-        <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.empty}</AppFrame>
+        <AppFrame panelClassName="p-4">
+          <p className="text-sm text-text-secondary">{tl.empty}</p>
+          {editing ? (
+            <TimelineEntryEditor projectId={projectId} onClose={() => setEditing(null)} />
+          ) : (
+            <Button type="button" size="sm" className="mt-3" onClick={() => setEditing({})}>
+              {tl.editorNew}
+            </Button>
+          )}
+        </AppFrame>
         <DecisionTreeBootstrap projectId={projectId} hasPrompt={hasPrompt} />
       </div>
     )
@@ -245,10 +281,24 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
           <h2 className="text-lg font-semibold text-text-primary">{tl.title}</h2>
           <p className="text-sm text-text-secondary">{tl.subtitle}</p>
         </div>
-        <span className="text-xs text-text-muted">
-          {format(tl.entryCount, { count: String(visible.length) })}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-muted">
+            {format(tl.entryCount, { count: String(visible.length) })}
+          </span>
+          <Button type="button" size="sm" onClick={() => setEditing({})}>
+            {tl.editorNew}
+          </Button>
+        </div>
       </div>
+
+      {editing ? (
+        <TimelineEntryEditor
+          key={editing.entry?.id ?? 'new'}
+          projectId={projectId}
+          entry={editing.entry}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
 
       <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label={tl.title}>
         {VIEWS.map((value) => (
@@ -328,7 +378,11 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
           // A failed goal fetch degrades to an empty goal list rather than blanking the
           // page: every decision then shows under "not attached to any goal", which is
           // the truth about what is known right now.
-          <DecisionTreeView goals={goalsQuery.data ?? []} entries={visible} />
+          <DecisionTreeView
+            goals={goalsQuery.data ?? []}
+            entries={visible}
+            actions={{ projectId, onEdit: (value) => setEditing({ entry: value }) }}
+          />
         )
       ) : view === 'open' ? (
         <div className="space-y-3">
@@ -336,7 +390,12 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
           {open.length ? (
             <ol className="space-y-2">
               {open.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} />
+                <EntryCard
+                  key={entry.id}
+                  entry={entry}
+                  projectId={projectId}
+                  onEdit={(value) => setEditing({ entry: value })}
+                />
               ))}
             </ol>
           ) : (
@@ -352,7 +411,12 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
               </h3>
               <ol className="space-y-2">
                 {group.entries.map((entry) => (
-                  <EntryCard key={entry.id} entry={entry} />
+                  <EntryCard
+                  key={entry.id}
+                  entry={entry}
+                  projectId={projectId}
+                  onEdit={(value) => setEditing({ entry: value })}
+                />
                 ))}
               </ol>
             </section>
