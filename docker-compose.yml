@@ -95,7 +95,7 @@ services:
       BDA_V2_DATABASE_POOL_SIZE: "5"
       BDA_V2_DATABASE_MAX_OVERFLOW: "5"
       BDA_V2_BUILD_REVISION: local
-      BDA_V2_SCHEMA_REVISION: 0054_autopilot_takeover
+      BDA_V2_SCHEMA_REVISION: 0055_autopilot_worker_rls
       BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot
     command: >-
       sh -c "BDA_V2_DATABASE_URL=postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@postgres-v2:5432/bda_v2

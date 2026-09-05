@@ -107,4 +107,24 @@ npm --prefix frontend test
 
 其中**已覆盖**：重复 idempotency key、超额拒绝、取消级联、settle 的重投幂等、预留超支的封顶与记账、adapter 在 worker 中途崩溃后的复用（清空 stage 指针后仍找回同一条 run）、跨项目接管拒绝。
 
-**仍未覆盖**：并发预留的真实竞争（需要多进程而非单会话）、RLS 在 worker 上下文中的完整验证，以及在真实计算上跑通的端到端闭环。**这三项没通过之前，不得把 Autopilot 描述为完整自动执行闭环。**
+并发预留与 worker 上下文 RLS 需要真实 PostgreSQL，单独放在
+`backend_v2/tests/test_autopilot_postgres.py`，按 `BDA_V2_RUN_DB_TESTS=1` 开启：
+
+```bash
+BDA_V2_RUN_DB_TESTS=1 BDA_V2_DATABASE_URL=... \
+  backend_v2/.venv/bin/pytest backend_v2/tests/test_autopilot_postgres.py
+```
+
+**并发预留**：八个线程、各自独立连接，争一个只装得下两份的预算。写这个测试时才看清防护是两层的，
+且触发顺序与预期相反 —— `_reserve_budget` 的 `SELECT … FOR UPDATE` 先把算术串行化，
+但随后 `campaign.version` 的乐观锁只放行一个事务，其余抛 `StaleDataError` 回滚（预留一并回滚）。
+**同一 campaign 上的并发，通常是版本检查而不是预算锁在拒绝。** 两者都是真实拒绝，
+不变量成立：硬上限从未被突破，回滚的事务不留预留行。
+
+**worker 上下文 RLS**：`0055_autopilot_worker_rls`。`0049` 建表时已经加了 RLS，
+但表达式只认 `bda.user_id`；`0051` 后来给其余项目表加的 `bda.worker_project_id` 分支没有覆盖到这里。
+留下的缺陷与"泄露"相反：**一个按 §5 要求限定在自己项目里的 worker，看不见它被派去执行的那个 campaign**。
+在 stage adapter 让 worker 真的去读 campaign 之前，这一点不会显现。已补齐，并两头都断言：
+限定到别的项目什么也看不到，限定到自己的项目恰好看到自己那一条。
+
+**仍未覆盖**：在真实计算上跑通的端到端闭环。**这一项没通过之前，不得把 Autopilot 描述为完整自动执行闭环。**

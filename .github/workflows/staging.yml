@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0054_autopilot_takeover
+            BDA_SCHEMA_REVISION=0055_autopilot_worker_rls
           provenance: mode=max
           sbom: true
       - id: frontend

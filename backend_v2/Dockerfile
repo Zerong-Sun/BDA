@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0054_autopilot_takeover
+ARG BDA_SCHEMA_REVISION=0055_autopilot_worker_rls
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)
