@@ -127,4 +127,19 @@ BDA_V2_RUN_DB_TESTS=1 BDA_V2_DATABASE_URL=... \
 在 stage adapter 让 worker 真的去读 campaign 之前，这一点不会显现。已补齐，并两头都断言：
 限定到别的项目什么也看不到，限定到自己的项目恰好看到自己那一条。
 
-**仍未覆盖**：在真实计算上跑通的端到端闭环。**这一项没通过之前，不得把 Autopilot 描述为完整自动执行闭环。**
+**计算侧对真实集群已验证**（2026-09-06，Qiming LSF）。`backend_v2/scripts/check_lsf_roundtrip.py`
+在真实调度器上跑完 `ensure_submitted → status → collect`：作业 `4250455` / `4250457`
+提交到 `v3-64`，`Done successfully`，CPU 时间 0.1 秒；重复调用 `ensure_submitted`
+返回**同一个作业号**（`bjobs -J <确定性名字>` 的先查后建纪律在真实 LSF 上成立）；
+`collect` 返回 0 个产物，且这个 0 来自作业自己写出的 `output-manifest.json`，
+不是默认值。提交脚本 `-n 1` / `span[ptile=1]` / `BDA_CPUS=1` 三者同源，队列先查过没有合并
+`GPU_REQ`。
+
+这个脚本不进默认测试集：它需要集群凭据，并且会往共享队列上放一个作业。
+
+**仍未覆盖**：**串成一条的无人值守闭环** —— campaign → stage adapter → submission →
+outbox → publisher → Celery → dispatch → collect → 制品/候选 → 下一阶段，在一次真实运行里
+依次走完。每一环单独有测试，计算那一环现在对真实集群也有了，但**整条链没有在一次真实运行里连起来过**：
+连起来需要一个会产出真实文件的已注册插件，也就是一次真正的科学计算作业。
+
+**这一项没通过之前，不得把 Autopilot 描述为完整自动执行闭环。**
