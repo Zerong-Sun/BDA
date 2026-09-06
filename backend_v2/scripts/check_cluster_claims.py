@@ -137,8 +137,8 @@ def literals_with_bsub(path: Path) -> list[tuple[str, str]]:
 
     f-string placeholders are resolved against module-level constants where those are
     plain literals, so ``#BSUB -n {JACKHMMER_N_CPU}`` is compared as ``-n 8``. A
-    placeholder that cannot be resolved becomes ``?``, which never equals another value
-    and therefore reports rather than passing silently.
+    placeholder that cannot be resolved becomes ``?``. Resource comparisons involving
+    it are explicitly reported as unverified; this scanner does not execute generators.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     constants: dict[str, str] = {}
@@ -200,7 +200,8 @@ def check_stage(path: Path, name: str, body: str, acked: dict[str, str] | None =
 
     requests_gpu = bool(BSUB_GPU.search(body))
     claims_no_gpu = bool(NO_GPU_CLAIM.search(body))
-    if claims_no_gpu and not requests_gpu and not GPU_GUARD.search(body):
+    code = COMMENT_LINE.sub("", body)
+    if claims_no_gpu and not requests_gpu and not GPU_GUARD.search(code):
         problems.append(
             f"{where}: claims it needs no GPU and requests none, but never asserts it got none. "
             "The queue is chosen at submit time and can merge its own GPU_REQ into the job - that is "
@@ -210,10 +211,11 @@ def check_stage(path: Path, name: str, body: str, acked: dict[str, str] | None =
 
     cores = BSUB_CORES.search(body)
     span = BSUB_SPAN.search(body)
+    if any(match and "?" in match.group(1) for match in (cores, span)):
+        print(f"UNVERIFIED {where}: unresolved resource count; inspect the rendered job")
     if cores and span and cores.group(1) != span.group(1):
         problems.append(f"{where}: -n {cores.group(1)} but span[ptile={span.group(1)}]; "
                         "ptile is slots per host, so these must be equal or the job scatters")
-    code = COMMENT_LINE.sub("", body)
     shell_vars = dict(SHELL_ASSIGN.findall(code))
 
     def thread_value(raw: str) -> str | None:
@@ -316,6 +318,9 @@ def main() -> int:
 
     for problem in problems:
         print(f"FAIL {problem}", file=sys.stderr)
+    if stages == 0 and not problems:
+        print("SKIP cluster claims: no LSF stages present; generator validation was not performed")
+        return 0
     print(f"cluster claims: {stages} LSF stage(s) checked, {len(problems)} problem(s)")
     return 1 if problems else 0
 
