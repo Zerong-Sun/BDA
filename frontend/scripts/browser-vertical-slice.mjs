@@ -55,6 +55,7 @@ const ROUTE_SURFACES = Object.freeze({
   faq: '[data-tour-id="faq-content"]',
   timeline: '[data-tour-id="timeline-page"]',
   autopilot: '[data-tour-id="autopilot-page"]',
+  lab: '[data-tour-id="lab-page"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -1309,6 +1310,7 @@ function assertControlAcceptance(testCase, diagnostics) {
     faq: ['faqDisclosure'],
     timeline: ['timelineViews'],
     autopilot: ['autopilotPromptGuard'],
+    lab: [],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
     for (const layer of ['Settings', 'Copilot', 'Tour menu', 'Project selector']) {

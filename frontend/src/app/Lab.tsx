@@ -15,7 +15,7 @@ export function LabPage() {
   const { projectId } = useProjectContext()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-tour-id="lab-page">
       <header className="space-y-1">
         <h1 className="text-2xl font-medium">{t.lab.title}</h1>
         <p className="text-text-secondary">{t.lab.subtitle}</p>

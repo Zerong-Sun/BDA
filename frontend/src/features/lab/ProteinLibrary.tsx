@@ -20,6 +20,7 @@ import {
   AccordionTrigger,
 } from '../../components/ui/accordion'
 import { Button } from '../../components/ui/Button'
+import { Skeleton } from '../../components/ui/Skeleton'
 import { Input } from '../../components/ui/Input'
 import { Textarea } from '../../components/ui/textarea'
 
@@ -243,6 +244,37 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
+
+        {/* Same confusion from the other side: while the first read is in flight the grid
+            also showed the empty message, so "loading" and "you have none" looked
+            identical. Skeletons match every other page's loading convention. */}
+        {proteins.isLoading ? (
+          <div className="space-y-2" aria-label={copy.title} aria-busy="true">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-8 w-full" />
+            ))}
+          </div>
+        ) : null}
+
+        {/* Without this a failed request rendered as "no constructs yet": `rows` falls
+            back to [] on error, and the grid's empty message is indistinguishable from
+            an empty library. A load that failed and a library that is empty are
+            different facts and have different next actions. */}
+        {proteins.isError ? (
+          <div role="alert" className="rounded-md border border-border-soft bg-surface-2 p-3">
+            <p className="text-sm text-text-secondary">{copy.loadFailed}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              onClick={() => proteins.refetch()}
+              disabled={proteins.isFetching}
+            >
+              {copy.retry}
+            </Button>
+          </div>
+        ) : null}
 
         <DataGrid
           table={table}
