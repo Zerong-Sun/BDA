@@ -1,5 +1,15 @@
 # Frontend plugin verification — 2026-09-07
 
+状态：活跃
+
+最后核验：2026-09-07（Asia/Shanghai）
+
+权威范围：本次前端插件检查与修复；不构成集群运行验收。
+
+数据来源：仓库代码、回归测试及本次构建。
+
+替代关系：补充 FRONTEND_V2.md，不替代插件运行证据。
+
 The registry-backed node editor can render plugin parameter schemas, bind input ports,
 and construct workflow requests. Runtime readiness still requires backend preflight and
 fingerprinted runtime validation; a visible card or an enabled registry entry is not proof

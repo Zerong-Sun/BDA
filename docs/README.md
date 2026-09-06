@@ -39,3 +39,5 @@ reports are maintained only in the private BDA-demo archive.
 Generated plugin runbooks live under `qm-scripts/plugins/`. Historical v1
 documents that contain private paths or research runs are retained only in the
 private recovery archive, not in this public repository.
+
+- [前端插件检查与修复（2026-09-07）](FRONTEND_PLUGIN_CHECK_2026-09-07.md)
