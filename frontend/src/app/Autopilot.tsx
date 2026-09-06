@@ -76,7 +76,7 @@ export function AutopilotPage() {
     takeoverMutation.error
 
   return (
-    <section className="mx-auto max-w-5xl">
+    <section className="mx-auto max-w-5xl" data-tour-id="autopilot-page">
       <PageHead eyebrow="Autopilot" title={language === 'zh' ? '冻结协议自动执行' : 'Frozen-protocol execution'} />
       <Alert className="mb-5" variant="warning">
         <AlertTitle>{language === 'zh' ? '先预览，再确认，再启动' : 'Preview, confirm, then start'}</AlertTitle>
@@ -86,7 +86,6 @@ export function AutopilotPage() {
             : 'There is no default 400 GPU-hour allowance. Supervised campaigns require an explicit hard budget; prompt and spec become immutable after confirmation.'}
         </AlertDescription>
       </Alert>
-      {!projectId ? <Alert variant="info"><AlertDescription>{language === 'zh' ? '请先选择项目。' : 'Select a project first.'}</AlertDescription></Alert> : null}
       <div className="grid gap-5 lg:grid-cols-2">
         <AppFrame heading={language === 'zh' ? '1. 自然语言需求' : '1. Natural-language request'} panelClassName="space-y-4 p-5">
           <Textarea

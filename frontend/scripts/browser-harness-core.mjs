@@ -18,6 +18,7 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   research: { root: '[data-tour-id="research-tabs"]', maxSteps: 160 },
   faq: { root: '[data-tour-id="faq-content"]', maxSteps: 96 },
   timeline: { root: '[data-tour-id="timeline-page"]', maxSteps: 128 },
+  autopilot: { root: '[data-tour-id="autopilot-page"]', maxSteps: 96 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -228,6 +229,9 @@ export const ROUTES = Object.freeze([
   // release without browser coverage while carrying the editor, which is how a page
   // gets to be the one nobody has actually looked at in a browser.
   { id: 'timeline', path: `/timeline?project=${PROJECT_ID}`, authenticated: true },
+  // The other page that had no coverage while carrying new controls. It fetches nothing
+  // on mount, so its contract is about the guard on the way in rather than a data state.
+  { id: 'autopilot', path: `/autopilot?project=${PROJECT_ID}`, authenticated: true },
 ])
 
 export const VIEWPORTS = Object.freeze([
@@ -279,6 +283,9 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   // has, and it is the one moment the bootstrap and the "record an entry" button are
   // the whole page.
   timeline: ['empty', 'loading', 'recoverable-error'],
+  // No state scenarios: the page reads nothing when it opens, so an empty/loading/error
+  // case here would be asserting on a fixture rather than on the page.
+  autopilot: [],
 })
 
 export function buildBrowserMatrix() {

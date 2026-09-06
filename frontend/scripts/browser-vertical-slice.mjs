@@ -54,6 +54,7 @@ const ROUTE_SURFACES = Object.freeze({
   research: '[data-tour-id="research-tabs"]',
   faq: '[data-tour-id="faq-content"]',
   timeline: '[data-tour-id="timeline-page"]',
+  autopilot: '[data-tour-id="autopilot-page"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -495,6 +496,17 @@ async function expectVisible(locator, label, timeout = 10_000) {
   } catch (error) {
     throw new Error(`Expected visible ${label}: ${asError(error).message}`)
   }
+}
+
+/** Waits for a control to become enabled: a guard releasing is a state change, and
+ *  React re-renders after the input event rather than during it. */
+async function expectEnabled(locator, label, timeout = 5_000) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (!(await locator.isDisabled())) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Expected enabled ${label} within ${timeout}ms`)
 }
 
 async function expectHidden(locator, label, timeout = 5_000) {
@@ -1162,6 +1174,31 @@ async function exerciseTimelineViews(page, diagnostics) {
   diagnostics.interactions.timelineOverflow = await assertNoPageOverflow(page)
 }
 
+/**
+ * The guard on the way in: a draft cannot be requested from a prompt too short to be one.
+ *
+ * This is the only interactive contract the page has before anything is submitted, and it
+ * is the one that matters - `AUTOPILOT_CAMPAIGNS.md` §1 turns on the platform refusing to
+ * treat an underspecified prompt as an executable protocol. A disabled button is where
+ * that refusal is visible.
+ */
+async function exerciseAutopilotPromptGuard(page, diagnostics) {
+  const draftButton = page.getByRole('button', { name: /Generate structured preview/i })
+  await expectVisible(draftButton, 'autopilot draft button')
+  if (!(await draftButton.isDisabled())) {
+    throw new Error('Autopilot offered to draft from an empty prompt.')
+  }
+  const prompt = page.locator('[data-tour-id="autopilot-page"] textarea').first()
+  await prompt.fill('too short')
+  if (!(await draftButton.isDisabled())) {
+    throw new Error('Autopilot offered to draft from a prompt under the minimum length.')
+  }
+  await prompt.fill('Design a small binder against the demonstration target, three stages.')
+  await expectEnabled(draftButton, 'autopilot draft button after a usable prompt')
+  diagnostics.interactions.autopilotPromptGuard = 'disabled while empty and short, enabled once usable'
+  diagnostics.interactions.autopilotOverflow = await assertNoPageOverflow(page)
+}
+
 async function exerciseDisclosure(page, containerSelector, label) {
   const selected = page.locator(containerSelector).locator('button[aria-expanded]').first()
   await expectVisible(selected, `${label} disclosure`)
@@ -1242,6 +1279,8 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'autopilot') {
+    await exerciseAutopilotPromptGuard(page, diagnostics)
   }
 }
 
@@ -1269,6 +1308,7 @@ function assertControlAcceptance(testCase, diagnostics) {
     research: ['researchSort', 'researchDecisionTree'],
     faq: ['faqDisclosure'],
     timeline: ['timelineViews'],
+    autopilot: ['autopilotPromptGuard'],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
     for (const layer of ['Settings', 'Copilot', 'Tour menu', 'Project selector']) {
