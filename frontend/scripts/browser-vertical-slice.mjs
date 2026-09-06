@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { constants as fsConstants } from 'node:fs'
-import { access, appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { access, appendFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -53,6 +53,9 @@ const ROUTE_SURFACES = Object.freeze({
   results: '[data-tour-id="results-validation"]',
   research: '[data-tour-id="research-tabs"]',
   faq: '[data-tour-id="faq-content"]',
+  timeline: '[data-tour-id="timeline-page"]',
+  autopilot: '[data-tour-id="autopilot-page"]',
+  lab: '[data-tour-id="lab-page"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -147,7 +150,51 @@ async function waitForPreviewReady(output, earlyExit) {
   throw new Error(`Vite preview did not become ready at ${BASE_URL}.\n${previewTail(output)}`)
 }
 
+/**
+ * Refuse to run against a build older than the sources.
+ *
+ * `vite preview` serves whatever is in `dist/`; it does not build. CI builds first, so
+ * this never bit there - but locally the matrix would pass green against a bundle that
+ * predated the change under test, which is the most expensive kind of green there is.
+ * Checking timestamps is cheap and the message says exactly what to do.
+ */
+async function assertBuildIsCurrent() {
+  const dist = path.join(FRONTEND_DIRECTORY, 'dist')
+  let builtAt
+  try {
+    builtAt = (await stat(path.join(dist, 'index.html'))).mtimeMs
+  } catch {
+    throw new Error('No frontend/dist. Run `npm run build` before the browser matrix.')
+  }
+  const sourceRoot = path.join(FRONTEND_DIRECTORY, 'src')
+  let newest = 0
+  let newestFile = ''
+  const walk = async (dir) => {
+    for (const item of await readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, item.name)
+      if (item.isDirectory()) {
+        await walk(full)
+        continue
+      }
+      if (item.name.endsWith('.test.ts') || item.name.endsWith('.test.tsx')) continue
+      const { mtimeMs } = await stat(full)
+      if (mtimeMs > newest) {
+        newest = mtimeMs
+        newestFile = path.relative(FRONTEND_DIRECTORY, full)
+      }
+    }
+  }
+  await walk(sourceRoot)
+  if (newest > builtAt) {
+    throw new Error(
+      `frontend/dist is older than ${newestFile}. The matrix would test the previous build. `
+      + 'Run `npm run build` first.',
+    )
+  }
+}
+
 async function startPreview() {
+  await assertBuildIsCurrent()
   const viteCli = fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url))
   const output = []
   const earlyExit = { value: null }
@@ -450,6 +497,17 @@ async function expectVisible(locator, label, timeout = 10_000) {
   } catch (error) {
     throw new Error(`Expected visible ${label}: ${asError(error).message}`)
   }
+}
+
+/** Waits for a control to become enabled: a guard releasing is a state change, and
+ *  React re-renders after the input event rather than during it. */
+async function expectEnabled(locator, label, timeout = 5_000) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (!(await locator.isDisabled())) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`Expected enabled ${label} within ${timeout}ms`)
 }
 
 async function expectHidden(locator, label, timeout = 5_000) {
@@ -1091,6 +1149,57 @@ async function exerciseResearchGrids(page, diagnostics) {
   diagnostics.interactions.researchDecisionTreeOverflow = await assertNoPageOverflow(page)
 }
 
+/**
+ * The three readings of one record - tree, timeline, open questions.
+ *
+ * Worth exercising rather than just screenshotting the default: the whole design claim of
+ * this page is that the same entries are legible three ways, and a tab that renders
+ * nothing would still pass a "is the page visible" check.
+ */
+async function exerciseTimelineViews(page, diagnostics) {
+  const seen = []
+  for (const name of [/^Timeline$/, /^Open questions$/, /^Decision tree$/]) {
+    const tab = page.getByRole('tab', { name })
+    await expectVisible(tab, `timeline ${String(name)} tab`)
+    await tab.click()
+    if ((await tab.getAttribute('aria-selected')) !== 'true') {
+      throw new Error(`Timeline tab ${String(name)} did not become selected.`)
+    }
+    seen.push(String(name))
+  }
+  await expectVisible(
+    page.getByRole('button', { name: 'New entry' }),
+    'timeline entry editor entry point',
+  )
+  diagnostics.interactions.timelineViews = `three readings exercised: ${seen.join(', ')}`
+  diagnostics.interactions.timelineOverflow = await assertNoPageOverflow(page)
+}
+
+/**
+ * The guard on the way in: a draft cannot be requested from a prompt too short to be one.
+ *
+ * This is the only interactive contract the page has before anything is submitted, and it
+ * is the one that matters - `AUTOPILOT_CAMPAIGNS.md` §1 turns on the platform refusing to
+ * treat an underspecified prompt as an executable protocol. A disabled button is where
+ * that refusal is visible.
+ */
+async function exerciseAutopilotPromptGuard(page, diagnostics) {
+  const draftButton = page.getByRole('button', { name: /Generate structured preview/i })
+  await expectVisible(draftButton, 'autopilot draft button')
+  if (!(await draftButton.isDisabled())) {
+    throw new Error('Autopilot offered to draft from an empty prompt.')
+  }
+  const prompt = page.locator('[data-tour-id="autopilot-page"] textarea').first()
+  await prompt.fill('too short')
+  if (!(await draftButton.isDisabled())) {
+    throw new Error('Autopilot offered to draft from a prompt under the minimum length.')
+  }
+  await prompt.fill('Design a small binder against the demonstration target, three stages.')
+  await expectEnabled(draftButton, 'autopilot draft button after a usable prompt')
+  diagnostics.interactions.autopilotPromptGuard = 'disabled while empty and short, enabled once usable'
+  diagnostics.interactions.autopilotOverflow = await assertNoPageOverflow(page)
+}
+
 async function exerciseDisclosure(page, containerSelector, label) {
   const selected = page.locator(containerSelector).locator('button[aria-expanded]').first()
   await expectVisible(selected, `${label} disclosure`)
@@ -1169,6 +1278,10 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
   } else if (testCase.routeId === 'faq') {
     diagnostics.interactions.faqDisclosure =
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
+  } else if (testCase.routeId === 'timeline') {
+    await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'autopilot') {
+    await exerciseAutopilotPromptGuard(page, diagnostics)
   }
 }
 
@@ -1195,6 +1308,9 @@ function assertControlAcceptance(testCase, diagnostics) {
     results: ['resultsSort'],
     research: ['researchSort', 'researchDecisionTree'],
     faq: ['faqDisclosure'],
+    timeline: ['timelineViews'],
+    autopilot: ['autopilotPromptGuard'],
+    lab: [],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
     for (const layer of ['Settings', 'Copilot', 'Tour menu', 'Project selector']) {

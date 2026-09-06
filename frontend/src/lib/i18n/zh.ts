@@ -38,6 +38,8 @@ export const zh: TranslationDict = {
       duplicate: '已存在',
       rejected: '已拒绝',
       sequenceNotice: '序列不出服务器。此处以 SHA-256 指纹标识构建体。',
+      loadFailed: '无法载入构建体库。',
+      retry: '重试',
     },
     bench: {
       title: '计算工具',

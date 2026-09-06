@@ -32,8 +32,10 @@ backend_v2/.venv/bin/pytest backend_v2/tests/test_compute_service.py::test_name 
 ```
 
 ```bash
-npx --prefix frontend vitest run src/lib/api/workflow.test.ts -t "case name"
+npx --prefix frontend vitest run --root frontend src/lib/api/workflow.test.ts -t "case name"
 ```
+
+`--root frontend` is not optional: without it vitest never finds `frontend/vitest.config.ts`, and every test that imports `@/...` fails with a misleading `Cannot find package '@/components/...'`.
 
 Local stack (frontend on `:8080`, MinIO console on `:9003`, Postgres on `:5433`):
 
@@ -74,6 +76,7 @@ Other gates, each with a script you can run locally:
 - **Coverage** — 85% overall, plus 95% on `identity/service.py`, `identity/deps.py`, `compute/service.py`, `artifacts/service.py`, `research/package_import.py`, `research/package_validation.py`, and `migration/`. Thresholds live in `backend_v2/scripts/check_coverage.py`. `research/package_validation.py` additionally needs 95% *branch* coverage. On a machine with no PostgreSQL the DB-gated tests skip and the numbers come out below CI's — `check_coverage.py` says so rather than letting it read as a regression.
 - **Slot declarations** — a plugin may declare `cpus > 1` only with a `cpus_evidence` string naming the measurement or upstream thread flag that supports it. The cluster treats a job holding unused cores as a violation, so an unreviewable number is not allowed to sit in the registry. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_plugin_cpu_declarations.py`.
 - **Decision coverage** — every numbered decision in a project's `DECISIONS.md` must either have a `decision_ref` row in that project's timeline seeder or be a gap declared in `contracts/decision-records.yaml` with the decision that declared it. `recorded_baseline` is a ratchet and fails in both directions, so improving coverage means raising it. This exists because `D080–D099` were made on the cluster, cited by submit scripts, and never written back — and nothing noticed. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_decision_coverage.py`.
+- **Cluster claims** — a job script that says it needs no GPU must prove it at run time. The queue is chosen on the `bsub` command line and can merge its own `GPU_REQ` into the job, so `#BSUB` carrying no `-gpu` does not mean no GPU: `2v100-32-e5` forces `num=1:mode=exclusive_process` onto everything, and three jackhmmer stages held a V100 for about seven GPU-hours while their comments said they had not asked for one. Every no-GPU stage must exit when `CUDA_VISIBLE_DEVICES` is set; `-n`, `span[ptile=]` and the tool's thread count must agree; and a loop over staged inputs must compare a count, because `sha256sum -c` cannot see files its manifest never listed. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_cluster_claims.py`, and `--live <job-id>` to ask the scheduler what a running job was actually given.
 - **Migration reversibility** — CI runs `alembic check` (model/migration drift) then `alembic downgrade base`. Every migration needs a working downgrade.
 - **Retired-runtime grep** — CI greps the tree and fails on `/api/v1`, `submit-to-compute`, `/jobs/.*/sync`, `experiment-results/upload`, `copilot/literature`, `docker.sock`, and `sqlite:///`. These paths are deliberately dead.
 - **Frontend transport boundary** — see below.

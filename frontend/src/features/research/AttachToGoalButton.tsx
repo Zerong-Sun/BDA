@@ -41,7 +41,7 @@ import {
 
 interface AttachToGoalButtonProps {
   projectId: string
-  resourceType: 'experiment_result' | 'finding' | 'candidate' | 'job' | 'protein'
+  resourceType: 'experiment_result' | 'finding' | 'candidate' | 'job' | 'protein' | 'timeline_entry'
   resourceId: string
   /** Rendered on the trigger; defaults to the shared short label. */
   label?: string

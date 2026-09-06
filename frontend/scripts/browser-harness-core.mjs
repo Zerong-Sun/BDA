@@ -17,6 +17,9 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   results: { root: 'section', maxSteps: 128 },
   research: { root: '[data-tour-id="research-tabs"]', maxSteps: 160 },
   faq: { root: '[data-tour-id="faq-content"]', maxSteps: 96 },
+  timeline: { root: '[data-tour-id="timeline-page"]', maxSteps: 128 },
+  autopilot: { root: '[data-tour-id="autopilot-page"]', maxSteps: 96 },
+  lab: { root: '[data-tour-id="lab-page"]', maxSteps: 128 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -180,6 +183,42 @@ export const SCENARIO_CONTRACTS = Object.freeze({
       disabledControl('button', 'Add finding/source', 'Viewer demo mode blocks research-note mutations.'),
     ],
   },
+  'timeline:empty': {
+    root: '[data-tour-id="timeline-page"]',
+    evidence: [exactText('p', 'No timeline entries recorded for this project yet.')],
+    controls: [{
+      selector: 'button',
+      name: 'New entry',
+      disabled: false,
+      reason: 'An empty record is the one moment writing the first entry is the whole page.',
+    }],
+  },
+  'timeline:loading': {
+    root: '[data-tour-id="timeline-page"]',
+    loadingSelector: '[data-slot="skeleton"]',
+    evidence: [],
+  },
+  'timeline:recoverable-error': {
+    root: '[data-tour-id="timeline-page"]',
+    // A failed read has to degrade to a sentence *and* a way out. Before this contract
+    // existed the error state held no focusable element at all.
+    retry: { selector: 'button', name: 'Retry' },
+    evidence: [exactText('p', 'Could not load the project timeline.')],
+  },
+  'lab:empty': {
+    root: '[data-tour-id="lab-page"]',
+    evidence: [exactText('[data-slot="data-grid"]', 'No constructs yet. Add one, or paste a FASTA to register a batch.')],
+  },
+  'lab:loading': {
+    root: '[data-tour-id="lab-page"]',
+    loadingSelector: '[data-slot="skeleton"]',
+    evidence: [],
+  },
+  'lab:recoverable-error': {
+    root: '[data-tour-id="lab-page"]',
+    retry: { selector: '[role="alert"] button', name: 'Retry' },
+    evidence: [exactText('[role="alert"] p', 'Could not load the construct library.')],
+  },
 })
 
 export const POLLING_CONTRACTS = Object.freeze({
@@ -201,6 +240,16 @@ export const ROUTES = Object.freeze([
   { id: 'results', path: `/results?project=${PROJECT_ID}`, authenticated: true },
   { id: 'research', path: `/research?tab=evidence&project=${PROJECT_ID}`, authenticated: true },
   { id: 'faq', path: `/faq?project=${PROJECT_ID}`, authenticated: true },
+  // The decision record, and the only page from which it can be written. It went a
+  // release without browser coverage while carrying the editor, which is how a page
+  // gets to be the one nobody has actually looked at in a browser.
+  { id: 'timeline', path: `/timeline?project=${PROJECT_ID}`, authenticated: true },
+  // The other page that had no coverage while carrying new controls. It fetches nothing
+  // on mount, so its contract is about the guard on the way in rather than a data state.
+  { id: 'autopilot', path: `/autopilot?project=${PROJECT_ID}`, authenticated: true },
+  // The last route the matrix did not reach. Its three panels are the ones the React
+  // Compiler skips (TanStack Table), so nothing else was watching them either.
+  { id: 'lab', path: `/lab?project=${PROJECT_ID}`, authenticated: true },
 ])
 
 export const VIEWPORTS = Object.freeze([
@@ -248,6 +297,14 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   results: ['empty', 'loading', 'recoverable-error', 'pending'],
   research: ['empty', 'loading', 'recoverable-error', 'pending', 'read-only'],
   faq: [],
+  // `empty` is the state that matters most here: an empty record is what a new project
+  // has, and it is the one moment the bootstrap and the "record an entry" button are
+  // the whole page.
+  timeline: ['empty', 'loading', 'recoverable-error'],
+  // No state scenarios: the page reads nothing when it opens, so an empty/loading/error
+  // case here would be asserting on a fixture rather than on the page.
+  autopilot: [],
+  lab: ['empty', 'loading', 'recoverable-error'],
 })
 
 export function buildBrowserMatrix() {
@@ -874,6 +931,8 @@ const LOADING_PATH_BY_ROUTE = Object.freeze({
   candidates: `/api/v2/projects/${PROJECT_ID}/candidates`,
   results: `/api/v2/projects/${PROJECT_ID}/experiment-results`,
   research: `/api/v2/projects/${PROJECT_ID}/research-workspace`,
+  timeline: `/api/v2/projects/${PROJECT_ID}/timeline`,
+  lab: `/api/v2/projects/${PROJECT_ID}/proteins`,
 })
 
 function strictRoute(method, path, query, resolver) {
@@ -1086,6 +1145,23 @@ function createStrictRoutes({ scenario, routeId }) {
   // The goal tree is fetched only when an attach menu is opened, so most cases never
   // ask for it. Stubbed anyway: the harness is an allowlist, and a case that does open
   // one must not fail for want of a route.
+  add('GET', `/api/v2/projects/${PROJECT_ID}/proteins`, { limit: '50' }, () => ok({
+    items: empty ? [] : [{
+      id: 'protein_browser_1',
+      project_id: PROJECT_ID,
+      name: 'Browser acceptance construct',
+      sequence: 'MKTAYIAKQRQISFVKSHFSRQ',
+      construct_type: 'binder',
+      expression_host: 'e_coli',
+      tags: ['browser'],
+      notes: '',
+      candidate_id: null,
+      version: 1,
+      created_at: NOW,
+      updated_at: NOW,
+    }],
+    next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/research-goals`, {}, () => ok({
     items: empty
       ? []
@@ -1342,6 +1418,8 @@ const RECOVERABLE_PATH_BY_ROUTE = Object.freeze({
   candidates: `/api/v2/projects/${PROJECT_ID}/candidates`,
   results: `/api/v2/projects/${PROJECT_ID}/experiment-results`,
   research: `/api/v2/projects/${PROJECT_ID}/research-workspace`,
+  timeline: `/api/v2/projects/${PROJECT_ID}/timeline`,
+  lab: `/api/v2/projects/${PROJECT_ID}/proteins`,
 })
 
 export function createFixtureRouter({ scenario = 'populated', routeId = '' } = {}) {
