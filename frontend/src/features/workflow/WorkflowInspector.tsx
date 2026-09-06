@@ -19,7 +19,7 @@ import {
 import { ParameterSchemaForm } from '../plugins'
 import { InputBindingPanel } from './InputBindingPanel'
 import { listProjectArtifacts } from '../../lib/api/artifacts'
-import { defaultsFromFields, fieldsFromParameterSchema } from '../../lib/forms/parameterSchema'
+import { defaultsFromFields, fieldsFromParameterSchema, prepareParameterValues } from '../../lib/forms/parameterSchema'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { ClusterDrafts } from '../copilot/ClusterDrafts'
@@ -147,7 +147,7 @@ function WorkflowInspectorContent({
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
       if (!workflowRunId || !selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       return updateWorkflowNode(workflowRunId, selectedNode.id, {
-        parameters: effectiveParameters,
+        parameters: prepareParameterValues(parameterFields, effectiveParameters),
         input_bindings: draftBindings,
         queue: queueName.trim() || null,
       })

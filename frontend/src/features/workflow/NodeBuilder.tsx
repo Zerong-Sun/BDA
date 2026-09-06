@@ -9,6 +9,7 @@ import {
   defaultsFromFields,
   fieldsFromParameterSchema,
   parseParameterSchemaMetadata,
+  prepareParameterValues,
   type ParameterSchemaMetadata,
 } from '../../lib/forms/parameterSchema'
 import type { MethodPlugin, ModelPlugin } from '../../lib/schemas/registry'
@@ -79,6 +80,7 @@ function parseJsonRecord(value: unknown): Record<string, unknown> {
 }
 
 function resourceForPlugin(plugin: ModelPlugin): WorkflowNodeData['resource'] {
+  if (typeof plugin.resources?.gpu === 'boolean') return plugin.resources.gpu ? 'gpu' : 'cpu'
   const schemaMetadata = parseJsonRecord(plugin.parameter_schema.metadata)
   const resource = String(schemaMetadata.resource ?? plugin.plugin_key).toLowerCase()
   if (resource.includes('gpu') || resource.includes('pipeline')) {
@@ -178,6 +180,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
   const [parameters, setParameters] = useState<Record<string, unknown>>({})
   const [adding, setAdding] = useState(false)
   const [nameError, setNameError] = useState('')
+  const [addError, setAddError] = useState('')
   const [newMethodName, setNewMethodName] = useState('')
   const [newMethodType, setNewMethodType] = useState('custom')
   const [newMethodDescription, setNewMethodDescription] = useState('')
@@ -185,7 +188,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
   const methodDefaultsApplied = useRef<string | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: plugins = [] } = useQuery({
+  const { data: plugins = [], isPending: pluginsLoading, error: pluginsError, refetch: reloadPlugins } = useQuery({
     queryKey: ['model-plugins'],
     queryFn: listModelPlugins,
   })
@@ -297,6 +300,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
     }
     if (selectedMethodOptions.length === 0) return
     setNameError('')
+    setAddError('')
     setAdding(true)
     try {
       const methodRefs = selectedMethodOptions.map((method) => {
@@ -318,10 +322,11 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
         }
       })
       await onAdd(template, trimmedName, selectedMethodOptions.map((method) => method.label), {
-        ...defaultsFromFields(parameterFields),
-        ...parameters,
+        ...prepareParameterValues(parameterFields, { ...defaultsFromFields(parameterFields), ...parameters }),
         method_refs: methodRefs,
       })
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : String(error))
     } finally {
       setAdding(false)
     }
@@ -356,7 +361,14 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
           <SectionLabel id="node-builder-models" hint={templates.length || undefined}>
             {t.nodeBuilder.modelCards}
           </SectionLabel>
-          {templates.length === 0 ? (
+          {pluginsLoading ? (
+            <p role="status">{t.common.loading}</p>
+          ) : pluginsError ? (
+            <Alert variant="destructive" role="alert">
+              <AlertDescription>{pluginsError.message}</AlertDescription>
+              <Button type="button" variant="outline" onClick={() => void reloadPlugins()}>{t.common.retry}</Button>
+            </Alert>
+          ) : templates.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border-soft px-3 py-6 text-center text-xs text-text-secondary">
               {t.nodeBuilder.noModels}
             </p>
@@ -608,6 +620,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
         </section>
       </div>
       </ScrollArea>
+      {addError ? <Alert variant="destructive" role="alert"><AlertDescription>{addError}</AlertDescription></Alert> : null}
       <SheetFooter className="flex-row justify-end border-t border-border-soft">
         <Button type="button" variant="outline" className="flex-1 sm:flex-none sm:min-w-28" onClick={handleClose} disabled={adding}>
           {t.nodeBuilder.cancel}
@@ -615,7 +628,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
         <Button type="button"
           className="flex-1 sm:flex-none sm:min-w-44"
           onClick={() => void handleAdd()}
-          disabled={adding || templates.length === 0 || selectedMethodOptions.length === 0}
+          disabled={adding || pluginsLoading || Boolean(pluginsError) || templates.length === 0 || selectedMethodOptions.length === 0}
         >
           {adding ? (
             <>

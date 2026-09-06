@@ -874,7 +874,8 @@ export function WorkflowPage() {
                   onClose={() => setBuilderOpen(false)}
                   onAdd={async (template, nodeName, methods, parameters) => {
                     try {
-                      await canvasRef.current?.addNodeFromTemplate(
+                      if (!canvasRef.current) throw new Error(t.workflowExt.toasts.addNodeFailed)
+                      await canvasRef.current.addNodeFromTemplate(
                         template,
                         nodeName,
                         methods,
