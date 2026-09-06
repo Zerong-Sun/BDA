@@ -17,6 +17,7 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   results: { root: 'section', maxSteps: 128 },
   research: { root: '[data-tour-id="research-tabs"]', maxSteps: 160 },
   faq: { root: '[data-tour-id="faq-content"]', maxSteps: 96 },
+  timeline: { root: '[data-tour-id="timeline-page"]', maxSteps: 128 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -180,6 +181,28 @@ export const SCENARIO_CONTRACTS = Object.freeze({
       disabledControl('button', 'Add finding/source', 'Viewer demo mode blocks research-note mutations.'),
     ],
   },
+  'timeline:empty': {
+    root: '[data-tour-id="timeline-page"]',
+    evidence: [exactText('p', 'No timeline entries recorded for this project yet.')],
+    controls: [{
+      selector: 'button',
+      name: 'New entry',
+      disabled: false,
+      reason: 'An empty record is the one moment writing the first entry is the whole page.',
+    }],
+  },
+  'timeline:loading': {
+    root: '[data-tour-id="timeline-page"]',
+    loadingSelector: '[data-slot="skeleton"]',
+    evidence: [],
+  },
+  'timeline:recoverable-error': {
+    root: '[data-tour-id="timeline-page"]',
+    // A failed read has to degrade to a sentence *and* a way out. Before this contract
+    // existed the error state held no focusable element at all.
+    retry: { selector: 'button', name: 'Retry' },
+    evidence: [exactText('p', 'Could not load the project timeline.')],
+  },
 })
 
 export const POLLING_CONTRACTS = Object.freeze({
@@ -201,6 +224,10 @@ export const ROUTES = Object.freeze([
   { id: 'results', path: `/results?project=${PROJECT_ID}`, authenticated: true },
   { id: 'research', path: `/research?tab=evidence&project=${PROJECT_ID}`, authenticated: true },
   { id: 'faq', path: `/faq?project=${PROJECT_ID}`, authenticated: true },
+  // The decision record, and the only page from which it can be written. It went a
+  // release without browser coverage while carrying the editor, which is how a page
+  // gets to be the one nobody has actually looked at in a browser.
+  { id: 'timeline', path: `/timeline?project=${PROJECT_ID}`, authenticated: true },
 ])
 
 export const VIEWPORTS = Object.freeze([
@@ -248,6 +275,10 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   results: ['empty', 'loading', 'recoverable-error', 'pending'],
   research: ['empty', 'loading', 'recoverable-error', 'pending', 'read-only'],
   faq: [],
+  // `empty` is the state that matters most here: an empty record is what a new project
+  // has, and it is the one moment the bootstrap and the "record an entry" button are
+  // the whole page.
+  timeline: ['empty', 'loading', 'recoverable-error'],
 })
 
 export function buildBrowserMatrix() {
@@ -874,6 +905,7 @@ const LOADING_PATH_BY_ROUTE = Object.freeze({
   candidates: `/api/v2/projects/${PROJECT_ID}/candidates`,
   results: `/api/v2/projects/${PROJECT_ID}/experiment-results`,
   research: `/api/v2/projects/${PROJECT_ID}/research-workspace`,
+  timeline: `/api/v2/projects/${PROJECT_ID}/timeline`,
 })
 
 function strictRoute(method, path, query, resolver) {
@@ -1342,6 +1374,7 @@ const RECOVERABLE_PATH_BY_ROUTE = Object.freeze({
   candidates: `/api/v2/projects/${PROJECT_ID}/candidates`,
   results: `/api/v2/projects/${PROJECT_ID}/experiment-results`,
   research: `/api/v2/projects/${PROJECT_ID}/research-workspace`,
+  timeline: `/api/v2/projects/${PROJECT_ID}/timeline`,
 })
 
 export function createFixtureRouter({ scenario = 'populated', routeId = '' } = {}) {

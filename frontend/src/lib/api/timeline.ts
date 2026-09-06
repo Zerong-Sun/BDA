@@ -6,6 +6,7 @@ import {
   postTimelineEntryApiV2ProjectsProjectIdTimelinePost,
 } from './generated/sdk.gen'
 import { TimelineEntrySchema, TimelineEntryPageSchema, type TimelineEntry } from '../schemas/timeline'
+import type { TimelineEntryCreate, TimelineEntryUpdate } from './generated/types.gen'
 
 export interface TimelineQuery {
   entry_type?: string
@@ -56,23 +57,13 @@ export async function listAllTimeline(
   throw new Error(`Timeline pagination exceeded ${MAX_TIMELINE_PAGES} pages.`)
 }
 
-/** The body both writes take. Built by `features/timeline/timelineEntryForm`, which owns
- *  the field rules; this module owns only the transport. */
-export interface TimelineEntryBody {
-  occurred_at: string
-  entry_type: string
-  decision_ref: string | null
-  lane: string
-  phase: string
-  title: string
-  summary: string
-  body: string
-  outcome: string
-  provenance: Record<string, string[]>
-  alternatives: Array<{ option: string; rejected_because: string }>
-  code_refs: Array<{ path: string; role: string }>
-  tags: string[]
-}
+/** The body both writes take, and it is the *generated* contract rather than a hand-kept
+ *  copy of it. An earlier version of this file declared its own shape and cast it away
+ *  with `as never` at each call site, which is precisely the drift the generated SDK
+ *  exists to prevent: the cast would have kept compiling after a field changed type.
+ *  Built by `features/timeline/timelineEntryForm`, which owns the field rules; this
+ *  module owns only the transport. */
+export type TimelineEntryBody = TimelineEntryCreate
 
 export async function createTimelineEntry(
   projectId: string,
@@ -80,7 +71,7 @@ export async function createTimelineEntry(
 ): Promise<TimelineEntry> {
   const created = await postTimelineEntryApiV2ProjectsProjectIdTimelinePost<true>({
     path: { project_id: projectId },
-    body: body as never,
+    body,
     throwOnError: true,
   })
   return TimelineEntrySchema.parse(created.data)
@@ -96,7 +87,7 @@ export async function updateTimelineEntry(
   const updated = await patchTimelineEntryApiV2TimelineEntryIdPatch<true>({
     path: { entry_id: entryId },
     headers: { 'If-Match': `W/"${version}"` },
-    body: body as never,
+    body: body satisfies TimelineEntryUpdate,
     throwOnError: true,
   })
   return TimelineEntrySchema.parse(updated.data)

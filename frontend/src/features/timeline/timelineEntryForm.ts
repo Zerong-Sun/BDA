@@ -52,6 +52,13 @@ export interface TimelineEntryDraft {
   code_refs: DraftCodeRef[]
   /** Comma or whitespace separated. */
   tags: string
+  /** Entry id, or '' for none. The two horizontal edges between decisions: what this
+   *  one replaced, and which problem it answers. Without them a record written in the UI
+   *  can never supersede anything - and `DecisionTreeView` folding an overturned decision
+   *  into its replacement, and `openQuestions` skipping what has been superseded, both
+   *  read exactly these two fields. */
+  supersedes_id: string
+  caused_by_id: string
 }
 
 /** Field length caps, from the backend column definitions and Pydantic constraints. */
@@ -71,6 +78,7 @@ export type DraftErrorCode =
   | 'bad_timestamp'
   | 'lane_evidence_missing'
   | 'alternative_incomplete'
+  | 'self_link'
 
 export interface DraftError {
   /** Dotted path: `title`, `alternatives.0.rejected_because`, `provenance`. */
@@ -101,6 +109,8 @@ export function emptyDraft(now: Date = new Date()): TimelineEntryDraft {
     alternatives: [],
     code_refs: [],
     tags: '',
+    supersedes_id: '',
+    caused_by_id: '',
   }
 }
 
@@ -128,6 +138,8 @@ export function draftFromEntry(entry: TimelineEntry): TimelineEntryDraft {
     alternatives: entry.alternatives.map((item) => ({ ...item })),
     code_refs: entry.code_refs.map((item) => ({ path: item.path, role: item.role ?? '' })),
     tags: entry.tags.join(', '),
+    supersedes_id: entry.supersedes_id ?? '',
+    caused_by_id: entry.caused_by_id ?? '',
   }
 }
 
@@ -184,7 +196,7 @@ function isDatetimeLocal(value: string): boolean {
  * `check_lane_evidence` does, and it deliberately does not apply to an open decision -
  * writing down a question before answering it must stay possible.
  */
-export function validateDraft(draft: TimelineEntryDraft): DraftError[] {
+export function validateDraft(draft: TimelineEntryDraft, selfId?: string): DraftError[] {
   const errors: DraftError[] = []
 
   if (!draft.title.trim()) errors.push({ field: 'title', code: 'required' })
@@ -222,6 +234,12 @@ export function validateDraft(draft: TimelineEntryDraft): DraftError[] {
       errors.push({ field: `code_refs.${index}.role`, code: 'too_long', limit: LIMITS.code_ref_role })
   }
 
+  // The backend answers a self-link with 422 `timeline_self_link`; an entry that
+  // supersedes itself renders as an infinite fold in any view that follows the chain.
+  for (const field of ['supersedes_id', 'caused_by_id'] as const) {
+    if (draft[field] && draft[field] === selfId) errors.push({ field, code: 'self_link' })
+  }
+
   if (
     draft.entry_type === 'decision' &&
     (draft.lane === 'wet' || draft.lane === 'both') &&
@@ -249,6 +267,8 @@ interface EntryBody {
   alternatives: DraftAlternative[]
   code_refs: DraftCodeRef[]
   tags: string[]
+  supersedes_id: string | null
+  caused_by_id: string | null
 }
 
 /** The wire body. `decision_ref` collapses blank to `null` for the same reason the
@@ -278,5 +298,7 @@ export function draftToBody(draft: TimelineEntryDraft): EntryBody {
       .split(/[,\s]+/)
       .map((tag) => tag.trim())
       .filter(Boolean),
+    supersedes_id: draft.supersedes_id || null,
+    caused_by_id: draft.caused_by_id || null,
   }
 }

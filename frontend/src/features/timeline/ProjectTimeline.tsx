@@ -19,6 +19,7 @@ import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { AppFrame } from '../../components/ui/AppFrame'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { Button } from '../../components/ui/Button'
+import { Skeleton } from '../../components/ui/Skeleton'
 import {
   Select,
   SelectContent,
@@ -29,10 +30,24 @@ import {
 import type { StatusTone } from '../../components/ui/statusTone'
 import { useI18n } from '../../lib/i18n'
 
-/** Radix Select cannot hold an empty-string value, so 'all' and the unphased bucket
+/** Base UI's Select cannot hold an empty-string value, so 'all' and the unphased bucket
  *  get explicit sentinels rather than being smuggled through ''. */
 const ALL = '__all__'
 const NO_PHASE = '__nophase__'
+
+/**
+ * What the closed filter shows.
+ *
+ * `Select.Value` renders the raw *value* unless it is handed a function - it does not go
+ * looking for the matching item's label. Without this the four filters displayed
+ * `__all__` to the user, which is the sentinel leaking through the exact seam it was
+ * introduced to hide.
+ */
+function filterLabel(value: string, fallback: string, labels: Record<string, string>): string {
+  if (!value || value === ALL) return fallback
+  if (value === NO_PHASE) return labels[NO_PHASE] ?? fallback
+  return labels[value] ?? value
+}
 
 /** Three readings of one record, not three records. `tree` answers "why did the project
  *  end up here", `timeline` answers "what happened recently", and `open` answers "what
@@ -246,12 +261,43 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
   const open = useMemo(() => openQuestions(visible), [visible])
 
   if (query.isLoading) {
+    // Skeletons rather than the word "loading", which is what every other page in the
+    // app shows and what the browser matrix asserts on. A bare string here also made the
+    // timeline the one page whose loading state could not be told from a short record.
     return (
-      <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.loading}</AppFrame>
+      <AppFrame panelClassName="p-4">
+        <span className="sr-only">{tl.loading}</span>
+        <div className="space-y-3" aria-hidden="true">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </AppFrame>
     )
   }
   if (query.isError) {
-    return <AppFrame panelClassName="p-4 text-sm text-text-secondary">{tl.loadFailed}</AppFrame>
+    // A retry control, not just a sentence. Without it this state contained no focusable
+    // element at all: a keyboard user landed on a dead page, and the only way out was the
+    // browser's own reload. The focus audit in the browser matrix is what surfaced it.
+    return (
+      <AppFrame panelClassName="p-4">
+        <p className="text-sm text-text-secondary">{tl.loadFailed}</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="mt-3"
+          onClick={() => query.refetch()}
+          disabled={query.isFetching}
+        >
+          {tl.retry}
+        </Button>
+      </AppFrame>
+    )
   }
   if (!entries.length) {
     // The emptiest the record ever is, and therefore the one moment the bootstrap is
@@ -296,6 +342,7 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
           key={editing.entry?.id ?? 'new'}
           projectId={projectId}
           entry={editing.entry}
+          entries={entries}
           onClose={() => setEditing(null)}
         />
       ) : null}
@@ -319,7 +366,9 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
       <div className="mb-4 flex flex-wrap gap-2">
         <Select value={lane || ALL} onValueChange={(value) => setLane(value === ALL ? '' : (value ?? ''))}>
           <SelectTrigger aria-label={tl.allLanes} className="min-w-36">
-            <SelectValue placeholder={tl.allLanes} />
+            <SelectValue placeholder={tl.allLanes}>
+              {(value) => filterLabel(String(value ?? ''), tl.allLanes, tl.lane)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>{tl.allLanes}</SelectItem>
@@ -332,7 +381,9 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
         </Select>
         <Select value={phase || ALL} onValueChange={(value) => setPhase(value === ALL ? '' : (value ?? ''))}>
           <SelectTrigger aria-label={tl.allPhases} className="min-w-36">
-            <SelectValue placeholder={tl.allPhases} />
+            <SelectValue placeholder={tl.allPhases}>
+              {(value) => filterLabel(String(value ?? ''), tl.allPhases, { [NO_PHASE]: tl.noPhase })}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>{tl.allPhases}</SelectItem>
@@ -345,7 +396,9 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
         </Select>
         <Select value={entryType || ALL} onValueChange={(value) => setEntryType(value === ALL ? '' : (value ?? ''))}>
           <SelectTrigger aria-label={tl.allTypes} className="min-w-36">
-            <SelectValue placeholder={tl.allTypes} />
+            <SelectValue placeholder={tl.allTypes}>
+              {(value) => filterLabel(String(value ?? ''), tl.allTypes, tl.type)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>{tl.allTypes}</SelectItem>
@@ -358,7 +411,9 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
         </Select>
         <Select value={outcome || ALL} onValueChange={(value) => setOutcome(value === ALL ? '' : (value ?? ''))}>
           <SelectTrigger aria-label={tl.allOutcomes} className="min-w-36">
-            <SelectValue placeholder={tl.allOutcomes} />
+            <SelectValue placeholder={tl.allOutcomes}>
+              {(value) => filterLabel(String(value ?? ''), tl.allOutcomes, tl.outcome)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>{tl.allOutcomes}</SelectItem>

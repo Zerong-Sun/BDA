@@ -183,3 +183,44 @@ describe('the alternatives editor', () => {
     expect(updateTimelineEntry).not.toHaveBeenCalled()
   })
 })
+
+describe('choosing what an entry replaces', () => {
+  const OTHER: TimelineEntry = { ...ENTRY, id: 'e2', decision_ref: 'D6', title: 'an earlier call' }
+
+  it('offers the project’s other entries, and not itself', () => {
+    renderWithProviders(
+      <TimelineEntryEditor projectId="p1" entry={ENTRY} entries={[ENTRY, OTHER]} onClose={vi.fn()} />,
+    )
+    // Radix renders options on open; the trigger is what must exist unconditionally.
+    expect(screen.getByLabelText('Replaces')).toBeInTheDocument()
+    expect(screen.getByLabelText('Answers')).toBeInTheDocument()
+  })
+
+  it('sends the chosen edge on save', async () => {
+    renderWithProviders(
+      <TimelineEntryEditor
+        projectId="p1"
+        entry={{ ...ENTRY, supersedes_id: 'e2' }}
+        entries={[ENTRY, OTHER]}
+        onClose={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(updateTimelineEntry).toHaveBeenCalled())
+    expect(updateTimelineEntry.mock.calls[0][2].supersedes_id).toBe('e2')
+  })
+
+  it('blocks an entry that supersedes itself before the request goes out', async () => {
+    renderWithProviders(
+      <TimelineEntryEditor
+        projectId="p1"
+        entry={{ ...ENTRY, supersedes_id: ENTRY.id }}
+        entries={[ENTRY, OTHER]}
+        onClose={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByText(/cannot point at itself/i)).toBeInTheDocument())
+    expect(updateTimelineEntry).not.toHaveBeenCalled()
+  })
+})

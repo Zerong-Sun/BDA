@@ -52,8 +52,15 @@ interface Props {
   projectId: string
   /** Absent when recording a new entry. */
   entry?: TimelineEntry
+  /** The project's other entries, so `replaces` / `answers` can point at one. Optional so
+   *  the editor still works where the caller has no list to hand; the two selects then
+   *  offer only "nothing", which is honest rather than broken. */
+  entries?: TimelineEntry[]
   onClose: () => void
 }
+
+/** '' is the wire value for "no edge", and Radix Select cannot hold an empty string. */
+const NO_EDGE = '__none__'
 
 function errorFor(errors: DraftError[], field: string): DraftError | undefined {
   return errors.find((error) => error.field === field)
@@ -65,7 +72,7 @@ function isConflict(error: unknown): boolean {
   return status === 412
 }
 
-export function TimelineEntryEditor({ projectId, entry, onClose }: Props) {
+export function TimelineEntryEditor({ projectId, entry, entries = [], onClose }: Props) {
   const { t, format } = useI18n()
   const tl = t.timeline
   const queryClient = useQueryClient()
@@ -74,7 +81,7 @@ export function TimelineEntryEditor({ projectId, entry, onClose }: Props) {
   )
   const [submitted, setSubmitted] = useState(false)
 
-  const errors = useMemo(() => validateDraft(draft), [draft])
+  const errors = useMemo(() => validateDraft(draft, entry?.id), [draft, entry?.id])
   // Errors appear after the first save attempt, not while someone is still typing the
   // first character of a title.
   const shown = submitted ? errors : []
@@ -92,6 +99,8 @@ export function TimelineEntryEditor({ projectId, entry, onClose }: Props) {
         return tl.errLaneEvidence
       case 'alternative_incomplete':
         return tl.errAlternativeIncomplete
+      case 'self_link':
+        return tl.errSelfLink
     }
   }
 
@@ -269,6 +278,42 @@ export function TimelineEntryEditor({ projectId, entry, onClose }: Props) {
           />
           <span className="text-text-muted">{tl.fieldTagsHelp}</span>
         </label>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {(
+          [
+            ['supersedes_id', tl.fieldSupersedes, tl.fieldSupersedesHelp],
+            ['caused_by_id', tl.fieldCausedBy, tl.fieldCausedByHelp],
+          ] as const
+        ).map(([field, label, help]) => (
+          <label key={field} className="grid gap-1 text-xs text-text-secondary">
+            {label}
+            <Select
+              value={draft[field] || NO_EDGE}
+              onValueChange={(value) => set({ [field]: value === NO_EDGE ? '' : (value ?? '') })}
+            >
+              <SelectTrigger aria-label={label}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_EDGE}>{tl.fieldEdgeNone}</SelectItem>
+                {entries
+                  .filter((candidate) => candidate.id !== entry?.id)
+                  .map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.decision_ref ? `${candidate.decision_ref} · ` : ''}
+                      {candidate.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <span className="text-text-muted">{help}</span>
+            {message(errorFor(shown, field)) ? (
+              <span className="text-warning">{message(errorFor(shown, field))}</span>
+            ) : null}
+          </label>
+        ))}
       </div>
 
       <label className="mt-3 grid gap-1 text-xs text-text-secondary">

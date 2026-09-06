@@ -75,6 +75,8 @@ describe('draftFromEntry / draftToBody round trip', () => {
       alternatives: [{ option: 'the low setting', rejected_because: 'did not move enough to count' }],
       code_refs: [{ path: 'scripts/measure.py', role: 'gate readout' }],
       tags: ['route', 'screening'],
+      supersedes_id: null,
+      caused_by_id: null,
     })
   })
 
@@ -269,5 +271,42 @@ describe('draftToBody', () => {
     expect(draftToBody(draft({ occurred_at: '2026-08-26T16:00' })).occurred_at).toBe(
       '2026-08-26T16:00:00Z',
     )
+  })
+})
+
+describe('the two edges between decisions', () => {
+  it('round-trips replaces and answers', () => {
+    const loaded = draftFromEntry(entry({ supersedes_id: 'older', caused_by_id: 'problem' }))
+    expect(loaded.supersedes_id).toBe('older')
+    expect(loaded.caused_by_id).toBe('problem')
+    const body = draftToBody(loaded)
+    expect(body.supersedes_id).toBe('older')
+    expect(body.caused_by_id).toBe('problem')
+  })
+
+  it('sends null rather than an empty string when there is no edge', () => {
+    const body = draftToBody(draft())
+    expect(body.supersedes_id).toBeNull()
+    expect(body.caused_by_id).toBeNull()
+  })
+
+  it('refuses an entry that points at itself', () => {
+    // The backend answers this with 422 timeline_self_link; a self-superseding entry is
+    // an infinite fold in any view that follows the chain.
+    expect(validateDraft(draft({ supersedes_id: 'e1' }), 'e1')).toEqual([
+      { field: 'supersedes_id', code: 'self_link' },
+    ])
+    expect(validateDraft(draft({ caused_by_id: 'e1' }), 'e1')).toEqual([
+      { field: 'caused_by_id', code: 'self_link' },
+    ])
+  })
+
+  it('allows pointing at a different entry', () => {
+    expect(validateDraft(draft({ supersedes_id: 'other' }), 'e1')).toEqual([])
+  })
+
+  it('does not treat a new entry as self-linking', () => {
+    // No id yet, so nothing to collide with.
+    expect(validateDraft(draft({ supersedes_id: 'e1' }))).toEqual([])
   })
 })

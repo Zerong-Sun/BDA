@@ -32,11 +32,11 @@ import {
 test('builds the complete route, viewport, appearance, and state matrix', () => {
   const matrix = buildBrowserMatrix()
 
-  assert.equal(ROUTES.length, 8)
+  assert.equal(ROUTES.length, 9)
   assert.equal(VIEWPORTS.length, 2)
   assert.equal(APPEARANCES.length, 4)
-  assert.equal(matrix.filter((entry) => entry.scenario === 'populated').length, 64)
-  assert.equal(matrix.length, 112)
+  assert.equal(matrix.filter((entry) => entry.scenario === 'populated').length, 72)
+  assert.equal(matrix.length, 126)
   assert.equal(new Set(matrix.map((entry) => entry.id)).size, matrix.length)
   assert.ok(matrix.every((entry) => entry.reducedMotion === 'reduce'))
   assert.ok(matrix.some((entry) => entry.routeId === 'workflow' && entry.scenario === 'read-only'))
