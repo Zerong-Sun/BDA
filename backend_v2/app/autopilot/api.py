@@ -25,6 +25,7 @@ from .service import (
     require_campaign,
     require_draft,
     start_campaign,
+    take_over_campaign,
 )
 
 router = APIRouter(tags=["autopilot"])
@@ -128,3 +129,29 @@ def post_cancel(
     require_project_permission(session, campaign.project_id, user, "autopilot")
     operation = cancel_campaign(session, campaign, user)
     return AutopilotOperationAccepted(campaign_id=campaign.id, operation_id=operation.id, status=operation.status)
+
+
+@router.post(
+    "/autopilot-campaigns/{campaign_id}/takeover",
+    response_model=AutopilotCampaignResponse,
+    openapi_extra={"x-permission": "autopilot.campaign.takeover"},
+)
+def post_takeover(
+    campaign_id: uuid.UUID,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> AutopilotCampaignResponse:
+    """Take authority over a running campaign's products.
+
+    `If-Match` is required for the same reason every other mutation here requires it: two
+    people taking over the same campaign from two stale tabs must not both believe they
+    did. The protocol stays frozen; what moves is who may edit the runs and candidates
+    the stages produced.
+    """
+    campaign = require_campaign(session, campaign_id)
+    require_project_permission(session, campaign.project_id, user, "autopilot")
+    take_over_campaign(session, campaign, parse_if_match(if_match), user)
+    response.headers["ETag"] = etag(campaign.version)
+    return AutopilotCampaignResponse.model_validate(campaign)

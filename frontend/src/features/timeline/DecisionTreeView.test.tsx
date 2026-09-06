@@ -1,5 +1,5 @@
-import { cleanup, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { TimelineEntrySchema, type TimelineEntry } from '../../lib/schemas/timeline'
 import type { ResearchGoal } from '../../lib/api/researchGoals'
@@ -106,5 +106,42 @@ describe('DecisionTreeView', () => {
   it('says what to do when there is nothing to draw yet', () => {
     renderWithProviders(<DecisionTreeView goals={[]} entries={[]} />)
     expect(screen.getByText(/no goals or decisions to draw yet/i)).toBeInTheDocument()
+  })
+})
+
+describe('editing from the tree', () => {
+  const decision = {
+    ...entry('d'),
+    id: 'd-edit',
+    decision_ref: 'D7',
+    title: 'a gate decision',
+  }
+
+  it('renders read-only when no actions are given', () => {
+    renderWithProviders(<DecisionTreeView goals={[]} entries={[decision]} />)
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+
+  it('offers edit and attach on an unattached decision when actions are given', () => {
+    // The tree is the default view and every seeded decision lands unattached, so the
+    // control that fixes that has to be reachable without switching tabs.
+    renderWithProviders(
+      <DecisionTreeView
+        goals={[]}
+        entries={[decision]}
+        actions={{ projectId: 'p1', onEdit: () => {} }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /goal/i })).toBeInTheDocument()
+  })
+
+  it('hands the entry back to the caller', () => {
+    const onEdit = vi.fn()
+    renderWithProviders(
+      <DecisionTreeView goals={[]} entries={[decision]} actions={{ projectId: 'p1', onEdit }} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd-edit' }))
   })
 })

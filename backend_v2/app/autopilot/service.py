@@ -278,3 +278,59 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
         actor_id=user.id,
     )
     return operation
+
+
+def take_over_campaign(
+    session: Session, campaign: AutopilotCampaign, expected: int, user: User
+) -> AutopilotCampaign:
+    """Hand authority over a campaign's products from the worker to a person.
+
+    Three things happen together, and none of them is optional:
+
+    * the campaign stops advancing on its own (`execute_campaign` refuses a taken-over
+      campaign the same way it refuses a cancelled one);
+    * who and when is recorded on the row;
+    * the ledger gets an entry written by the *user*, not by the service principal, which
+      is what makes "who decided this" answerable afterwards.
+
+    The frozen spec is untouched. What changes hands is authority over the products - the
+    runs, jobs and candidates the stages created - not over the protocol, which stays
+    immutable because the budget and permission checks rest on it.
+
+    Idempotent: taking over an already-taken-over campaign returns it unchanged rather
+    than writing a second handover, so a double-clicked button does not produce two
+    entries claiming two different people took the same thing.
+    """
+    if campaign.version != expected:
+        raise DomainError(
+            "version_conflict", "Autopilot campaign was modified by another request", status_code=412
+        )
+    if campaign.status == "manual_takeover":
+        return campaign
+    if campaign.status == "cancelled":
+        raise DomainError(
+            "autopilot_campaign_cancelled",
+            "A cancelled campaign has nothing left to take over",
+            status_code=409,
+        )
+    campaign.status = "manual_takeover"
+    campaign.taken_over_at = datetime.now(UTC)
+    campaign.taken_over_by = user.id
+    campaign.version += 1
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            writer_user_id=user.id,
+            event_type="campaign.takeover",
+            payload={"taken_over_by": str(user.id)},
+        )
+    )
+    record_audit(
+        session,
+        action="autopilot.campaign.takeover",
+        entity_type="autopilot_campaign",
+        entity_id=campaign.id,
+        project_id=campaign.project_id,
+        actor_id=user.id,
+    )
+    return campaign

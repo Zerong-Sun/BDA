@@ -78,8 +78,20 @@ def create_entry(
 
 
 def update_entry(
-    session: Session, project: Project, entry: ProjectTimelineEntry, payload: TimelineEntryUpdate, expected: int
+    session: Session,
+    project: Project,
+    entry: ProjectTimelineEntry,
+    payload: TimelineEntryUpdate,
+    expected: int,
+    *,
+    actor: User,
 ) -> ProjectTimelineEntry:
+    """Apply a partial change, and record who made it.
+
+    ``actor`` is keyword-only and required rather than defaulted: an edit to a decision
+    record that leaves no trace is exactly the failure the audit log exists to prevent,
+    and a default would let a new call site drop the trail without anyone noticing.
+    """
     if entry.version != expected:
         raise DomainError("version_conflict", "Timeline entry was modified by another request", status_code=412)
     changes = payload.model_dump(exclude_unset=True)
@@ -112,10 +124,35 @@ def update_entry(
     for field, value in changes.items():
         setattr(entry, field, value)
     entry.version += 1
+    record_audit(
+        session,
+        action="timeline.update",
+        entity_type="project_timeline_entry",
+        entity_id=entry.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        actor_id=actor.id,
+    )
     return entry
 
 
-def delete_entry(session: Session, entry: ProjectTimelineEntry, expected: int) -> None:
+def delete_entry(
+    session: Session, project: Project, entry: ProjectTimelineEntry, expected: int, *, actor: User
+) -> None:
+    """Remove an entry, freeing its decision number.
+
+    The audit row is written *before* the delete, while the entity id still resolves to
+    something; afterwards the only record that the number was ever held is this line.
+    """
     if entry.version != expected:
         raise DomainError("version_conflict", "Timeline entry was modified by another request", status_code=412)
+    record_audit(
+        session,
+        action="timeline.delete",
+        entity_type="project_timeline_entry",
+        entity_id=entry.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        actor_id=actor.id,
+    )
     session.delete(entry)

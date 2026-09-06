@@ -1,8 +1,10 @@
 import {
+  getCampaignApiV2AutopilotCampaignsCampaignIdGet,
   postCancelApiV2AutopilotCampaignsCampaignIdCancelPost,
   postConfirmApiV2AutopilotDraftsDraftIdConfirmPost,
   postDraftApiV2AutopilotDraftsPost,
   postStartApiV2AutopilotCampaignsCampaignIdStartPost,
+  postTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPost,
 } from './generated/sdk.gen'
 import type {
   AutopilotCampaignResponse,
@@ -62,4 +64,30 @@ export async function cancelAutopilotCampaign(campaignId: string): Promise<Autop
     throwOnError: true,
   })
   return data
+}
+
+export async function getAutopilotCampaign(campaignId: string): Promise<AutopilotCampaignResponse> {
+  const { data } = await getCampaignApiV2AutopilotCampaignsCampaignIdGet<true>({
+    path: { campaign_id: campaignId },
+    throwOnError: true,
+  })
+  return data as AutopilotCampaignResponse
+}
+
+/** Take authority over a running campaign's products.
+ *
+ *  `If-Match` for the same reason every other mutation carries it: two people taking the
+ *  same campaign over from two stale tabs must not both believe they did. A 412 here means
+ *  reload and look again - the campaign moved, and the state you were acting on is gone.
+ */
+export async function takeOverAutopilotCampaign(
+  campaignId: string,
+  version: number,
+): Promise<AutopilotCampaignResponse> {
+  const { data } = await postTakeoverApiV2AutopilotCampaignsCampaignIdTakeoverPost<true>({
+    path: { campaign_id: campaignId },
+    headers: { 'If-Match': `W/"${version}"` },
+    throwOnError: true,
+  })
+  return data as AutopilotCampaignResponse
 }

@@ -8,7 +8,7 @@ export default function TimelinePage() {
   const { projectId, activeProject } = useProjectContext()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour-id="timeline-page">
       <PageHead eyebrow={t.timeline.subtitle} title={t.timeline.title} />
       {projectId ? (
         <ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} />

@@ -39,6 +39,8 @@ export const en: TranslationDict = {
       rejected: 'rejected',
       sequenceNotice:
         'Sequences stay on the server. Constructs are identified here by a SHA-256 fingerprint.',
+      loadFailed: 'Could not load the construct library.',
+      retry: 'Retry',
     },
     bench: {
       title: 'Bench calculators',

@@ -43,6 +43,8 @@ type CoreTranslationDict = {
       duplicate: string
       rejected: string
       sequenceNotice: string
+      loadFailed: string
+      retry: string
     }
     bench: {
       title: string

@@ -51,6 +51,25 @@ class AutopilotConfirm(BaseModel):
         return self
 
 
+class AutopilotStageResponse(BaseModel):
+    """A stage, and the object on the main trunk it produced.
+
+    `resource_type` / `resource_id` are the whole point of exposing this: without them
+    the Autopilot page can say a stage is running but not where to go and look, which is
+    how an automatic campaign ends up being something you watch rather than something you
+    can inspect and correct.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    stage_key: str
+    position: int
+    status: str
+    resource_type: str | None
+    resource_id: uuid.UUID | None
+
+
 class AutopilotCampaignResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +84,10 @@ class AutopilotCampaignResponse(BaseModel):
     frozen_spec: dict
     started_at: datetime | None
     cancelled_at: datetime | None
+    taken_over_at: datetime | None = None
+    taken_over_by: uuid.UUID | None = None
+    # Bounded by the spec's stage list, so nesting beats a second round trip.
+    stages: list[AutopilotStageResponse] = Field(default_factory=list)
     version: int
     created_at: datetime
 
