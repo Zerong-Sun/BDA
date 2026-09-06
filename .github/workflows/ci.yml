@@ -83,6 +83,8 @@ jobs:
         run: PYTHONPATH=. python backend_v2/scripts/check_decision_coverage.py private/contracts/decision-records.yaml
       - name: Reject unexplained slot reservations
         run: PYTHONPATH=. python backend_v2/scripts/check_plugin_cpu_declarations.py
+      - name: Reject unverifiable cluster claims in job scripts
+        run: PYTHONPATH=. python backend_v2/scripts/check_cluster_claims.py
       - name: Reject model/migration drift
         run: alembic -c backend_v2/alembic.ini check
       - name: Verify downgrade
