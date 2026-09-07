@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..core.statuses import WorkflowNodeStatus, WorkflowRunStatus
+from .gate_schemas import GatePolicy
 
 
 class WorkflowInputBinding(BaseModel):
@@ -34,12 +35,15 @@ class WorkflowNodeInput(BaseModel):
     container_image: str | None = Field(default=None, max_length=500)
     command: str | None = None
     queue: str | None = Field(default=None, max_length=120)
+    configuration: dict = Field(default_factory=dict)
     parameters: dict = Field(default_factory=dict)
     input_bindings: list[WorkflowInputBinding] = Field(default_factory=list, max_length=50)
     position: dict[str, float] | None = None
 
 
 class WorkflowEdgeInput(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=160)
+    gate: GatePolicy = Field(default_factory=GatePolicy)
     source: str
     target: str
     source_port: str | None = Field(default=None, max_length=120)
@@ -116,6 +120,7 @@ class WorkflowNodeUpdate(BaseModel):
     container_image: str | None = Field(default=None, max_length=500)
     command: str | None = None
     queue: str | None = Field(default=None, max_length=120)
+    configuration: dict | None = None
     parameters: dict | None = None
     input_bindings: list[WorkflowInputBinding] | None = Field(default=None, max_length=50)
     position: dict[str, float] | None = None
@@ -135,6 +140,7 @@ class WorkflowNodeResponse(BaseModel):
     queue: str | None
     status: WorkflowNodeStatus
     execution_mode: str = "dispatch"
+    configuration: dict = Field(default_factory=dict)
     parameters: dict
     input_bindings: list = Field(default_factory=list)
     error_message: str | None
@@ -170,6 +176,8 @@ class WorkflowPreflightResponse(BaseModel):
 
 
 class ScriptPreviewCreate(BaseModel):
+    configuration: dict | None = None
+    input_bindings: list[WorkflowInputBinding] | None = None
     compute_backend: str = Field(default="lsf", pattern="^(docker|lsf)$")
     overrides: dict = Field(default_factory=dict)
 

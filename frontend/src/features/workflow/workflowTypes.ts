@@ -17,6 +17,8 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   status: WorkflowNodeStatus
   footer: string
   resource?: 'cpu' | 'gpu' | 'local' | 'manual'
+  inputPorts?: string[]
+  outputPorts?: string[]
   methods?: string[]
   parameters?: Record<string, unknown>
 }

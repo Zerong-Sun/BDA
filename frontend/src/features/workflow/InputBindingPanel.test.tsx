@@ -53,6 +53,7 @@ const node = (key: string, pluginId: string): WorkflowNode =>
     queue: null,
     status: 'draft',
     parameters: {},
+    configuration: {},
     input_bindings: [],
     error_message: null,
     version: 1,

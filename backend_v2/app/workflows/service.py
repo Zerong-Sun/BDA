@@ -19,9 +19,7 @@ def create_workflow(session: Session, project: Project, payload: WorkflowCreate,
     if payload.derived_from_id is not None:
         ancestor = session.get(WorkflowRun, payload.derived_from_id)
         if ancestor is None or ancestor.project_id != project.id:
-            raise DomainError(
-                "workflow_not_found", "The run this one derives from was not found", status_code=404
-            )
+            raise DomainError("workflow_not_found", "The run this one derives from was not found", status_code=404)
     workflow = WorkflowRepository(session).add(
         WorkflowRun(
             project_id=project.id,
@@ -43,12 +41,16 @@ def create_workflow(session: Session, project: Project, payload: WorkflowCreate,
                 command=node.command,
                 queue=node.queue,
                 parameters=node.parameters,
+                configuration=node.configuration,
                 input_bindings=[item.model_dump(mode="json") for item in node.input_bindings],
             )
             for node in payload.nodes
         ]
     )
     session.flush()
+    from .connections import initialize_connections
+
+    initialize_connections(session, workflow)
     record_audit(
         session,
         action="workflow.create",
@@ -93,11 +95,16 @@ def replace_workflow_graph(
                 command=node.command,
                 queue=node.queue,
                 parameters=node.parameters,
+                configuration=node.configuration,
                 input_bindings=[item.model_dump(mode="json") for item in node.input_bindings],
             )
             for node in payload.nodes
         ]
     )
+    session.flush()
+    from .connections import initialize_connections
+
+    initialize_connections(session, workflow)
     workflow.version += 1
     record_audit(
         session,
@@ -127,6 +134,7 @@ def add_node(
         command=payload.command,
         queue=payload.queue,
         parameters=payload.parameters,
+        configuration=payload.configuration,
         input_bindings=[item.model_dump(mode="json") for item in payload.input_bindings],
     )
     session.add(node)
@@ -142,6 +150,16 @@ def update_node(
     workflow: WorkflowRun, node: WorkflowNode, payload: WorkflowNodeUpdate, expected_version: int
 ) -> WorkflowNode:
     _require_editable(workflow, expected_version)
+    if payload.configuration is not None:
+        old_script = (node.configuration or {}).get("script")
+        if old_script and old_script != payload.configuration.get("script"):
+            payload.configuration = {
+                **payload.configuration,
+                "script_history": [*(node.configuration or {}).get("script_history", []), old_script],
+            }
+        from .assistance import validate_configuration
+
+        validate_configuration(payload.configuration)
     values = payload.model_dump(exclude_unset=True, exclude={"position"})
     # The graph is a JSON column, so it needs JSON-safe values (UUIDs as strings);
     # the ORM attributes want native types. Dump twice rather than coercing.
@@ -166,6 +184,8 @@ def update_node(
 def delete_node(session: Session, workflow: WorkflowRun, node: WorkflowNode, expected_version: int) -> None:
     _require_editable(workflow, expected_version)
     key = node.node_key
+    for sibling in WorkflowRepository(session).nodes(workflow.id):
+        sibling.input_bindings = [b for b in sibling.input_bindings if b.get("from_node") != key]
     graph = dict(workflow.graph)
     graph["nodes"] = [item for item in graph.get("nodes", []) if item.get("key") != key]
     graph["edges"] = [
@@ -180,7 +200,12 @@ def update_layout(workflow: WorkflowRun, payload: WorkflowLayoutUpdate, expected
     if workflow.version != expected_version:
         raise DomainError("version_conflict", "Workflow was modified by another request", status_code=412)
     graph = dict(workflow.graph)
-    graph["layout"] = payload.model_dump(mode="json")
+    graph["layout"] = {"nodes": payload.nodes}
+    positions = {str(item.get("id")): item.get("position") for item in payload.nodes}
+    graph["nodes"] = [
+        {**item, **({"position": positions[item.get("key")]} if item.get("key") in positions else {})}
+        for item in graph.get("nodes", [])
+    ]
     workflow.graph = graph
     workflow.version += 1
     return graph

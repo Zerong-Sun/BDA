@@ -63,6 +63,7 @@ const CANVAS_STATUS: Record<ApiWorkflowNodeStatus, WorkflowNodeStatus> = {
   running: 'running',
   collecting: 'running',
   cancel_requested: 'running',
+  skipped: 'skipped',
   succeeded: 'completed',
   failed: 'failed',
   cancelled: 'skipped',
@@ -168,11 +169,12 @@ export function mapApiGraphToGraph(apiNodes: WorkflowNode[], apiEdges: WorkflowE
   return {
     nodes: mapApiNodesToGraph(apiNodes),
     edges: apiEdges.map((edge, index) => ({
-      id: `edge-${index}-${edge.source}-${edge.target}`,
+      id: edge.id ?? `edge-${index}-${edge.source}-${edge.target}`,
+      data: { gate: edge.gate },
       source: apiNodes.find((node) => node.node_key === edge.source)?.id ?? edge.source,
       target: apiNodes.find((node) => node.node_key === edge.target)?.id ?? edge.target,
-      sourceHandle: 'output',
-      targetHandle: 'input',
+      sourceHandle: edge.source_port ?? 'output',
+      targetHandle: edge.target_port ?? 'input',
       type: 'workflowEdge',
       markerEnd: { type: MarkerType.ArrowClosed, color: themeColor('--accent', '#D08A2A') },
       animated: false,

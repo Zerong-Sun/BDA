@@ -221,6 +221,8 @@ def publish_outbox(batch_size: int = 100) -> dict:
         # fan-out: `job.settled` is read by campaigns and by the copilot's agent
         # runs, and neither is the other's business.
         topic_tasks: dict[str, str | tuple[str, ...]] = {
+            "gate.evaluate": "bda_v2.evaluate_workflow_gate",
+            "gate.resume": "bda_v2.evaluate_workflow_gate",
             "job.dispatch": "bda_v2.dispatch_job",
             "job.cancel": "bda_v2.cancel_job",
             "job.collect": "bda_v2.collect_job",
@@ -770,6 +772,9 @@ def _apply_parsed_outputs(
             )
         )
 
+    from ..workflows.gate_runtime import capture_results
+    capture_results(session, job, artifacts, parsed, storage)
+
 
 @celery_app.task(name="bda_v2.cancel_job", bind=True, max_retries=3)
 def cancel_job(self, job_id: str) -> dict:
@@ -968,3 +973,9 @@ def compute_draft_confirm(draft_id: str) -> dict:
         draft.status = "submitted"
         draft.version += 1
         return {"draft_id": draft_id, "status": "accepted", "job_id": str(job.id)}
+
+
+@celery_app.task(name="bda_v2.evaluate_workflow_gate")
+def evaluate_workflow_gate(gate_id: str):
+    from ..workflows.gate_runtime import execute_gate
+    execute_gate(gate_id)

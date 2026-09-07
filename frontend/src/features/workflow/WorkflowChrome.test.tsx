@@ -78,7 +78,8 @@ describe('workflow chrome safeguards', () => {
         selectedNode={{
           id: 'node_test', workflow_run_id: 'run_test', node_key: 'fold', node_type: 'model',
           model_plugin: 'test-plugin', model_plugin_id: null, container_image: null, command: null,
-          queue: null, status: 'succeeded', parameters: {}, input_bindings: [], error_message: null, version: 1,
+          queue: null, status: 'succeeded', parameters: {},
+    configuration: {}, input_bindings: [], error_message: null, version: 1,
           created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
         }}
       />,
