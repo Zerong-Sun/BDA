@@ -59,9 +59,9 @@ export interface SubmitWorkflowResponse {
   status: SubmitStatus
 }
 
-export function submitWorkflowRun(workflowRunId: string): Promise<SubmitWorkflowResponse> {
+export function submitWorkflowRun(workflowRunId: string, workflowVersion?: number, review?: { backend: string; fingerprints: Record<string, string> }): Promise<SubmitWorkflowResponse> {
   return submitWorkflowApiV2WorkflowRunsWorkflowIdSubmissionsPost<true>({ path: { workflow_id: workflowRunId },
-    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: {}, throwOnError: true,
+    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { workflow_version: workflowVersion, ...(review ? { compute_backend: review.backend, review_fingerprints: review.fingerprints } : {}) }, throwOnError: true,
   }).then(({ data: submission }) => ({ ...submission, workflow_run_id: workflowRunId }))
 }
 

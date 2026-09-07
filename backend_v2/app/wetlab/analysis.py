@@ -75,9 +75,7 @@ def _decimate(xs: Any, ys: Any, limit: int = TRACE_POINTS) -> list[list[float]]:
 
 
 def _load_artifact(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> Artifact:
-    artifact = session.scalar(
-        select(Artifact).where(Artifact.id == artifact_id, Artifact.deleted_at.is_(None))
-    )
+    artifact = session.scalar(select(Artifact).where(Artifact.id == artifact_id, Artifact.deleted_at.is_(None)))
     if artifact is None or artifact.project_id != project_id:
         raise DomainError(
             "artifact_not_found",
@@ -155,7 +153,17 @@ def analyse_bli(
     a recorded number.
     """
     artifact = _load_artifact(session, project_id, artifact_id)
-    curves = bli.parse_fortebio_csv(_read(artifact))
+    measurement, summary = analyse_bli_bytes(_read(artifact), sample_id=sample_id, t_assoc=t_assoc, t_dissoc=t_dissoc)
+    row = _record(
+        session, project_id=project_id, user_id=user_id, artifact=artifact, candidate_id=candidate_id, **measurement
+    )
+    return row, summary
+
+
+def analyse_bli_bytes(
+    data: bytes, *, sample_id: str | None = None, t_assoc: float | None = None, t_dissoc: float | None = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    curves = bli.parse_fortebio_csv(data)
     if not curves:
         raise DomainError("bli_no_curves", "That file contained no usable curves.", status_code=422)
 
@@ -174,11 +182,7 @@ def analyse_bli(
     primary = fit.get("joint") or fit.get("standard") or {}
     kd = primary.get("kd") if isinstance(primary, dict) else None
 
-    row = _record(
-        session,
-        project_id=project_id,
-        user_id=user_id,
-        artifact=artifact,
+    measurement = dict(
         experiment_type="bli_affinity",
         params={
             "sample_id": chosen,
@@ -190,7 +194,6 @@ def analyse_bli(
         analysis_version=bli.BLI_ANALYSIS_VERSION,
         value=float(kd) if isinstance(kd, int | float) else None,
         unit="nM" if isinstance(kd, int | float) else None,
-        candidate_id=candidate_id,
     )
     summary = {
         "sample_id": chosen,
@@ -210,7 +213,7 @@ def analyse_bli(
             for curve in sorted(grouped[chosen], key=lambda item: item.conc_nM, reverse=True)
         ],
     }
-    return row, summary
+    return measurement, summary
 
 
 def analyse_akta(
@@ -224,7 +227,15 @@ def analyse_akta(
 ) -> tuple[ExperimentResult, dict[str, Any]]:
     """Detect peaks in an AKTA Unicorn export and record the peak table."""
     artifact = _load_artifact(session, project_id, artifact_id)
-    parsed = akta.parse_akta_zip(_read(artifact))
+    measurement, summary = analyse_akta_bytes(_read(artifact), channel=channel)
+    row = _record(
+        session, project_id=project_id, user_id=user_id, artifact=artifact, candidate_id=candidate_id, **measurement
+    )
+    return row, summary
+
+
+def analyse_akta_bytes(data: bytes, *, channel: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    parsed = akta.parse_akta_zip(data)
     channels = parsed["channels"]
     if not channels:
         raise DomainError(
@@ -249,35 +260,26 @@ def analyse_akta(
     fractions = akta.fraction_ranges(akta.find_fraction_events(parsed["events"]))
 
     largest = max((peak.area for peak in peaks), default=None)
-    row = _record(
-        session,
-        project_id=project_id,
-        user_id=user_id,
-        artifact=artifact,
+    measurement = dict(
         experiment_type="akta_purification",
         params={"channel": chosen, "channels_available": sorted(channels)},
         results={
             "peaks": rows,
-            "fractions": [
-                {"start": start, "end": end, "label": label} for start, end, label in fractions
-            ],
+            "fractions": [{"start": start, "end": end, "label": label} for start, end, label in fractions],
             "meta": parsed.get("meta", {}),
         },
         analysis_version=akta.AKTA_ANALYSIS_VERSION,
         value=float(largest) if largest is not None else None,
         unit="mAU*mL" if largest is not None else None,
-        candidate_id=candidate_id,
     )
-    return row, {
+    return measurement, {
         "channel": chosen,
         "channels_available": sorted(channels),
         "peak_count": len(rows),
         "peaks": rows,
         "unit": channels[chosen].unit,
         "trace": _decimate(channels[chosen].vols, channels[chosen].amps),
-        "fractions": [
-            {"start": start, "end": end, "label": label} for start, end, label in fractions
-        ],
+        "fractions": [{"start": start, "end": end, "label": label} for start, end, label in fractions],
     }
 
 
@@ -296,12 +298,18 @@ def analyse_enzyme(
     also shifted the samples would be counted twice once rates are corrected.
     """
     artifact = _load_artifact(session, project_id, artifact_id)
-    plate = calculators.parse_tecan_xlsx(_read(artifact))
+    measurement, summary = analyse_enzyme_bytes(_read(artifact), subtract_background=subtract_background)
+    row = _record(
+        session, project_id=project_id, user_id=user_id, artifact=artifact, candidate_id=candidate_id, **measurement
+    )
+    return row, summary
+
+
+def analyse_enzyme_bytes(data: bytes, *, subtract_background: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
+    plate = calculators.parse_tecan_xlsx(data)
     wells = plate.get("wells") or {}
     if not wells:
-        raise DomainError(
-            "enzyme_no_wells", "That workbook contained no readable wells.", status_code=422
-        )
+        raise DomainError("enzyme_no_wells", "That workbook contained no readable wells.", status_code=422)
 
     corrected, background = calculators.sub_blank(wells, enabled=subtract_background)
     fits = {
@@ -310,11 +318,7 @@ def analyse_enzyme(
     }
     slopes = [fit["slope"] for fit in fits.values() if fit.get("slope") is not None]
 
-    row = _record(
-        session,
-        project_id=project_id,
-        user_id=user_id,
-        artifact=artifact,
+    measurement = dict(
         experiment_type="enzyme_activity",
         params={
             "subtract_background": subtract_background,
@@ -330,9 +334,8 @@ def analyse_enzyme(
         analysis_version=f"calculators/{bli.BLI_ANALYSIS_VERSION}",
         value=max(slopes) if slopes else None,
         unit="dOD/min" if slopes else None,
-        candidate_id=candidate_id,
     )
-    return row, {
+    return measurement, {
         "well_count": len(wells),
         "fits": fits,
         "background_subtracted": background is not None,

@@ -156,6 +156,12 @@ def create_submission(
     repo = ComputeRepository(session)
     scope = f"workflow:{workflow.id}:submit"
     digest = _payload_hash(workflow.id, payload)
+    session.scalar(
+        select(WorkflowRun)
+        .where(WorkflowRun.id == workflow.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     existing = repo.idempotency(user.id, scope, idempotency_key)
     if existing:
         if existing.request_hash != digest:
@@ -169,9 +175,31 @@ def create_submission(
             )
         return submission, repo.jobs_for_submission(submission.id)
 
+    if payload.workflow_version is not None and payload.workflow_version != workflow.version:
+        raise DomainError(
+            "version_conflict",
+            "The workflow changed after preview; review the new scripts before submitting",
+            status_code=412,
+        )
+    if workflow.status != "draft":
+        raise DomainError(
+            "workflow_locked",
+            "This workflow was already submitted; inspect its jobs or create a new run",
+            status_code=409,
+        )
     nodes = WorkflowRepository(session).nodes(workflow.id)
     if not nodes:
         raise DomainError("workflow_empty", "Workflow has no executable nodes", status_code=409)
+    from ..registry.models import ModelPlugin
+
+    # Hold declarations stable until their snapshots and jobs have been persisted.
+    list(session.scalars(select(ModelPlugin).where(ModelPlugin.id.in_(
+        [node.model_plugin_id for node in nodes if node.model_plugin_id]
+    )).order_by(ModelPlugin.id).with_for_update(read=True).execution_options(populate_existing=True)))
+    if payload.review_fingerprints is not None:
+        executable_ids = {node.id for node in nodes if node.execution_mode != "manual"}
+        if set(payload.review_fingerprints) != executable_ids:
+            raise DomainError("preview_incomplete", "Review every executable node before submitting", status_code=412)
     _record_lineage(session, workflow, nodes)
     settings = get_settings()
     backend = payload.compute_backend or settings.compute_backend
@@ -189,7 +217,7 @@ def create_submission(
     # a known blocker is how unvalidated commands used to reach the cluster.
     from ..workflows.preflight import evaluate_preflight
 
-    blockers, _, _ = evaluate_preflight(session, workflow)
+    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend=backend)
     if blockers:
         raise DomainError(
             "workflow_preflight_failed",
@@ -253,6 +281,15 @@ def create_submission(
                 status_code=409,
                 errors=exc.blockers,
             ) from exc
+        if payload.review_fingerprints is not None:
+            from .review import render_review
+
+            _, current_review = render_review(node, plugin, backend, {
+                "schema_version": "1", "parameters": node.parameters,
+                "inputs": resolved_inputs, "pending_inputs": pending_inputs,
+            })
+            if payload.review_fingerprints[node.id] != current_review:
+                raise DomainError("preview_changed", "Plugin, inputs or execution settings changed; refresh the preview", status_code=412)
         job = Job(
             submission_id=submission.id,
             workflow_run_id=workflow.id,
@@ -394,9 +431,7 @@ def _original_timeout(job: Job) -> timedelta:
     return budget if budget > timedelta(minutes=5) else DEFAULT_JOB_TIMEOUT
 
 
-def _bind_upstream_inputs(
-    session: Session, job: Job, parent_keys: set[str], by_key: dict[str, Job]
-) -> bool:
+def _bind_upstream_inputs(session: Session, job: Job, parent_keys: set[str], by_key: dict[str, Job]) -> bool:
     """Fold succeeded parents' outputs into ``job``'s input manifest.
 
     Returns False (and fails the job) when a declared upstream binding produced nothing,

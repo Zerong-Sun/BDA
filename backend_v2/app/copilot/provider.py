@@ -47,7 +47,11 @@ def completion_message(
     endpoint = provider.endpoint.rstrip("/")
     if not endpoint.endswith("/chat/completions"):
         endpoint += "/chat/completions"
-    body: dict[str, Any] = {"model": provider.model, "messages": messages, **provider.config}
+    body: dict[str, Any] = {
+        "model": provider.model,
+        "messages": messages,
+        **{key: value for key, value in provider.config.items() if key != "platform_default"},
+    }
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"

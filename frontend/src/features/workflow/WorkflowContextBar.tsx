@@ -51,7 +51,7 @@ export function WorkflowContextBar({
     (node) =>
       String(node.labels.accelerator ?? node.labels.resource_type ?? '').toLowerCase().includes('gpu') &&
       node.enabled &&
-      node.health_status !== 'unhealthy',
+      node.health_status === 'healthy',
   )
   const computeOffline = clusterHealth?.connected !== true && !gpuAvailable
   const activeRun = projectWorkflowRuns.find((r) => r.id === workflowRunId)

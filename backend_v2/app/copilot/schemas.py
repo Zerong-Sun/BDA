@@ -107,6 +107,7 @@ class SkillResponse(BaseModel):
 
 
 class RoutePlanCreate(BaseModel):
+    use_model: bool = False
     project_id: uuid.UUID
     goal: str = Field(min_length=1, max_length=5000)
 

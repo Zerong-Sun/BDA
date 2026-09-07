@@ -4,11 +4,13 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
+from ..core.config import get_settings
 from ..core.database import SessionFactory, get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
@@ -26,6 +28,7 @@ from .capabilities import (
 from .models import CopilotAgentRun, CopilotConfig
 from .provider import complete as complete_with_provider
 from .provider import credential_available
+from .provider_selection import select_provider
 from .repository import CopilotRepository
 from .schemas import (
     AgentRunAccepted,
@@ -71,12 +74,17 @@ SKILLS = [SkillResponse(**item) for item in COPILOT_CAPABILITIES]
 
 
 def _config_response(session: Session, row: CopilotConfig) -> CopilotConfigResponse:
-    provider = CopilotRepository(session).llm_provider(row.llm_provider_id) if row.llm_provider_id else None
+    provider = select_provider(session, project_id=row.project_id)
     return CopilotConfigResponse.model_validate(row).model_copy(
         update={
-            "api_key_configured": bool(
-                provider and provider.enabled and credential_available(provider.credential_ref)
-            )
+            "settings": {
+                **(row.settings or {}),
+                "llm_api_base": provider.endpoint if provider else "",
+                "llm_model": provider.model if provider else "",
+                "inherited_provider": row.llm_provider_id is None,
+                "browser_api_key_allowed": not get_settings().is_production,
+            },
+            "api_key_configured": bool(provider and provider.enabled and credential_available(provider.credential_ref)),
         }
     )
 
@@ -103,12 +111,8 @@ def post_chat(
         )
     project = require_project(session, payload.project_id, user)
     config = CopilotRepository(session).config(project.id)
-    if (
-        payload.skill is not None
-        and payload.skill
-        not in normalize_capabilities(
-            list(config.enabled_skills) if config else None
-        )
+    if payload.skill is not None and payload.skill not in normalize_capabilities(
+        list(config.enabled_skills) if config else None
     ):
         raise DomainError(
             "copilot_capability_disabled",
@@ -234,7 +238,16 @@ def get_config(
     require_project(session, project_id, user)
     row = CopilotRepository(session).config(project_id)
     if row is None:
-        raise DomainError("copilot_config_not_found", "Copilot config was not found", status_code=404)
+        now = datetime.now(UTC)
+        row = CopilotConfig(
+            id=project_id,
+            project_id=project_id,
+            version=0,
+            settings={},
+            enabled_skills=["research"],
+            created_at=now,
+            updated_at=now,
+        )
     response.headers["ETag"] = etag(row.version)
     return _config_response(session, row)
 
@@ -271,8 +284,7 @@ def test_config(
     user: User = Depends(require_command),
 ) -> CopilotConfigTestResponse:
     require_project(session, project_id, user)
-    config = CopilotRepository(session).config(project_id)
-    provider = CopilotRepository(session).llm_provider(config.llm_provider_id) if config and config.llm_provider_id else None
+    provider = select_provider(session, project_id=project_id)
     if provider is None or not provider.enabled:
         return CopilotConfigTestResponse(connected=False, model="", reason="No enabled LLM provider is configured")
     try:
@@ -334,7 +346,7 @@ def _run_response(session: Session, run: CopilotAgentRun) -> AgentRunResponse:
     spend upward would make its own `cost_usd_cents` untrue, and that column is
     what a person reads when asking where the money went.
     """
-    return _run_response(session, run).model_copy(
+    return AgentRunResponse.model_validate(run).model_copy(
         update={"subtree_cost_usd_cents": agent_runs.tree_cost_usd_cents(session, run)}
     )
 
@@ -358,9 +370,7 @@ def start_agent_run(
 ) -> AgentRunAccepted:
     project = require_project(session, payload.project_id, user)
     run, operation = start_agent_run_service(session, project, user, payload)
-    return AgentRunAccepted(
-        run=_run_response(session, run), operation_id=operation.id
-    )
+    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
 
 
 @router.get("/projects/{project_id}/agent-runs", response_model=AgentRunPage)

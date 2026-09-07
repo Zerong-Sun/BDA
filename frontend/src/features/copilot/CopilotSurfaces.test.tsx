@@ -94,6 +94,8 @@ beforeEach(() => {
     llm_api_base: 'https://api.example.test',
     llm_model: 'model-one',
     api_key_configured: true,
+    browser_api_key_allowed: true,
+    inherited_provider: false,
     api_key_preview: 'sk-…1234',
     system_prompt: 'Use reviewed evidence.',
   } as never)
@@ -212,9 +214,25 @@ describe('ClusterDrafts', () => {
 })
 
 describe('CopilotSettings', () => {
+  it('discards model and secret drafts when switching projects', async () => {
+    const ui = renderSurface(<CopilotSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Advanced model settings' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Model' }), { target: { value: 'old-project-draft' } })
+    fireEvent.change(document.querySelector('#copilot-api-key')!, { target: { value: 'fixture-unsaved-secret' } })
+    const first = vi.mocked(useProjectContext).mock.results[0].value
+    vi.mocked(useProjectContext).mockReturnValue({ ...first, projectId: 'project-two' })
+    ui.rerender(<QueryClientProvider client={ui.client}><HashRouter><CopilotSettings /></HashRouter></QueryClientProvider>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Advanced model settings' }))
+    expect(screen.getByRole('textbox', { name: 'Model' })).toHaveValue('model-one')
+    expect(document.querySelector('#copilot-api-key')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+    await waitFor(() => expect(updateCopilotConfig).toHaveBeenCalledWith('project-two', expect.not.objectContaining({ llm_api_key: 'fixture-unsaved-secret' })))
+  })
+
   it('uses registry form controls and preserves masked save/test outcomes', async () => {
     renderSurface(<CopilotSettings />)
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Advanced model settings' }))
     const baseUrl = await screen.findByRole('textbox', { name: 'API base URL' })
     const prompt = screen.getByRole('textbox', { name: 'Project prompt preferences (cannot override evidence or safety policy)' })
     const model = screen.getByRole('textbox', { name: 'Model' })
@@ -244,7 +262,8 @@ describe('CopilotSettings', () => {
     const onActionsReady = vi.fn()
     renderSurface(<CopilotSettings hideActions onActionsReady={onActionsReady} />)
 
-    await screen.findByRole('textbox', { name: 'API base URL' })
+    await screen.findByRole('button', { name: 'Advanced model settings' })
+    expect(screen.queryByRole('textbox', { name: 'API base URL' })).not.toBeInTheDocument()
     await waitFor(() =>
       expect(onActionsReady.mock.calls.at(-1)?.[0]).toMatchObject({
         savePending: false,

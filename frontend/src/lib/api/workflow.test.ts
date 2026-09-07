@@ -5,6 +5,16 @@ import { server } from '../../test/mocks/handlers'
 import { submitWorkflowNode, submitWorkflowRun } from './workflow'
 
 describe('workflow submission backend selection', () => {
+  it('submits the reviewed backend, workflow version and every node fingerprint', async () => {
+    let body: unknown
+    server.use(http.post('/api/v2/workflow-runs/reviewed/submissions', async ({ request }) => {
+      body = await request.json()
+      return HttpResponse.json({ id: 'submission', status: 'pending', jobs: [] })
+    }))
+    await submitWorkflowRun('reviewed', 7, { backend: 'lsf', fingerprints: { node: 'a'.repeat(64) } })
+    expect(body).toEqual({ workflow_version: 7, compute_backend: 'lsf', review_fingerprints: { node: 'a'.repeat(64) } })
+  })
+
   it('uses the server default unless a node submission explicitly overrides it', async () => {
     const requestBodies: Array<Record<string, unknown>> = []
     server.use(

@@ -38,8 +38,8 @@ export function currentStageIndex(
   if (!hasProject) return 0
   if (overview?.target_readiness?.ready_for_workflow !== true) return 0
   if ((overview?.experiment_result_count ?? 0) > 0) return 4
+  if ((overview?.funnel.ordered ?? 0) > 0) return 3
   if ((overview?.funnel.generated ?? 0) > 0) return 2
-  if ((overview?.funnel.ordered ?? 0) > 0 || (overview?.funnel.generated ?? 0) > 0) return 1
   return 1
 }
 

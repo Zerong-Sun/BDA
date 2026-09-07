@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useSearchParams } from 'react-router'
 import { ChatCircleIcon } from '@phosphor-icons/react'
+import { CopilotAgentRuns } from '../features/copilot/CopilotAgentRuns'
 import { NextStep } from '../components/ui/NextStep'
 import { Button } from '../components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs'
@@ -18,13 +19,21 @@ import { isDemoProject } from '../features/tour'
 export function ResearchPage() {
   const { language, t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [researchAgentOpen, setResearchAgentOpen] = useState(false)
   const rawTab = searchParams.get('tab')
   const { projectId, activeProject } = useProjectContext()
   const isPd1Demo = Boolean(activeProject && isDemoProject(activeProject))
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
   const setCopilotSelectedEntityIds = useAppStore((state) => state.setCopilotSelectedEntityIds)
-  const tab = normalizeResearchTab(rawTab)
+  const tab = rawTab ? normalizeResearchTab(rawTab) : 'goals'
+  const group = tab === 'references' || tab === 'structures' || tab === 'data' ? 'evidence' : tab
+  const groups = [
+    { key: 'goals', label: language === 'zh' ? '目标与问题' : 'Goals & questions' },
+    { key: 'evidence', label: language === 'zh' ? '文献与证据' : 'Literature & evidence' },
+    { key: 'methods', label: language === 'zh' ? '实验方案' : 'Experiment plan' },
+    { key: 'timeline', label: language === 'zh' ? '决策记录' : 'Decision record' },
+  ] as const
   useEffect(() => {
     if (rawTab === 'campaigns' || rawTab === tab) return
     const next = new URLSearchParams(searchParams)
@@ -52,7 +61,7 @@ export function ResearchPage() {
   return (
     <div className="mx-auto max-w-[1180px]">
       <Tabs
-        value={tab}
+        value={group}
         onValueChange={(value) => selectTab(value as ResearchTab)}
         data-tour-id="research-tabs"
       >
@@ -89,24 +98,31 @@ export function ResearchPage() {
           <TabsList
             aria-label={t.research.page.tabsLabel}
             variant="line"
-            className="mt-4 grid !h-auto w-full grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-6"
+            className="mt-4 grid !h-auto w-full grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-4"
           >
-            {RESEARCH_TABS.map((item, index) => (
-              <TabsTrigger
-                key={item}
-                value={item}
-                aria-label={tabConfig[item].label}
-                className="h-auto min-w-0 justify-start px-3 py-2 text-left"
-              >
-                <span aria-hidden="true" className="text-[10px] font-semibold text-primary">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span className="truncate">{tabConfig[item].label}</span>
+            {groups.map((item) => (
+              <TabsTrigger key={item.key} value={item.key} aria-label={item.label} className="h-auto justify-start px-3 py-2">
+                {item.label}
               </TabsTrigger>
             ))}
           </TabsList>
         </header>
-        <TabsContent value={tab}>
+        {group === 'evidence' ? <nav className="mb-4 flex flex-wrap gap-2" aria-label={language === 'zh' ? '证据资料类型' : 'Evidence categories'}>
+          {RESEARCH_TABS.filter((item) => ['evidence', 'references', 'structures', 'data'].includes(item)).map((item) => (
+            <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
+          ))}
+        </nav> : null}
+        {projectId ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-soft p-4">
+          <p className="text-sm text-text-secondary">{language === 'zh'
+            ? ({ goals: '先明确目标、约束和成功标准，再拆出需要回答的问题。', evidence: '区分已读正文、摘要与待核实资料。每个结论都应能回到证据。', methods: '比较方案并确认输入。创建工作流后，还需通过执行检查。', timeline: '沿目标查看计算、实验和判断；点击卡片展开证据与详细记录。' }[group])
+            : ({ goals: 'Define objectives, constraints and success criteria, then identify open questions.', evidence: 'Distinguish full text, abstracts and unverified sources. Trace conclusions to evidence.', methods: 'Compare methods and confirm inputs. A workflow draft still needs execution checks.', timeline: 'Follow goals through computations, experiments and decisions. Open cards for evidence.' }[group])}</p>
+          {group === 'methods' ? <Button render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
+          {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
+        </div> : null}
+        {projectId && group === 'evidence' && researchAgentOpen ? <CopilotAgentRuns key={projectId} skills={['project-read', 'research-read', 'knowledge-authoring', 'literature-search']} initialGoal={language === 'zh'
+          ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，调用文献检索并等待完成，读取可获取的正文或摘要，保存带引用的待审核研究笔记，列出信息缺口和实验方案建议。只保存草案，不审核结论、不提交计算任务。请使用中文汇报。'
+          : 'Research this project: read its brief, search literature, wait for retrieval, read available full text or abstracts, and save cited pending-review knowledge notes. Identify evidence gaps and propose experiments. Save drafts only; do not approve conclusions or submit compute jobs.'} /> : null}
+        <TabsContent value={group}>
           {!projectId ? (
             <Frame>
               <FramePanel>
@@ -122,7 +138,7 @@ export function ResearchPage() {
               </FramePanel>
             </Frame>
           ) : tab === 'timeline' ? (
-            <div data-tour-id="research-timeline"><ProjectTimeline projectId={projectId} /></div>
+            <div data-tour-id="research-timeline"><ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} /></div>
           ) : <div data-tour-id="research-workspace"><ResearchWorkspacePanel view={tab} /></div>}
         </TabsContent>
       </Tabs>

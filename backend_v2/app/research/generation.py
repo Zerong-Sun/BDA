@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -522,9 +523,19 @@ def finalize_research_generation(session: Session, row: ResearchGeneration) -> R
     issues: list[dict[str, str]] = []
     evidence_tools = EvidenceToolService(max_calls=60)
     if request.get("use_external_evidence", True):
+        from .search_query import search_topic
+
+        try:
+            discovery_topic = search_topic(session, project.id, topic)
+        except (DomainError, ValueError, httpx.HTTPError) as exc:
+            row.status = "failed"
+            row.error = str(exc)[:1000]
+            row.version += 1
+            evidence_tools.close()
+            return row
         issues.extend(_verify_workspace_entities(workspace, evidence_tools))
         external_references, external_issues = _external_references(
-            topic,
+            discovery_topic,
             evidence_tools,
             evidence_cutoff=request.get("evidence_cutoff"),
         )

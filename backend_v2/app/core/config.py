@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     upload_url_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, ge=1024)
     compute_backend: str = "docker"
+    # Production always requires proof; development can opt in for acceptance runs.
+    compute_require_runtime_proof: bool = False
     docker_host: str = "tcp://localhost:2376"
     docker_tls_ca: str | None = None
     docker_tls_cert: str | None = None

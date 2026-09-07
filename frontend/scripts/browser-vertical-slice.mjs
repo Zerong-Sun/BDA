@@ -1096,7 +1096,7 @@ async function exerciseCandidateGrid(page, diagnostics) {
 }
 
 async function exerciseResearchGrids(page, diagnostics) {
-  const dataTab = page.getByRole('tab', { name: /Data/i })
+  const dataTab = page.getByRole('navigation', { name: 'Evidence categories' }).getByRole('button', { name: /Data/i })
   await dataTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await dataTab.click()
   const tables = page.locator('[data-slot="data-grid-table"]')
@@ -1123,7 +1123,7 @@ async function exerciseResearchGrids(page, diagnostics) {
   if ((await datasetTable.locator('tbody tr[data-row-id]').count()) !== 1) {
     throw new Error('Dataset search did not restore the matching bilingual fixture row.')
   }
-  const methodsTab = page.getByRole('tab', { name: /Research Methods/i })
+  const methodsTab = page.getByRole('tab', { name: 'Experiment plan' })
   await methodsTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await methodsTab.click()
   await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
@@ -1246,6 +1246,36 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       'Workflow node builder',
       diagnostics,
     )
+    const submissionRequests = []
+    const recordSubmission = (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/submissions')) submissionRequests.push(request)
+    }
+    page.on('request', recordSubmission)
+    await page.getByRole('button', { name: 'Submit workflow', exact: true }).click()
+    const review = page.getByRole('dialog', { name: 'Review compute submission' })
+    await expectVisible(review, 'compute submission review')
+    const confirm = review.getByRole('button', { name: 'Confirm and submit jobs' })
+    await review.getByRole('button', { name: 'browser-scoring-model' }).click()
+    await expectVisible(review.getByText('#!/bin/bash', { exact: false }), 'rendered submission script')
+    if (submissionRequests.length !== 0) throw new Error('Opening the preview submitted compute prematurely.')
+    const exerciseStalePreview = testCase.viewportId === 'mobile'
+    if (exerciseStalePreview) {
+      const refreshed = page.waitForRequest((request) => request.url().endsWith('/script-previews'))
+      await confirm.click()
+      await refreshed
+      await expectVisible(review, 'review remains open after stale preview rejection')
+      await expectEnabled(confirm, 'confirmation after refreshed preview')
+    }
+    await confirm.click()
+    await expectHidden(review, 'review after confirmed submission')
+    const expectedRequests = exerciseStalePreview ? 2 : 1
+    if (submissionRequests.length !== expectedRequests || submissionRequests.some((request) => request.postDataJSON().workflow_version !== 3 || request.postDataJSON().review_fingerprints?.node_browser !== 'a'.repeat(64))) {
+      throw new Error('Each confirmation must send exactly one request with the reviewed version and fingerprints.')
+    }
+    page.off('request', recordSubmission)
+    diagnostics.interactions.computeConfirmation = exerciseStalePreview
+      ? 'stale preview rejected; automatically refreshed; explicit reconfirmation succeeded'
+      : 'preview does not submit; confirmation sends one versioned request'
     const jobTrigger = page.getByRole('button').filter({ hasText: 'job_browser' }).first()
     await assertEscapeFocusReturn(
       page,
@@ -1280,6 +1310,18 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'lab') {
+    await page.getByRole('link', { name: 'Toolbox', exact: true }).click()
+    await expectVisible(page.getByRole('heading', { name: 'Lab toolbox' }), 'standalone toolbox')
+    await page.getByRole('button', { name: 'Choose a project for saving (optional)' }).click()
+    await page.getByRole('combobox', { name: /select research project/i }).click()
+    await page.getByRole('option', { name: 'No project', exact: true }).click()
+    const concentration = page.getByRole('region', { name: 'Concentration (A280)', exact: true })
+    await concentration.getByRole('button', { name: 'Compute', exact: true }).click()
+    await expectVisible(concentration.getByText('100 µM · 1.2 mg/mL', { exact: true }), 'projectless concentration result')
+    await expectVisible(page.getByRole('button', { name: 'Preview without saving' }), 'projectless analysis preview action')
+    diagnostics.interactions.standaloneToolbox = 'toolbox opens without project gating and calculates after deselecting project'
+    diagnostics.interactions.toolboxOverflow = await assertNoPageOverflow(page)
   } else if (testCase.routeId === 'autopilot') {
     await exerciseAutopilotPromptGuard(page, diagnostics)
   }
@@ -1499,6 +1541,8 @@ async function runCase(browser, testCase) {
   const router = createFixtureRouter({
     scenario: testCase.scenario,
     routeId: testCase.routeId,
+    stalePreview: testCase.routeId === 'workflow' && testCase.scenario === 'populated'
+      && testCase.appearanceId === 'en-light' && testCase.viewportId === 'mobile',
   })
 
   try {

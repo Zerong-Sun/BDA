@@ -5,7 +5,7 @@ import { server } from '../test/mocks/handlers'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { useAppStore } from '../lib/store/appStore'
 import { en, zh } from '../lib/i18n'
-import { RESEARCH_TABS, type ResearchTab } from '../features/research/researchUi'
+import { type ResearchTab } from '../features/research/researchUi'
 import { ResearchPage } from './Research'
 
 vi.mock('../features/research/ResearchWorkspacePanel', () => ({
@@ -27,40 +27,22 @@ const project = {
   status: 'active',
   owner_id: 'user_admin',
   summary: 'Verify the research workspace.',
+  prompt: 'A confirmed research brief.',
   primary_target_id: null,
   version: 1,
   created_at: '2026-07-21T00:00:00Z',
   updated_at: '2026-07-21T00:00:00Z',
 }
 
-type WorkspaceLabels = {
-  research: {
-    workspace: {
-      tabEvidence: string
-      tabReferences: string
-      tabStructures: string
-      tabData: string
-      tabMethods: string
-      tabTimeline: string
-    }
-    goals: { title: string }
-  }
-}
+const englishGroups = ['Goals & questions', 'Literature & evidence', 'Experiment plan', 'Decision record']
+const chineseGroups = ['目标与问题', '文献与证据', '实验方案', '决策记录']
 
-function tabLabel(bundle: WorkspaceLabels, tab: ResearchTab): string {
-  const workspace = bundle.research.workspace
-  return {
-    // The goal tree has its own copy block rather than a workspace tab label: it is a
-    // panel of its own, not one of the workspace views.
-    goals: bundle.research.goals.title,
-    evidence: workspace.tabEvidence,
-    references: workspace.tabReferences,
-    structures: workspace.tabStructures,
-    data: workspace.tabData,
-    methods: workspace.tabMethods,
-    timeline: workspace.tabTimeline,
-  }[tab]
-}
+vi.mock('../features/research/ResearchGoalsPanel', () => ({
+  ResearchGoalsPanel: () => <div data-testid="research-goals-view" />,
+}))
+vi.mock('../features/timeline/ProjectTimeline', () => ({
+  ProjectTimeline: ({ hasPrompt }: { hasPrompt: boolean }) => <div data-testid="research-timeline-view">{String(hasPrompt)}</div>,
+}))
 
 function installHandlers() {
   server.use(
@@ -84,60 +66,37 @@ describe('ResearchPage', () => {
     useAppStore.setState({ language: 'en' })
   })
 
-  it('renders each workspace tab exactly once, with no nested sub-navigation', () => {
+  it('defaults to goals and presents four stages with accessible controls', () => {
     renderWithProviders(<ResearchPage />)
-
-    expect(screen.getAllByRole('tablist', { name: en.research.page.tabsLabel })).toHaveLength(1)
-    for (const tab of RESEARCH_TABS) {
-      expect(within(nav()).getAllByRole('tab', { name: tabLabel(en, tab) })).toHaveLength(1)
+    expect(within(nav()).getAllByRole('tab')).toHaveLength(4)
+    for (const label of englishGroups) {
+      expect(within(nav()).getByRole('tab', { name: label })).toHaveAttribute('data-slot', 'tabs-trigger')
     }
-    expect(within(nav()).getAllByRole('tab')).toHaveLength(RESEARCH_TABS.length)
+    expect(within(nav()).getByRole('tab', { name: englishGroups[0] })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('navigation', { name: 'Evidence categories' })).not.toBeInTheDocument()
   })
 
-  it('exposes the URL-driven workspace navigation through registry tabs', () => {
+  it('supports keyboard navigation between stages and evidence subcategories', async () => {
     renderWithProviders(<ResearchPage />)
-
-    expect(screen.getByRole('tablist', { name: en.research.page.tabsLabel })).toHaveAttribute(
-      'data-slot',
-      'tabs-list',
-    )
-    expect(screen.getByRole('tab', { name: tabLabel(en, 'evidence') })).toHaveAttribute(
-      'data-slot',
-      'tabs-trigger',
-    )
-  })
-
-  it('associates one dynamic tabpanel with the active tab and preserves keyboard focus navigation', async () => {
-    renderWithProviders(<ResearchPage />)
-
-    const evidenceTab = screen.getByRole('tab', { name: tabLabel(en, 'evidence') })
+    const goals = within(nav()).getByRole('tab', { name: englishGroups[0] })
+    const evidence = within(nav()).getByRole('tab', { name: englishGroups[1] })
+    goals.focus()
+    fireEvent.keyDown(goals, { key: 'ArrowRight' })
+    await waitFor(() => expect(evidence).toHaveFocus())
+    fireEvent.click(evidence)
     await screen.findByTestId('research-workspace-view')
     const panel = screen.getByRole('tabpanel')
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
-    expect(panel).toHaveAttribute('aria-labelledby', evidenceTab.id)
-    expect(within(panel).getByTestId('research-workspace-view')).toHaveTextContent('evidence')
-
-    evidenceTab.focus()
-    fireEvent.keyDown(evidenceTab, { key: 'ArrowRight' })
-
-    const referencesTab = screen.getByRole('tab', { name: tabLabel(en, 'references') })
-    await waitFor(() => expect(referencesTab).toHaveFocus())
-    fireEvent.click(referencesTab)
-    await waitFor(() => expect(referencesTab).toHaveAttribute('aria-selected', 'true'))
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
-    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', referencesTab.id)
-    expect(within(screen.getByRole('tabpanel')).getByTestId('research-workspace-view'))
-      .toHaveTextContent('references')
+    expect(panel).toHaveAttribute('aria-labelledby', evidence.id)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Evidence categories' })).getByRole('button', { name: en.research.workspace.tabReferences }))
+    expect(within(panel).getByTestId('research-workspace-view')).toHaveTextContent('references')
     expect(window.location.hash).toContain('tab=references')
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
   })
 
-  it('defaults to evidence and marks it as current', () => {
+  it('passes the confirmed brief into the decision record', async () => {
+    window.location.hash = '/research?project=proj_research&tab=timeline'
     renderWithProviders(<ResearchPage />)
-
-    expect(within(nav()).getByRole('tab', { name: tabLabel(en, 'evidence') })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await waitFor(() => expect(screen.getByTestId('research-timeline-view')).toHaveTextContent('true'))
   })
 
   it.each([
@@ -151,10 +110,11 @@ describe('ResearchPage', () => {
     window.location.hash = `/research?project=proj_research&tab=${legacyTab}`
     renderWithProviders(<ResearchPage />)
 
-    expect(within(nav()).getByRole('tab', { name: tabLabel(en, expectedTab) })).toHaveAttribute(
+    expect(within(nav()).getByRole('tab', { name: englishGroups[1] })).toHaveAttribute(
       'aria-selected',
       'true',
     )
+    expect(window.location.hash).toContain(`tab=${expectedTab}`)
   })
 
   it('uses the language selected in settings without rendering a local language switch', () => {
@@ -167,16 +127,17 @@ describe('ResearchPage', () => {
     rendered.rerender(<ResearchPage />)
     expect(screen.getByRole('heading', { name: zh.research.page.title })).toBeInTheDocument()
     const zhNav = nav(zh.research.page.tabsLabel)
-    for (const tab of RESEARCH_TABS) {
-      expect(within(zhNav).getByRole('tab', { name: tabLabel(zh, tab) })).toBeInTheDocument()
+    for (const label of chineseGroups) {
+      expect(within(zhNav).getByRole('tab', { name: label })).toBeInTheDocument()
     }
   })
 
   it('keeps one workspace mounted while switching its URL-driven view', async () => {
+    window.location.hash = '/research?project=proj_research&tab=evidence'
     renderWithProviders(<ResearchPage />)
     await waitFor(() => expect(screen.getByTestId('research-workspace-view')).toHaveTextContent('evidence'))
 
-    fireEvent.click(within(nav()).getByRole('tab', { name: tabLabel(en, 'structures') }))
+    fireEvent.click(screen.getByRole('button', { name: en.research.workspace.tabStructures }))
 
     expect(screen.getByTestId('research-workspace-view')).toHaveTextContent('structures')
     expect(screen.getAllByTestId('research-workspace-view')).toHaveLength(1)

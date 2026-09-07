@@ -26,8 +26,8 @@ export function ComputeStatusStrip() {
     String(node.labels.accelerator ?? node.labels.resource_type ?? '').toLowerCase().includes('gpu'),
   )
   const cpuNodes = nodes.filter((node) => !gpuNodes.some((gpuNode) => gpuNode.id === node.id))
-  const gpuAvailable = gpuNodes.some((node) => node.enabled && node.health_status !== 'unhealthy')
-  const cpuAvailable = cpuNodes.some((node) => node.enabled && node.health_status !== 'unhealthy')
+  const gpuAvailable = gpuNodes.some((node) => node.enabled && node.health_status === 'healthy')
+  const cpuAvailable = cpuNodes.some((node) => node.enabled && node.health_status === 'healthy')
 
   return (
     <Frame variant="inverse" spacing="xs" className="mb-4">

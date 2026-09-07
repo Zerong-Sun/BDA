@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -9,6 +10,8 @@ from ..core.statuses import ComputeDraftStatus, JobStatus, JobSubmissionStatus
 
 
 class SubmissionCreate(BaseModel):
+    review_fingerprints: dict[uuid.UUID, Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]] | None = Field(default=None, max_length=1000)
+    workflow_version: int | None = Field(default=None, ge=1)
     compute_backend: str | None = Field(default=None, max_length=32)
     timeout_minutes: int = Field(default=180, ge=5, le=1440)
 

@@ -74,11 +74,13 @@ export function ProjectChooser({
   const [projectType, setProjectType] = useState('protein_design')
   const [summary, setSummary] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [advanced, setAdvanced] = useState(false)
 
   const generatePrompt = useMutation({
     mutationFn: async () => {
       const { draft_id: draftId } = await createProjectPromptDraft({
         name: name.trim(),
+        language,
         project_type: projectType,
         summary: summary.trim() || undefined,
       })
@@ -95,7 +97,7 @@ export function ProjectChooser({
         name: name.trim(),
         project_type: projectType,
         summary: summary.trim() || undefined,
-        prompt: prompt.trim(),
+        prompt: prompt.trim() || summary.trim(),
       }),
     onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -253,7 +255,7 @@ export function ProjectChooser({
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="project-prompt">{t.projects.projectChooser.promptLabel}</Label>
+                <Label htmlFor="project-prompt">{language === 'zh' ? '任务书（可选，AI 辅助完善）' : 'Design brief (optional AI refinement)'}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -271,14 +273,17 @@ export function ProjectChooser({
                     : t.projects.projectChooser.generatePrompt}
                 </Button>
               </div>
-              <Textarea
+              <Button type="button" variant="ghost" size="sm" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced}>
+                {language === 'zh' ? '查看或编辑完整任务书' : 'Review or edit the full brief'}
+              </Button>
+              {(advanced || prompt) ? <Textarea
                 id="project-prompt"
                 rows={6}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder={t.projects.projectChooser.promptPlaceholder}
-              />
-              <p className="text-xs text-muted-foreground">{t.projects.projectChooser.promptRequiredHint}</p>
+              /> : null}
+              <p className="text-xs text-muted-foreground">{language === 'zh' ? '先写清目标与约束即可创建项目。AI 生成的任务书供你检查和修改。' : 'Describe your objective and constraints to create a project. Review and edit any AI-generated brief.'}</p>
             </div>
             {generatePrompt.isError ? (
               <Alert variant="destructive">
@@ -305,7 +310,7 @@ export function ProjectChooser({
             </Button>
             <Button
               type="button"
-              disabled={!name.trim() || !prompt.trim() || create.isPending}
+              disabled={!name.trim() || !(prompt.trim() || summary.trim()) || create.isPending || generatePrompt.isPending}
               onClick={() => create.mutate()}
               aria-busy={create.isPending}
             >

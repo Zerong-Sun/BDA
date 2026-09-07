@@ -112,6 +112,7 @@ export function Topbar() {
           >
             <ChatCircleIcon className="h-4 w-4" />
           </Button>
+          <Button variant="outline" size="sm" render={<NavLink to="/tools" />}>{language === 'zh' ? '工具箱' : 'Toolbox'}</Button>
           <ActivityIndicatorButton />
           <Button
             type="button"

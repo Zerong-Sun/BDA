@@ -201,3 +201,21 @@ class AnalysisResponse(BaseModel):
     unit: str | None
     source_artifact_id: uuid.UUID
     summary: dict
+
+
+class AnalysisPreviewRequest(BaseModel):
+    instrument: str = Field(pattern="^(bli|akta|enzyme)$")
+    content_base64: str = Field(min_length=1, max_length=16 * 1024 * 1024)
+    sample_id: str | None = Field(default=None, max_length=200)
+    channel: str | None = Field(default=None, max_length=200)
+    t_assoc: float | None = Field(default=None, ge=0)
+    t_dissoc: float | None = Field(default=None, ge=0)
+    subtract_background: bool = True
+
+
+class AnalysisPreviewResponse(BaseModel):
+    analysis_version: str
+    experiment_type: str
+    value: float | None
+    unit: str | None
+    summary: dict

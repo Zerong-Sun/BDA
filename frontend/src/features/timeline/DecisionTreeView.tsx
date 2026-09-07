@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure'
 import { createContext, useContext, useMemo, useState } from 'react'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
@@ -213,13 +214,19 @@ function GoalBranch({ node }: { node: GoalNode }) {
   const tl = t.timeline
   const count = subtreeDecisionCount(node)
   return (
-    <li style={{ marginInlineStart: node.depth ? '1.25rem' : undefined }}>
-      <div className="flex flex-wrap items-baseline gap-2 border-l-2 border-l-accent pl-2">
-        <h3 className="text-sm font-semibold text-text-primary">{node.goal.title}</h3>
+    <li className="border-l border-border-soft pl-3" style={{ marginInlineStart: node.depth ? '1.25rem' : undefined }}>
+      <Disclosure defaultOpen className="rounded-md bg-surface-2 p-3 text-text-primary" title={
+      <span className="inline-flex flex-wrap items-baseline gap-2">
+        <span className="text-sm font-semibold">{node.goal.title}</span>
+        <StatusPill tone={node.goal.status === 'answered' ? 'green' : node.goal.status === 'open' ? 'amber' : 'neutral'}>
+          {t.research.goals.status[node.goal.status as 'open' | 'answered' | 'abandoned'] ?? node.goal.status}
+        </StatusPill>
         <span className="text-[11px] text-text-muted">
           {format(tl.decisionCount, { count: String(count) })}
         </span>
-      </div>
+      </span>
+      }>
+      {node.goal.detail ? <p className="my-2 text-xs text-text-secondary">{node.goal.detail}</p> : null}
       {node.decisions.length ? (
         <ul className="mt-1.5 space-y-1.5 pl-2">
           {node.decisions.map((decision) => (
@@ -234,6 +241,7 @@ function GoalBranch({ node }: { node: GoalNode }) {
           ))}
         </ul>
       ) : null}
+      </Disclosure>
     </li>
   )
 }

@@ -93,6 +93,8 @@ export const CopilotConfigSchema = z.object({
   llm_api_base: z.string(),
   llm_model: z.string(),
   api_key_configured: z.boolean(),
+  inherited_provider: z.boolean().default(false),
+  browser_api_key_allowed: z.boolean().default(true),
   api_key_preview: z.string().nullable().optional(),
   system_scope: z.string(),
   system_prompt: z.string(),
@@ -172,7 +174,8 @@ export function getCopilotConfig(projectId?: string) {
   }).then(({ data: config }) => {
     const settings = config.settings ?? {}
     return CopilotConfigSchema.parse({ llm_api_base: settings.llm_api_base ?? '',
-      llm_model: settings.llm_model ?? '', api_key_configured: config.api_key_configured,
+      llm_model: settings.llm_model ?? '', inherited_provider: settings.inherited_provider,
+      browser_api_key_allowed: settings.browser_api_key_allowed, api_key_configured: config.api_key_configured,
       api_key_preview: settings.api_key_preview ?? null,
       system_scope: 'project', system_prompt: settings.system_prompt ?? '',
       enabled_skills: config.enabled_skills ?? [],
@@ -550,6 +553,7 @@ export const RouteOptionSchema = z.object({
   // Thresholds and limits the route carries from the project's methods document.
   constraints: z.record(z.string(), z.unknown()).default({}),
   estimated_steps: z.number(),
+  workflow_spec: z.record(z.string(), z.unknown()).optional(),
 }).passthrough()
 
 export const RoutePlanSchema = z.object({
@@ -781,7 +785,7 @@ export function planRoute(payload: {
   constraints?: Record<string, unknown>
 }) {
   return createRoutePlanApiV2CopilotRoutePlansPost<true>({
-    body: { project_id: payload.project_id, goal: payload.objective }, throwOnError: true,
+    body: { project_id: payload.project_id, goal: payload.objective, use_model: true }, throwOnError: true,
   }).then(({ data: plan }) => RoutePlanSchema.parse({
     mode: 'service',
     project_id: plan.project_id,
@@ -805,6 +809,7 @@ export function applyRoutePlan(payload: {
    * the reason the plan is worth following — would be dropped on creation.
    */
   module_parameters?: Record<string, Record<string, unknown>>
+  workflow_spec?: Record<string, unknown>
   target?: string
   constraints?: Record<string, unknown>
 }) {
@@ -817,19 +822,20 @@ export function applyRoutePlan(payload: {
     if (plugins.length !== payload.selected_module_ids.length) {
       throw new Error('One or more selected route modules are unavailable')
     }
-    const nodes = plugins.map((plugin, index) => ({
-      key: `${plugin!.plugin_key.toLowerCase()}-${index + 1}`,
-      node_type: plugin!.plugin_key,
-      model_plugin: plugin!.name,
-      model_plugin_id: plugin!.id,
-      container_image: plugin!.container_image,
-      command: plugin!.command,
-      parameters: payload.module_parameters?.[payload.selected_module_ids[index]] ?? {},
+    const planned = payload.workflow_spec ? z.object({ nodes: z.array(z.object({
+      key: z.string(), node_type: z.string(), model_plugin: z.string(), model_plugin_id: z.string(),
+      container_image: z.string().nullable().optional(), command: z.string().optional(), parameters: z.record(z.string(), z.unknown()).default({}),
+      input_bindings: z.array(z.object({ port: z.string(), source: z.string(), artifact_id: z.string().optional(), from_node: z.string().optional(), from_port: z.string().optional() })).default([]),
+    })), edges: z.array(z.object({ source: z.string(), target: z.string() })) }).parse(payload.workflow_spec) : null
+    if (planned && (planned.nodes.length !== plugins.length || planned.nodes.some((node) => !payload.selected_module_ids.includes(node.model_plugin_id)))) {
+      throw new Error('A template requires all of its steps. Create a custom workflow to change its structure.')
+    }
+    const nodes = planned ? planned.nodes.map((node) => ({ ...node, parameters: payload.module_parameters?.[node.model_plugin_id] ?? node.parameters })) : plugins.map((plugin, index) => ({
+      key: `${plugin!.plugin_key.toLowerCase()}-${index + 1}`, node_type: plugin!.plugin_key,
+      model_plugin: plugin!.name, model_plugin_id: plugin!.id, container_image: plugin!.container_image,
+      command: plugin!.command, parameters: payload.module_parameters?.[payload.selected_module_ids[index]] ?? {},
     }))
-    const edges = nodes.slice(1).map((node, index) => ({
-      source: nodes[index].key,
-      target: node.key,
-    }))
+    const edges = planned?.edges ?? nodes.slice(1).map((node, index) => ({ source: nodes[index].key, target: node.key }))
     const { data: workflow } = await postWorkflowApiV2ProjectsProjectIdWorkflowRunsPost<true>({
       path: { project_id: payload.project_id },
       body: { name: payload.objective, nodes, edges },

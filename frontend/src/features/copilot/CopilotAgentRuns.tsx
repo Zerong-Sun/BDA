@@ -60,7 +60,7 @@ function toneFor(status: string): StatusTone {
   return 'neutral'
 }
 
-export function CopilotAgentRuns() {
+export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: string; skills?: string[] }) {
   const { t, format } = useI18n()
   const copy = t.copilot.agentRuns
   const { projectId } = useProjectContext()
@@ -68,7 +68,7 @@ export function CopilotAgentRuns() {
   const showToast = useToastStore((state) => state.show)
   const [openRunId, setOpenRunId] = useState<string | null>(null)
 
-  const [goal, setGoal] = useState('')
+  const [goal, setGoal] = useState(initialGoal)
   const [maxTurns, setMaxTurns] = useState('12')
   const [maxCost, setMaxCost] = useState('')
 
@@ -89,6 +89,7 @@ export function CopilotAgentRuns() {
       return startAgentRun({
         project_id: projectId,
         goal: goal.trim(),
+        ...(skills ? { skills } : {}),
         max_turns: Number(maxTurns) || 12,
         max_cost_usd_cents: maxCost.trim() && Number.isFinite(cost) ? cost : null,
       })

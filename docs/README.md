@@ -16,6 +16,9 @@ reports are maintained only in the private BDA-demo archive.
 
 ## Active guides
 
+- [项目引导、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
+- [六维复核与修复清单](GUIDED_PLATFORM_REVIEW.md)
+
 - [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
 - [Backend v2](BACKEND_V2.md)
 - [Frontend v2](FRONTEND_V2.md)

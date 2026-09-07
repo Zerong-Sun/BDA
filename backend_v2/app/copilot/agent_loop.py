@@ -102,11 +102,7 @@ def fold_settled_tasks(session: Session, run: CopilotAgentRun) -> int:
     the transcript, and the transcript is meant to be the only state.
     """
     turns = agent_runs.transcript(session, run)
-    recorded = {
-        str((turn.tool_calls or [{}])[0].get("tool_call_id") or "")
-        for turn in turns
-        if turn.role == "tool"
-    }
+    recorded = {str((turn.tool_calls or [{}])[0].get("tool_call_id") or "") for turn in turns if turn.role == "tool"}
     names = {
         str(call.get("id") or ""): str((call.get("function") or {}).get("name") or "")
         for turn in turns
@@ -114,9 +110,7 @@ def fold_settled_tasks(session: Session, run: CopilotAgentRun) -> int:
         for call in turn.tool_calls or []
     }
     settled = session.scalars(
-        select(CopilotAgentTask).where(
-            CopilotAgentTask.run_id == run.id, CopilotAgentTask.status != "running"
-        )
+        select(CopilotAgentTask).where(CopilotAgentTask.run_id == run.id, CopilotAgentTask.status != "running")
     )
     folded = 0
     for task in settled:
@@ -175,9 +169,7 @@ def _tool_context(session: Session, run: CopilotAgentRun) -> ToolContext:
         project=ProjectContextService(session, project),
         # The goal is the human's own words, so the same request check that stops
         # a chat turn talking itself into a write applies unchanged here.
-        actions=CopilotActionService(
-            session, project, user, request_text=run.goal, source_message_id=run.id
-        ),
+        actions=CopilotActionService(session, project, user, request_text=run.goal, source_message_id=run.id),
         agent_run=run,
     )
 
@@ -204,9 +196,7 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
 
     turns = agent_runs.transcript(session, run)
     schemas = _schemas(run)
-    message = completion_message(
-        provider, messages_for(run, turns), tools=schemas if schemas else None
-    )
+    message = completion_message(provider, messages_for(run, turns), tools=schemas if schemas else None)
     requested = message.get("tool_calls")
     content = message.get("content")
 
@@ -376,10 +366,9 @@ def settle_operation_waits(
 
 
 def provider_for(session: Session, run: CopilotAgentRun) -> LLMProvider:
-    from .models import CopilotConfig
+    from .provider_selection import select_provider
 
-    config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == run.project_id))
-    provider = session.get(LLMProvider, config.llm_provider_id) if config and config.llm_provider_id else None
-    if provider is None or not provider.enabled:
+    provider = select_provider(session, project_id=run.project_id)
+    if provider is None:
         raise AgentRunError("agent_run_provider_not_configured")
     return provider

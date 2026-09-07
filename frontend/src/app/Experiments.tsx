@@ -1,3 +1,4 @@
+import { Disclosure } from '../components/ui/Disclosure'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { PlayCircle, X } from '@phosphor-icons/react'
@@ -21,6 +22,8 @@ import { ProjectLibrary } from '../features/experiments/ProjectLibrary'
 import { ManageProjectDrawer } from '../features/experiments/ManageProjectDrawer'
 import { CampaignPanel } from '../features/research/CampaignPanel'
 import { findDemoProject, isDemoProject } from '../features/tour'
+
+import { ProjectNextAction } from '../features/projects/ProjectNextAction'
 
 export function ExperimentsPage() {
   const { t, format, language } = useI18n()
@@ -147,6 +150,8 @@ export function ExperimentsPage() {
         </AppFrame>
       ) : null}
 
+      {overview ? <ProjectNextAction overview={overview} /> : null}
+
       <div data-tour-id="project-library">
       <ProjectLibrary
         onCreate={openCreate}
@@ -160,6 +165,7 @@ export function ExperimentsPage() {
 
       {showCampaigns ? <div className="mb-6"><CampaignPanel /></div> : null}
 
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={overview?.target_readiness?.ready_for_workflow !== true} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
       <ActiveProjectPanel
         project={activeProject}
         projectQuery={query}
@@ -167,8 +173,10 @@ export function ExperimentsPage() {
         onManage={() => setManageOpen(true)}
         onCreate={openCreate}
       />
+      </Disclosure>
 
-      <WorkflowProgress projectQuery={query} overview={overview} hasProject={Boolean(projectId)} />
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" title={language === 'zh' ? '查看完整流程与项目指标' : 'Full workflow and project metrics'}>
+        <WorkflowProgress projectQuery={query} overview={overview} hasProject={Boolean(projectId)} />
 
       {projectId ? (
         <ApiState
@@ -189,6 +197,8 @@ export function ExperimentsPage() {
           {overview ? <OverviewCards overview={overview} /> : null}
         </ApiState>
       ) : null}
+
+      </Disclosure>
 
       {overview ? <DesignPromptCard project={overview.project} /> : null}
 

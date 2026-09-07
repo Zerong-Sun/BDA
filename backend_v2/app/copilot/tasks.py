@@ -63,7 +63,6 @@ def copilot_respond(message_id: str) -> dict:
     )
     from ..copilot.research_context import ResearchContextService
     from ..identity.models import User
-    from ..registry.models import LLMProvider
 
     parsed = uuid.UUID(message_id)
     with session_scope() as session:
@@ -83,7 +82,9 @@ def copilot_respond(message_id: str) -> dict:
             if conversation is None:
                 return {"message_id": message_id, "status": "missing_conversation"}
             config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == conversation.project_id))
-            provider = session.get(LLMProvider, config.llm_provider_id) if config and config.llm_provider_id else None
+            from .provider_selection import select_provider
+
+            provider = select_provider(session, project_id=conversation.project_id)
             project = session.get(Project, conversation.project_id)
             if project is None:
                 return {"message_id": message_id, "status": "missing_project"}

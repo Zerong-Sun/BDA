@@ -33,10 +33,14 @@ interface CopilotSettingsProps {
   onActionsReady?: (actions: CopilotSettingsActions) => void
 }
 
-export function CopilotSettings({ hideActions = false, onActionsReady }: CopilotSettingsProps) {
-  const { t, format } = useI18n()
-  const queryClient = useQueryClient()
+export function CopilotSettings(props: CopilotSettingsProps) {
   const { projectId } = useProjectContext()
+  return <ProjectCopilotSettings key={projectId} projectId={projectId} {...props} />
+}
+
+function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady }: CopilotSettingsProps & { projectId: string }) {
+  const { t, format, language } = useI18n()
+  const queryClient = useQueryClient()
   const { data: config, isLoading, isError } = useQuery({
     queryKey: ['copilot-config', projectId],
     queryFn: () => getCopilotConfig(projectId),
@@ -46,6 +50,7 @@ export function CopilotSettings({ hideActions = false, onActionsReady }: Copilot
   const [baseUrlDraft, setBaseUrlDraft] = useState<string | null>(null)
   const [modelDraft, setModelDraft] = useState<string | null>(null)
   const [promptDraft, setPromptDraft] = useState<string | null>(null)
+  const [advanced, setAdvanced] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const baseUrl = baseUrlDraft ?? config?.llm_api_base ?? 'https://api.deepseek.com'
   const model = modelDraft ?? config?.llm_model ?? 'deepseek-v4-pro'
@@ -69,7 +74,7 @@ export function CopilotSettings({ hideActions = false, onActionsReady }: Copilot
   })
   const test = useMutation({ mutationFn: () => testCopilotConfig(projectId) })
   const mutationPending = save.isPending || test.isPending
-  const canSave = Boolean(baseUrl.trim() && model.trim())
+  const canSave = Boolean(projectId && (config?.api_key_configured || (config?.browser_api_key_allowed && apiKey.trim() && baseUrl.trim() && model.trim())))
   const canTest = Boolean(config?.api_key_configured)
   const saveConfiguration = save.mutate
   const testConfiguration = test.mutate
@@ -129,9 +134,18 @@ export function CopilotSettings({ hideActions = false, onActionsReady }: Copilot
         ) : null}
         {!isLoading && !isError ? (
           <div className="grid gap-3">
+            <p className="text-sm" role="status">{config?.api_key_configured
+              ? (language === 'zh' ? `当前模型：${model} · ${config.inherited_provider ? '继承平台配置' : '项目专属配置'}` : `Model: ${model} · ${config.inherited_provider ? 'Platform default' : 'Project configuration'}`)
+              : (language === 'zh' ? '尚无可用模型。请管理员设置唯一的平台默认模型，或在高级设置中配置项目模型。' : 'No model is ready. Ask an administrator to configure one platform default, or configure a project model in advanced settings.')}</p>
+            <Button type="button" variant="outline" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced}>
+              {language === 'zh' ? '高级模型设置' : 'Advanced model settings'}
+            </Button>
+            {advanced ? <>
+            {!config?.browser_api_key_allowed ? <p className="text-sm text-text-secondary">{language === 'zh' ? '此部署由管理员管理模型凭据，用户无需填写 API Key。' : 'Model credentials are managed by your administrator. No API key is needed here.'}</p> : null}
             <div className="grid gap-1">
               <Label htmlFor="copilot-api-base">{t.copilot.settings.apiBaseLabel}</Label>
               <Input
+                disabled={!config?.browser_api_key_allowed}
                 id="copilot-api-base"
                 value={baseUrl}
                 onChange={(event) => setBaseUrlDraft(event.target.value)}
@@ -151,12 +165,13 @@ export function CopilotSettings({ hideActions = false, onActionsReady }: Copilot
             <div className="grid gap-1">
               <Label htmlFor="copilot-model">{t.copilot.settings.modelLabel}</Label>
               <Input
+                disabled={!config?.browser_api_key_allowed}
                 id="copilot-model"
                 value={model}
                 onChange={(event) => setModelDraft(event.target.value)}
               />
             </div>
-            <div className="grid gap-1">
+            {config?.browser_api_key_allowed ? <div className="grid gap-1">
               <Label htmlFor="copilot-api-key">
                 {t.copilot.settings.apiKeyLabel}{' '}
                 {config?.api_key_configured
@@ -175,7 +190,8 @@ export function CopilotSettings({ hideActions = false, onActionsReady }: Copilot
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
               />
-            </div>
+            </div> : null}
+            </> : null}
           </div>
         ) : null}
 

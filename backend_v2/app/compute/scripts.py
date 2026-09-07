@@ -80,7 +80,7 @@ class ScriptContext:
 # Emitted at the end of an ssh-staged job. Walks the output directory and writes the
 # manifest the collector reads. Inlined rather than installed as a cluster-side wrapper
 # so that onboarding a cluster requires no software installation - only SSH access.
-_MANIFEST_EMITTER = '''
+_MANIFEST_EMITTER = """
 python3 - "$BDA_OUTPUT_DIR" "$BDA_REMOTE_DIR/output-manifest.json" <<'BDA_EMIT_MANIFEST'
 import hashlib, json, os, sys
 
@@ -103,7 +103,7 @@ with open(manifest_path, "w") as handle:
     json.dump({"schema_version": "1", "outputs": entries}, handle)
 print(f"bda: wrote manifest for {len(entries)} output(s)")
 BDA_EMIT_MANIFEST
-'''.strip()
+""".strip()
 
 
 def preview_context(node, plugin, backend: str, command: str, parameters: dict | None = None) -> ScriptContext:
@@ -128,6 +128,7 @@ def preview_context(node, plugin, backend: str, command: str, parameters: dict |
         container_image=node.container_image or (plugin.container_image if plugin else None),
         upload_wrapper=settings.lsf_upload_wrapper,
         resources=resources,
+        staging_mode=settings.lsf_staging_mode,
         runtime_setup=list(getattr(plugin, "runtime_setup", None) or []),
         parameters=parameters if parameters is not None else dict(node.parameters or {}),
     )
