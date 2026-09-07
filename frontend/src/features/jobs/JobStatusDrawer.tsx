@@ -1,3 +1,4 @@
+import { ModelResultGuide } from '../results/ModelResultGuide'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowsClockwise, Download, StopCircle, Terminal } from '@phosphor-icons/react'
@@ -222,6 +223,7 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
                     </TimelineContent>
                   </TimelineItem>
                 </Timeline>
+                <ModelResultGuide pluginKey={selectedJob.model_plugin} />
                 <div className="flex flex-wrap gap-2">
                   {isCancellableJob(selectedJob.status) ? (
                     <Button type="button"

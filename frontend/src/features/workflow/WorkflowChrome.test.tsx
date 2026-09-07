@@ -99,7 +99,7 @@ describe('workflow chrome safeguards', () => {
   it('requires saving queue edits before preview, without requiring a runnable workflow', async () => {
     api.getWorkflowPreflight.mockResolvedValueOnce({ allowed: false, blockers: [{ message: 'Execution is disabled' }], warnings: [], checks: {} })
     renderWithProviders(<WorkflowInspector workflowRunId="run_test" selectedNode={{
-      id: 'node_test', workflow_run_id: 'run_test', node_key: 'audit', node_type: 'compute',
+      id: 'node_test', workflow_run_id: 'run_test', node_key: 'audit', execution_mode: 'dispatch', node_type: 'compute',
       model_plugin: 'audit', model_plugin_id: null, container_image: null, command: 'true',
       queue: null, status: 'draft', parameters: {}, input_bindings: [], error_message: null, version: 1,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',

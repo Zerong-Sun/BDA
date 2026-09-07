@@ -454,9 +454,13 @@ export function WorkflowPage() {
     queryKey: ['submission-preview', workflowRunId, workflowGraph?.workflow.version, workflowPreflight.data?.checks],
     enabled: confirmRun && Boolean(workflowRunId),
     retry: false,
-    queryFn: () => Promise.all(workflowNodes.filter((node) => node.execution_mode !== 'manual').map(async (node) => ({
-      name: node.model_plugin, ...(await previewWorkflowNodeScript(node.id, { compute_backend: String(workflowPreflight.data?.checks.compute_backend ?? 'lsf') })),
-    }))),
+    queryFn: () => {
+      const backend = workflowPreflight.data?.checks.compute_backend ?? 'lsf'
+      if (backend !== 'lsf' && backend !== 'docker') throw new Error('Unsupported compute backend')
+      return Promise.all(workflowNodes.filter((node) => node.execution_mode !== 'manual').map(async (node) => ({
+        name: node.model_plugin, ...(await previewWorkflowNodeScript(node.id, { compute_backend: backend })),
+      })))
+    },
   })
   const startWorkflow = useMutation({
     mutationFn: () => {

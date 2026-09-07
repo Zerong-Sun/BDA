@@ -1,3 +1,4 @@
+import { ModelResultGuide } from '../results/ModelResultGuide'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Copy, Download, FileCode, FloppyDisk, Gear, Network, PlugsConnected } from '@phosphor-icons/react'
 import type { WorkflowInputBinding, WorkflowNode } from '../../lib/schemas/workflow'
@@ -241,6 +242,8 @@ function WorkflowInspectorContent({
               </div>
               <StatusPill label={selectedNode.status} tone={statusTone(selectedNode.status)} />
             </div>
+
+            <ModelResultGuide pluginKey={activePlugin?.plugin_key ?? selectedNode.model_plugin ?? selectedNode.node_type} />
 
             <RouteDisplayCatalog
               parameters={selectedNode.parameters}
