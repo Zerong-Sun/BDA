@@ -58,7 +58,7 @@ export function Topbar() {
               <span className="hidden shrink-0 text-fine font-semibold uppercase tracking-wide text-text-muted sm:inline">
                 {t.common.project}
               </span>
-              <Select value={projectId || null} onValueChange={(value) => setProjectId(value ?? '')}>
+              <Select items={visibleProjects.map((p) => ({ value: p.id, label: projectText(p, 'name', language) }))} value={projectId || null} onValueChange={(value) => setProjectId(value ?? '')}>
                 <SelectTrigger aria-label={t.common.selectProject} className="min-w-48 max-w-sm">
                   <SelectValue placeholder={t.common.selectProject} />
                 </SelectTrigger>

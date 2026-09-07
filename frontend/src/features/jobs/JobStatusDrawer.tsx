@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowsClockwise, Download, StopCircle, Terminal } from '@phosphor-icons/react'
 import { cancelJob, getJobLogs, listWorkflowJobs, retryJob, syncJobResult } from '../../lib/api/jobs'
-import { submitWorkflowNode } from '../../lib/api/workflow'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { useJobEventStream } from './useJobEventStream'
 import type { Job } from '../../lib/schemas/job'
@@ -11,7 +10,6 @@ import { StatusPill } from '../../components/ui/StatusPill'
 import { statusTone } from '../../components/ui/statusTone'
 import { useToastStore } from '../../components/ui/toastStore'
 import { useI18n } from '../../lib/i18n'
-import { DEFAULT_GPU_QUEUE } from '../../lib/config/cluster'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Frame, FrameHeader, FramePanel, FrameTitle } from '../../components/reui/frame'
 import {
@@ -23,7 +21,6 @@ import {
   TimelineTitle,
 } from '../../components/reui/timeline'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import {
   Sheet,
@@ -36,22 +33,11 @@ import {
 interface JobStatusDrawerProps {
   workflowRunId?: string
   selectedNodeId?: string | null
-  overrideParams?: Record<string, unknown>
-  /**
-   * Hides manual submission. This drawer reaches the compute cluster, so a run the
-   * server considers finished - or a demo session, or an unready target - must not be
-   * able to start work from here.
-   */
   readOnly?: boolean
 }
 
-export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeId, overrideParams }: JobStatusDrawerProps) {
+export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeId }: JobStatusDrawerProps) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
-  const [manualOpen, setManualOpen] = useState(false)
-  const [queueName, setQueueName] = useState(DEFAULT_GPU_QUEUE)
-  const [cpuCount, setCpuCount] = useState(8)
-  const [resourceRequirement, setResourceRequirement] = useState('span[ptile=1]')
-  const [gpuRequirement, setGpuRequirement] = useState('num=1')
   const queryClient = useQueryClient()
   const showToast = useToastStore((s) => s.show)
   const { t, format } = useI18n()
@@ -113,19 +99,6 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
       showToast(err instanceof Error ? err.message : t.jobs.retryFailed, 'error'),
   })
 
-  const submitManual = useMutation({
-    mutationFn: () => {
-      if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
-      if (!selectedNodeId || !workflowRunId) throw new Error(t.jobs.errorSelectNode)
-      return submitWorkflowNode(workflowRunId, { override_params: overrideParams })
-    },
-    onSuccess: async (result) => {
-      showToast(format(t.jobs.submitted, { jobId: result.job?.id ?? 'pending' }), 'success')
-      await queryClient.invalidateQueries({ queryKey: ['workflow-jobs', workflowRunId] })
-    },
-    onError: (error) => showToast(error instanceof Error ? error.message : t.jobs.manualSubmitFailed, 'error'),
-  })
-
   const syncResult = useMutation({
     mutationFn: (job: Job) => {
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
@@ -170,75 +143,7 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
       <FramePanel>
 
       <div className="mb-3 rounded-md border border-border-soft bg-surface-1 p-2">
-        {!selectedNodeId ? (
-          <p className="text-xs leading-relaxed text-text-secondary">{t.jobs.manualSubmitHint}</p>
-        ) : (
-          <>
-            <Button type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between"
-              disabled={readOnly}
-              onClick={() => setManualOpen((value) => !value)}
-            >
-              <span>{t.jobs.manualSubmit}</span>
-              <span className="text-text-secondary">{manualOpen ? t.jobs.hide : t.jobs.editQueue}</span>
-            </Button>
-            {manualOpen ? (
-              <div className="mt-3 grid gap-2">
-                <label className="grid gap-1 text-[11px] text-text-secondary">
-                  {t.jobs.queue}
-                  <Input
-                    className="rounded border border-border-soft bg-bg-app px-2 py-1.5 text-xs text-text-primary"
-                    value={queueName}
-                    disabled={readOnly}
-                    onChange={(event) => setQueueName(event.target.value)}
-                    placeholder={DEFAULT_GPU_QUEUE}
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="grid gap-1 text-[11px] text-text-secondary">
-                    {t.jobs.cpuTasks}
-                    <Input
-                      className="rounded border border-border-soft bg-bg-app px-2 py-1.5 text-xs text-text-primary"
-                      type="number"
-                      min={1}
-                      max={256}
-                      value={cpuCount}
-                      disabled={readOnly}
-                      onChange={(event) => setCpuCount(Number(event.target.value) || 1)}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-[11px] text-text-secondary">
-                    {t.jobs.gpu}
-                    <Input
-                      className="rounded border border-border-soft bg-bg-app px-2 py-1.5 text-xs text-text-primary"
-                      value={gpuRequirement}
-                      disabled={readOnly}
-                      onChange={(event) => setGpuRequirement(event.target.value)}
-                    />
-                  </label>
-                </div>
-                <label className="grid gap-1 text-[11px] text-text-secondary">
-                  {t.jobs.resourceRequirement}
-                  <Input
-                    className="rounded border border-border-soft bg-bg-app px-2 py-1.5 text-xs text-text-primary"
-                    value={resourceRequirement}
-                    disabled={readOnly}
-                    onChange={(event) => setResourceRequirement(event.target.value)}
-                  />
-                </label>
-                <p className="text-[11px] leading-relaxed text-text-secondary">{t.jobs.manualSubmitBody}</p>
-                <Button type="button"
-                  disabled={readOnly || submitManual.isPending || !queueName.trim()}
-                  onClick={() => submitManual.mutate()}
-                >
-                  {submitManual.isPending ? t.jobs.submitting : t.jobs.submitSelectedNode}
-                </Button>
-              </div>
-            ) : null}
-          </>
-        )}
+        <p className="text-xs leading-relaxed text-text-secondary">{t.jobs.manualSubmitHint}</p>
       </div>
 
       {visibleJobs.length === 0 ? (

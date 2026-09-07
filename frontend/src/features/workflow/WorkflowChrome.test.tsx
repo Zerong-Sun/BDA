@@ -24,7 +24,6 @@ vi.mock('../../lib/api/registry', () => ({
 vi.mock('../../lib/api/workflow', () => ({
   getWorkflowPreflight: api.getWorkflowPreflight,
   previewWorkflowNodeScript: vi.fn(),
-  submitWorkflowNode: vi.fn(),
   updateWorkflowNode: vi.fn(),
 }))
 
@@ -85,8 +84,35 @@ describe('workflow chrome safeguards', () => {
     )
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save parameters' })).toBeDisabled())
-    expect(screen.getByRole('button', { name: /Manual LSF submit/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Manual LSF submit/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Submit selected node' })).not.toBeInTheDocument()
+  })
+
+  it('never offers disconnected resource overrides or a single-node launch', async () => {
+    renderWithProviders(<JobStatusDrawer workflowRunId="run_test" selectedNodeId="node_test" />)
+    expect(screen.getByText(/submit the entire workflow from the toolbar/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /submit/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('requires saving queue edits before preview, without requiring a runnable workflow', async () => {
+    api.getWorkflowPreflight.mockResolvedValueOnce({ allowed: false, blockers: [{ message: 'Execution is disabled' }], warnings: [], checks: {} })
+    renderWithProviders(<WorkflowInspector workflowRunId="run_test" selectedNode={{
+      id: 'node_test', workflow_run_id: 'run_test', node_key: 'audit', node_type: 'compute',
+      model_plugin: 'audit', model_plugin_id: null, container_image: null, command: 'true',
+      queue: null, status: 'draft', parameters: {}, input_bindings: [], error_message: null, version: 1,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }} />)
+    await screen.findByText('Execution is disabled')
+    const preview = screen.getByRole('button', { name: 'Generate script' })
+    expect(preview).toBeEnabled()
+    const queue = screen.getByLabelText('LSF queue override')
+    fireEvent.change(queue, { target: { value: 'new-queue' } })
+    expect(preview).toBeDisabled()
+    expect(screen.getByText('Save queue and input binding changes before previewing the script.')).toBeInTheDocument()
+    fireEvent.change(queue, { target: { value: '' } })
+    expect(preview).toBeEnabled()
   })
 
   it('hides the native script picker behind a localized registry trigger and names reorder handles', async () => {
@@ -101,6 +127,9 @@ describe('workflow chrome safeguards', () => {
     renderWithProviders(<ScriptAssetManager />)
 
     await screen.findByText('submit.lsf')
+    expect(screen.queryByRole('combobox', { name: 'Model plugin' })).not.toBeInTheDocument()
+    expect(screen.getByText('Archived · no execution binding')).toBeInTheDocument()
+    expect(screen.queryByText(/warnings 0/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Script file')).toHaveClass('hidden')
     expect(screen.getByRole('button', { name: 'Choose script file' })).toHaveAttribute('data-slot', 'button')
     expect(screen.getByRole('button', { name: 'Reorder script' })).toHaveAttribute(

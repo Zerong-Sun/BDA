@@ -77,7 +77,9 @@ function WorkflowInspectorContent({
   )
   const [scriptPreview, setScriptPreview] = useState<ScriptPreviewResponse | null>(null)
   const [queueName, setQueueName] = useState(selectedNode?.queue ?? '')
-  const [previewBackend, setPreviewBackend] = useState('lsf')
+  const [previewBackend, setPreviewBackend] = useState<'lsf' | 'docker'>('lsf')
+  const unsavedPreviewInputs = (queueName.trim() || null) !== (selectedNode?.queue || null)
+    || JSON.stringify(draftBindings) !== JSON.stringify(selectedNode?.input_bindings ?? [])
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const { t, language } = useI18n()
@@ -167,6 +169,7 @@ function WorkflowInspectorContent({
   const previewScript = useMutation({
     mutationFn: () => {
       if (!selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
+      if (unsavedPreviewInputs) throw new Error(t.workflowExt.inspector.savePreviewInputs)
       return previewWorkflowNodeScript(selectedNode.id, {
         override_params: effectiveParameters,
         compute_backend: previewBackend,
@@ -317,7 +320,7 @@ function WorkflowInspectorContent({
                 </Button>
                 <Button type="button"
                   size="sm"
-                  disabled={previewScript.isPending || nodePreflight.data?.allowed !== true}
+                  disabled={previewScript.isPending || saveParameters.isPending || unsavedPreviewInputs}
                   onClick={() => previewScript.mutate()}
                 >
                   <FileCode className="h-3.5 w-3.5" />
@@ -326,6 +329,9 @@ function WorkflowInspectorContent({
                     : t.workflowExt.inspector.generateScript}
                 </Button>
               </div>
+              {unsavedPreviewInputs ? (
+                <p className="mt-2 text-xs text-text-secondary">{t.workflowExt.inspector.savePreviewInputs}</p>
+              ) : null}
               {nodePreflight.data && !nodePreflight.data.allowed ? (
                 <Alert className="mt-2" variant="warning">
                   <AlertDescription>
@@ -428,7 +434,6 @@ function WorkflowInspectorContent({
         workflowRunId={workflowRunId}
         readOnly={readOnly}
         selectedNodeId={selectedNode?.id ?? null}
-        overrideParams={effectiveParameters}
       />
       <div className="mt-3">
         <ClusterDrafts projectId={projectId} variant="panel" readOnly={readOnly} />
