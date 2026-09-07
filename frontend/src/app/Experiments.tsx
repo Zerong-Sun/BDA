@@ -175,9 +175,6 @@ export function ExperimentsPage() {
       />
       </Disclosure>
 
-      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" title={language === 'zh' ? '查看完整流程与项目指标' : 'Full workflow and project metrics'}>
-        <WorkflowProgress projectQuery={query} overview={overview} hasProject={Boolean(projectId)} />
-
       {projectId ? (
         <ApiState
           isLoading={overviewLoading}
@@ -194,11 +191,12 @@ export function ExperimentsPage() {
             </AppFrame>
           }
         >
-          {overview ? <OverviewCards overview={overview} /> : null}
+          <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" title={language === 'zh' ? '查看完整流程与项目指标' : 'Full workflow and project metrics'}>
+            <WorkflowProgress projectQuery={query} overview={overview} hasProject={Boolean(projectId)} />
+            {overview ? <OverviewCards overview={overview} /> : null}
+          </Disclosure>
         </ApiState>
       ) : null}
-
-      </Disclosure>
 
       {overview ? <DesignPromptCard project={overview.project} /> : null}
 
