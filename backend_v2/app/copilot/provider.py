@@ -50,8 +50,10 @@ def completion_message(
     body: dict[str, Any] = {
         "model": provider.model,
         "messages": messages,
-        **{key: value for key, value in provider.config.items() if key != "platform_default"},
+        **{key: value for key, value in provider.config.items() if key not in {"platform_default", "bda_pricing"}},
     }
+    if provider.config.get("bda_pricing") and "max_tokens" not in body and "max_completion_tokens" not in body:
+        body["max_tokens"] = 2048
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"

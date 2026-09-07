@@ -380,7 +380,11 @@ export function selectCasesFromEnv(matrix, env = process.env) {
     ['BDA_BROWSER_CASES', 'id'],
   ]
 
-  let selected = matrix
+  // Desktop web is the delivery target. Keep historical cases available for
+  // explicit reruns without including mobile in the default acceptance suite.
+  let selected = env.BDA_BROWSER_VIEWPORTS || env.BDA_BROWSER_CASES
+    ? matrix
+    : matrix.filter((entry) => entry.viewportId === 'desktop')
   for (const [environmentKey, property] of filters) {
     const raw = env[environmentKey]
     if (!raw) continue
@@ -1310,6 +1314,16 @@ function createStrictRoutes({ scenario, routeId }) {
     items: [],
     next_cursor: null,
   }))
+  add('GET', '/api/v2/copilot/task-services', {}, () => ok([{
+    id: 'literature', title: 'Research the evidence', title_zh: '调研与比较证据',
+    deliverable: 'Traced excerpts and evidence gaps', deliverable_zh: '可追溯的证据与缺口',
+    capabilities: ['research-read'], write_tools: ['start_literature_search', 'create_knowledge_draft'],
+    steps: [{ id: 'excerpts', title: 'Read traced excerpts', title_zh: '读取可追溯来源', tools: ['get_reference_content'] }],
+  }]))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/task-readiness`, {}, () => ok({
+    model: '', checked_at: null, checks: {}, eligible_services: [], reason: 'No model in this browser fixture.',
+  }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/config`, {}, () => ok({
     project_id: PROJECT_ID,
     llm_provider_id: null,

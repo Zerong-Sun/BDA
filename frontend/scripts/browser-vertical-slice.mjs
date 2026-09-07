@@ -930,6 +930,31 @@ async function firstVisible(locator) {
   return null
 }
 
+async function exerciseCopilotTaskPlan(page, testCase, diagnostics) {
+  if (!testCase.authenticated || testCase.routeId !== 'experiments' || testCase.viewportId !== 'desktop') return
+  if (testCase.scenario === 'populated') {
+    const trigger = page.getByRole('button', { name: /^(Open Copilot|打开 Copilot)$/ })
+    await trigger.focus()
+    await trigger.click()
+    const taskPanel = page.locator(COPILOT_LAYER_SELECTOR)
+    await taskPanel.getByRole('button', { name: /Research the evidence|调研与比较证据/ }).click()
+    await taskPanel.getByRole('textbox', { name: /Task goal|希望完成的工作/ }).fill('Research the project evidence')
+    await taskPanel.getByRole('button', { name: /Research the evidence|调研与比较证据/ }).click()
+    const startTask = taskPanel.getByRole('button', { name: /Start this plan|按以上计划开始/ })
+    await startTask.waitFor({ state: 'visible' })
+    if (await startTask.isEnabled()) throw new Error('Unqualified provider must not start a guided task')
+    const searchGrant = taskPanel.getByRole('checkbox', { name: /Allow external literature|允许发起外部文献检索/ })
+    if (await searchGrant.isChecked()) throw new Error('External search authorization must start unchecked')
+    await searchGrant.check()
+    await page.screenshot({ path: `/tmp/bda-copilot-task-${testCase.viewportId}-${testCase.appearanceId}.png` })
+    await page.keyboard.press('Escape')
+    await expectHidden(taskPanel, 'Copilot task panel')
+    await trigger.focus()
+    diagnostics.copilotTaskPlan = 'checked scope and unqualified-model gate'
+  }
+
+}
+
 async function exerciseGlobalLayers(page, testCase, diagnostics) {
   if (
     !testCase.authenticated
@@ -952,6 +977,7 @@ async function exerciseGlobalLayers(page, testCase, diagnostics) {
     'Copilot',
     diagnostics,
   )
+
 
   const helpTrigger = await firstVisible(page.getByRole('button', { name: 'Help' }))
   if (helpTrigger) {
@@ -1568,6 +1594,7 @@ async function runCase(browser, testCase) {
 
     diagnostics.systemTheme = await assertSystemThemeResponse(page, testCase)
     await exerciseGlobalLayers(page, testCase, diagnostics)
+    await exerciseCopilotTaskPlan(page, testCase, diagnostics)
     diagnostics.overflow = await assertNoPageOverflow(page)
     diagnostics.reducedMotion = await assertReducedMotion(page)
     diagnostics.touchTargets = await assertMobileTouchTargets(page, testCase)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { ChatCircleIcon } from '@phosphor-icons/react'
-import { CopilotAgentRuns } from '../features/copilot/CopilotAgentRuns'
+import { CopilotWorkspace } from '../features/copilot/CopilotWorkspace'
 import { NextStep } from '../components/ui/NextStep'
 import { Button } from '../components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs'
@@ -119,7 +119,7 @@ export function ResearchPage() {
           {group === 'methods' ? <Button render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
           {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
         </div> : null}
-        {projectId && group === 'evidence' && researchAgentOpen ? <CopilotAgentRuns key={projectId} skills={['project-read', 'research-read', 'knowledge-authoring', 'literature-search']} initialGoal={language === 'zh'
+        {projectId && group === 'evidence' && researchAgentOpen ? <CopilotWorkspace key={projectId} initialService="literature" initialGoal={language === 'zh'
           ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，调用文献检索并等待完成，读取可获取的正文或摘要，保存带引用的待审核研究笔记，列出信息缺口和实验方案建议。只保存草案，不审核结论、不提交计算任务。请使用中文汇报。'
           : 'Research this project: read its brief, search literature, wait for retrieval, read available full text or abstracts, and save cited pending-review knowledge notes. Identify evidence gaps and propose experiments. Save drafts only; do not approve conclusions or submit compute jobs.'} /> : null}
         <TabsContent value={group}>

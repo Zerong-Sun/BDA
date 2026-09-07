@@ -90,7 +90,7 @@ function LaneMarks({ entry }: { entry: TimelineEntry }) {
 
 function DecisionCard({ node }: { node: DecisionNode }) {
   const actions = useContext(TreeActionsContext)
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const tl = t.timeline
   const [open, setOpen] = useState(false)
   const entry = node.entry
@@ -135,7 +135,7 @@ function DecisionCard({ node }: { node: DecisionNode }) {
             {format(tl.supersedesCount, { count: String(node.superseded.length) })}
           </span>
         ) : null}
-        {entry.alternatives.length || node.superseded.length || entry.body ? (
+        {entry.alternatives.length || node.superseded.length || entry.body || refs.length ? (
           <Button
             type="button"
             variant="ghost"
@@ -173,6 +173,7 @@ function DecisionCard({ node }: { node: DecisionNode }) {
 
       {open ? (
         <div className="mt-2 space-y-2">
+          {refs.length ? <div className="rounded-md border border-border-soft p-2"><p className="text-xs font-medium">{language === 'zh' ? '证据与来源' : 'Evidence and sources'}</p><ul className="mt-1 space-y-1 break-all text-xs">{refs.map((ref, index) => <li key={index}>{ref.kind}: {ref.value}</li>)}</ul></div> : null}
           {entry.alternatives.length ? (
             <div className="rounded-md border border-border-soft bg-surface-2 p-2">
               <p className="text-[11px] uppercase tracking-wide text-text-muted">{tl.alternatives}</p>

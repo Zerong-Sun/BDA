@@ -36,8 +36,10 @@ from ..registry.models import LLMProvider
 from . import agent_runs
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
+from .policy import SCIENTIFIC_POLICY
 from .provider import completion_message
 from .registry import REGISTRY, ToolContext
+from .task_contracts import FINAL_INSTRUCTION, available_step_tools, evaluate_delivery, progress
 
 #: Kept deliberately short. The turn policy that governs what may be claimed
 #: lives in the chat prompt and is unchanged by running longer; what an agent
@@ -66,9 +68,11 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
     conversation: list[dict[str, Any]] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+        {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + FINAL_INSTRUCTION},
         {"role": "user", "content": run.goal},
     ]
+    if run.task_contract:
+        conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**run.task_contract, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})
     for turn in turns:
         if turn.role == "tool":
             meta = (turn.tool_calls or [{}])[0]
@@ -169,13 +173,14 @@ def _tool_context(session: Session, run: CopilotAgentRun) -> ToolContext:
         project=ProjectContextService(session, project),
         # The goal is the human's own words, so the same request check that stops
         # a chat turn talking itself into a write applies unchanged here.
-        actions=CopilotActionService(session, project, user, request_text=run.goal, source_message_id=run.id),
+        actions=CopilotActionService(session, project, user, request_text=run.goal, source_message_id=run.id,
+            authorized_writes=set(run.task_contract.get("authorized_writes", [])) if (run.task_contract or {}).get("version") else None),
         agent_run=run,
     )
 
 
-def _schemas(run: CopilotAgentRun) -> list[dict[str, Any]]:
-    allowed = set(run.allowed_tools or [])
+def _schemas(run: CopilotAgentRun, turns: list[CopilotAgentTurn] | None = None) -> list[dict[str, Any]]:
+    allowed = available_step_tools(run, turns or [])
     return [spec.schema() for spec in REGISTRY.all() if spec.id in allowed]
 
 
@@ -194,9 +199,17 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         settle_parent(session, run)
         return run.status
 
+    from .capabilities import normalize_capabilities, tools_for_capabilities
+    from .models import CopilotConfig
+    config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == run.project_id))
+    enabled = tools_for_capabilities(normalize_capabilities(list(config.enabled_skills) if config else None))
+    run.allowed_tools = sorted(set(run.allowed_tools or []) & enabled)
     turns = agent_runs.transcript(session, run)
-    schemas = _schemas(run)
-    message = completion_message(provider, messages_for(run, turns), tools=schemas if schemas else None)
+    schemas = _schemas(run, turns)
+    from .task_budget import reserve_model_call
+    messages = messages_for(run, turns)
+    reserve_model_call(session, run, provider, messages, schemas or None)
+    message = completion_message(provider, messages, tools=schemas if schemas else None)
     requested = message.get("tool_calls")
     content = message.get("content")
 
@@ -205,6 +218,26 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         if not answer:
             raise AgentRunError("agent_run_empty_answer")
         agent_runs.append_turn(session, run, role="assistant", content=answer)
+        run.outcome = evaluate_delivery(run, answer, turns)
+        if (run.task_contract or {}).get("service_kind") in {"literature", "interpretation"} and run.outcome["status"] in {"completed", "partial"}:
+            from .task_contracts import tool_records
+            try:
+                review_messages = [
+                    {"role": "system", "content": SCIENTIFIC_POLICY + "\nReview the entire draft against the tool records. Correct unsupported claims in every section. Preserve the contract's required sections and do not invent citations.\n" + FINAL_INSTRUCTION},
+                    {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
+                        "draft": run.outcome, "tool_records": tool_records(turns)}, ensure_ascii=False)},
+                ]
+                reserve_model_call(session, run, provider, review_messages)
+                review_message = completion_message(provider, review_messages)
+                reviewed = str(review_message.get("content") or "")
+                reviewed_outcome = evaluate_delivery(run, reviewed, turns)
+                if reviewed_outcome["status"] == "review_required":
+                    raise ValueError("invalid_review_delivery")
+                agent_runs.append_turn(session, run, role="assistant", content=reviewed)
+                run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed"}
+            except Exception:
+                run.outcome = {**run.outcome, "status": "review_required", "scientific_review": "unavailable",
+                               "missing": [*run.outcome.get("missing", []), "scientific_review_unavailable"]}
         agent_runs.finish(session, run, status="succeeded")
         settle_parent(session, run)
         return run.status
@@ -255,6 +288,8 @@ def _run_tool(
         # run's vocabulary, which is a fact it should see and correct, not a
         # reason to abandon a run that may be most of the way to its goal.
         return {"error": "tool_not_allowed_for_this_run", "tool": name}, None
+    if (run.task_contract or {}).get("version") and name not in available_step_tools(run, agent_runs.transcript(context.session, run)):
+        return {"error": "complete_the_current_task_step_first", "tool": name}, None
     try:
         arguments = json.loads(raw_arguments or "{}") if isinstance(raw_arguments, str) else dict(raw_arguments or {})
         if not isinstance(arguments, dict):
@@ -307,7 +342,7 @@ def settle_parent(session: Session, run: CopilotAgentRun) -> None:
         session,
         task,
         status="succeeded" if run.status == "succeeded" else "failed",
-        result={"answer": final} if final else {},
+        result={"answer": final, "outcome": run.outcome or {}},
         error=run.error,
     )
 
@@ -371,4 +406,9 @@ def provider_for(session: Session, run: CopilotAgentRun) -> LLMProvider:
     provider = select_provider(session, project_id=run.project_id)
     if provider is None:
         raise AgentRunError("agent_run_provider_not_configured")
+    kind = (run.task_contract or {}).get("service_kind")
+    if kind and kind != "custom":
+        from .qualification import readiness
+        if kind not in readiness(session, run.project_id)["eligible_services"]:
+            raise AgentRunError("copilot_model_task_checks_required")
     return provider

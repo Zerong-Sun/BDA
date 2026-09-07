@@ -186,6 +186,9 @@ def put_config(
             provider.endpoint = endpoint
         if model:
             provider.model = model
+    settings_payload.pop("task_qualification", None)
+    if (row.settings or {}).get("task_qualification"):
+        settings_payload["task_qualification"] = row.settings["task_qualification"]
     row.settings = settings_payload
     row.enabled_skills = payload.enabled_skills
     if payload.llm_provider_id is not None and not raw_api_key:
@@ -528,7 +531,7 @@ def start_agent_run(
     and `allowed_tools` is the restriction a subagent is intersected against.
     """
     config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == project.id))
-    enabled = normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
+    enabled = normalize_capabilities(list(config.enabled_skills) if config else None)
     if payload.skills:
         requested = normalize_capabilities(payload.skills)
         unknown = sorted(set(payload.skills) - configurable_capability_ids())
@@ -548,7 +551,27 @@ def start_agent_run(
         capabilities = requested
     else:
         capabilities = enabled
-    allowed_tools = sorted(tools_for_capabilities(capabilities))
+    from .registry import REGISTRY
+    from .task_contracts import SERVICES, build_contract
+
+    recipe = SERVICES.get(payload.service_kind)
+    if recipe:
+        from .qualification import readiness
+        if payload.service_kind not in readiness(session, project.id)["eligible_services"]:
+            raise DomainError("copilot_model_not_qualified", "Run the current model's task checks before starting this service.", status_code=409)
+        capabilities &= set(recipe["capabilities"])
+    available = tools_for_capabilities(capabilities)
+    writes = set(payload.authorized_writes)
+    permitted_writes = REGISTRY.write_ids() & available
+    if recipe:
+        permitted_writes &= set(recipe["write_tools"])
+    if not writes <= permitted_writes:
+        raise DomainError("copilot_task_scope_invalid", "Requested writes exceed the service or project scope.", status_code=403)
+    allowed_tools = sorted((available - REGISTRY.write_ids()) | writes)
+    if payload.conversation_id:
+        conversation = session.get(CopilotConversation, payload.conversation_id)
+        if conversation is None or conversation.project_id != project.id:
+            raise DomainError("conversation_not_found", "Conversation does not belong to this project", status_code=404)
     if not allowed_tools:
         raise DomainError(
             "copilot_agent_run_without_tools",
@@ -560,6 +583,7 @@ def start_agent_run(
         project_id=project.id,
         user_id=user.id,
         goal=payload.goal,
+        task_contract=build_contract(payload.service_kind, sorted(writes)),
         allowed_tools=allowed_tools,
         conversation_id=payload.conversation_id,
         max_turns=payload.max_turns,
@@ -576,3 +600,56 @@ def start_agent_run(
         payload={"run_id": str(run.id)},
     )
     return run, operation
+
+
+def continue_agent_run(session: Session, run: CopilotAgentRun, user: User, message: str, authorized_writes: list[str] | None = None) -> Operation:
+    from ..projects.service import require_project
+    project = require_project(session, run.project_id, user)
+    if run.created_by != user.id:
+        raise DomainError("copilot_task_actor_mismatch", "Only the task creator can extend its authorization.", status_code=403)
+    if run.parent_run_id or run.status not in {"succeeded", "failed"}:
+        raise DomainError("copilot_task_not_continuable", "Only a stopped root task can be continued.", status_code=409)
+    if run.turn_count >= 200:
+        raise DomainError("copilot_task_turn_limit", "Start a new task after reviewing the results.", status_code=409)
+    root = agent_runs.budget_root(session, run)
+    if root.max_cost_usd_cents is not None and agent_runs.tree_cost_usd_cents(session, root) >= root.max_cost_usd_cents:
+        raise DomainError("copilot_task_budget_exhausted", "The approved budget is exhausted. Start a new task with a new budget.", status_code=409)
+    if authorized_writes is not None:
+        from .registry import REGISTRY
+        from .task_contracts import build_contract
+        original = set((run.task_contract or {}).get("authorized_writes", []))
+        if not set(authorized_writes) <= original:
+            raise DomainError("copilot_task_scope_expansion", "Continuations can reduce scope. Start a new plan to authorize additional writes.", status_code=403)
+        run.task_contract = {**(run.task_contract or {}), **build_contract((run.task_contract or {}).get("service_kind", "custom"), authorized_writes)}
+        run.allowed_tools = sorted(set(run.allowed_tools) - (REGISTRY.write_ids() - set(authorized_writes)))
+    agent_runs.append_turn(session, run, role="user", content=message)
+    run.max_turns = min(200, max(run.max_turns, run.turn_count + 12))
+    run.status, run.error, run.outcome = "running", None, {}
+    run.version += 1
+    session.flush()
+    return enqueue_operation(session, topic="copilot.agent_step", resource_type="copilot_agent_run", resource_id=run.id,
+        project_id=project.id, organization_id=project.organization_id, user=user, payload={"run_id": str(run.id)})
+
+
+def save_task_record(session: Session, run: CopilotAgentRun, user: User) -> None:
+    from datetime import UTC, datetime
+
+    from ..projects.service import require_project
+    from ..timeline.schemas import TimelineEntryCreate
+    from ..timeline.service import create_entry
+    project = require_project(session, run.project_id, user)
+    outcome = run.outcome or {}
+    if run.status not in {"succeeded", "failed"} or not outcome.get("summary"):
+        raise DomainError("copilot_delivery_not_ready", "A stopped task with a delivery is required.", status_code=409)
+    if outcome.get("decision_record_id"):
+        return
+    # This records a proposal, never an approved scientific conclusion.
+    body = str(outcome["summary"]) + "\n\nRemaining: " + "; ".join(outcome.get("missing", [])) + "\nNext: " + str(outcome.get("next_action", ""))
+    entry = create_entry(session, project, TimelineEntryCreate(
+        occurred_at=datetime.now(UTC), entry_type="plan", title=run.goal[:300], summary=str(outcome["summary"])[:1000],
+        body=body, outcome="unspecified", phase="copilot_review", entry_key=f"copilot-task:{run.id}:{run.version}",
+        provenance={"external_refs": [f"copilot-agent-run:{run.id}"]}, tags=["copilot", "pending_review"],
+    ), user)
+    run.outcome = {**outcome, "decision_record_id": str(entry.id)}
+    run.version += 1
+    session.flush()

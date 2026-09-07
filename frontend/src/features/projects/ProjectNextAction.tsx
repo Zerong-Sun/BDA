@@ -1,3 +1,4 @@
+import { useAppStore } from '../../lib/store/appStore'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { Link } from 'react-router'
 import { Button } from '../../components/ui/Button'
@@ -32,6 +33,7 @@ export function ProjectNextAction({ overview }: { overview: ProjectOverview }) {
       <ul className="mt-2 list-disc pl-5">{overview.target_readiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
     </Disclosure> : null}
     <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="outline" onClick={() => { useAppStore.getState().setCopilotDraft(''); useAppStore.getState().setCopilotOpen(true) }}>{language === 'zh' ? '让助手准备下一步' : 'Prepare the next step with Copilot'}</Button>
       <Button render={<Link to={`${stage.path}?project=${project}${index === 0 ? '&tab=goals' : ''}`} />}>{language === 'zh' ? '继续当前任务' : 'Continue current task'}</Button>
       <Button variant="outline" render={<Link to={`/research?project=${project}&tab=timeline`} />}>{language === 'zh' ? '查看决策记录' : 'Decision record'}</Button>
     </div>

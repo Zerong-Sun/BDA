@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftIcon, SpinnerGapIcon } from '@phosphor-icons/react'
 import {
   cancelAgentRun,
+  continueAgentRun,
   getAgentRun,
   isLive,
   listAgentRuns,
@@ -11,6 +12,10 @@ import {
   type AgentRun,
   type AgentTurn,
 } from '../../lib/api/agentRuns'
+import { TaskDelivery } from './TaskDelivery'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Disclosure } from '../../components/ui/Disclosure'
+import { deliveryLabel } from './taskPresentation'
 import { ApiError } from '../../lib/api/client'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
@@ -198,6 +203,8 @@ function costLabel(
   copy: Record<string, string>,
   format: (template: string, values: Record<string, string | number>) => string,
 ): string {
+  if (run.task_contract?.cost_mode === 'unavailable') return 'Cost not measured / 费用未计量'
+  if (run.task_contract?.cost_mode === 'conservative_estimate') return `Estimated reserve / 保守预留 ${run.subtree_cost_usd_cents ?? run.cost_usd_cents}¢`
   // The server always sends the subtree total; falling back to the run's own
   // cost keeps an older response readable rather than showing a confident zero.
   const subtree = run.subtree_cost_usd_cents ?? run.cost_usd_cents
@@ -209,7 +216,7 @@ function costLabel(
   return format(copy.cost, { cents: run.cost_usd_cents })
 }
 
-function AgentRunDetail({
+export function AgentRunDetail({
   runId,
   projectId,
   onBack,
@@ -218,20 +225,22 @@ function AgentRunDetail({
   projectId: string
   onBack: () => void
 }) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const copy = t.copilot.agentRuns
   const queryClient = useQueryClient()
   const showToast = useToastStore((state) => state.show)
 
+  const [followup, setFollowup] = useState('')
+  const [retainedWrites, setRetainedWrites] = useState<string[] | null>(null)
   const run = useQuery({
-    queryKey: ['agent-run', runId],
+    queryKey: ['agent-run', projectId, runId],
     queryFn: () => getAgentRun(runId),
     refetchInterval: (query) =>
       query.state.data && isLive(query.state.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
 
   const turns = useQuery({
-    queryKey: ['agent-run-turns', runId],
+    queryKey: ['agent-run-turns', projectId, runId],
     queryFn: () => listAgentTurns(runId),
     refetchInterval: run.data && isLive(run.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
@@ -243,7 +252,7 @@ function AgentRunDetail({
     },
     onSuccess: (result) => {
       showToast(format(copy.cancelled, { count: result.cancelled_runs }), 'success')
-      void queryClient.invalidateQueries({ queryKey: ['agent-run', runId] })
+      void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] })
       void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
     },
     onError: (error) => {
@@ -251,11 +260,23 @@ function AgentRunDetail({
       // usually means it finished before the click landed.
       if (error instanceof ApiError && error.status === 412) {
         showToast(copy.conflict, 'error')
-        void queryClient.invalidateQueries({ queryKey: ['agent-run', runId] })
+        void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] })
         return
       }
       showToast(error instanceof Error ? error.message : String(error), 'error')
     },
+  })
+
+  const continuation = useMutation({
+    mutationFn: () => continueAgentRun(runId, run.data!.version, followup.trim(), retainedWrites ?? undefined),
+    onSuccess: () => {
+      setFollowup('')
+      setRetainedWrites(null)
+      void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] })
+      void queryClient.invalidateQueries({ queryKey: ['agent-run-turns', projectId, runId] })
+      void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
+    },
+    onError: () => { void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] }) },
   })
 
   return (
@@ -282,7 +303,7 @@ function AgentRunDetail({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <StatusPill tone={toneFor(run.data.status)}>
-              {statusLabel(run.data.status, copy)}
+              {deliveryLabel(run.data, language === 'zh')}
             </StatusPill>
             {run.data.status === 'awaiting_tasks' ? (
               <SpinnerGapIcon aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
@@ -304,8 +325,16 @@ function AgentRunDetail({
         </div>
       ) : null}
 
-      <div className="space-y-2">
-        <h4 className="text-xs uppercase tracking-wide text-text-secondary">{copy.transcript}</h4>
+      {run.data ? <TaskDelivery run={run.data} /> : null}
+      {run.error || turns.error ? <p role="alert">{language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.'}</p> : null}
+      {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
+        <label className="text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
+        {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
+        <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用或缩小本任务的写入范围和费用上限，增加最多 12 轮处理。' : 'Keeps the same write scope and cost ceiling, with up to 12 more turns.'}</p>
+        <Button type="submit" disabled={!followup.trim() || continuation.isPending}>{language === 'zh' ? '继续此任务' : 'Continue this task'}</Button>
+        {continuation.error ? <p role="alert">{continuation.error instanceof Error ? continuation.error.message : String(continuation.error)}</p> : null}
+      </form> : null}
+      <Disclosure key={run.data?.task_contract?.version ? "task" : "legacy"} title={copy.transcript} defaultOpen={!run.data?.task_contract?.version}>
         {turns.data && turns.data.length > 0 ? (
           <ol className="space-y-2">
             {turns.data.map((turn) => (
@@ -317,7 +346,7 @@ function AgentRunDetail({
             {turns.isLoading ? '' : copy.transcriptEmpty}
           </p>
         )}
-      </div>
+      </Disclosure>
     </div>
   )
 }

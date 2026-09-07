@@ -33,6 +33,7 @@ from .repository import CopilotRepository
 from .schemas import (
     AgentRunAccepted,
     AgentRunCancelled,
+    AgentRunContinuation,
     AgentRunCreate,
     AgentRunPage,
     AgentRunResponse,
@@ -52,6 +53,8 @@ from .schemas import (
     RoutePlanCreate,
     RoutePlanResponse,
     SkillResponse,
+    TaskReadinessResponse,
+    TaskServiceResponse,
 )
 from .service import (
     create_interpretation as create_interpretation_service,
@@ -346,8 +349,10 @@ def _run_response(session: Session, run: CopilotAgentRun) -> AgentRunResponse:
     spend upward would make its own `cost_usd_cents` untrue, and that column is
     what a person reads when asking where the money went.
     """
+    from .task_contracts import task_view
     return AgentRunResponse.model_validate(run).model_copy(
-        update={"subtree_cost_usd_cents": agent_runs.tree_cost_usd_cents(session, run)}
+        update={"subtree_cost_usd_cents": agent_runs.tree_cost_usd_cents(session, run),
+                "outcome": task_view(run, agent_runs.transcript(session, run))}
     )
 
 
@@ -442,3 +447,59 @@ def cancel_agent_run(
     cancelled = agent_runs.cancel(session, run, reason=f"cancelled by {user.username}")
     response.headers["ETag"] = etag(run.version)
     return AgentRunCancelled(run=_run_response(session, run), cancelled_runs=cancelled)
+
+
+
+
+@router.get("/task-services", response_model=list[TaskServiceResponse])
+def list_task_services(user: User = Depends(current_user)) -> list[TaskServiceResponse]:
+    from .task_contracts import SERVICES
+    return [TaskServiceResponse(id=key, **value) for key, value in SERVICES.items()]
+
+
+@router.post("/agent-runs/{run_id}/continuations", response_model=AgentRunAccepted,
+             status_code=status.HTTP_202_ACCEPTED, openapi_extra={"x-permission": "copilot.agent.start"})
+def continue_agent_run(
+    run_id: uuid.UUID, payload: AgentRunContinuation,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> AgentRunAccepted:
+    from .service import continue_agent_run as continue_service
+    # Serialize continuation against another continuation and the worker.
+    agent_runs.require_run(session, run_id, for_update=True)
+    run = _require_run(session, run_id, user)
+    expected = parse_if_match(if_match)
+    if expected != run.version:
+        raise DomainError("version_conflict", "The task changed. Reload it before continuing.", status_code=412)
+    operation = continue_service(session, run, user, payload.message, payload.authorized_writes)
+    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+
+
+@router.get("/projects/{project_id}/task-readiness", response_model=TaskReadinessResponse)
+def get_task_readiness(project_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from .qualification import readiness
+    require_project(session, project_id, user)
+    return readiness(session, project_id)
+
+
+@router.post("/projects/{project_id}/config/assessments", response_model=TaskReadinessResponse,
+             openapi_extra={"x-permission": "copilot.config.test"})
+def assess_task_readiness(project_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(require_command)) -> dict:
+    from .qualification import assess
+    require_project(session, project_id, user)
+    return assess(session, project_id)
+
+
+@router.post("/agent-runs/{run_id}/decision-records", response_model=AgentRunResponse,
+             openapi_extra={"x-permission": "timeline.create"})
+def save_task_decision_record(
+    run_id: uuid.UUID, if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> AgentRunResponse:
+    from .service import save_task_record
+    agent_runs.require_run(session, run_id, for_update=True)
+    run = _require_run(session, run_id, user)
+    if parse_if_match(if_match) != run.version:
+        raise DomainError("version_conflict", "Reload the task before saving its delivery.", status_code=412)
+    save_task_record(session, run, user)
+    return _run_response(session, run)

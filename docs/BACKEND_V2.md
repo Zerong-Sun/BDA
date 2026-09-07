@@ -72,7 +72,7 @@ Artifact 状态为 uploading、available、failed、deleted。reconciliation 检
 - Literature 包含 document/chunk/claim/evidence/relation/subscription；摄取和关系检测由 research queue 执行。
 - Intelligence 包含 run/report/evidence/hotspot/design route；审核使用 ETag，apply-route 创建普通工作流，export 生成 artifact。
 - Registry 管理 server、compute node、model/method plugin、参数目录、script asset 和 LLM provider；数据库只存 `credential_ref`。
-- Copilot 提供 chat/messages/SSE/config/skills/route plan/interpretation，外部调用在 copilot queue 执行。
+- Copilot 提供聊天、持久化 agent run、配置、能力、路线建议和记录摘要。聊天/agent 由 copilot worker 处理；模型测试与 use_model 路线建议当前在请求中调用模型。详见 [服务及接口指南](COPILOT_SERVICE_GUIDE.md)。
 - Compute draft 确认后创建普通 job；配体查询无副作用，导入必须生成项目 artifact。
 
 ## 8. 配置与启动门禁
@@ -110,4 +110,4 @@ alembic -c backend_v2/alembic.ini upgrade head
 alembic -c backend_v2/alembic.ini check
 ```
 
-本地 PostgreSQL/Redis/MinIO、50 并发 API、20 SSE、故障恢复、三次快照迁移、依赖审计和容器扫描结果见 `docs/V2_LOCAL_ACCEPTANCE.md`。生产验收仍需在实际 Kubernetes、远程 Docker daemon 与 LSF 测试队列重跑闭环，并验证监控告警、PITR/MinIO 恢复和维护窗口。缺少这些环境证据时只能声明“仓库默认切换完成”，不能声明“生产已切流”。
+历史批次的本地基础设施、并发、故障恢复、迁移与审计记录见 `docs/archive/2026-09-07/validation/V2_LOCAL_ACCEPTANCE.md`。生产验收仍需在实际 Kubernetes、远程 Docker daemon 与 LSF 测试队列重跑闭环，并验证监控告警、PITR/MinIO 恢复和维护窗口。缺少这些环境证据时只能声明“仓库默认切换完成”，不能声明“生产已切流”。

@@ -1,0 +1,69 @@
+{
+  "archived_on": "2026-09-07",
+  "preservation": "Original bytes are preserved after an archive notice.",
+  "documents": [
+    {
+      "old_path": "docs/COPILOT_CAPABILITY_PLAN_V2.md",
+      "archive_path": "docs/archive/2026-09-07/copilot/COPILOT_CAPABILITY_PLAN_V2.md",
+      "reason": "能力规划缺少完整入口/API映射及新增实验服务",
+      "replacement": "docs/COPILOT_SERVICE_GUIDE.md",
+      "original_sha256": "02ec885c9b2f8efd1e01206ead2f20c547336bce8d95f29463762fd1512234dc"
+    },
+    {
+      "old_path": "docs/COPILOT_DEEPSEEK_配置指南.md",
+      "archive_path": "docs/archive/2026-09-07/copilot/COPILOT_DEEPSEEK_配置指南.md",
+      "reason": "密钥、数据库与配置变量说明过时",
+      "replacement": "docs/COPILOT_SERVICE_GUIDE.md",
+      "original_sha256": "9ec445fc5119af7d2fad9f7a44f32780889eb1870c3b096ab933032922e2e26c"
+    },
+    {
+      "old_path": "docs/COPILOT_VALIDATION_REPORT.md",
+      "archive_path": "docs/archive/2026-09-07/copilot/COPILOT_VALIDATION_REPORT.md",
+      "reason": "仅保留当时验证证据，不作为当前能力承诺",
+      "replacement": "docs/COPILOT_SERVICE_GUIDE.md",
+      "original_sha256": "d9178ac204b161d59965406ef993e3c3e973f56d2581344c78f1020c4595449e"
+    },
+    {
+      "old_path": "docs/RESEARCH_INTERFACE_USAGE_GUIDE.md",
+      "archive_path": "docs/archive/2026-09-07/research/RESEARCH_INTERFACE_USAGE_GUIDE.md",
+      "reason": "旧五页签与当前四分区不符",
+      "replacement": "docs/GUIDED_PLATFORM_WORKFLOW.md",
+      "original_sha256": "7d62fafe67668bcde07991f7d0e646fbaf8942782f20f059e9ac4f695ae2e76e"
+    },
+    {
+      "old_path": "docs/BDA_RESEARCH_WORKSPACE_AND_BYOK.md",
+      "archive_path": "docs/archive/2026-09-07/research/BDA_RESEARCH_WORKSPACE_AND_BYOK.md",
+      "reason": "研究包与模型配置职责拆分，移除重复操作说明",
+      "replacement": "docs/RESEARCH_PACKAGES.md",
+      "original_sha256": "a658e4e754debe1f0c5650f7381c29d1c6f0435c0e2fb8c1f782d1a2334e0b50"
+    },
+    {
+      "old_path": "docs/superpowers/plans/2026-07-26-frontend-reui-migration.md",
+      "archive_path": "docs/archive/2026-09-07/frontend/2026-07-26-frontend-reui-migration.md",
+      "reason": "阶段性界面迁移实施计划，当前规则由架构文档与自动检查维护",
+      "replacement": "docs/FRONTEND_V2.md",
+      "original_sha256": "076e31ec4bc5b1aec8a514dc32b8dca03ae99839fe39d99b1a796bea714641d3"
+    },
+    {
+      "old_path": "docs/superpowers/plans/Task-4-review.md",
+      "archive_path": "docs/archive/2026-09-07/frontend/Task-4-review.md",
+      "reason": "旧行号和阶段审查意见，仅供历史追溯",
+      "replacement": "docs/FRONTEND_V2.md",
+      "original_sha256": "75bbcae2d4be333168b5810a0895bae449bf07da48ef2a9477400bbca1b4954e"
+    },
+    {
+      "old_path": "docs/superpowers/specs/2026-07-26-frontend-reui-migration-design.md",
+      "archive_path": "docs/archive/2026-09-07/frontend/2026-07-26-frontend-reui-migration-design.md",
+      "reason": "阶段性迁移设计，不代表当前页面入口清单",
+      "replacement": "docs/FRONTEND_V2.md",
+      "original_sha256": "1e525302e9fcb840577fdfe68e52b8b1d5691bdaca3663f60228a58d5f196b47"
+    },
+    {
+      "old_path": "docs/V2_LOCAL_ACCEPTANCE.md",
+      "archive_path": "docs/archive/2026-09-07/validation/V2_LOCAL_ACCEPTANCE.md",
+      "reason": "旧测试数量与迁移head仅属于历史验收批次",
+      "replacement": "docs/STAGING_RELEASE_AND_RECOVERY.md",
+      "original_sha256": "7639cd8bad222d5c6e3f6881e3d2f7676103bd5539c262a9fcd10b954aed08df"
+    }
+  ]
+}

@@ -200,7 +200,7 @@ export async function updateCopilotConfig(projectId: string, payload: CopilotCon
       // Whatever the project already had. A hard-coded list here revoked every
       // capability added after it was written; "research" is the alias the
       // server expands to the full default set for a project that has none yet.
-      enabled_skills: current?.enabled_skills?.length ? current.enabled_skills : ['research'] },
+      enabled_skills: current?.enabled_skills ?? ['research'] },
     throwOnError: true,
   })
   return getCopilotConfig(projectId)

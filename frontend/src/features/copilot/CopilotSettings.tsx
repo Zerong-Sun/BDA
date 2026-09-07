@@ -52,8 +52,8 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
   const [promptDraft, setPromptDraft] = useState<string | null>(null)
   const [advanced, setAdvanced] = useState(false)
   const [apiKey, setApiKey] = useState('')
-  const baseUrl = baseUrlDraft ?? config?.llm_api_base ?? 'https://api.deepseek.com'
-  const model = modelDraft ?? config?.llm_model ?? 'deepseek-v4-pro'
+  const baseUrl = baseUrlDraft ?? config?.llm_api_base ?? ''
+  const model = modelDraft ?? config?.llm_model ?? ''
   const systemPrompt = promptDraft ?? config?.system_prompt ?? ''
 
   const save = useMutation({

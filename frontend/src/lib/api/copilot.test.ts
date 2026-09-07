@@ -77,7 +77,7 @@ describe('target intelligence api', () => {
     })
   })
 
-  it('falls back to the server-side default set for a project with none', async () => {
+  it('preserves an explicitly empty capability set', async () => {
     const configPayload = {
       id: 'config_new',
       project_id: 'proj_new',
@@ -100,7 +100,7 @@ describe('target intelligence api', () => {
 
     // "research" is an alias the server expands, so the client never has to
     // keep its own copy of the default set in step.
-    expect(sent[0]).toMatchObject({ enabled_skills: ['research'] })
+    expect(sent[0]).toMatchObject({ enabled_skills: [] })
   })
 
   it('parses target intelligence endpoints', async () => {

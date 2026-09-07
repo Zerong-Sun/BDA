@@ -1,8 +1,6 @@
 import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/react'
-import { CopilotChat } from '../../features/copilot/CopilotChat'
-import { CopilotActions } from '../../features/copilot/CopilotActions'
-import { CopilotAgentRuns } from '../../features/copilot/CopilotAgentRuns'
+import { CopilotWorkspace } from '../../features/copilot/CopilotWorkspace'
 import { CopilotSettings } from '../../features/copilot/CopilotSettings'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
@@ -21,11 +19,6 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   const copilotWidth = useAppStore((s) => s.copilotWidth)
   const setCopilotWidth = useAppStore((s) => s.setCopilotWidth)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Chat and runs are the two ways to use the copilot, and they are alternatives
-  // rather than companions: a transcript and a conversation both want the whole
-  // drawer, and showing them at once would leave neither readable.
-  const [surface, setSurface] = useState<'chat' | 'runs'>('chat')
-
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
     const startX = event.clientX
@@ -78,15 +71,6 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           <div className="flex items-center gap-1">
             <Button
               type="button"
-              variant={surface === 'runs' ? 'secondary' : 'outline'}
-              size="sm"
-              aria-pressed={surface === 'runs'}
-              onClick={() => setSurface((value) => (value === 'runs' ? 'chat' : 'runs'))}
-            >
-              {t.copilot.agentRuns.toggle}
-            </Button>
-            <Button
-              type="button"
               variant="outline"
               size="sm"
               onClick={() => setSettingsOpen((value) => !value)}
@@ -109,20 +93,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             <CopilotSettings />
           </ScrollArea>
         ) : null}
-        {surface === 'runs' ? (
-          <ScrollArea className="min-h-0 flex-1">
-            <CopilotAgentRuns />
-          </ScrollArea>
-        ) : (
-          <>
-            <div className="shrink-0">
-              <CopilotActions onNavigate={onClose} />
-            </div>
-            <div className="min-h-0 flex-1">
-              <CopilotChat pageContext={pageContext} />
-            </div>
-          </>
-        )}
+        <CopilotWorkspace pageContext={pageContext} />
       </SheetContent>
     </Sheet>
   )

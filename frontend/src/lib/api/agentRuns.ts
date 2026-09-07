@@ -1,4 +1,5 @@
 import './generatedTransport'
+import * as taskSdk from './generated/sdk.gen'
 import {
   cancelAgentRunApiV2CopilotAgentRunsRunIdCancellationsPost,
   getAgentRunApiV2CopilotAgentRunsRunIdGet,
@@ -29,6 +30,8 @@ export function isLive(run: Pick<AgentRun, 'status'>): boolean {
 export async function startAgentRun(body: {
   project_id: string
   goal: string
+  service_kind?: 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation' | 'custom'
+  authorized_writes?: string[]
   skills?: string[]
   max_turns?: number
   max_cost_usd_cents?: number | null
@@ -76,4 +79,30 @@ export async function cancelAgentRun(runId: string, version: number) {
     throwOnError: true,
   })
   return cancelled.data
+}
+
+export async function listTaskServices() {
+  const { data } = await taskSdk.listTaskServicesApiV2CopilotTaskServicesGet<true>({ throwOnError: true })
+  return data
+}
+export async function getTaskReadiness(projectId: string) {
+  const { data } = await taskSdk.getTaskReadinessApiV2CopilotProjectsProjectIdTaskReadinessGet<true>({ path: { project_id: projectId }, throwOnError: true })
+  return data
+}
+export async function assessTaskReadiness(projectId: string) {
+  const { data } = await taskSdk.assessTaskReadinessApiV2CopilotProjectsProjectIdConfigAssessmentsPost<true>({ path: { project_id: projectId }, throwOnError: true })
+  return data
+}
+export async function continueAgentRun(runId: string, version: number, message: string, authorizedWrites?: string[]) {
+  const { data } = await taskSdk.continueAgentRunApiV2CopilotAgentRunsRunIdContinuationsPost<true>({
+    path: { run_id: runId }, body: { message, ...(authorizedWrites ? { authorized_writes: authorizedWrites } : {}) }, headers: { 'If-Match': `W/"${version}"` }, throwOnError: true,
+  })
+  return data
+}
+
+export async function saveTaskDecisionRecord(runId: string, version: number) {
+  const { data } = await taskSdk.saveTaskDecisionRecordApiV2CopilotAgentRunsRunIdDecisionRecordsPost<true>({
+    path: { run_id: runId }, headers: { 'If-Match': `W/"${version}"` }, throwOnError: true,
+  })
+  return data
 }
