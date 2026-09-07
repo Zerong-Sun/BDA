@@ -58,7 +58,7 @@ export function Topbar() {
               <span className="hidden shrink-0 text-fine font-semibold uppercase tracking-wide text-text-muted sm:inline">
                 {t.common.project}
               </span>
-              <Select value={projectId || null} onValueChange={(value) => setProjectId(value ?? '')}>
+              <Select items={visibleProjects.map((p) => ({ value: p.id, label: projectText(p, 'name', language) }))} value={projectId || null} onValueChange={(value) => setProjectId(value ?? '')}>
                 <SelectTrigger aria-label={t.common.selectProject} className="min-w-48 max-w-sm">
                   <SelectValue placeholder={t.common.selectProject} />
                 </SelectTrigger>
@@ -112,6 +112,7 @@ export function Topbar() {
           >
             <ChatCircleIcon className="h-4 w-4" />
           </Button>
+          <Button variant="outline" size="sm" render={<NavLink to="/tools" />}>{language === 'zh' ? '工具箱' : 'Toolbox'}</Button>
           <ActivityIndicatorButton />
           <Button
             type="button"

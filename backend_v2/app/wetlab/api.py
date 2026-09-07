@@ -16,6 +16,8 @@ from .analysis import analyse_akta, analyse_bli, analyse_enzyme
 from .repository import ProteinRepository
 from .schemas import (
     AktaAnalysisRequest,
+    AnalysisPreviewRequest,
+    AnalysisPreviewResponse,
     AnalysisResponse,
     BliAnalysisRequest,
     ConcentrationRequest,
@@ -57,9 +59,7 @@ def list_proteins(
     user: User = Depends(current_user),
 ) -> ProteinPage:
     require_project(session, project_id, user)
-    rows = ProteinRepository(session).list_project(
-        project_id, decode_cursor(cursor), limit, search=search, tag=tag
-    )
+    rows = ProteinRepository(session).list_project(project_id, decode_cursor(cursor), limit, search=search, tag=tag)
     page = rows[:limit]
     return ProteinPage(
         items=[to_read(row) for row in page],
@@ -204,9 +204,7 @@ def get_unit_conversion(
     user: User = Depends(current_user),
 ) -> UnitConversionResult:
     return convert_units(
-        UnitConversionRequest(
-            value=value, from_unit=from_unit, to_unit=to_unit, molecular_weight=molecular_weight
-        )
+        UnitConversionRequest(value=value, from_unit=from_unit, to_unit=to_unit, molecular_weight=molecular_weight)
     )
 
 
@@ -325,3 +323,63 @@ def post_enzyme_analysis(
         candidate_id=payload.candidate_id,
     )
     return _analysis_response(row, summary)
+
+
+@router.get("/wetlab/concentration", response_model=ConcentrationResult)
+def standalone_concentration(
+    a280: float = Query(ge=0),
+    ext_coeff: float = Query(gt=0),
+    molecular_weight: float = Query(gt=0),
+    path_length_cm: float = Query(default=1, gt=0),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ConcentrationResult:
+    return concentration(
+        session,
+        uuid.UUID(int=0),
+        ConcentrationRequest(
+            a280=a280,
+            ext_coeff=ext_coeff,
+            molecular_weight=molecular_weight,
+            path_length_cm=path_length_cm,
+        ),
+    )
+
+
+@router.post(
+    "/wetlab/analysis-previews",
+    response_model=AnalysisPreviewResponse,
+    openapi_extra={"x-permission": "wetlab.preview"},
+)
+def preview_analysis(payload: AnalysisPreviewRequest, user: User = Depends(current_user)) -> AnalysisPreviewResponse:
+    """Ephemeral calculation only. Saving uses the project artifact/analysis endpoints."""
+    import base64
+    import binascii
+    import io
+    import zipfile
+
+    from .analysis import analyse_akta_bytes, analyse_bli_bytes, analyse_enzyme_bytes
+
+    try:
+        data = base64.b64decode(payload.content_base64, validate=True)
+        if data.startswith(b"PK"):
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                if sum(item.file_size for item in archive.infolist()) > 64 * 1024 * 1024:
+                    raise ValueError("Expanded instrument export exceeds 64 MiB")
+        if payload.instrument == "bli":
+            measurement, summary = analyse_bli_bytes(
+                data, sample_id=payload.sample_id, t_assoc=payload.t_assoc, t_dissoc=payload.t_dissoc
+            )
+        elif payload.instrument == "akta":
+            measurement, summary = analyse_akta_bytes(data, channel=payload.channel)
+        else:
+            measurement, summary = analyse_enzyme_bytes(data, subtract_background=payload.subtract_background)
+    except (ValueError, binascii.Error, zipfile.BadZipFile, OSError, KeyError) as exc:
+        raise DomainError(
+            "analysis_input_invalid",
+            "Cannot read this instrument export; check the file and analysis settings",
+            status_code=422,
+        ) from exc
+    return AnalysisPreviewResponse(
+        summary=summary, **{key: measurement[key] for key in ("analysis_version", "experiment_type", "value", "unit")}
+    )

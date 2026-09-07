@@ -108,6 +108,11 @@ class CopilotAgentRun(UUIDVersionMixin, Base):
     #: data rather than in a branch, so a subagent cannot widen its own reach.
     allowed_tools: Mapped[list] = mapped_column(JSON, default=list)
 
+    #: Server-built task plan and explicit write scope, preserved across resumes.
+    task_contract: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: Business outcome is independent of the runner's transport/execution status.
+    outcome: Mapped[dict] = mapped_column(JSON, default=dict)
+
     #: Budget, checked before each provider call rather than after, so an
     #: overrun stops the run instead of being noticed once it is paid for.
     max_turns: Mapped[int] = mapped_column(Integer, default=24)

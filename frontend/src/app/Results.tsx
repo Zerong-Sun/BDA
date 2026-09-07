@@ -1,3 +1,4 @@
+import { ModelResultGuideLibrary } from '../features/results/ModelResultGuide'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
@@ -183,6 +184,8 @@ export function ResultsPage() {
           </div>
         }
       />
+
+      <ModelResultGuideLibrary />
 
       {isDemoReferenceProject ? (
         <div className="mb-5">

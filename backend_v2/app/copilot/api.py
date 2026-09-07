@@ -4,11 +4,13 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
+from ..core.config import get_settings
 from ..core.database import SessionFactory, get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
@@ -26,10 +28,12 @@ from .capabilities import (
 from .models import CopilotAgentRun, CopilotConfig
 from .provider import complete as complete_with_provider
 from .provider import credential_available
+from .provider_selection import select_provider
 from .repository import CopilotRepository
 from .schemas import (
     AgentRunAccepted,
     AgentRunCancelled,
+    AgentRunContinuation,
     AgentRunCreate,
     AgentRunPage,
     AgentRunResponse,
@@ -49,6 +53,8 @@ from .schemas import (
     RoutePlanCreate,
     RoutePlanResponse,
     SkillResponse,
+    TaskReadinessResponse,
+    TaskServiceResponse,
 )
 from .service import (
     create_interpretation as create_interpretation_service,
@@ -71,12 +77,17 @@ SKILLS = [SkillResponse(**item) for item in COPILOT_CAPABILITIES]
 
 
 def _config_response(session: Session, row: CopilotConfig) -> CopilotConfigResponse:
-    provider = CopilotRepository(session).llm_provider(row.llm_provider_id) if row.llm_provider_id else None
+    provider = select_provider(session, project_id=row.project_id)
     return CopilotConfigResponse.model_validate(row).model_copy(
         update={
-            "api_key_configured": bool(
-                provider and provider.enabled and credential_available(provider.credential_ref)
-            )
+            "settings": {
+                **(row.settings or {}),
+                "llm_api_base": provider.endpoint if provider else "",
+                "llm_model": provider.model if provider else "",
+                "inherited_provider": row.llm_provider_id is None,
+                "browser_api_key_allowed": not get_settings().is_production,
+            },
+            "api_key_configured": bool(provider and provider.enabled and credential_available(provider.credential_ref)),
         }
     )
 
@@ -103,12 +114,8 @@ def post_chat(
         )
     project = require_project(session, payload.project_id, user)
     config = CopilotRepository(session).config(project.id)
-    if (
-        payload.skill is not None
-        and payload.skill
-        not in normalize_capabilities(
-            list(config.enabled_skills) if config else None
-        )
+    if payload.skill is not None and payload.skill not in normalize_capabilities(
+        list(config.enabled_skills) if config else None
     ):
         raise DomainError(
             "copilot_capability_disabled",
@@ -234,7 +241,16 @@ def get_config(
     require_project(session, project_id, user)
     row = CopilotRepository(session).config(project_id)
     if row is None:
-        raise DomainError("copilot_config_not_found", "Copilot config was not found", status_code=404)
+        now = datetime.now(UTC)
+        row = CopilotConfig(
+            id=project_id,
+            project_id=project_id,
+            version=0,
+            settings={},
+            enabled_skills=["research"],
+            created_at=now,
+            updated_at=now,
+        )
     response.headers["ETag"] = etag(row.version)
     return _config_response(session, row)
 
@@ -271,8 +287,7 @@ def test_config(
     user: User = Depends(require_command),
 ) -> CopilotConfigTestResponse:
     require_project(session, project_id, user)
-    config = CopilotRepository(session).config(project_id)
-    provider = CopilotRepository(session).llm_provider(config.llm_provider_id) if config and config.llm_provider_id else None
+    provider = select_provider(session, project_id=project_id)
     if provider is None or not provider.enabled:
         return CopilotConfigTestResponse(connected=False, model="", reason="No enabled LLM provider is configured")
     try:
@@ -334,8 +349,10 @@ def _run_response(session: Session, run: CopilotAgentRun) -> AgentRunResponse:
     spend upward would make its own `cost_usd_cents` untrue, and that column is
     what a person reads when asking where the money went.
     """
-    return _run_response(session, run).model_copy(
-        update={"subtree_cost_usd_cents": agent_runs.tree_cost_usd_cents(session, run)}
+    from .task_contracts import task_view
+    return AgentRunResponse.model_validate(run).model_copy(
+        update={"subtree_cost_usd_cents": agent_runs.tree_cost_usd_cents(session, run),
+                "outcome": task_view(run, agent_runs.transcript(session, run))}
     )
 
 
@@ -358,9 +375,7 @@ def start_agent_run(
 ) -> AgentRunAccepted:
     project = require_project(session, payload.project_id, user)
     run, operation = start_agent_run_service(session, project, user, payload)
-    return AgentRunAccepted(
-        run=_run_response(session, run), operation_id=operation.id
-    )
+    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
 
 
 @router.get("/projects/{project_id}/agent-runs", response_model=AgentRunPage)
@@ -432,3 +447,59 @@ def cancel_agent_run(
     cancelled = agent_runs.cancel(session, run, reason=f"cancelled by {user.username}")
     response.headers["ETag"] = etag(run.version)
     return AgentRunCancelled(run=_run_response(session, run), cancelled_runs=cancelled)
+
+
+
+
+@router.get("/task-services", response_model=list[TaskServiceResponse])
+def list_task_services(user: User = Depends(current_user)) -> list[TaskServiceResponse]:
+    from .task_contracts import SERVICES
+    return [TaskServiceResponse(id=key, **value) for key, value in SERVICES.items()]
+
+
+@router.post("/agent-runs/{run_id}/continuations", response_model=AgentRunAccepted,
+             status_code=status.HTTP_202_ACCEPTED, openapi_extra={"x-permission": "copilot.agent.start"})
+def continue_agent_run(
+    run_id: uuid.UUID, payload: AgentRunContinuation,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> AgentRunAccepted:
+    from .service import continue_agent_run as continue_service
+    # Serialize continuation against another continuation and the worker.
+    agent_runs.require_run(session, run_id, for_update=True)
+    run = _require_run(session, run_id, user)
+    expected = parse_if_match(if_match)
+    if expected != run.version:
+        raise DomainError("version_conflict", "The task changed. Reload it before continuing.", status_code=412)
+    operation = continue_service(session, run, user, payload.message, payload.authorized_writes)
+    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+
+
+@router.get("/projects/{project_id}/task-readiness", response_model=TaskReadinessResponse)
+def get_task_readiness(project_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from .qualification import readiness
+    require_project(session, project_id, user)
+    return readiness(session, project_id)
+
+
+@router.post("/projects/{project_id}/config/assessments", response_model=TaskReadinessResponse,
+             openapi_extra={"x-permission": "copilot.config.test"})
+def assess_task_readiness(project_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(require_command)) -> dict:
+    from .qualification import assess
+    require_project(session, project_id, user)
+    return assess(session, project_id)
+
+
+@router.post("/agent-runs/{run_id}/decision-records", response_model=AgentRunResponse,
+             openapi_extra={"x-permission": "timeline.create"})
+def save_task_decision_record(
+    run_id: uuid.UUID, if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> AgentRunResponse:
+    from .service import save_task_record
+    agent_runs.require_run(session, run_id, for_update=True)
+    run = _require_run(session, run_id, user)
+    if parse_if_match(if_match) != run.version:
+        raise DomainError("version_conflict", "Reload the task before saving its delivery.", status_code=412)
+    save_task_record(session, run, user)
+    return _run_response(session, run)

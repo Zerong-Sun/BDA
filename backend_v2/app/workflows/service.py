@@ -19,9 +19,7 @@ def create_workflow(session: Session, project: Project, payload: WorkflowCreate,
     if payload.derived_from_id is not None:
         ancestor = session.get(WorkflowRun, payload.derived_from_id)
         if ancestor is None or ancestor.project_id != project.id:
-            raise DomainError(
-                "workflow_not_found", "The run this one derives from was not found", status_code=404
-            )
+            raise DomainError("workflow_not_found", "The run this one derives from was not found", status_code=404)
     workflow = WorkflowRepository(session).add(
         WorkflowRun(
             project_id=project.id,
@@ -36,6 +34,7 @@ def create_workflow(session: Session, project: Project, payload: WorkflowCreate,
             WorkflowNode(
                 workflow_run_id=workflow.id,
                 node_key=node.key,
+                execution_mode=node.execution_mode,
                 node_type=node.node_type,
                 model_plugin=node.model_plugin,
                 model_plugin_id=node.model_plugin_id,
@@ -86,6 +85,7 @@ def replace_workflow_graph(
             WorkflowNode(
                 workflow_run_id=workflow.id,
                 node_key=node.key,
+                execution_mode=node.execution_mode,
                 node_type=node.node_type,
                 model_plugin=node.model_plugin,
                 model_plugin_id=node.model_plugin_id,
@@ -120,6 +120,7 @@ def add_node(
     node = WorkflowNode(
         workflow_run_id=workflow.id,
         node_key=payload.key,
+        execution_mode=payload.execution_mode,
         node_type=payload.node_type,
         model_plugin=payload.model_plugin,
         model_plugin_id=payload.model_plugin_id,

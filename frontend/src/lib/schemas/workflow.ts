@@ -101,6 +101,7 @@ export const WorkflowNodeSchema = z.object({
   id: z.string(),
   workflow_run_id: z.string(),
   node_key: z.string(),
+  execution_mode: z.enum(['dispatch', 'manual']).default('dispatch'),
   node_type: z.string(),
   model_plugin: z.string(),
   model_plugin_id: z.string().nullable(),

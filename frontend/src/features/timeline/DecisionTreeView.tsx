@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure'
 import { createContext, useContext, useMemo, useState } from 'react'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
@@ -89,7 +90,7 @@ function LaneMarks({ entry }: { entry: TimelineEntry }) {
 
 function DecisionCard({ node }: { node: DecisionNode }) {
   const actions = useContext(TreeActionsContext)
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const tl = t.timeline
   const [open, setOpen] = useState(false)
   const entry = node.entry
@@ -134,7 +135,7 @@ function DecisionCard({ node }: { node: DecisionNode }) {
             {format(tl.supersedesCount, { count: String(node.superseded.length) })}
           </span>
         ) : null}
-        {entry.alternatives.length || node.superseded.length || entry.body ? (
+        {entry.alternatives.length || node.superseded.length || entry.body || refs.length ? (
           <Button
             type="button"
             variant="ghost"
@@ -172,6 +173,7 @@ function DecisionCard({ node }: { node: DecisionNode }) {
 
       {open ? (
         <div className="mt-2 space-y-2">
+          {refs.length ? <div className="rounded-md border border-border-soft p-2"><p className="text-xs font-medium">{language === 'zh' ? '证据与来源' : 'Evidence and sources'}</p><ul className="mt-1 space-y-1 break-all text-xs">{refs.map((ref, index) => <li key={index}>{ref.kind}: {ref.value}</li>)}</ul></div> : null}
           {entry.alternatives.length ? (
             <div className="rounded-md border border-border-soft bg-surface-2 p-2">
               <p className="text-[11px] uppercase tracking-wide text-text-muted">{tl.alternatives}</p>
@@ -213,13 +215,19 @@ function GoalBranch({ node }: { node: GoalNode }) {
   const tl = t.timeline
   const count = subtreeDecisionCount(node)
   return (
-    <li style={{ marginInlineStart: node.depth ? '1.25rem' : undefined }}>
-      <div className="flex flex-wrap items-baseline gap-2 border-l-2 border-l-accent pl-2">
-        <h3 className="text-sm font-semibold text-text-primary">{node.goal.title}</h3>
+    <li className="border-l border-border-soft pl-3" style={{ marginInlineStart: node.depth ? '1.25rem' : undefined }}>
+      <Disclosure defaultOpen className="rounded-md bg-surface-2 p-3 text-text-primary" title={
+      <span className="inline-flex flex-wrap items-baseline gap-2">
+        <span className="text-sm font-semibold">{node.goal.title}</span>
+        <StatusPill tone={node.goal.status === 'answered' ? 'green' : node.goal.status === 'open' ? 'amber' : 'neutral'}>
+          {t.research.goals.status[node.goal.status as 'open' | 'answered' | 'abandoned'] ?? node.goal.status}
+        </StatusPill>
         <span className="text-[11px] text-text-muted">
           {format(tl.decisionCount, { count: String(count) })}
         </span>
-      </div>
+      </span>
+      }>
+      {node.goal.detail ? <p className="my-2 text-xs text-text-secondary">{node.goal.detail}</p> : null}
       {node.decisions.length ? (
         <ul className="mt-1.5 space-y-1.5 pl-2">
           {node.decisions.map((decision) => (
@@ -234,6 +242,7 @@ function GoalBranch({ node }: { node: GoalNode }) {
           ))}
         </ul>
       ) : null}
+      </Disclosure>
     </li>
   )
 }

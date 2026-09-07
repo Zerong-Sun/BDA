@@ -1,3 +1,10 @@
+> **已归档 · 2026-09-07**
+> 原位置：`docs/COPILOT_VALIDATION_REPORT.md`。
+> 原因：仅保留当时验证证据，不作为当前能力承诺。
+> 当前依据：[替代文档](../../../COPILOT_SERVICE_GUIDE.md)。以下正文按原样保存；其中原日期、状态、操作命令和行号属于历史，不作为当前使用说明。
+
+---
+
 # Copilot Validation and Repair Report
 
 状态：活跃

@@ -169,6 +169,12 @@ def create_project_prompt_draft(
     role = repo.organization_role(payload.organization_id, user.id)
     if user.role != "admin" and role not in {"admin", "owner", "researcher"}:
         raise DomainError("forbidden", "Organization membership is required", status_code=403)
+    if payload.project_id:
+        project = require_project_permission(session, payload.project_id, user, "write")
+        if project.organization_id != payload.organization_id:
+            raise DomainError(
+                "project_organization_mismatch", "Project belongs to another organization", status_code=422
+            )
     draft = ProjectPromptDraft(
         organization_id=payload.organization_id,
         created_by=user.id,
@@ -218,9 +224,7 @@ def _record_prompt_change(session: Session, project: Project, previous: str | No
             title="设计任务书（prompt）变更",
             summary=reason[:2000],
             body=(
-                f"**变更理由**\n\n{reason}\n\n"
-                "**变更前的任务书**\n\n"
-                + (previous if previous else "（此前没有任务书）")
+                f"**变更理由**\n\n{reason}\n\n**变更前的任务书**\n\n" + (previous if previous else "（此前没有任务书）")
             ),
             tags=["prompt"],
         ),
@@ -425,9 +429,7 @@ def _legacy_builtin_research_key(project: Project) -> str | None:
 
 def _json_refs_builtin_package(value: object) -> bool:
     if isinstance(value, dict):
-        if str(value.get("package_id") or value.get("citation") or "").startswith(
-            BUILTIN_RESEARCH_PACKAGE_PREFIXES
-        ):
+        if str(value.get("package_id") or value.get("citation") or "").startswith(BUILTIN_RESEARCH_PACKAGE_PREFIXES):
             return True
         return any(_json_refs_builtin_package(item) for item in value.values())
     if isinstance(value, list):
@@ -488,9 +490,7 @@ def _project_completeness_score(session: Session, project: Project) -> tuple[int
     )
 
 
-def soft_delete_builtin_research_duplicates(
-    session: Session, organization_id: uuid.UUID, user: User
-) -> list[str]:
+def soft_delete_builtin_research_duplicates(session: Session, organization_id: uuid.UUID, user: User) -> list[str]:
     rows = list(
         session.scalars(
             select(Project).where(
@@ -526,7 +526,9 @@ def dedupe_builtin_research_projects(session: Session, projects: list[Project]) 
         if not key:
             continue
         current = best_by_key.get(key)
-        if current is None or _project_completeness_score(session, project) > _project_completeness_score(session, current):
+        if current is None or _project_completeness_score(session, project) > _project_completeness_score(
+            session, current
+        ):
             best_by_key[key] = project
     emitted: set[str] = set()
     result: list[Project] = []
@@ -548,6 +550,7 @@ def project_library_item(session: Session, project: Project) -> ProjectLibraryIt
 
     target = TargetRepository(session).get(project.primary_target_id) if project.primary_target_id else None
     package_meta = project.localized_content.get("package", {}) if isinstance(project.localized_content, dict) else {}
+
     def package_count(key: str, actual: int) -> int:
         expected = package_meta.get(key)
         return max(actual, int(expected)) if isinstance(expected, int | float) else actual
@@ -562,9 +565,7 @@ def project_library_item(session: Session, project: Project) -> ProjectLibraryIt
                 Candidate.candidate_kind == "research_target",
             ),
         ),
-        finding_count=package_count(
-            "finding_count", count(ResearchFinding, ResearchFinding.project_id == project.id)
-        ),
+        finding_count=package_count("finding_count", count(ResearchFinding, ResearchFinding.project_id == project.id)),
         reference_count=package_count(
             "reference_count", count(LiteratureDocument, LiteratureDocument.project_id == project.id)
         ),

@@ -59,9 +59,9 @@ export interface SubmitWorkflowResponse {
   status: SubmitStatus
 }
 
-export function submitWorkflowRun(workflowRunId: string): Promise<SubmitWorkflowResponse> {
+export function submitWorkflowRun(workflowRunId: string, workflowVersion?: number, review?: { backend: string; fingerprints: Record<string, string> }): Promise<SubmitWorkflowResponse> {
   return submitWorkflowApiV2WorkflowRunsWorkflowIdSubmissionsPost<true>({ path: { workflow_id: workflowRunId },
-    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: {}, throwOnError: true,
+    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { workflow_version: workflowVersion, ...(review ? { compute_backend: review.backend, review_fingerprints: review.fingerprints } : {}) }, throwOnError: true,
   }).then(({ data: submission }) => ({ ...submission, workflow_run_id: workflowRunId }))
 }
 
@@ -82,21 +82,10 @@ export function preflightBlockersFrom(error: unknown): string[] {
     .filter(Boolean)
 }
 
-export interface SubmitNodeOptions {
-  /** Parameter overrides applied to the script preview. */
+export interface ScriptPreviewOptions {
+  /** Unsaved parameters may be previewed, but must be saved before submission. */
   override_params?: Record<string, unknown>
-  /** Compute backend. Omit to let the server use its configured default. */
-  compute_backend?: string
-  timeout_minutes?: number
-}
-
-export function submitWorkflowNode(workflowRunId: string, options: SubmitNodeOptions = {}) {
-  return submitWorkflowApiV2WorkflowRunsWorkflowIdSubmissionsPost<true>({ path: { workflow_id: workflowRunId },
-    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: {
-      compute_backend: options.compute_backend,
-      timeout_minutes: options.timeout_minutes ?? 180,
-    }, throwOnError: true,
-  }).then(({ data: submission }) => ({ job: submission.jobs[0] ?? null, status: submission.status }))
+  compute_backend?: 'lsf' | 'docker'
 }
 
 export interface ScriptPreviewResponse {
@@ -106,7 +95,7 @@ export interface ScriptPreviewResponse {
   input_manifest: Record<string, unknown>
 }
 
-export function previewWorkflowNodeScript(nodeRunId: string, options: SubmitNodeOptions = {}) {
+export function previewWorkflowNodeScript(nodeRunId: string, options: ScriptPreviewOptions = {}) {
   return previewNodeScriptApiV2WorkflowNodesNodeIdScriptPreviewsPost<true>({ path: { node_id: nodeRunId },
     body: {
       compute_backend: options.compute_backend,

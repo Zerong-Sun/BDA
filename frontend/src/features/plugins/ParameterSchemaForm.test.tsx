@@ -86,3 +86,16 @@ describe('ParameterSchemaForm with a JSON Schema plugin', () => {
     expect(screen.getByLabelText('Recycling steps')).toBeTruthy()
   })
 })
+
+describe('numeric parameter editing', () => {
+  it('keeps a cleared value empty instead of NaN', () => {
+    const onChange = renderForm()
+    fireEvent.change(screen.getByLabelText(/^Num designs/), { target: { value: '' } })
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ num_designs: '' }))
+  })
+  it('does not silently truncate a fractional experiment count', () => {
+    const onChange = renderForm()
+    fireEvent.change(screen.getByLabelText(/^Num designs/), { target: { value: '1.5' } })
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ num_designs: 1.5 }))
+  })
+})

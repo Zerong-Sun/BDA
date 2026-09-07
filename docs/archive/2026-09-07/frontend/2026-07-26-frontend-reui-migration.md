@@ -1,3 +1,10 @@
+> **已归档 · 2026-09-07**
+> 原位置：`docs/superpowers/plans/2026-07-26-frontend-reui-migration.md`。
+> 原因：阶段性界面迁移实施计划，当前规则由架构文档与自动检查维护。
+> 当前依据：[替代文档](../../../FRONTEND_V2.md)。以下正文按原样保存；其中原日期、状态、操作命令和行号属于历史，不作为当前使用说明。
+
+---
+
 # Frontend REUI Migration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

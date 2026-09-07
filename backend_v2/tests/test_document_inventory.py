@@ -34,3 +34,4 @@ def test_category_separates_active_history_and_drafts(tmp_path: Path, monkeypatc
     assert inventory.category(tmp_path / "docs/guide.md") == "active"
     assert inventory.category(tmp_path / "docs/archive/old.md") == "history"
     assert inventory.category(tmp_path / "docs/superpowers/specs/draft.md") == "draft"
+    assert inventory.category(tmp_path / "docs/plans/plan.md") == "draft"

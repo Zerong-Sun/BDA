@@ -10,7 +10,7 @@ import { useI18n } from '../../lib/i18n'
 import type { Project } from '../../lib/schemas/project'
 
 export function DesignPromptCard({ project }: { project: Project }) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -24,6 +24,9 @@ export function DesignPromptCard({ project }: { project: Project }) {
     mutationFn: async () => {
       const { draft_id: draftId } = await createProjectPromptDraft({
         name: project.name,
+        project_id: project.id,
+        organization_id: project.organization_id,
+        language,
         project_type: project.project_type,
         summary: project.summary ?? undefined,
       })

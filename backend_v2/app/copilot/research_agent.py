@@ -14,308 +14,8 @@ from .provider import completion_message
 from .registry import REGISTRY, ToolContext
 from .research_context import ResearchContextService
 
-RESEARCH_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "research_overview",
-            "description": "Return project identity, review document metadata, category counts, and available kinds.",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_research",
-            "description": "Search the current project's canonical Research workspace and return entity-level results.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                },
-                "required": ["query"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_research_items",
-            "description": "Page through Research entities of one kind, optionally restricted to exact entity IDs.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "kind": {"type": "string"},
-                    "ids": {"type": "array", "items": {"type": "string"}, "maxItems": 50},
-                    "offset": {"type": "integer", "minimum": 0},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
-                },
-                "required": ["kind"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_dataset_slice",
-            "description": "Return a bounded page from a Research dataset by dataset ID or key.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "dataset_id": {"type": "string"},
-                    "offset": {"type": "integer", "minimum": 0},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
-                },
-                "required": ["dataset_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_reference",
-            "description": "Expand one Research reference using its workspace document ID or ref_id.",
-            "parameters": {
-                "type": "object",
-                "properties": {"reference_id": {"type": "string"}},
-                "required": ["reference_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_reference_content",
-            "description": (
-                "Read checksum-traced chunks extracted from a saved scientific paper full text or abstract. "
-                "Use this before making factual, quantitative, or novelty claims from a reference."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "reference_id": {"type": "string"},
-                    "offset": {"type": "integer", "minimum": 0},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                },
-                "required": ["reference_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-]
-
-RESEARCH_WRITE_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "resolve_research_gaps",
-            "description": (
-                "Queue permission-checked repairs for retrievable reference content and an AlphaFold predicted "
-                "structure for one exact Research target. Call only when the user explicitly asks to fix, fill, "
-                "complete, or resolve gaps. This cannot resolve wet-lab, clinical, patent-landscape, or "
-                "experimental-structure gaps. Return and report the operation as pending; never claim completion "
-                "until a later operation result confirms it."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "research_target_id": {
-                        "type": "string",
-                        "description": "Exact Research target entity UUID from the current project.",
-                    },
-                    "resolve_references": {"type": "boolean"},
-                    "resolve_structure": {"type": "boolean"},
-                },
-                "required": ["research_target_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "start_literature_search",
-            "description": (
-                "Queue an auditable Europe PMC search in the current project. Call only when the user explicitly "
-                "asks to search or ingest literature. Report the search_run_id and pending status; do not claim "
-                "that papers have already been reviewed."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "minLength": 3, "maxLength": 2000},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 25},
-                },
-                "required": ["query"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "start_target_intelligence",
-            "description": (
-                "Queue target intelligence for one exact project Target UUID. Call only when explicitly requested. "
-                "A Research target/candidate UUID is not interchangeable with a Target UUID. Report pending status."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_id": {"type": "string"},
-                    "query": {"type": "string", "maxLength": 2000},
-                },
-                "required": ["target_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_knowledge_draft",
-            "description": (
-                "Create a pending-review project knowledge note only when the user explicitly asks to save one. "
-                "Never present the note as curated or reviewed evidence."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "minLength": 1, "maxLength": 300},
-                    "content": {"type": "string", "minLength": 1},
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "maxItems": 30,
-                    },
-                },
-                "required": ["title", "content"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_compute_draft",
-            "description": (
-                "Create a reviewable Docker or LSF compute draft only when explicitly requested. This never confirms "
-                "or submits the draft. Report confirmation_required=true."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "maxLength": 240},
-                    "backend": {"type": "string", "enum": ["docker", "lsf"]},
-                    "specification": {"type": "object"},
-                },
-                "required": ["name", "backend", "specification"],
-                "additionalProperties": False,
-            },
-        },
-    },
-]
-
-PROJECT_READ_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_project_targets",
-            "description": "List bounded operational Target records in the current project.",
-            "parameters": {
-                "type": "object",
-                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 50}},
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_project_candidates",
-            "description": "List ranked design candidates from the current project database.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "status": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                },
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_experiment_results",
-            "description": "List recorded experiment results, optionally for one exact candidate UUID.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "candidate_id": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                },
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_workflow_status",
-            "description": "Read workflow and node status without modifying or submitting it.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "workflow_id": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
-                },
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_compute_status",
-            "description": "Read recent compute drafts and jobs in the current project.",
-            "parameters": {
-                "type": "object",
-                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 50}},
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_project_knowledge",
-            "description": "Search curated and draft project knowledge entries.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
-                },
-                "required": ["query"],
-                "additionalProperties": False,
-            },
-        },
-    },
-]
-
-WRITE_TOOL_NAMES = {
-    "resolve_research_gaps",
-    "start_literature_search",
-    "start_target_intelligence",
-    "create_knowledge_draft",
-    "create_compute_draft",
-}
+# Every surface derives schemas and write classification from the same registry.
+WRITE_TOOL_NAMES = REGISTRY.write_ids()
 
 SCIENTIFIC_REVIEW_PROMPT = """\
 BDA_SCIENTIFIC_REVIEW_V1. Act as a strict scientific and techno-economic reviewer.
@@ -457,13 +157,13 @@ def complete_research_turn(
     call_log = list(initial_tool_calls)
     conversation = list(messages)
     for _ in range(max_tool_calls + 1):
-        tools: list[dict[str, Any]] = [*RESEARCH_TOOLS]
-        if project_context is not None:
-            tools.extend(PROJECT_READ_TOOLS)
-        if actions is not None:
-            tools.extend(RESEARCH_WRITE_TOOLS)
-        if allowed_tools is not None:
-            tools = [tool for tool in tools if tool["function"]["name"] in allowed_tools]
+        services = {"research": context, "project": project_context, "actions": actions,
+                    "session": getattr(context, "session", None)}
+        tools = [spec.schema() for spec in REGISTRY.all()
+                 if services.get(spec.requires) is not None
+                 and (spec.execution_mode == "read" or actions is not None)
+                 and (allowed_tools is None or spec.id in allowed_tools)]
+        offered = {tool["function"]["name"] for tool in tools}
         message = completion_message(
             provider,
             conversation,
@@ -501,6 +201,8 @@ def complete_research_turn(
             function = request.get("function") or {}
             name = str(function.get("name") or "")
             try:
+                if name not in offered:
+                    raise ValueError("tool_not_allowed_for_this_turn")
                 arguments = json.loads(function.get("arguments") or "{}")
                 if not isinstance(arguments, dict):
                     raise ValueError("tool_arguments_not_object")
@@ -744,7 +446,7 @@ def _execute(
         raise ValueError("unknown_research_tool")
     tool_context = ToolContext(
         project_id=getattr(context, "project_id", None),
-        user_id=getattr(context, "user_id", None),
+        user_id=getattr(getattr(actions, "user", None), "id", None) or getattr(context, "user_id", None),
         session=getattr(context, "session", None),
         research=context,
         project=project_context,

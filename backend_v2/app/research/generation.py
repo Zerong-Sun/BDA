@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -43,8 +44,20 @@ LOW_QUALITY_REFERENCE_TITLES = (
     "conference abstracts",
 )
 TOPIC_STOPWORDS = {
-    "and", "branches", "draft", "for", "from", "grounded", "in", "of", "pending-review",
-    "project", "research", "source", "the", "with",
+    "and",
+    "branches",
+    "draft",
+    "for",
+    "from",
+    "grounded",
+    "in",
+    "of",
+    "pending-review",
+    "project",
+    "research",
+    "source",
+    "the",
+    "with",
 }
 
 
@@ -84,9 +97,7 @@ def _search_query(topic: str, evidence_cutoff: date | str | None = None) -> str:
     if evidence_cutoff:
         cutoff = evidence_cutoff if isinstance(evidence_cutoff, date) else date.fromisoformat(evidence_cutoff)
         return (
-            f"({topic_query})"
-            f" AND FIRST_PDATE:[1900-01-01 TO {cutoff.isoformat()}]"
-            f" AND PUB_YEAR:[1900 TO {cutoff.year}]"
+            f"({topic_query}) AND FIRST_PDATE:[1900-01-01 TO {cutoff.isoformat()}] AND PUB_YEAR:[1900 TO {cutoff.year}]"
         )
     return topic_query
 
@@ -123,12 +134,14 @@ def _external_references(
     except RuntimeError as exc:
         return [], [{"kind": "tool_failure", "entity_id": "europe_pmc", "detail": str(exc)}]
     except ValueError as exc:
-        return [], [{
-            "kind": "invalid_evidence_cutoff",
-            "entity_id": "europe_pmc",
-            "detail": str(exc),
-        }]
-    rows = ((payload.get("resultList") or {}).get("result") or [])
+        return [], [
+            {
+                "kind": "invalid_evidence_cutoff",
+                "entity_id": "europe_pmc",
+                "detail": str(exc),
+            }
+        ]
+    rows = (payload.get("resultList") or {}).get("result") or []
     references: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
@@ -154,46 +167,52 @@ def _external_references(
                 if matched:
                     verification_status = "verified_crossref"
                 elif not pmid:
-                    issues.append({
-                        "kind": "metadata_mismatch",
-                        "entity_id": ref_id,
-                        "detail": "Crossref title did not match Europe PMC metadata",
-                    })
+                    issues.append(
+                        {
+                            "kind": "metadata_mismatch",
+                            "entity_id": ref_id,
+                            "detail": "Crossref title did not match Europe PMC metadata",
+                        }
+                    )
             except (RuntimeError, ValueError) as exc:
                 verification["crossref_error"] = str(exc)
                 if not pmid:
                     issues.append({"kind": "tool_failure", "entity_id": ref_id, "detail": str(exc)})
-        references.append({
-            "document_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:{ref_id}")),
-            "ref_id": ref_id,
-            "title": {"default": title, "en": title, "zh": None},
-            "authors": str(row.get("authorString") or ""),
-            "journal": str(row.get("journalTitle") or ""),
-            "year": str(row.get("pubYear") or ""),
-            "doi": doi,
-            "pmid": pmid,
-            "pmcid": str(row.get("pmcid") or ""),
-            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else f"https://doi.org/{doi}",
-            "verification_status": verification_status,
-            "status": "pending_review",
-            "metadata": {
-                "source": "europe_pmc",
-                "origin": "external_discovery",
-                "retrieval_scope": "metadata_only",
-                "full_text_retrieved": False,
-                "relevance": {"matched_terms": matched_terms, "query": query},
-                "verification": verification,
-                "review_status": "pending_review",
-            },
-        })
+        references.append(
+            {
+                "document_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:{ref_id}")),
+                "ref_id": ref_id,
+                "title": {"default": title, "en": title, "zh": None},
+                "authors": str(row.get("authorString") or ""),
+                "journal": str(row.get("journalTitle") or ""),
+                "year": str(row.get("pubYear") or ""),
+                "doi": doi,
+                "pmid": pmid,
+                "pmcid": str(row.get("pmcid") or ""),
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else f"https://doi.org/{doi}",
+                "verification_status": verification_status,
+                "status": "pending_review",
+                "metadata": {
+                    "source": "europe_pmc",
+                    "origin": "external_discovery",
+                    "retrieval_scope": "metadata_only",
+                    "full_text_retrieved": False,
+                    "relevance": {"matched_terms": matched_terms, "query": query},
+                    "verification": verification,
+                    "review_status": "pending_review",
+                },
+            }
+        )
         if len(references) >= limit:
             break
     if rejected_references:
-        issues.append({
-            "kind": "irrelevant_references_rejected",
-            "entity_id": "europe_pmc",
-            "detail": f"{rejected_references} search results failed topic or publication-quality checks",
-        })
+        issues.append(
+            {
+                "kind": "irrelevant_references_rejected",
+                "entity_id": "europe_pmc",
+                "detail": f"{rejected_references} search results failed topic or publication-quality checks",
+            }
+        )
     return references, issues
 
 
@@ -202,9 +221,7 @@ def _annotate_source_references(
     project_id: uuid.UUID,
     references: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    documents = list(
-        session.scalars(select(LiteratureDocument).where(LiteratureDocument.project_id == project_id))
-    )
+    documents = list(session.scalars(select(LiteratureDocument).where(LiteratureDocument.project_id == project_id)))
     documents_by_id = {str(document.id): document for document in documents}
     chunk_document_ids = {
         str(document_id)
@@ -221,15 +238,17 @@ def _annotate_source_references(
         document = documents_by_id.get(str(item.get("document_id") or ""))
         has_full_text = str(item.get("document_id") or "") in chunk_document_ids
         has_abstract = bool(document and document.abstract)
-        metadata.update({
-            "origin": metadata.get("origin") or "source_project",
-            "source_project_id": str(project_id),
-            "full_text_retrieved": has_full_text,
-            "abstract_available": has_abstract,
-            "retrieval_scope": (
-                "full_text" if has_full_text else "abstract_or_metadata" if has_abstract else "metadata_only"
-            ),
-        })
+        metadata.update(
+            {
+                "origin": metadata.get("origin") or "source_project",
+                "source_project_id": str(project_id),
+                "full_text_retrieved": has_full_text,
+                "abstract_available": has_abstract,
+                "retrieval_scope": (
+                    "full_text" if has_full_text else "abstract_or_metadata" if has_abstract else "metadata_only"
+                ),
+            }
+        )
         item["metadata"] = metadata
         result.append(item)
     return result
@@ -244,26 +263,32 @@ def _ensure_review_sections(workspace: dict[str, Any]) -> list[dict[str, Any]]:
         edge_id = str(edge.get("id") or uuid.uuid4())
         source_label = edge.get("source_label") or {"default": str(edge.get("source") or "")}
         target_label = edge.get("target_label") or {"default": str(edge.get("target") or "")}
-        summary = edge.get("summary") or edge.get("context") or {
-            "default": f"{_localized_text(source_label)} {edge.get('predicate', 'related_to')} {_localized_text(target_label)}"
-        }
-        items.append({
-            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-generation:review:{edge_id}")),
-            "finding_type": "prior_art_landscape",
-            "title": summary,
-            "content": summary,
-            "evidence": {
-                "reference_ids": edge.get("reference_ids", []),
-                "source_refs": edge.get("source_urls", []),
-                "assertion_class": edge.get("assertion"),
-                "evidence_level": edge.get("evidence_grade"),
-                "derived_from_graph_edge": edge_id,
-                "review_status": "pending_review",
-            },
-            "version": 1,
-            "created_at": datetime.now(UTC).isoformat(),
-            "updated_at": datetime.now(UTC).isoformat(),
-        })
+        summary = (
+            edge.get("summary")
+            or edge.get("context")
+            or {
+                "default": f"{_localized_text(source_label)} {edge.get('predicate', 'related_to')} {_localized_text(target_label)}"
+            }
+        )
+        items.append(
+            {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-generation:review:{edge_id}")),
+                "finding_type": "prior_art_landscape",
+                "title": summary,
+                "content": summary,
+                "evidence": {
+                    "reference_ids": edge.get("reference_ids", []),
+                    "source_refs": edge.get("source_urls", []),
+                    "assertion_class": edge.get("assertion"),
+                    "evidence_level": edge.get("evidence_grade"),
+                    "derived_from_graph_edge": edge_id,
+                    "review_status": "pending_review",
+                },
+                "version": 1,
+                "created_at": datetime.now(UTC).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        )
     return [{"track": "prior_art_landscape", "items": items}] if items else []
 
 
@@ -280,28 +305,29 @@ def _ensure_research_targets(workspace: dict[str, Any], *, limit: int, strata: s
     for index, node in enumerate((workspace.get("graph_nodes") or [])[:limit], start=1):
         node_id = str(node.get("id") or f"target-{index}")
         label = node.get("label") or {"default": node_id}
-        result.append({
-            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-generation:target:{node_id}")),
-            "candidate_key": f"R{index:02d}",
-            "name": label,
-            "pain_group": {"default": strata} if strata else {"default": ""},
-            "gene": "",
-            "protein_type": {"default": str(node.get("kind") or "evidence_graph_entity")},
-            "localization": {"default": ""},
-            "axis": node.get("description") or label,
-            "score": None,
-            "rank": index,
-            "scores": {},
-            "properties": {
-                "derived_from_graph_node": node_id,
+        result.append(
+            {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-generation:target:{node_id}")),
+                "candidate_key": f"R{index:02d}",
+                "name": label,
+                "pain_group": {"default": strata} if strata else {"default": ""},
+                "gene": "",
+                "protein_type": {"default": str(node.get("kind") or "evidence_graph_entity")},
+                "localization": {"default": ""},
+                "axis": node.get("description") or label,
+                "score": None,
+                "rank": index,
+                "scores": {},
+                "properties": {
+                    "derived_from_graph_node": node_id,
+                    "review_status": "pending_review",
+                },
+                "reference_ids": sorted(
+                    {str(value) for value in node.get("reference_ids") or []} | connected_references.get(node_id, set())
+                ),
                 "review_status": "pending_review",
-            },
-            "reference_ids": sorted(
-                {str(value) for value in node.get("reference_ids") or []}
-                | connected_references.get(node_id, set())
-            ),
-            "review_status": "pending_review",
-        })
+            }
+        )
     return result
 
 
@@ -345,11 +371,13 @@ def _verify_workspace_entities(
             if returned == accession.upper():
                 primary_target["identity_status"] = "verified_uniprot"
             else:
-                issues.append({
-                    "kind": "metadata_mismatch",
-                    "entity_id": accession,
-                    "detail": "UniProt response accession did not match the requested target",
-                })
+                issues.append(
+                    {
+                        "kind": "metadata_mismatch",
+                        "entity_id": accession,
+                        "detail": "UniProt response accession did not match the requested target",
+                    }
+                )
         except (RuntimeError, ValueError) as exc:
             issues.append({"kind": "tool_failure", "entity_id": f"uniprot:{accession}", "detail": str(exc)})
     for structure in workspace.get("structures", []):
@@ -367,11 +395,13 @@ def _verify_workspace_entities(
                 "verified_rcsb" if matched else "metadata_mismatch"
             )
             if not matched:
-                issues.append({
-                    "kind": "metadata_mismatch",
-                    "entity_id": pdb_id,
-                    "detail": "RCSB response entry did not match the requested PDB identifier",
-                })
+                issues.append(
+                    {
+                        "kind": "metadata_mismatch",
+                        "entity_id": pdb_id,
+                        "detail": "RCSB response entry did not match the requested PDB identifier",
+                    }
+                )
         except (RuntimeError, ValueError) as exc:
             issues.append({"kind": "tool_failure", "entity_id": f"rcsb:{pdb_id}", "detail": str(exc)})
     return issues
@@ -386,8 +416,7 @@ def _ensure_datasets(
     existing = {str(item.get("key")) for item in result}
     generated = {
         "identifiers": [
-            {"ref_id": item.get("ref_id"), "doi": item.get("doi"), "pmid": item.get("pmid")}
-            for item in references
+            {"ref_id": item.get("ref_id"), "doi": item.get("doi"), "pmid": item.get("pmid")} for item in references
         ],
         "search_log": audits,
         "field_dictionary": [
@@ -405,16 +434,18 @@ def _ensure_datasets(
                         item["data"] = data
             continue
         title = key.replace("_", " ").title()
-        result.append({
-            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-dataset:{key}")),
-            "key": key,
-            "title": {"default": title, "en": title, "zh": None},
-            "content": {"default": f"Backend-generated {title.lower()} for this draft."},
-            "data": data,
-            "display_data": None,
-            "source": {"generated_by": "research_generation_v2", "review_status": "pending_review"},
-            "version": 1,
-        })
+        result.append(
+            {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"bda:research-dataset:{key}")),
+                "key": key,
+                "title": {"default": title, "en": title, "zh": None},
+                "content": {"default": f"Backend-generated {title.lower()} for this draft."},
+                "data": data,
+                "display_data": None,
+                "source": {"generated_by": "research_generation_v2", "review_status": "pending_review"},
+                "version": 1,
+            }
+        )
     return result
 
 
@@ -437,11 +468,13 @@ def _validate_draft(draft: dict[str, Any]) -> tuple[list[dict[str, str]], float]
         entity_id = str(edge.get("id"))
         for endpoint in ("source", "target"):
             if str(edge.get(endpoint)) not in node_ids:
-                issues.append({
-                    "kind": "unknown_node",
-                    "entity_id": entity_id,
-                    "detail": f"{endpoint}:{edge.get(endpoint)}",
-                })
+                issues.append(
+                    {
+                        "kind": "unknown_node",
+                        "entity_id": entity_id,
+                        "detail": f"{endpoint}:{edge.get(endpoint)}",
+                    }
+                )
         check_references(entity_id, edge.get("reference_ids"))
     for target in draft.get("research_targets", []):
         check_references(str(target.get("id") or target.get("candidate_key")), target.get("reference_ids"))
@@ -522,9 +555,19 @@ def finalize_research_generation(session: Session, row: ResearchGeneration) -> R
     issues: list[dict[str, str]] = []
     evidence_tools = EvidenceToolService(max_calls=60)
     if request.get("use_external_evidence", True):
+        from .search_query import search_topic
+
+        try:
+            discovery_topic = search_topic(session, project.id, topic)
+        except (DomainError, ValueError, httpx.HTTPError) as exc:
+            row.status = "failed"
+            row.error = str(exc)[:1000]
+            row.version += 1
+            evidence_tools.close()
+            return row
         issues.extend(_verify_workspace_entities(workspace, evidence_tools))
         external_references, external_issues = _external_references(
-            topic,
+            discovery_topic,
             evidence_tools,
             evidence_cutoff=request.get("evidence_cutoff"),
         )
@@ -545,11 +588,13 @@ def finalize_research_generation(session: Session, row: ResearchGeneration) -> R
             issues.append({"kind": "unknown_reference", "entity_id": str(edge.get("id")), "detail": ",".join(missing)})
         if edge.get("assertion") == "established_fact" and not any(item in verified_ids for item in edge_refs):
             edge["assertion"] = "evidence_based_inference"
-            issues.append({
-                "kind": "assertion_downgraded",
-                "entity_id": str(edge.get("id")),
-                "detail": "No locally verified reference supports established_fact",
-            })
+            issues.append(
+                {
+                    "kind": "assertion_downgraded",
+                    "entity_id": str(edge.get("id")),
+                    "detail": "No locally verified reference supports established_fact",
+                }
+            )
 
     review_sections = _ensure_review_sections(workspace)
     research_targets = _ensure_research_targets(
@@ -683,7 +728,9 @@ def import_research_generation(
             counts=(row.draft or {}).get("counts", {}),
         )
     if row.status != "ready" or not row.checksum:
-        raise DomainError("research_generation_not_ready", "Research generation is not ready to import", status_code=409)
+        raise DomainError(
+            "research_generation_not_ready", "Research generation is not ready to import", status_code=409
+        )
     if not (row.validation or {}).get("valid"):
         raise DomainError(
             "research_generation_confirmation_blocked",
@@ -692,7 +739,9 @@ def import_research_generation(
         )
     if checksum != row.checksum:
         RESEARCH_IMPORT_ACCEPTANCE.labels("checksum_conflict").inc()
-        raise DomainError("research_generation_checksum_conflict", "Research draft changed after preview", status_code=412)
+        raise DomainError(
+            "research_generation_checksum_conflict", "Research draft changed after preview", status_code=412
+        )
 
     draft = ResearchDraftV2.model_validate(row.draft).model_dump(mode="json")
     closure_issues, _ = _validate_draft(draft)
@@ -765,118 +814,130 @@ def import_research_generation(
 
     for section in draft["review_sections"]:
         for item in section.get("items", []):
-            session.add(ResearchFinding(
+            session.add(
+                ResearchFinding(
+                    project_id=project.id,
+                    brief_id=brief.id,
+                    finding_type=str(section.get("track") or item.get("finding_type") or "observation"),
+                    title=_localized_text(item.get("title"))[:300] or "Pending review finding",
+                    content=_localized_text(item.get("content")) or "Pending review finding",
+                    evidence={
+                        **(item.get("evidence") or {}),
+                        "localized_content": {"title": item.get("title"), "content": item.get("content")},
+                        "review_status": "pending_review",
+                        "checksum": row.checksum,
+                    },
+                    created_by=user.id,
+                )
+            )
+
+    for node in draft["graph_nodes"]:
+        session.add(
+            ResearchFinding(
                 project_id=project.id,
                 brief_id=brief.id,
-                finding_type=str(section.get("track") or item.get("finding_type") or "observation"),
-                title=_localized_text(item.get("title"))[:300] or "Pending review finding",
-                content=_localized_text(item.get("content")) or "Pending review finding",
+                finding_type="evidence_entity",
+                title=_localized_text(node.get("label"))[:300] or str(node.get("id")),
+                content=_localized_text(node.get("description")) or _localized_text(node.get("label")),
                 evidence={
-                    **(item.get("evidence") or {}),
-                    "localized_content": {"title": item.get("title"), "content": item.get("content")},
+                    "relation_element": "entity",
+                    "node_id": node.get("id"),
+                    "node_kind": node.get("kind"),
+                    "reference_ids": node.get("reference_ids", []),
                     "review_status": "pending_review",
                     "checksum": row.checksum,
                 },
                 created_by=user.id,
-            ))
-
-    for node in draft["graph_nodes"]:
-        session.add(ResearchFinding(
-            project_id=project.id,
-            brief_id=brief.id,
-            finding_type="evidence_entity",
-            title=_localized_text(node.get("label"))[:300] or str(node.get("id")),
-            content=_localized_text(node.get("description")) or _localized_text(node.get("label")),
-            evidence={
-                "relation_element": "entity",
-                "node_id": node.get("id"),
-                "node_kind": node.get("kind"),
-                "reference_ids": node.get("reference_ids", []),
-                "review_status": "pending_review",
-                "checksum": row.checksum,
-            },
-            created_by=user.id,
-        ))
+            )
+        )
     node_labels = {str(node.get("id")): _localized_text(node.get("label")) for node in draft["graph_nodes"]}
     for edge in draft["graph_edges"]:
         source_label = node_labels.get(str(edge.get("source")), _localized_text(edge.get("source_label")))
         target_label = node_labels.get(str(edge.get("target")), _localized_text(edge.get("target_label")))
-        session.add(ResearchFinding(
-            project_id=project.id,
-            brief_id=brief.id,
-            finding_type="evidence_statement",
-            title=f"{source_label} —{edge.get('predicate', 'related_to')}→ {target_label}"[:300],
-            content=_localized_text(edge.get("summary")) or "Pending review relation",
-            evidence={
-                "relation_element": "statement",
-                "edge_id": edge.get("id"),
-                "source": edge.get("source"),
-                "target": edge.get("target"),
-                "predicate": edge.get("predicate"),
-                "assertion_class": edge.get("assertion"),
-                "evidence_level": edge.get("evidence_grade"),
-                "reference_ids": edge.get("reference_ids", []),
-                "source_refs": edge.get("source_urls", []),
-                "localized_summary": edge.get("summary"),
-                "localized_context": edge.get("context"),
-                "review_status": "pending_review",
-                "checksum": row.checksum,
-            },
-            created_by=user.id,
-        ))
+        session.add(
+            ResearchFinding(
+                project_id=project.id,
+                brief_id=brief.id,
+                finding_type="evidence_statement",
+                title=f"{source_label} —{edge.get('predicate', 'related_to')}→ {target_label}"[:300],
+                content=_localized_text(edge.get("summary")) or "Pending review relation",
+                evidence={
+                    "relation_element": "statement",
+                    "edge_id": edge.get("id"),
+                    "source": edge.get("source"),
+                    "target": edge.get("target"),
+                    "predicate": edge.get("predicate"),
+                    "assertion_class": edge.get("assertion"),
+                    "evidence_level": edge.get("evidence_grade"),
+                    "reference_ids": edge.get("reference_ids", []),
+                    "source_refs": edge.get("source_urls", []),
+                    "localized_summary": edge.get("summary"),
+                    "localized_context": edge.get("context"),
+                    "review_status": "pending_review",
+                    "checksum": row.checksum,
+                },
+                created_by=user.id,
+            )
+        )
 
     for reference in draft["references"]:
         metadata = {**(reference.get("metadata") or {}), **reference, "review_status": "pending_review"}
-        session.add(LiteratureDocument(
-            project_id=project.id,
-            title=_localized_text(reference.get("title"))[:500] or str(reference.get("ref_id")),
-            source="copilot_research_v2",
-            external_id=str(reference.get("pmid") or reference.get("doi") or reference.get("ref_id") or ""),
-            metadata_json=metadata,
-            status="pending_review",
-        ))
+        session.add(
+            LiteratureDocument(
+                project_id=project.id,
+                title=_localized_text(reference.get("title"))[:500] or str(reference.get("ref_id")),
+                source="copilot_research_v2",
+                external_id=str(reference.get("pmid") or reference.get("doi") or reference.get("ref_id") or ""),
+                metadata_json=metadata,
+                status="pending_review",
+            )
+        )
 
     for candidate in draft["research_targets"]:
-        session.add(Candidate(
-            project_id=project.id,
-            candidate_key=str(candidate.get("candidate_key") or candidate.get("id")),
-            name=_localized_text(candidate.get("name"))[:240],
-            candidate_kind="research_target",
-            status="proposed",
-            rank=candidate.get("rank"),
-            score=candidate.get("score"),
-            scores=candidate.get("scores") or {},
-            properties={
-                **(candidate.get("properties") or {}),
-                "localized_content": {
-                    key: candidate.get(key)
-                    for key in ("name", "pain_group", "protein_type", "localization", "axis")
+        session.add(
+            Candidate(
+                project_id=project.id,
+                candidate_key=str(candidate.get("candidate_key") or candidate.get("id")),
+                name=_localized_text(candidate.get("name"))[:240],
+                candidate_kind="research_target",
+                status="proposed",
+                rank=candidate.get("rank"),
+                score=candidate.get("score"),
+                scores=candidate.get("scores") or {},
+                properties={
+                    **(candidate.get("properties") or {}),
+                    "localized_content": {
+                        key: candidate.get(key)
+                        for key in ("name", "pain_group", "protein_type", "localization", "axis")
+                    },
+                    "reference_ids": candidate.get("reference_ids", []),
+                    "review_status": "pending_review",
+                    "checksum": row.checksum,
                 },
-                "reference_ids": candidate.get("reference_ids", []),
-                "review_status": "pending_review",
-                "checksum": row.checksum,
-            },
-        ))
+            )
+        )
 
     for entry in [*draft["methods"], *draft["datasets"]]:
         key = str(entry.get("key") or "methods")
-        session.add(KnowledgeEntry(
-            project_id=project.id,
-            title=_localized_text(entry.get("title"))[:300] or key,
-            content=_localized_text(entry.get("content")),
-            entry_type=key,
-            source={
-                **(entry.get("source") or {}),
-                "entry_key": key,
-                "localized_content": {"title": entry.get("title"), "content": entry.get("content")},
-                "data": entry.get("data"),
-                "display_data": entry.get("display_data"),
-                "review_status": "pending_review",
-                "checksum": row.checksum,
-            },
-            tags=["copilot-research-v2", "pending-review", "dataset" if key in DATASET_KEYS else "method"],
-            created_by=user.id,
-        ))
+        session.add(
+            KnowledgeEntry(
+                project_id=project.id,
+                title=_localized_text(entry.get("title"))[:300] or key,
+                content=_localized_text(entry.get("content")),
+                entry_type=key,
+                source={
+                    **(entry.get("source") or {}),
+                    "entry_key": key,
+                    "localized_content": {"title": entry.get("title"), "content": entry.get("content")},
+                    "data": entry.get("data"),
+                    "display_data": entry.get("display_data"),
+                    "review_status": "pending_review",
+                    "checksum": row.checksum,
+                },
+                tags=["copilot-research-v2", "pending-review", "dataset" if key in DATASET_KEYS else "method"],
+                created_by=user.id,
+            )
+        )
 
     storage: ObjectStorage | None = None
     for structure in draft["structures"]:
@@ -912,30 +973,32 @@ def import_research_generation(
             status = "pending"
             size_bytes = 0
             checksum_sha256 = hashlib.sha256(object_key.encode()).hexdigest()
-        session.add(Artifact(
-            project_id=project.id,
-            created_by=user.id,
-            artifact_type="target_structure",
-            filename=filename,
-            content_type=content_type,
-            object_key=object_key,
-            status=status,
-            size_bytes=size_bytes,
-            checksum_sha256=checksum_sha256,
-            lineage={
-                **(structure.get("lineage") or {}),
-                "pdb_id": structure.get("pdb_id"),
-                "name": _localized_text(structure.get("name")),
-                "role": _localized_text(structure.get("role")),
-                "method": _localized_text(structure.get("method")),
-                "resolution": structure.get("resolution"),
-                "reference_id": structure.get("reference_id"),
-                "rcsb_url": structure.get("rcsb_url"),
-                "review_status": "pending_review",
-                "checksum": row.checksum,
-                "source_artifact_id": str(source_artifact.id) if source_artifact else None,
-            },
-        ))
+        session.add(
+            Artifact(
+                project_id=project.id,
+                created_by=user.id,
+                artifact_type="target_structure",
+                filename=filename,
+                content_type=content_type,
+                object_key=object_key,
+                status=status,
+                size_bytes=size_bytes,
+                checksum_sha256=checksum_sha256,
+                lineage={
+                    **(structure.get("lineage") or {}),
+                    "pdb_id": structure.get("pdb_id"),
+                    "name": _localized_text(structure.get("name")),
+                    "role": _localized_text(structure.get("role")),
+                    "method": _localized_text(structure.get("method")),
+                    "resolution": structure.get("resolution"),
+                    "reference_id": structure.get("reference_id"),
+                    "rcsb_url": structure.get("rcsb_url"),
+                    "review_status": "pending_review",
+                    "checksum": row.checksum,
+                    "source_artifact_id": str(source_artifact.id) if source_artifact else None,
+                },
+            )
+        )
 
     session.flush()
     row.status = "imported"

@@ -380,7 +380,11 @@ export function selectCasesFromEnv(matrix, env = process.env) {
     ['BDA_BROWSER_CASES', 'id'],
   ]
 
-  let selected = matrix
+  // Desktop web is the delivery target. Keep historical cases available for
+  // explicit reruns without including mobile in the default acceptance suite.
+  let selected = env.BDA_BROWSER_VIEWPORTS || env.BDA_BROWSER_CASES
+    ? matrix
+    : matrix.filter((entry) => entry.viewportId === 'desktop')
   for (const [environmentKey, property] of filters) {
     const raw = env[environmentKey]
     if (!raw) continue
@@ -955,6 +959,11 @@ function createStrictRoutes({ scenario, routeId }) {
   }
   const ok = (body, options) => routeResponse(200, body, options)
 
+  add('GET', '/api/v2/wetlab/concentration', { a280: '1', ext_coeff: '10000', molecular_weight: '12000', path_length_cm: '1' }, () => ok({
+    a280: 1, path_length_cm: 1, epsilon: 10000, mw: 12000,
+    molar_conc_uM: 100, molar_conc_nM: 100000, molar_conc_M: 0.0001,
+    mass_conc_mg_mL: 1.2, mass_conc_ug_mL: 1200, mass_conc_ng_uL: 1200,
+  }))
   add('GET', '/api/v2/health/ready', {}, () => ok({
     status: 'ok',
     service: 'bda-v2',
@@ -1101,7 +1110,12 @@ function createStrictRoutes({ scenario, routeId }) {
     warnings: scenario === 'read-only'
       ? [{ code: 'read_only', message: 'Completed workflows are read-only.' }]
       : [],
-    checks: { target_ready: scenario !== 'blocked' },
+    checks: { target_ready: scenario !== 'blocked', compute_backend: 'lsf', queue: 'cpu', staging_mode: 'ssh', connectivity_checked: false },
+  }))
+  add('POST', `/api/v2/workflow-nodes/${workflowNode.id}/script-previews`, {}, () => ok({
+    workflow_node_id: workflowNode.id, plugin_id: workflowNode.model_plugin_id, review_fingerprint: 'a'.repeat(64),
+    script: '#!/bin/bash\n#BSUB -q cpu\nscore --input candidates.json',
+    input_manifest: { parameters: workflowNode.parameters, inputs: [], pending_inputs: [] },
   }))
   add('GET', `/api/v2/workflow-runs/${workflowRun.id}/jobs`, {}, () => ok({
     items: empty ? [] : [jobFixture(scenario)],
@@ -1300,6 +1314,16 @@ function createStrictRoutes({ scenario, routeId }) {
     items: [],
     next_cursor: null,
   }))
+  add('GET', '/api/v2/copilot/task-services', {}, () => ok([{
+    id: 'literature', title: 'Research the evidence', title_zh: '调研与比较证据',
+    deliverable: 'Traced excerpts and evidence gaps', deliverable_zh: '可追溯的证据与缺口',
+    capabilities: ['research-read'], write_tools: ['start_literature_search', 'create_knowledge_draft'],
+    steps: [{ id: 'excerpts', title: 'Read traced excerpts', title_zh: '读取可追溯来源', tools: ['get_reference_content'] }],
+  }]))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/task-readiness`, {}, () => ok({
+    model: '', checked_at: null, checks: {}, eligible_services: [], reason: 'No model in this browser fixture.',
+  }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/config`, {}, () => ok({
     project_id: PROJECT_ID,
     llm_provider_id: null,
@@ -1422,7 +1446,7 @@ const RECOVERABLE_PATH_BY_ROUTE = Object.freeze({
   lab: `/api/v2/projects/${PROJECT_ID}/proteins`,
 })
 
-export function createFixtureRouter({ scenario = 'populated', routeId = '' } = {}) {
+export function createFixtureRouter({ scenario = 'populated', routeId = '', stalePreview = false } = {}) {
   const routes = createStrictRoutes({ scenario, routeId })
   const routesBySignature = new Map(routes.map((route) => [route.signature, route]))
   const counts = new Map()
@@ -1443,6 +1467,12 @@ export function createFixtureRouter({ scenario = 'populated', routeId = '' } = {
       counts.set(signature, count)
 
       const url = new URL(rawUrl, 'http://browser.invalid')
+      if (stalePreview && count === 1 && method === 'POST' && url.pathname === '/api/v2/workflow-runs/run_browser/submissions') {
+        return routeResponse(412, {
+          type: 'about:blank', title: 'Preview changed', status: 412,
+          code: 'preview_changed', detail: 'Plugin changed; refresh the preview',
+        }, { expectedHttpFailure: true })
+      }
       const recoverablePath = RECOVERABLE_PATH_BY_ROUTE[routeId]
       if (
         scenario === 'recoverable-error'

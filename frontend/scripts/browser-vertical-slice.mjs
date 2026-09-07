@@ -930,6 +930,31 @@ async function firstVisible(locator) {
   return null
 }
 
+async function exerciseCopilotTaskPlan(page, testCase, diagnostics) {
+  if (!testCase.authenticated || testCase.routeId !== 'experiments' || testCase.viewportId !== 'desktop') return
+  if (testCase.scenario === 'populated') {
+    const trigger = page.getByRole('button', { name: /^(Open Copilot|打开 Copilot)$/ })
+    await trigger.focus()
+    await trigger.click()
+    const taskPanel = page.locator(COPILOT_LAYER_SELECTOR)
+    await taskPanel.getByRole('button', { name: /Research the evidence|调研与比较证据/ }).click()
+    await taskPanel.getByRole('textbox', { name: /Task goal|希望完成的工作/ }).fill('Research the project evidence')
+    await taskPanel.getByRole('button', { name: /Research the evidence|调研与比较证据/ }).click()
+    const startTask = taskPanel.getByRole('button', { name: /Start this plan|按以上计划开始/ })
+    await startTask.waitFor({ state: 'visible' })
+    if (await startTask.isEnabled()) throw new Error('Unqualified provider must not start a guided task')
+    const searchGrant = taskPanel.getByRole('checkbox', { name: /Allow external literature|允许发起外部文献检索/ })
+    if (await searchGrant.isChecked()) throw new Error('External search authorization must start unchecked')
+    await searchGrant.check()
+    await page.screenshot({ path: `/tmp/bda-copilot-task-${testCase.viewportId}-${testCase.appearanceId}.png` })
+    await page.keyboard.press('Escape')
+    await expectHidden(taskPanel, 'Copilot task panel')
+    await trigger.focus()
+    diagnostics.copilotTaskPlan = 'checked scope and unqualified-model gate'
+  }
+
+}
+
 async function exerciseGlobalLayers(page, testCase, diagnostics) {
   if (
     !testCase.authenticated
@@ -952,6 +977,7 @@ async function exerciseGlobalLayers(page, testCase, diagnostics) {
     'Copilot',
     diagnostics,
   )
+
 
   const helpTrigger = await firstVisible(page.getByRole('button', { name: 'Help' }))
   if (helpTrigger) {
@@ -1096,7 +1122,7 @@ async function exerciseCandidateGrid(page, diagnostics) {
 }
 
 async function exerciseResearchGrids(page, diagnostics) {
-  const dataTab = page.getByRole('tab', { name: /Data/i })
+  const dataTab = page.getByRole('navigation', { name: 'Evidence categories' }).getByRole('button', { name: /Data/i })
   await dataTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await dataTab.click()
   const tables = page.locator('[data-slot="data-grid-table"]')
@@ -1123,7 +1149,7 @@ async function exerciseResearchGrids(page, diagnostics) {
   if ((await datasetTable.locator('tbody tr[data-row-id]').count()) !== 1) {
     throw new Error('Dataset search did not restore the matching bilingual fixture row.')
   }
-  const methodsTab = page.getByRole('tab', { name: /Research Methods/i })
+  const methodsTab = page.getByRole('tab', { name: 'Experiment plan' })
   await methodsTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await methodsTab.click()
   await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
@@ -1246,6 +1272,36 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       'Workflow node builder',
       diagnostics,
     )
+    const submissionRequests = []
+    const recordSubmission = (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/submissions')) submissionRequests.push(request)
+    }
+    page.on('request', recordSubmission)
+    await page.getByRole('button', { name: 'Submit workflow', exact: true }).click()
+    const review = page.getByRole('dialog', { name: 'Review compute submission' })
+    await expectVisible(review, 'compute submission review')
+    const confirm = review.getByRole('button', { name: 'Confirm and submit jobs' })
+    await review.getByRole('button', { name: 'browser-scoring-model' }).click()
+    await expectVisible(review.getByText('#!/bin/bash', { exact: false }), 'rendered submission script')
+    if (submissionRequests.length !== 0) throw new Error('Opening the preview submitted compute prematurely.')
+    const exerciseStalePreview = testCase.viewportId === 'mobile'
+    if (exerciseStalePreview) {
+      const refreshed = page.waitForRequest((request) => request.url().endsWith('/script-previews'))
+      await confirm.click()
+      await refreshed
+      await expectVisible(review, 'review remains open after stale preview rejection')
+      await expectEnabled(confirm, 'confirmation after refreshed preview')
+    }
+    await confirm.click()
+    await expectHidden(review, 'review after confirmed submission')
+    const expectedRequests = exerciseStalePreview ? 2 : 1
+    if (submissionRequests.length !== expectedRequests || submissionRequests.some((request) => request.postDataJSON().workflow_version !== 3 || request.postDataJSON().review_fingerprints?.node_browser !== 'a'.repeat(64))) {
+      throw new Error('Each confirmation must send exactly one request with the reviewed version and fingerprints.')
+    }
+    page.off('request', recordSubmission)
+    diagnostics.interactions.computeConfirmation = exerciseStalePreview
+      ? 'stale preview rejected; automatically refreshed; explicit reconfirmation succeeded'
+      : 'preview does not submit; confirmation sends one versioned request'
     const jobTrigger = page.getByRole('button').filter({ hasText: 'job_browser' }).first()
     await assertEscapeFocusReturn(
       page,
@@ -1280,6 +1336,18 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'lab') {
+    await page.getByRole('link', { name: 'Toolbox', exact: true }).click()
+    await expectVisible(page.getByRole('heading', { name: 'Lab toolbox' }), 'standalone toolbox')
+    await page.getByRole('button', { name: 'Choose a project for saving (optional)' }).click()
+    await page.getByRole('combobox', { name: /select research project/i }).click()
+    await page.getByRole('option', { name: 'No project', exact: true }).click()
+    const concentration = page.getByRole('region', { name: 'Concentration (A280)', exact: true })
+    await concentration.getByRole('button', { name: 'Compute', exact: true }).click()
+    await expectVisible(concentration.getByText('100 µM · 1.2 mg/mL', { exact: true }), 'projectless concentration result')
+    await expectVisible(page.getByRole('button', { name: 'Preview without saving' }), 'projectless analysis preview action')
+    diagnostics.interactions.standaloneToolbox = 'toolbox opens without project gating and calculates after deselecting project'
+    diagnostics.interactions.toolboxOverflow = await assertNoPageOverflow(page)
   } else if (testCase.routeId === 'autopilot') {
     await exerciseAutopilotPromptGuard(page, diagnostics)
   }
@@ -1499,6 +1567,8 @@ async function runCase(browser, testCase) {
   const router = createFixtureRouter({
     scenario: testCase.scenario,
     routeId: testCase.routeId,
+    stalePreview: testCase.routeId === 'workflow' && testCase.scenario === 'populated'
+      && testCase.appearanceId === 'en-light' && testCase.viewportId === 'mobile',
   })
 
   try {
@@ -1524,6 +1594,7 @@ async function runCase(browser, testCase) {
 
     diagnostics.systemTheme = await assertSystemThemeResponse(page, testCase)
     await exerciseGlobalLayers(page, testCase, diagnostics)
+    await exerciseCopilotTaskPlan(page, testCase, diagnostics)
     diagnostics.overflow = await assertNoPageOverflow(page)
     diagnostics.reducedMotion = await assertReducedMotion(page)
     diagnostics.touchTargets = await assertMobileTouchTargets(page, testCase)

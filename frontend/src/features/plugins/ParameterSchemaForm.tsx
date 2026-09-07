@@ -193,9 +193,9 @@ function FieldControl({
         min={field.min}
         max={field.max}
         step={field.type === 'integer' ? 1 : 'any'}
-        value={Number(value)}
+        value={value === '' || value === undefined ? '' : Number(value)}
         disabled={disabled}
-        onChange={(event) => onChange(field.type === 'integer' ? Number.parseInt(event.target.value, 10) : Number(event.target.value))}
+        onChange={(event) => onChange(event.target.value === '' ? '' : Number(event.target.value))}
       />
     )
   }

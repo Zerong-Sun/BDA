@@ -967,3 +967,22 @@ _register(
         handler=_spawn_subagent,
     )
 )
+
+
+def _plan_workflow_route(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..projects.models import Project
+    from .schemas import RoutePlanCreate
+    from .service import create_route_plan
+
+    project = ctx.session.get(Project, _project_of(ctx))
+    if project is None:
+        raise ValueError("project_not_found")
+    # Deterministic catalog generation; this agent compares the returned choices.
+    return create_route_plan(ctx.session, project, RoutePlanCreate(project_id=project.id, goal=args["goal"])).model_dump(mode="json")
+
+
+_register(ToolSpec(
+    id="plan_workflow_route", description="Compare registered workflow routes and missing inputs. Does not create or submit a workflow.",
+    parameters={"type": "object", "properties": {"goal": {"type": "string", "minLength": 1, "maxLength": 5000}}, "required": ["goal"], "additionalProperties": False},
+    capability="workflow-planning", execution_mode="read", requires="session", handler=_plan_workflow_route,
+))

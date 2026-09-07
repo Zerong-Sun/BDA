@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -126,5 +126,58 @@ describe('node builder card display', () => {
     expect(screen.getByText('0 selected')).toBeInTheDocument()
     expect(screen.getByText('Select at least one method')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add card to workflow' })).toBeDisabled()
+  })
+})
+
+describe('plugin submission from the form', () => {
+  function installPlugin() {
+    api.listModelPlugins.mockResolvedValue([{ ...modelPlugin('p-json', 'JSON model', '1'),
+      resources: { cpus: 1, gpu: true, gpu_count: 1 },
+      parameter_schema: { type: 'object', properties: {
+        targets: { type: 'array', default: [] },
+        count: { type: 'integer', minimum: 1, default: 1 },
+      }, required: ['count'] },
+    }])
+  }
+  it('adds typed JSON and derives the GPU badge from declared resources', async () => {
+    installPlugin()
+    const onAdd = vi.fn().mockResolvedValue(undefined)
+    renderWithProviders(<NodeBuilder open onClose={vi.fn()} onAdd={onAdd} />)
+    fireEvent.click(await findPluginCard('JSON model'))
+    fireEvent.change(screen.getByLabelText('Targets'), { target: { value: '["target-A"]' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add card to workflow' }))
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ resource: 'gpu' }), 'JSON model', expect.any(Array),
+      expect.objectContaining({ targets: ['target-A'], count: 1 }),
+    ))
+  })
+  it('shows an error and never adds a malformed JSON draft', async () => {
+    installPlugin()
+    const onAdd = vi.fn()
+    renderWithProviders(<NodeBuilder open onClose={vi.fn()} onAdd={onAdd} />)
+    fireEvent.click(await findPluginCard('JSON model'))
+    fireEvent.change(screen.getByLabelText('Targets'), { target: { value: '[' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add card to workflow' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Targets: invalid JSON')
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+})
+
+describe('registry availability', () => {
+  it('distinguishes loading from an empty registry', () => {
+    api.listModelPlugins.mockReturnValue(new Promise(() => {}))
+    renderWithProviders(<NodeBuilder open onClose={vi.fn()} onAdd={vi.fn()} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
+    expect(screen.queryByText('No model plugins are registered yet.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add card to workflow' })).toBeDisabled()
+  })
+  it('surfaces a failed registry request and recovers through Retry', async () => {
+    api.listModelPlugins.mockRejectedValueOnce(new Error('Registry unavailable'))
+      .mockResolvedValueOnce([modelPlugin('recovered', 'Recovered model', '1')])
+    renderWithProviders(<NodeBuilder open onClose={vi.fn()} onAdd={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Registry unavailable')
+    expect(screen.getByRole('button', { name: 'Add card to workflow' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await findPluginCard('Recovered model')).toBeInTheDocument()
   })
 })

@@ -1,3 +1,4 @@
+import { ModelResultGuide } from '../results/ModelResultGuide'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Copy, Download, FileCode, FloppyDisk, Gear, Network, PlugsConnected } from '@phosphor-icons/react'
 import type { WorkflowInputBinding, WorkflowNode } from '../../lib/schemas/workflow'
@@ -19,7 +20,7 @@ import {
 import { ParameterSchemaForm } from '../plugins'
 import { InputBindingPanel } from './InputBindingPanel'
 import { listProjectArtifacts } from '../../lib/api/artifacts'
-import { defaultsFromFields, fieldsFromParameterSchema } from '../../lib/forms/parameterSchema'
+import { defaultsFromFields, fieldsFromParameterSchema, prepareParameterValues } from '../../lib/forms/parameterSchema'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { ClusterDrafts } from '../copilot/ClusterDrafts'
@@ -77,7 +78,9 @@ function WorkflowInspectorContent({
   )
   const [scriptPreview, setScriptPreview] = useState<ScriptPreviewResponse | null>(null)
   const [queueName, setQueueName] = useState(selectedNode?.queue ?? '')
-  const [previewBackend, setPreviewBackend] = useState('lsf')
+  const [previewBackend, setPreviewBackend] = useState<'lsf' | 'docker'>('lsf')
+  const unsavedPreviewInputs = (queueName.trim() || null) !== (selectedNode?.queue || null)
+    || JSON.stringify(draftBindings) !== JSON.stringify(selectedNode?.input_bindings ?? [])
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const { t, language } = useI18n()
@@ -147,7 +150,7 @@ function WorkflowInspectorContent({
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
       if (!workflowRunId || !selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       return updateWorkflowNode(workflowRunId, selectedNode.id, {
-        parameters: effectiveParameters,
+        parameters: prepareParameterValues(parameterFields, effectiveParameters),
         input_bindings: draftBindings,
         queue: queueName.trim() || null,
       })
@@ -167,6 +170,7 @@ function WorkflowInspectorContent({
   const previewScript = useMutation({
     mutationFn: () => {
       if (!selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
+      if (unsavedPreviewInputs) throw new Error(t.workflowExt.inspector.savePreviewInputs)
       return previewWorkflowNodeScript(selectedNode.id, {
         override_params: effectiveParameters,
         compute_backend: previewBackend,
@@ -238,6 +242,8 @@ function WorkflowInspectorContent({
               </div>
               <StatusPill label={selectedNode.status} tone={statusTone(selectedNode.status)} />
             </div>
+
+            <ModelResultGuide pluginKey={activePlugin?.plugin_key ?? selectedNode.model_plugin ?? selectedNode.node_type} />
 
             <RouteDisplayCatalog
               parameters={selectedNode.parameters}
@@ -317,7 +323,7 @@ function WorkflowInspectorContent({
                 </Button>
                 <Button type="button"
                   size="sm"
-                  disabled={previewScript.isPending || nodePreflight.data?.allowed !== true}
+                  disabled={previewScript.isPending || saveParameters.isPending || unsavedPreviewInputs}
                   onClick={() => previewScript.mutate()}
                 >
                   <FileCode className="h-3.5 w-3.5" />
@@ -326,6 +332,9 @@ function WorkflowInspectorContent({
                     : t.workflowExt.inspector.generateScript}
                 </Button>
               </div>
+              {unsavedPreviewInputs ? (
+                <p className="mt-2 text-xs text-text-secondary">{t.workflowExt.inspector.savePreviewInputs}</p>
+              ) : null}
               {nodePreflight.data && !nodePreflight.data.allowed ? (
                 <Alert className="mt-2" variant="warning">
                   <AlertDescription>
@@ -428,7 +437,6 @@ function WorkflowInspectorContent({
         workflowRunId={workflowRunId}
         readOnly={readOnly}
         selectedNodeId={selectedNode?.id ?? null}
-        overrideParams={effectiveParameters}
       />
       <div className="mt-3">
         <ClusterDrafts projectId={projectId} variant="panel" readOnly={readOnly} />
