@@ -254,7 +254,7 @@ def test_dataflow_feeds_downstream_job_and_records_lineage(env) -> None:
         status="draft",
         graph={
             "nodes": [{"key": "rfd"}, {"key": "mpnn"}],
-            "edges": [{"source": "rfd", "target": "mpnn", "source_port": "backbones", "target_port": "backbone"}],
+            "edges": [{"id": "rfd-mpnn", "source": "rfd", "target": "mpnn", "source_port": "backbones", "target_port": "backbone", "gate": {"mode": "manual", "configured": True}}],
         },
         created_by=user.id,
     )
@@ -281,6 +281,10 @@ def test_dataflow_feeds_downstream_job_and_records_lineage(env) -> None:
         idempotency_key="chain-key",
         user=user,
     )
+    # Running jobs submitted before gate support retain their original input resolution.
+    # New submissions and actual screening are covered by test_workflow_gates.
+    for job in jobs:
+        job.runtime_spec = {k: v for k, v in job.runtime_spec.items() if k != "workflow_edges"}
     by_key = {job.runtime_spec["node_key"]: job for job in jobs}
 
     # Downstream starts with nothing resolved but the dependency recorded.
@@ -327,7 +331,7 @@ def test_downstream_fails_when_upstream_produced_nothing(env) -> None:
         project_id=project.id,
         name="chain",
         status="draft",
-        graph={"nodes": [{"key": "rfd"}, {"key": "mpnn"}], "edges": [{"source": "rfd", "target": "mpnn"}]},
+        graph={"nodes": [{"key": "rfd"}, {"key": "mpnn"}], "edges": [{"id": "rfd-mpnn", "source": "rfd", "target": "mpnn", "source_port": "backbones", "target_port": "backbone", "gate": {"mode": "manual", "configured": True}}]},
         created_by=user.id,
     )
     session.add(workflow)
@@ -352,6 +356,10 @@ def test_downstream_fails_when_upstream_produced_nothing(env) -> None:
         idempotency_key="dry-key",
         user=user,
     )
+    # Running jobs submitted before gate support retain their original input resolution.
+    # New submissions and actual screening are covered by test_workflow_gates.
+    for job in jobs:
+        job.runtime_spec = {k: v for k, v in job.runtime_spec.items() if k != "workflow_edges"}
     by_key = {job.runtime_spec["node_key"]: job for job in jobs}
     upstream = by_key["rfd"]
     upstream.status = "succeeded"
@@ -669,7 +677,7 @@ def test_upstream_bindings_are_type_checked_without_ported_graph_edges(env) -> N
         project_id=project.id,
         name="unported mismatch",
         status="draft",
-        graph={"nodes": [], "edges": [{"source": "rfd", "target": "mpnn"}]},
+        graph={"nodes": [], "edges": [{"id": "rfd-mpnn", "source": "rfd", "target": "mpnn", "source_port": "backbones", "target_port": "backbone", "gate": {"mode": "manual", "configured": True}}]},
         created_by=user.id,
     )
     session.add(workflow)
@@ -712,7 +720,7 @@ def test_unknown_upstream_target_port_is_reported_once(env) -> None:
         project_id=project.id,
         name="unknown target port",
         status="draft",
-        graph={"nodes": [], "edges": [{"source": "rfd", "target": "mpnn"}]},
+        graph={"nodes": [], "edges": [{"id": "rfd-mpnn", "source": "rfd", "target": "mpnn", "source_port": "backbones", "target_port": "backbone", "gate": {"mode": "manual", "configured": True}}]},
         created_by=user.id,
     )
     session.add(workflow)

@@ -29,6 +29,7 @@ WorkflowNodeStatus = Literal[
     "running",
     "collecting",
     "cancel_requested",
+    "skipped",
     "succeeded",
     "failed",
     "cancelled",
@@ -42,6 +43,7 @@ JobStatus = Literal[
     "running",
     "collecting",
     "cancel_requested",
+    "skipped",
     "succeeded",
     "failed",
     "cancelled",
@@ -60,4 +62,4 @@ COMPUTE_DRAFT_STATUSES = frozenset(get_args(ComputeDraftStatus))
 
 # Terminal job states. Kept here so the state machine and the vocabulary cannot drift
 # apart; ``compute.service`` re-exports it under its historical name.
-TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
+TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled", "skipped"})

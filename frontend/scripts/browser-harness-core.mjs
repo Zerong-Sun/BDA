@@ -1103,6 +1103,7 @@ function createStrictRoutes({ scenario, routeId }) {
       : [],
     checks: { target_ready: scenario !== 'blocked' },
   }))
+  add('GET', `/api/v2/workflow-runs/${workflowRun.id}/gates`, {}, () => ok({ items: [] }))
   add('GET', `/api/v2/workflow-runs/${workflowRun.id}/jobs`, {}, () => ok({
     items: empty ? [] : [jobFixture(scenario)],
     next_cursor: null,

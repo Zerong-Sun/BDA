@@ -4,7 +4,6 @@ import {
   Background,
   Controls,
   MiniMap,
-  addEdge,
   applyEdgeChanges,
   useEdgesState,
   useNodesState,
@@ -26,6 +25,7 @@ import {
   type RecommendedWorkflowStep,
   type WorkflowNodeData,
 } from './workflowTypes'
+import { useToastStore } from '../../components/ui/toastStore'
 import { saveWorkflowLayout, addWorkflowNode } from '../../lib/api/workflow'
 import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
@@ -48,7 +48,7 @@ export interface WorkflowCanvasHandle {
     nodeName: string,
     methods: string[],
     parameters: Record<string, unknown>,
-  ) => Promise<void>
+  ) => Promise<string | undefined>
   addRecommendedWorkflow: (steps: RecommendedWorkflowStep[], goal: string) => Promise<number>
 }
 
@@ -59,6 +59,9 @@ interface WorkflowCanvasProps {
   readOnly?: boolean
   onNodeAdded?: () => void
   onLayoutSaved?: () => void
+  onConnectionRequested?: (connection: Connection) => void
+  onEdgesRemoved?: (ids: string[]) => Promise<void>
+  onEdgeSelected?: (edgeId: string) => void
   onNodeSelected?: (nodeId: string | null) => void
 }
 
@@ -72,11 +75,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       onNodeAdded,
       onLayoutSaved,
       onNodeSelected,
+      onConnectionRequested,
+      onEdgesRemoved,
+      onEdgeSelected,
     },
     ref,
   ) {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes ?? [])
     const [edges, setEdges] = useEdgesState(initialEdges ?? [])
+    const showToast = useToastStore(s => s.show)
     const [addingNode, setAddingNode] = useState(false)
     useAppStore((s) => s.themePreference)
     const { t } = useI18n()
@@ -126,7 +133,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       setEdges((current) => {
         const incoming = initialEdges ?? []
         const incomingIds = new Set(incoming.map((e) => e.id))
-        const retained = current.filter((edge) => incomingIds.has(edge.id))
+        const retained = current.filter((edge) => incomingIds.has(edge.id)).map(edge => ({ ...incoming.find(e => e.id === edge.id)!, selected: edge.selected }))
         const retainedIds = new Set(retained.map((e) => e.id))
         const added = incoming.filter((edge) => !retainedIds.has(edge.id))
         return [...retained, ...added]
@@ -149,36 +156,31 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             })),
           })
             .then(() => onLayoutSaved?.())
-            .catch(() => undefined)
+            .catch(error => showToast(error instanceof Error ? error.message : 'Layout save failed', 'error'))
         }, 500)
       },
-      [workflowRunId, onLayoutSaved],
+      [workflowRunId, onLayoutSaved, showToast],
     )
 
     const onEdgesChange = useCallback(
       (changes: EdgeChange<BdaWorkflowEdge>[]) => {
         if (readOnly) return
-        setEdges((current) => {
-          const next = applyEdgeChanges(changes, current)
-          if (changes.some((change) => change.type === 'remove')) {
-            persistLayout(nodesRef.current, next)
-          }
-          return next
-        })
+        const removed = changes.filter(c => c.type === 'remove').map(c => c.id)
+        if (removed.length) {
+          void onEdgesRemoved?.(removed).catch(error => showToast(error.message, 'error'))
+          return
+        }
+        setEdges(current => applyEdgeChanges(changes, current))
       },
-      [persistLayout, readOnly, setEdges],
+      [readOnly, setEdges, onEdgesRemoved, showToast],
     )
 
     const onConnect = useCallback(
       (connection: Connection) => {
         if (readOnly) return
-        setEdges((eds) => {
-          const next = addEdge({ ...connection, type: 'workflowEdge', animated: true }, eds)
-          persistLayout(nodesRef.current, next)
-          return next
-        })
+        onConnectionRequested?.(connection)
       },
-      [readOnly, setEdges, persistLayout],
+      [readOnly, onConnectionRequested],
     )
 
     const onNodeDragStop = useCallback(() => {
@@ -245,6 +247,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           }
           setNodes((nds) => [...nds, newNode])
           onNodeAdded?.()
+          return created.id
         } finally {
           setAddingNode(false)
         }
@@ -337,6 +340,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           const nextEdges = [...edgesRef.current, ...newEdges] as BdaWorkflowEdge[]
           setNodes(nextNodes)
           setEdges(nextEdges)
+          if (workflowRunId && !readOnly) {
+            const { getWorkflowGraph } = await import('../../lib/api/workflow')
+            const { saveConnections } = await import('../../lib/api/workflowGates')
+            const latest = await getWorkflowGraph(workflowRunId)
+            await saveConnections(workflowRunId, [...latest.edges, ...newEdges.map(e => ({ id: e.id, source: e.source, target: e.target }))], latest.workflow.version)
+          }
           persistLayout(nextNodes, nextEdges)
           onNodeAdded?.()
           return createdNodes.length
@@ -405,6 +414,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onEdgeClick={(_, edge) => onEdgeSelected?.(edge.id)}
           onNodeClick={(_, node) => onNodeSelected?.(node.id)}
           onPaneClick={() => onNodeSelected?.(null)}
           onNodeDragStop={onNodeDragStop}
@@ -415,8 +425,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           proOptions={proOptions}
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
-          edgesFocusable={!readOnly}
-          edgesReconnectable={!readOnly}
+          edgesFocusable={false}
+          edgesReconnectable={false}
           panOnScroll
           selectionOnDrag={false}
         >

@@ -43,29 +43,59 @@ export function WorkflowNodeCard({ data, selected }: NodeProps) {
         statusKey === 'running' && 'animate-pulse',
       )}
     >
-      <Handle
-        id="input"
-        type="target"
-        position={Position.Left}
-        className="!h-2 !w-2 !border-2 !border-bg-canvas !bg-accent opacity-0 transition-opacity group-hover:opacity-100 [.selected_&]:opacity-100"
-      />
       <header className="flex min-w-0 items-center gap-2">
         <Icon className="h-4 w-4 shrink-0 text-accent" />
-        <span className="truncate text-card-title font-semibold text-text-primary">{nodeData.label}</span>
+        <span className="truncate text-card-title font-semibold text-text-primary">
+          {nodeData.label}
+        </span>
       </header>
-      <p className="mt-0.5 truncate text-xs text-text-secondary">{nodeData.footer || nodeData.description}</p>
+      <p className="mt-0.5 truncate text-xs text-text-secondary">
+        {nodeData.footer || nodeData.description}
+      </p>
       <div className="mt-2 flex items-center justify-between gap-2">
         <StatusPill label={statusLabel} tone={statusTone(statusKey)} />
         {nodeData.resource ? (
-          <span className="truncate text-[11px] uppercase text-text-muted">{nodeData.resource}</span>
+          <span className="truncate text-[11px] uppercase text-text-muted">
+            {nodeData.resource}
+          </span>
         ) : null}
       </div>
-      <Handle
-        id="output"
-        type="source"
-        position={Position.Right}
-        className="!h-2 !w-2 !border-2 !border-bg-canvas !bg-accent opacity-0 transition-opacity group-hover:opacity-100 [.selected_&]:opacity-100"
-      />
+      <div className="mt-2 grid grid-cols-2 gap-3 border-t border-border-soft pt-1 text-[9px] text-text-secondary">
+        <div>
+          {(nodeData.inputPorts ?? ['input']).map((port) => (
+            <div key={port} className="relative h-4">
+              <Handle
+                id={port}
+                type="target"
+                position={Position.Left}
+                title={port}
+                style={{ left: -12 }}
+                className="!h-3 !w-3 !border-2 !border-bg-canvas !bg-accent"
+              />
+              <span className="block truncate" title={port}>
+                {port}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div>
+          {(nodeData.outputPorts ?? ['output']).map((port) => (
+            <div key={port} className="relative h-4 text-right">
+              <Handle
+                id={port}
+                type="source"
+                position={Position.Right}
+                title={port}
+                style={{ right: -12 }}
+                className="!h-3 !w-3 !border-2 !border-bg-canvas !bg-accent"
+              />
+              <span className="block truncate" title={port}>
+                {port}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </article>
   )
 }

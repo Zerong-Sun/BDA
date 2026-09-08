@@ -81,13 +81,13 @@ class DemoAdapter:
 class DockerAdapter:
     def __init__(self) -> None:
         import docker
-        from docker.tls import TLSConfig  # type: ignore[import-not-found]
+        from docker.tls import TLSConfig
 
         settings = get_settings()
         if settings.docker_host.startswith("unix:"):
             if settings.is_production:
                 raise RuntimeError("docker_socket_forbidden_in_production")
-            self.client = docker.from_env()  # type: ignore[attr-defined]
+            self.client = docker.from_env()
         else:
             client_cert: tuple[str, str] | None = None
             if settings.docker_tls_cert and settings.docker_tls_key:
@@ -99,7 +99,7 @@ class DockerAdapter:
                 ca_cert=settings.docker_tls_ca,
                 verify=settings.docker_tls_verify,
             )
-            self.client = docker.DockerClient(base_url=settings.docker_host, tls=tls)  # type: ignore[attr-defined]
+            self.client = docker.DockerClient(base_url=settings.docker_host, tls=tls)
 
     def ensure_submitted(self, job: RuntimeJob) -> str:
         import docker
@@ -107,7 +107,7 @@ class DockerAdapter:
         try:
             existing = self.client.containers.get(job.deterministic_name)
             return str(existing.id)
-        except docker.errors.NotFound:  # type: ignore[attr-defined]
+        except docker.errors.NotFound:
             pass
         image = str(job.runtime_spec.get("image") or job.model_plugin)
         command = job.runtime_spec.get("command")
