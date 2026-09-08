@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -102,6 +103,34 @@ function inspector(runs: GateSummary[] = [gate]) {
 }
 
 describe('workflow gates', () => {
+  it('blocks release and bulk selection until result loading completes', async () => {
+    vi.mocked(gateResults).mockImplementation(() => new Promise(() => {}))
+    inspector()
+    expect(screen.getByRole('button', { name: '不保留结果，结束分支' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '选择本页合格项' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('正在加载筛选结果')
+  })
+  it('requires an explicit empty-branch decision and retains the choice after cancelling', async () => {
+    inspector()
+    await screen.findByText('score too low')
+    fireEvent.click(screen.getByRole('button', { name: '不保留结果，结束分支' }))
+    expect(releaseGate).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '继续选择' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: '不保留结果，结束分支' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认不保留结果' }))
+    await waitFor(() => expect(releaseGate).toHaveBeenCalledWith('wf', gate, []))
+    expect(screen.getByRole('button', { name: '不保留结果，结束分支' })).toBeDisabled()
+  })
+  it('offers recovery and never releases an empty selection on a result fetch error', async () => {
+    vi.mocked(gateResults).mockRejectedValueOnce(new Error('Results unavailable'))
+    inspector()
+    await screen.findByText('Results unavailable')
+    expect(screen.getByRole('button', { name: '不保留结果，结束分支' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '重新加载结果' }))
+    await screen.findByText('score too low')
+    expect(screen.getByRole('button', { name: '选择本页合格项' })).toBeEnabled()
+  })
   it('shows the actual integrity contract without silently ignored candidate controls', () => {
     render(<GatePolicyEditor value={{ ...emptyPolicy(), mode: 'integrity' }} onChange={vi.fn()} />)
     expect(screen.getByText('完整性检查：核对文件大小和 SHA256 后放行。')).toBeVisible()
@@ -179,6 +208,11 @@ describe('workflow gates', () => {
     expect(dialog).toBeVisible()
     fireEvent.keyDown(dialog, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+  it('does not offer phantom handles when a plugin explicitly declares no ports', () => {
+    render(<WorkflowNodeCard {...({ data: { label: 'Sink', inputPorts: [], outputPorts: [] } } as unknown as ComponentProps<typeof WorkflowNodeCard>)} />)
+    expect(screen.queryByTestId('target-input')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('source-output')).not.toBeInTheDocument()
   })
   it('renders explicit named input and output handles', () => {
     render(

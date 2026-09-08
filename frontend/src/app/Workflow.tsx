@@ -864,7 +864,7 @@ export function WorkflowPage() {
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
         <div className="grid min-h-0 gap-4 xl:h-[calc(100vh-12rem)] xl:min-h-[38rem] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
-          <div className="order-2 min-h-0 xl:order-1">
+          <div className="order-3 min-h-0 xl:order-1">
             <WorkflowResourceSidebar
               projectId={projectId}
               artifacts={visibleArtifacts}
@@ -889,8 +889,12 @@ export function WorkflowPage() {
           </div>
 
           <main className="relative order-1 min-w-0 xl:order-2" data-tour-id="workflow-canvas">
+            {gateQuery.isError && <Alert variant="warning" className="mb-2">
+              <AlertDescription>{language === 'zh' ? '门控状态加载失败。' : 'Gate status could not be loaded.'} {gateQuery.error.message}</AlertDescription>
+              <Button type="button" size="sm" variant="outline" onClick={() => void gateQuery.refetch()}>{language === 'zh' ? '重新加载门控' : 'Reload gates'}</Button>
+            </Alert>}
             {connectionPicker && <ConnectionPicker nodes={workflowNodes} plugins={modelPlugins} {...connectionPicker} onConnect={connectPorts} onClose={() => setConnectionPicker(null)} />}
-            {selectedNode && !readOnly && <div className="mb-2 flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ target: selectedNode.id })}>{language === 'zh' ? '连接上一步' : 'Connect previous'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ source: selectedNode.id })}>{language === 'zh' ? '连接下一步' : 'Connect next'}</Button><Button type="button" size="sm" variant="outline" onClick={() => { setPendingNextSource(selectedNode.id); setBuilderOpen(true) }}>{language === 'zh' ? '添加下一步节点' : 'Add next node'}</Button></div>}
+            {selectedNode && !readOnly && <div className="mb-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ target: selectedNode.id })}>{language === 'zh' ? '连接上一步' : 'Connect previous'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ source: selectedNode.id })}>{language === 'zh' ? '连接下一步' : 'Connect next'}</Button><Button type="button" size="sm" variant="outline" onClick={() => { setPendingNextSource(selectedNode.id); setBuilderOpen(true) }}>{language === 'zh' ? '添加下一步节点' : 'Add next node'}</Button></div>}
             {currentWorkflowLoading || workflowGraphLoading ? (
               <Frame className="h-full min-h-96" aria-label={t.shared.apiState.loadingDefault}>
                 <FramePanel className="grid h-full gap-3 p-4">
@@ -909,7 +913,7 @@ export function WorkflowPage() {
               <>
                 <NodeBuilder
                   open={builderOpen && !readOnly}
-                  onClose={() => setBuilderOpen(false)}
+                  onClose={() => { setBuilderOpen(false); setPendingNextSource(null) }}
                   onAdd={async (template, nodeName, methods, parameters) => {
                     try {
                       const createdId = await canvasRef.current?.addNodeFromTemplate(
@@ -967,7 +971,7 @@ export function WorkflowPage() {
             )}
           </main>
 
-          <div className="order-3 min-h-0" data-tour-id="workflow-inspector">
+          <div className="order-2 min-h-0 xl:order-3" data-tour-id="workflow-inspector">
             {selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
               workflowRunId={workflowRunId}
               workflowVersion={workflowGraph?.workflow.version}

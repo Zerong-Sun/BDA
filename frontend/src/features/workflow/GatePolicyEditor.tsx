@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from '../../components/ui/Input'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Textarea } from '../../components/ui/textarea'
@@ -9,6 +9,16 @@ import type { GatePolicy, GateRules } from './gates'
 
 const field =
   'w-full rounded border border-border-soft bg-surface-1 p-1.5 text-xs text-text-primary'
+function ChainInput({ chains, onChange }: { chains: string[]; onChange: (chains: string[]) => void }) {
+  const [draft, setDraft] = useState(chains.join(','))
+  const parse = (text: string) => text.split(',').map((chain) => chain.trim()).filter(Boolean)
+  const text = parse(draft).join(',') === chains.join(',') ? draft : chains.join(',')
+  return <Input className={field} value={text} onChange={(event) => {
+    setDraft(event.target.value)
+    onChange(parse(event.target.value))
+  }} />
+}
+
 export function GatePolicyEditor({
   value,
   onChange,
@@ -215,21 +225,9 @@ export function GatePolicyEditor({
           </label>
           <label>
             {zh ? '设计链（必填，逗号分隔）' : 'Design chains (required, comma separated)'}
-            <Input
-              className={field}
-              value={value.structure.chains.join(',')}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  structure: {
-                    ...value.structure!,
-                    chains: e.target.value
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  },
-                })
-              }
+            <ChainInput
+              chains={value.structure.chains}
+              onChange={(chains) => onChange({ ...value, structure: { ...value.structure!, chains } })}
             />
           </label>
           {(['min_helices', 'min_helix_length', 'min_strands', 'start', 'end'] as const).map(
@@ -279,7 +277,7 @@ export function GatePolicyEditor({
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
         >
-          Upload Python script
+          {zh ? '上传 Python 脚本' : 'Upload Python script'}
         </Button>
         <input
           className="hidden"
@@ -290,6 +288,7 @@ export function GatePolicyEditor({
           onChange={async (e) => {
             const file = e.target.files?.[0]
             if (file) onChange({ ...value, configured: true, script: await file.text() })
+            e.target.value = ''
           }}
         />
         <Textarea

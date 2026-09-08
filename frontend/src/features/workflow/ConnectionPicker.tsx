@@ -44,7 +44,7 @@ export function ConnectionPicker({
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) onClose()
+        if (!open && !busy) onClose()
       }}
     >
       <DialogContent>
@@ -54,10 +54,13 @@ export function ConnectionPicker({
           {zh ? '上一步' : 'Source'}
           <WorkflowSelect
             className="w-full bg-surface-2 p-2"
+            aria-label={zh ? '上一步' : 'Source'}
+            disabled={busy}
             value={src}
             onChange={(e) => {
               setSrc(e.target.value)
               setPair('')
+              setError('')
             }}
           >
             <WorkflowOption value="">—</WorkflowOption>
@@ -74,10 +77,13 @@ export function ConnectionPicker({
           {zh ? '下一步' : 'Target'}
           <WorkflowSelect
             className="w-full bg-surface-2 p-2"
+            aria-label={zh ? '下一步' : 'Target'}
+            disabled={busy}
             value={dst}
             onChange={(e) => {
               setDst(e.target.value)
               setPair('')
+              setError('')
             }}
           >
             <WorkflowOption value="">—</WorkflowOption>
@@ -94,7 +100,8 @@ export function ConnectionPicker({
           <p className="text-xs">{pairs[0].join(' → ')}</p>
         ) : (
           <WorkflowSelect
-            aria-label="Ports"
+            aria-label={zh ? '兼容端口' : 'Ports'}
+            disabled={busy}
             className="w-full bg-surface-2 p-2"
             value={pair}
             onChange={(e) => setPair(e.target.value)}
@@ -127,6 +134,7 @@ export function ConnectionPicker({
             disabled={!chosen || busy}
             onClick={async () => {
               if (!chosen) return
+              setError('')
               setBusy(true)
               try {
                 await onConnect(src, dst, chosen[0], chosen[1])
@@ -138,9 +146,9 @@ export function ConnectionPicker({
               }
             }}
           >
-            {zh ? '连接' : 'Connect'}
+            {busy ? (zh ? '正在保存连接…' : 'Saving connection…') : (zh ? '连接' : 'Connect')}
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
+          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
             {zh ? '关闭' : 'Close'}
           </Button>
         </div>

@@ -62,7 +62,7 @@ export function WorkflowNodeCard({ data, selected }: NodeProps) {
       </div>
       <div className="mt-2 grid grid-cols-2 gap-3 border-t border-border-soft pt-1 text-[9px] text-text-secondary">
         <div>
-          {(nodeData.inputPorts?.length ? nodeData.inputPorts : ['input']).map((port) => (
+          {(nodeData.inputPorts ?? ['input']).map((port) => (
             <div key={port} className="relative h-4">
               <Handle
                 id={port}
@@ -79,7 +79,7 @@ export function WorkflowNodeCard({ data, selected }: NodeProps) {
           ))}
         </div>
         <div>
-          {(nodeData.outputPorts?.length ? nodeData.outputPorts : ['output']).map((port) => (
+          {(nodeData.outputPorts ?? ['output']).map((port) => (
             <div key={port} className="relative h-4 text-right">
               <Handle
                 id={port}

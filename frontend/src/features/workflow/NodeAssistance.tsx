@@ -139,7 +139,7 @@ export function NodeAssistance({
             aria-label="Upstream node"
             className="bg-surface-2 p-2"
             value={linkNode}
-            onChange={(e) => setLinkNode(e.target.value)}
+            onChange={(e) => { setLinkNode(e.target.value); setLinkParameter('') }}
           >
             <WorkflowOption value="">{zh ? '上游节点' : 'Upstream node'}</WorkflowOption>
             {upstream.map((n) => (
@@ -180,7 +180,7 @@ export function NodeAssistance({
               readOnly ||
               !linkTarget ||
               !linkNode ||
-              (linkMode === 'upstream_parameter' && !linkParameter)
+              (linkMode === 'upstream_parameter' && !Object.hasOwn(upstream.find((n) => n.node_key === linkNode)?.parameters ?? {}, linkParameter))
             }
             onClick={() =>
               onConfiguration({
@@ -224,9 +224,10 @@ export function NodeAssistance({
           type="button"
           size="sm"
           variant="outline"
+          disabled={readOnly || busy}
           onClick={() => fileInputRef.current?.click()}
         >
-          Import node script
+          {zh ? '导入节点脚本' : 'Import node script'}
         </Button>
         <input
           className="hidden"
@@ -245,6 +246,7 @@ export function NodeAssistance({
               toast((error as Error).message, 'error')
             } finally {
               setBusy(false)
+              e.target.value = ''
             }
           }}
         />

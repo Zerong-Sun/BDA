@@ -24,6 +24,9 @@ export function WorkflowEdge({
     targetPosition,
   })
 
+  // Compact layouts leave too little space between cards for a readable gate.
+  const labelOffset = Math.abs(targetX - sourceX) < 180 ? 56 : 0
+
   return (
     <>
       <BaseEdge
@@ -39,13 +42,15 @@ export function WorkflowEdge({
           ...style,
         }}
       />
+      {labelOffset > 0 && <path d={`M ${labelX},${labelY} V ${labelY + labelOffset}`} fill="none" stroke={themeColor('--accent', '#D08A2A')} strokeDasharray="3 3" opacity={0.5} pointerEvents="none" />}
       <EdgeLabelRenderer>
         <Button
           type="button"
+          size="sm"
           disabled={typeof data?.onSelect !== 'function'}
           variant="outline"
-          className="nodrag nopan pointer-events-auto absolute rounded-full border border-border-soft bg-surface-1 px-2 py-1 text-[10px] text-text-primary shadow-sm"
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}
+          className="nodrag nopan pointer-events-auto absolute max-w-40 whitespace-normal rounded-full border border-border-soft bg-surface-1 px-2 py-1 text-[10px] text-text-primary shadow-sm"
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + labelOffset}px)` }}
           onClick={() => (data?.onSelect as (() => void) | undefined)?.()}
           aria-label={String(data?.gateLabel ?? label ?? 'Configure gate')}
         >

@@ -65,8 +65,11 @@ export function GateInspector({
   const [sort, setSort] = useState('')
   const [descending, setDescending] = useState(true)
   const [selection, setSelection] = useState<Record<string, string[]>>({})
-  const selected = gate ? (selection[gate.id] ?? gate.selected_ids ?? []) : []
-  const setSelected = (ids: string[]) => gate && setSelection((s) => ({ ...s, [gate.id]: ids }))
+  const [releasedVersion, setReleasedVersion] = useState('')
+  const [confirmEmpty, setConfirmEmpty] = useState(false)
+  const selectionKey = gate ? `${gate.id}:${gate.version}` : ''
+  const selected = gate ? (selection[selectionKey] ?? gate.selected_ids ?? []) : []
+  const setSelected = (ids: string[]) => gate && setSelection((s) => ({ ...s, [selectionKey]: ids }))
   const cache = useQueryClient()
   const toast = useToastStore((s) => s.show)
   const results = useQuery({
@@ -107,25 +110,33 @@ export function GateInspector({
         const row = await previewGate(workflowId, edge.id!, policy, sourceJob || undefined)
         setSelectedRun(row.id)
       }
-      if (kind === 'release' && gate) await releaseGate(workflowId, gate, selected)
+      if (kind === 'release' && gate) {
+        await releaseGate(workflowId, gate, selected)
+        setReleasedVersion(selectionKey)
+        setConfirmEmpty(false)
+      }
       if (kind === 'retry' && gate) {
         const row = await retryGate(workflowId, gate.id)
         setSelectedRun(row.id)
         setOffset(0)
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, kind) => {
+      if (kind === 'save') toast(zh ? '门控规则已保存' : 'Gate rules saved', 'success')
+      if (kind === 'release') toast(zh ? '已提交放行，正在准备下游输入' : 'Release submitted; preparing downstream inputs', 'success')
       await cache.invalidateQueries({ queryKey: ['workflow-gates', workflowId] })
       await cache.invalidateQueries({ queryKey: ['gate-results', workflowId] })
     },
     onError: (e) => toast(e.message, 'error'),
   })
   const reviewable = gate?.status === 'awaiting_review' && !gate.preview
+  const canSelect = reviewable && !action.isPending && !results.isFetching && !results.isError
+    && results.data?.gate.version === gate.version && releasedVersion !== selectionKey
   return (
     <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
       <div className="flex items-center justify-between">
         <strong>{zh ? '连线与门控' : 'Connection gate'}</strong>
-        <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+        <Button type="button" size="sm" variant="ghost" aria-label={zh ? '关闭门控' : 'Close gate'} onClick={onClose}>
           ×
         </Button>
       </div>
@@ -225,7 +236,7 @@ export function GateInspector({
           </WorkflowOption>
           {runs.map((r) => (
             <WorkflowOption key={r.id} value={r.id}>
-              {r.preview ? 'Preview ' : ''}#{r.revision} · {r.status} · {r.created_at}
+              {r.preview ? (zh ? '试运行 ' : 'Preview ') : ''}#{r.revision} · {gateLabel(r.policy, r, zh)} · {r.created_at}
             </WorkflowOption>
           ))}
         </WorkflowSelect>
@@ -254,25 +265,30 @@ export function GateInspector({
           {zh ? '降序' : 'Descending'}
         </label>
       </div>
-      {results.isError && <p role="alert">{results.error.message}</p>}
+      {sources.isError && <p role="alert">{sources.error.message}</p>}
+      {results.isFetching && <p role="status">{zh ? '正在加载筛选结果…' : 'Loading screening results…'}</p>}
+      {!gate && <p className="my-3 text-text-secondary">{zh ? '保存规则后，等待上游完成；也可以选择已有结果试运行。' : 'Save rules and wait for upstream completion, or select existing results for a preview.'}</p>}
+      {results.isError && <div role="alert">{results.error.message}<Button type="button" size="sm" onClick={() => void results.refetch()}>{zh ? '重新加载结果' : 'Reload results'}</Button></div>}
+      {results.data?.total === 0 && !results.isFetching && <p className="my-3 text-text-secondary">{q ? (zh ? '没有匹配结果，请调整搜索条件。' : 'No matching results. Adjust your search.') : (zh ? '此记录中没有结果。' : 'No results in this evaluation.')}</p>}
       {reviewable && (
         <div className="my-2 flex gap-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
+            disabled={!canSelect}
             onClick={() =>
               setSelected([
                 ...new Set([
                   ...selected,
-                  ...(results.data?.items.filter((r) => r.passed).map((r) => r.id) ?? []),
+                  ...(results.data?.items.filter((r) => r.passed && !r.needs_attention).map((r) => r.id) ?? []),
                 ]),
               ])
             }
           >
             {zh ? '选择本页合格项' : 'Select qualified on page'}
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setSelected([])}>
+          <Button type="button" size="sm" variant="ghost" disabled={!canSelect} onClick={() => setSelected([])}>
             {zh ? '清空' : 'Clear'}
           </Button>
         </div>
@@ -281,7 +297,7 @@ export function GateInspector({
         <div key={r.id} className="my-2 rounded border border-border-soft p-2 text-xs">
           <label className="flex gap-2">
             <Checkbox
-              disabled={!reviewable || !r.passed}
+              disabled={!canSelect || !r.passed || r.needs_attention}
               checked={selected.includes(r.id)}
               onCheckedChange={(checked) =>
                 setSelected(checked ? [...selected, r.id] : selected.filter((id) => id !== r.id))
@@ -332,7 +348,8 @@ export function GateInspector({
           <Button
             type="button"
             size="sm"
-            disabled={offset === 0}
+            aria-label={zh ? '上一页结果' : 'Previous results page'}
+            disabled={results.isFetching || offset === 0}
             onClick={() => setOffset(Math.max(0, offset - 100))}
           >
             ←
@@ -344,7 +361,8 @@ export function GateInspector({
           <Button
             type="button"
             size="sm"
-            disabled={offset + 100 >= results.data.total}
+            aria-label={zh ? '下一页结果' : 'Next results page'}
+            disabled={results.isFetching || offset + 100 >= results.data.total}
             onClick={() => setOffset(offset + 100)}
           >
             →
@@ -388,8 +406,8 @@ export function GateInspector({
         <Button
           type="button"
           className="mt-3 w-full"
-          disabled={action.isPending}
-          onClick={() => action.mutate('release')}
+          disabled={!canSelect}
+          onClick={() => selected.length ? action.mutate('release') : setConfirmEmpty(true)}
         >
           {selected.length
             ? `${zh ? '放行所选' : 'Release selected'} (${selected.length})`
@@ -398,6 +416,14 @@ export function GateInspector({
               : 'Keep none and end branch'}
         </Button>
       )}
+      {confirmEmpty && <Dialog open onOpenChange={setConfirmEmpty}>
+        <DialogContent>
+          <DialogTitle>{zh ? '结束此分支？' : 'End this branch?'}</DialogTitle>
+          <p>{zh ? '没有选择任何结果，下游将跳过此输入分支。原始结果和文件会保留。' : 'No results are selected. Downstream will skip this input branch. Original results and files are retained.'}</p>
+          <Button type="button" disabled={!canSelect} onClick={() => action.mutate('release')}>{zh ? '确认不保留结果' : 'Confirm keeping no results'}</Button>
+          <Button type="button" variant="outline" onClick={() => setConfirmEmpty(false)}>{zh ? '继续选择' : 'Continue selecting'}</Button>
+        </DialogContent>
+      </Dialog>}
     </aside>
   )
 }

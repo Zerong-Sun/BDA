@@ -65,17 +65,15 @@ export function WorkflowSelect({
   const placeholder = options.find((o) => o.value === '')?.label
   return (
     <Select
-      value={value || null}
+      value={value}
       disabled={disabled}
       onValueChange={(next) => onChange({ target: { value: next ?? '' } })}
     >
       <SelectTrigger aria-label={label} className={className}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>{options.find((o) => o.value === value)?.label}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {options
-          .filter((o) => o.value !== '')
-          .map((o) => (
+        {options.map((o) => (
             <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
               {o.label}
             </SelectItem>
