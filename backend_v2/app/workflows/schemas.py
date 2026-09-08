@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..core.statuses import WorkflowNodeStatus, WorkflowRunStatus
 from .gate_schemas import GatePolicy
@@ -128,6 +128,14 @@ class WorkflowNodeUpdate(BaseModel):
 
 class WorkflowNodeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_legacy_status(cls, status):
+        # Read old imported nodes without rewriting their historical database rows.
+        if isinstance(status, str):
+            return {"not_started": "draft", "completed": "succeeded"}.get(status, status)
+        return status
 
     id: uuid.UUID
     workflow_run_id: uuid.UUID
