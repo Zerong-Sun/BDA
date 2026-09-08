@@ -85,6 +85,28 @@ def test_bootstrap_admin_is_idempotent(service_session) -> None:
         identity_service.authenticate(session, "bootstrap", "secure-123")
 
 
+@pytest.mark.parametrize("password", ["a1" * 37, "密碼1" * 11])
+def test_long_passwords_fail_as_domain_errors(service_session, password) -> None:
+    session, user, _ = service_session
+    with pytest.raises(DomainError) as caught:
+        identity_service.hash_password(password)
+    assert caught.value.error_code == "weak_password"
+    user.password_hash = identity_service.hash_password("safe-pass-123")
+    session.commit()
+    for username in (user.username, "missing-user"):
+        with pytest.raises(DomainError) as caught:
+            identity_service.authenticate(session, username, password)
+        assert caught.value.status_code == 401
+
+
+def test_password_at_bcrypt_byte_limit_still_authenticates(service_session) -> None:
+    session, user, _ = service_session
+    password = "a1" * 36
+    user.password_hash = identity_service.hash_password(password)
+    session.commit()
+    assert identity_service.authenticate(session, user.username, password).id == user.id
+
+
 def test_authentication_dependencies_enforce_roles(monkeypatch, service_session) -> None:
     session, user, _ = service_session
     with pytest.raises(DomainError, match="required"):
@@ -126,8 +148,12 @@ class FakeResponse:
         return self.payload
 
 
-def test_oidc_pkce_and_callback(monkeypatch, service_session) -> None:
+@pytest.mark.parametrize("username_taken", [False, True])
+def test_oidc_pkce_and_callback(monkeypatch, service_session, username_taken) -> None:
     session, _, _ = service_session
+    if username_taken:
+        session.add(User(username="person@example.test", display_name="Disabled", role="viewer", enabled=False))
+        session.flush()
     config = {
         "oidc_providers": {
             "test": {
@@ -161,6 +187,14 @@ def test_oidc_pkce_and_callback(monkeypatch, service_session) -> None:
     )
     user = identity_service.complete_oidc(session, "test", state, "code")
     assert user.oidc_subject == "subject"
+    assert user.username == ("person@example.test-2" if username_taken else "person@example.test")
+    user.enabled = False
+    session.flush()
+    _, disabled_state = identity_service.begin_oidc(session, "test", "https://app/callback")
+    session.flush()
+    with pytest.raises(DomainError) as caught:
+        identity_service.complete_oidc(session, "test", disabled_state, "code")
+    assert caught.value.status_code == 401
     with pytest.raises(DomainError, match="state is invalid"):
         identity_service.complete_oidc(session, "test", "missing", "code")
     with pytest.raises(DomainError, match="not configured"):

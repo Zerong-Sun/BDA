@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..core.sse import observed_sse
@@ -222,6 +222,7 @@ def retry_failed_job(
 @router.get("/jobs/{job_id}/events")
 def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> EventSourceResponse:
     with SessionFactory() as session:
+        set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
         job = ComputeRepository(session).job(job_id)
         if job is None:
             raise DomainError("job_not_found", "Job was not found", status_code=404)
@@ -231,8 +232,12 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
         cursor: datetime | None = None
         while True:
             with SessionFactory() as event_session:
-                events = ComputeRepository(event_session).events_after(job_id, cursor)
+                set_request_rls_context(event_session, user_id=user.id, is_global_admin=user.role == "admin")
                 current = ComputeRepository(event_session).job(job_id)
+                if current is None:
+                    return
+                require_project(event_session, current.project_id, user)
+                events = ComputeRepository(event_session).events_after(job_id, cursor)
                 payloads = [
                     {
                         "id": str(item.id),

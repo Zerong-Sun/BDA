@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.pagination import decode_time_cursor, encode_time_cursor
 from ..core.problem import DomainError
 from ..core.sse import observed_sse
@@ -112,6 +112,7 @@ def get_operation(
 @router.get("/operations/{operation_id}/events")
 def operation_events(operation_id: uuid.UUID, user: User = Depends(streaming_user)) -> EventSourceResponse:
     with SessionFactory() as session:
+        set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
         operation = visible_operation(session, operation_id)
         if operation is None:
             raise DomainError("operation_not_found", "Operation was not found", status_code=404)
@@ -121,9 +122,11 @@ def operation_events(operation_id: uuid.UUID, user: User = Depends(streaming_use
         previous_version = 0
         while True:
             with SessionFactory() as session:
+                set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
                 current = visible_operation(session, operation_id)
                 if current is None:
                     return
+                _authorize_operation(session, current, user)
                 payload = OperationResponse.model_validate(current).model_dump(mode="json")
                 changed = current.version != previous_version
                 previous_version = current.version

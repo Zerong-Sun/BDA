@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 
 import pytest
 from backend_v2.app.core.config import get_settings
+from backend_v2.app.core.database import set_request_rls_context
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
+from backend_v2.app.platform import api as platform_api
 from backend_v2.app.platform.models import Operation
 from backend_v2.app.projects.models import Project
 from sqlalchemy import create_engine, select, text
@@ -18,7 +21,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_nobypassrls_role_is_fenced_for_users_and_workers() -> None:
+def test_nobypassrls_role_is_fenced_for_users_and_workers(monkeypatch) -> None:
     """Exercise policies as a real non-owner role; owner-backed tests bypass RLS."""
     engine = create_engine(get_settings().database_url)
     role = f"bda_test_rls_{uuid.uuid4().hex}"
@@ -46,6 +49,7 @@ def test_nobypassrls_role_is_fenced_for_users_and_workers() -> None:
                 organization_id=project.organization_id,
                 created_by=user.id,
                 kind="rls.test",
+                status="succeeded",
                 resource_type="project",
                 resource_id=project.id,
             )
@@ -61,7 +65,7 @@ def test_nobypassrls_role_is_fenced_for_users_and_workers() -> None:
             connection.execute(
                 text(
                     f'GRANT SELECT, INSERT, UPDATE, DELETE ON projects, operations, '
-                    f'organization_members TO "{role}"'
+                    f'organization_members, project_members TO "{role}"'
                 )
             )
 
@@ -97,6 +101,31 @@ def test_nobypassrls_role_is_fenced_for_users_and_workers() -> None:
                         )
                     )
             transaction.rollback()
+        # Upload and other services release their connection during external I/O.
+        # The next transaction in that request must retain its authorization.
+        with engine.connect() as connection:
+            connection.execute(text(f'SET ROLE "{role}"'))
+            connection.commit()
+            try:
+                with Session(connection) as request_session:
+                    set_request_rls_context(request_session, user_id=user.id, is_global_admin=False)
+                    assert set(request_session.scalars(select(Project.id))) == {projects[0].id}
+                    request_session.commit()
+                    assert set(request_session.scalars(select(Project.id))) == {projects[0].id}
+                    request_session.rollback()
+                    assert set(request_session.scalars(select(Project.id))) == {projects[0].id}
+                with Session(connection) as anonymous_session:
+                    assert list(anonymous_session.scalars(select(Project.id))) == []
+                monkeypatch.setattr(platform_api, "SessionFactory", lambda: Session(connection))
+                response = platform_api.operation_events(operations[0].id, user)
+
+                async def consume():
+                    return [item async for item in response.body_iterator]
+
+                assert [item["event"] for item in asyncio.run(consume())] == ["operation", "done"]
+            finally:
+                connection.execute(text('RESET ROLE'))
+                connection.commit()
     finally:
         with engine.begin() as connection:
             connection.execute(text(f'DROP OWNED BY "{role}"'))

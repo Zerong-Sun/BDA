@@ -24,7 +24,7 @@ class IdentityRepository:
 
     def user_by_oidc(self, issuer: str, subject: str) -> User | None:
         return self.session.scalar(
-            select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject, User.enabled.is_(True))
+            select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject)
         )
 
     def add_refresh_session(self, item: RefreshSession) -> None:
@@ -36,5 +36,5 @@ class IdentityRepository:
                 RefreshSession.token_hash == token_hash,
                 RefreshSession.revoked_at.is_(None),
                 RefreshSession.expires_at > now,
-            )
+            ).with_for_update().execution_options(populate_existing=True)
         )

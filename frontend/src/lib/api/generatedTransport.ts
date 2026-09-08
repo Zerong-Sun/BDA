@@ -26,17 +26,24 @@ async function generatedFetch(input: RequestInfo | URL, init?: RequestInit): Pro
   const headers = new Headers(original.headers)
   const token = authToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  let request = new Request(original, { headers })
+  // Keep the original body available: constructing a Request transfers its
+  // stream, so reusing that consumed Request made authenticated POST retries fail.
+  let request = new Request(original.clone(), { headers })
   let response = await fetch(request.clone())
-  if (response.status === 401 && !request.url.endsWith('/auth/refresh')) {
+  const pathname = new URL(request.url).pathname.replace(/\/$/, '')
+  const isCredentialRequest = pathname.endsWith('/auth/refresh') || pathname.endsWith('/auth/token')
+  if (response.status === 401 && !isCredentialRequest) {
+    let nextToken: string
     try {
-      const nextToken = await refreshAccessToken()
-      headers.set('Authorization', `Bearer ${nextToken}`)
-      request = new Request(original, { headers })
-      response = await fetch(request)
+      nextToken = await refreshAccessToken()
     } catch {
       notifyUnauthorized()
+      return response
     }
+    headers.set('Authorization', `Bearer ${nextToken}`)
+    request = new Request(original, { headers })
+    response = await fetch(request)
+    if (response.status === 401) notifyUnauthorized()
   }
   return response
 }

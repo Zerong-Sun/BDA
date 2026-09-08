@@ -13,16 +13,45 @@ spec:
       labels: {app: {{ .Release.Name }}-migrate}
     spec:
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: migrate
           image: {{ include "bda.backendImage" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["alembic", "-c", "backend_v2/alembic.ini", "upgrade", "head"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+          # pre-install runs before the release ConfigMap exists. Supply the
+          # settings needed by production validation directly from chart values.
           env:
             - {name: BDA_V2_ENVIRONMENT, value: {{ .Values.config.environment | quote }}}
             - {name: BDA_V2_COMPUTE_BACKEND, value: {{ .Values.config.computeBackend | quote }}}
+            - {name: BDA_V2_RATE_LIMIT_ENABLED, value: "true"}
+            - {name: BDA_V2_RATE_LIMIT_FAIL_CLOSED, value: "true"}
+            - {name: BDA_V2_MINIO_SECURE, value: {{ .Values.config.minioSecure | quote }}}
+            - {name: BDA_V2_MINIO_PUBLIC_ENDPOINT, value: {{ .Values.config.minioPublicEndpoint | quote }}}
+            - {name: BDA_V2_LSF_SSH_HOST, value: {{ .Values.config.lsf.sshHost | quote }}}
+            - {name: BDA_V2_LSF_REMOTE_ROOT, value: {{ .Values.config.lsf.remoteRoot | quote }}}
+            {{- if .Values.lsfCredentials.keyFile }}
+            - {name: BDA_V2_LSF_SSH_KEY_PATH, value: {{ printf "%s/%s" .Values.lsfCredentials.mountPath .Values.lsfCredentials.keyFile | quote }}}
+            {{- end }}
+            {{- if .Values.lsfCredentials.passwordFile }}
+            - {name: BDA_V2_LSF_SSH_PASSWORD_REF, value: {{ printf "file:%s/%s" .Values.lsfCredentials.mountPath .Values.lsfCredentials.passwordFile | quote }}}
+            {{- end }}
             - {name: BDA_V2_REQUIRE_MAINTENANCE_DATABASE_URL, value: "true"}
             - {name: BDA_V2_MAINTENANCE_DATABASE_ROLE, value: "bda_migrator"}
           envFrom:
             - secretRef: {name: {{ .Values.existingSecret }}}
             - secretRef: {name: {{ .Values.migrationSecret }}}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: tmp, emptyDir: {}}

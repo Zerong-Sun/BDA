@@ -33,7 +33,7 @@ describe('PipelineRail route selection', () => {
 
     const research = screen.getByRole('tab', { name: /Research/i })
     const results = screen.getByRole('tab', { name: /Results/i })
-    await waitFor(() => expect(results).toHaveTextContent('You are here'))
+    await waitFor(() => expect(results).toHaveTextContent('Current project stage'))
 
     expect(research).toHaveAttribute('aria-selected', 'true')
     expect(results).toHaveAttribute('aria-selected', 'false')
@@ -45,7 +45,7 @@ describe('PipelineRail route selection', () => {
 
     const workflow = screen.getByRole('tab', { name: /Workflow/i })
     const results = screen.getByRole('tab', { name: /Results/i })
-    await waitFor(() => expect(results).toHaveTextContent('You are here'))
+    await waitFor(() => expect(results).toHaveTextContent('Current project stage'))
     expect(results).toHaveAttribute('aria-selected', 'true')
 
     fireEvent.click(workflow)
