@@ -53,7 +53,7 @@ export function Topbar() {
             always-visible switcher rather than a buried select. */}
         <div className="order-3 flex min-w-0 basis-full items-center gap-2 sm:order-none sm:basis-auto sm:flex-1">
           {visibleProjects.length > 0 ? (
-            <div className="group flex min-w-0 max-w-sm items-center gap-2" data-tour-id="project-selector">
+            <div className="group flex min-w-0 flex-1 max-w-md items-center gap-2" data-tour-id="project-selector">
               <FlaskIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="hidden shrink-0 text-fine font-semibold uppercase tracking-wide text-text-muted sm:inline">
                 {t.common.project}
@@ -63,12 +63,14 @@ export function Topbar() {
                 items={visibleProjects.map((project) => ({ value: project.id, label: projectText(project, 'name', language) }))}
                 onValueChange={(value) => setProjectId(value ?? '')}
               >
-                <SelectTrigger aria-label={t.common.selectProject} className="min-w-48 max-w-sm">
-                  <SelectValue placeholder={t.common.selectProject} />
+                <SelectTrigger aria-label={t.common.selectProject} title={activeProject ? projectText(activeProject, 'name', language) : t.common.selectProject} className="h-10! min-w-0 w-full text-sm!">
+                  <SelectValue className="min-w-0" placeholder={t.common.selectProject}>
+                    {activeProject ? <span className="truncate">{projectText(activeProject, 'name', language)}</span> : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {visibleProjects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={p.id} className="text-sm" title={projectText(p, 'name', language)}>
                       {projectText(p, 'name', language)}
                     </SelectItem>
                   ))}
@@ -161,10 +163,11 @@ export function Topbar() {
             variant="ghost"
             size="sm"
             aria-label={t.projects.activeProjectPanel.manageProject}
-            className="truncate"
+            className="max-w-full min-w-0"
+            title={projectText(activeProject, 'name', language)}
             onClick={() => navigate(`/projects${projectQuery}`)}
           >
-            {projectText(activeProject, 'name', language)}
+            <span className="truncate">{projectText(activeProject, 'name', language)}</span>
           </Button>
         </div>
       ) : null}

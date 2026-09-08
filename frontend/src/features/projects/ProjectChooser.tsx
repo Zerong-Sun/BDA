@@ -28,6 +28,7 @@ import { useDeleteProjectLifecycle } from '../../lib/hooks/useDeleteProjectLifec
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
+import { localizeStatusLabel } from '../../components/ui/statusLabel'
 import { projectText } from '../../lib/i18n/projectText'
 
 interface ProjectChooserProps {
@@ -135,7 +136,7 @@ export function ProjectChooser({
         <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
           <div className="grid gap-2">
             <Label htmlFor="project-chooser-trigger">{t.projects.projectChooser.existingProject}</Label>
-            <Select value={projectId || NO_PROJECT_VALUE} onValueChange={chooseProject}>
+            <Select items={[{ value: NO_PROJECT_VALUE, label: t.projectLibrary.selectNone }, ...visibleProjects.map((project) => ({ value: project.id, label: projectText(project, 'name', language) }))]} value={projectId || NO_PROJECT_VALUE} onValueChange={chooseProject}>
               <SelectTrigger
                 id="project-chooser-trigger"
                 aria-label={t.projects.projectChooser.selectProjectAria}
@@ -147,7 +148,7 @@ export function ProjectChooser({
                 <SelectItem value={NO_PROJECT_VALUE}>{t.projectLibrary.selectNone}</SelectItem>
                 {visibleProjects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
-                    {projectText(project, 'name', language)} · {project.status}
+                    {projectText(project, 'name', language)} · {localizeStatusLabel(project.status, t.shared.status)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -226,7 +227,7 @@ export function ProjectChooser({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="project-type-trigger">{t.projects.projectChooser.projectType}</Label>
-              <Select value={projectType} onValueChange={(value) => setProjectType(value ?? 'protein_design')}>
+              <Select items={PROJECT_TYPE_OPTIONS.map((option) => ({ value: option.value, label: t.projects.types[option.labelKey] }))} value={projectType} onValueChange={(value) => setProjectType(value ?? 'protein_design')}>
                 <SelectTrigger id="project-type-trigger" className="w-full">
                   <SelectValue />
                 </SelectTrigger>

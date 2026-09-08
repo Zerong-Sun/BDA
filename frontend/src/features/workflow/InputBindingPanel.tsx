@@ -199,6 +199,7 @@ function PortRow({
       ) : null}
 
       <Select
+        items={[{ value: 'none', label: t.workflowExt.inspector.inputSourceNone }, { value: 'artifact', label: t.workflowExt.inspector.inputSourceArtifact }, { value: 'upstream', label: t.workflowExt.inspector.inputSourceUpstream }]}
         value={source}
         disabled={readOnly}
         onValueChange={(value) => selectSource(value ?? 'none')}
@@ -218,6 +219,7 @@ function PortRow({
           <p className="mt-1 text-[11px] text-text-secondary">{t.workflowExt.inspector.inputNoCandidates}</p>
         ) : (
           <Select
+            items={artifacts.map((artifact) => ({ value: artifact.id, label: `${artifact.filename} · ${artifact.artifact_type}` }))}
             value={binding?.artifact_id ?? ''}
             disabled={readOnly}
             onValueChange={(value) =>
@@ -243,6 +245,7 @@ function PortRow({
           <p className="mt-1 text-[11px] text-text-secondary">{t.workflowExt.inspector.inputNoUpstream}</p>
         ) : (
           <Select
+            items={upstream.map((option) => ({ value: `${option.nodeKey}::${option.portName}`, label: option.label }))}
             value={binding?.from_node && binding?.from_port ? `${binding.from_node}::${binding.from_port}` : ''}
             disabled={readOnly}
             onValueChange={(value) => {

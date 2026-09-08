@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { localizeStatusLabel } from '../../components/ui/statusLabel'
 import { StatusPills } from '../../components/ui/StatusPill'
 import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
@@ -191,19 +192,19 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
             className="w-full pl-8"
           />
         </label>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
+        <Select items={statusOptions.map((status) => ({ value: status, label: status === 'all' ? t.projectLibrary.filterAll : localizeStatusLabel(status, t.shared.status) }))} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
           <SelectTrigger aria-label={t.projectLibrary.filterStatus}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {statusOptions.map((status) => (
               <SelectItem key={status} value={status}>
-                {status === 'all' ? t.projectLibrary.filterAll : status}
+                {status === 'all' ? t.projectLibrary.filterAll : localizeStatusLabel(status, t.shared.status)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
+        <Select items={[{ value: 'recent', label: t.projectLibrary.sortRecent }, { value: 'status', label: t.projectLibrary.sortStatus }, { value: 'name', label: t.projectLibrary.sortName }]} value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
           <SelectTrigger aria-label={t.projectLibrary.sortBy}>
             <SelectValue />
           </SelectTrigger>

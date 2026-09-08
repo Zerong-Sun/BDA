@@ -105,6 +105,15 @@ describe('InputBindingPanel', () => {
     ])
   })
 
+  it('shows an existing file name and source label before opening either selector', () => {
+    render(<InputBindingPanel node={node('mpnn', 'plugin-mpnn')} plugin={plugin()}
+      nodes={[]} pluginsByNodeKey={{}} artifacts={[artifact('opaque-file-id', 'backbone_set', 'design_0.pdb')]}
+      bindings={[{ port: 'backbone', source: 'artifact', artifact_id: 'opaque-file-id' }]} onChange={vi.fn()} />)
+    expect(screen.getByRole('combobox', { name: 'backbone' })).toHaveTextContent('Project file')
+    expect(screen.getByRole('combobox', { name: 'backbone artifact' })).toHaveTextContent('design_0.pdb')
+    expect(screen.getByRole('combobox', { name: 'backbone artifact' })).not.toHaveTextContent('opaque-file-id')
+  })
+
   it('does not filter on content type, which browsers get wrong for scientific files', async () => {
     render(
       <InputBindingPanel

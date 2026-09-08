@@ -133,6 +133,7 @@ export function ScriptAssetManager() {
         <label className="grid gap-1 text-xs text-text-secondary">
           {t.workflowExt.scriptAssets.modelPlugin}
           <Select
+            items={[{ value: 'all', label: t.workflowExt.scriptAssets.autoDetect }, ...plugins.map((plugin) => ({ value: plugin.id, label: plugin.name }))]}
             value={modelPluginId || 'all'}
             onValueChange={(value) => setModelPluginId(value === 'all' ? '' : (value ?? ''))}
           >
