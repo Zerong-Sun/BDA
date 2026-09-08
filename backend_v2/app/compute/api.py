@@ -229,7 +229,7 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
         require_project(session, job.project_id, user)
 
     async def stream() -> AsyncIterator[dict[str, str]]:
-        cursor: datetime | None = None
+        cursor: tuple[datetime, uuid.UUID] | None = None
         while True:
             with SessionFactory() as event_session:
                 set_request_rls_context(event_session, user_id=user.id, is_global_admin=user.role == "admin")
@@ -247,10 +247,13 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
                     for item in events
                 ]
                 if events:
-                    cursor = events[-1].created_at
-                terminal = current is None or current.status in {"succeeded", "failed", "cancelled"}
+                    cursor = (events[-1].created_at, events[-1].id)
+                terminal = current.status in {"succeeded", "failed", "cancelled"}
             for payload in payloads:
                 yield payload
+            # Drain full batches before announcing completion, including timestamp ties.
+            if len(events) == 100:
+                continue
             if terminal:
                 yield {"event": "done", "data": json.dumps({"job_id": str(job_id)})}
                 return

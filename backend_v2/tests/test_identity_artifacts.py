@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import uuid
 import zipfile
 from collections.abc import Generator
 from contextlib import nullcontext
@@ -310,13 +311,91 @@ class FakeStorage:
         return len(self.data), hashlib.sha256(self.data).hexdigest()
 
     def read_bytes(self, key: str, *, max_bytes: int) -> bytes:
-        return self.data[:max_bytes]
+        if self.fail:
+            raise RuntimeError("missing")
+        if len(self.data) > max_bytes:
+            raise ValueError("object_too_large")
+        return self.data
 
     def remove(self, key: str) -> None:
         return None
 
     def promote(self, source: str, target: str) -> None:
         self.promoted = (source, target)
+
+    def put_bytes(self, key: str, body: bytes, content_type: str) -> None:
+        return None
+
+
+@pytest.mark.parametrize("failure", ["lineage", "rollback"])
+def test_upload_completion_can_retry_without_reupload(monkeypatch, service_session, failure) -> None:
+    session, user, project = service_session
+
+    class Store(FakeStorage):
+        objects: dict[str, bytes] = {}
+
+        def read_bytes(self, key, *, max_bytes):
+            return self.objects[key]
+
+        def inspect_and_hash(self, key):
+            body = self.objects[key]
+            return len(body), hashlib.sha256(body).hexdigest()
+
+        def put_bytes(self, key, body, content_type):
+            self.objects[key] = body
+
+        def promote(self, source, target):
+            self.objects[target] = self.objects.pop(source)
+
+    monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
+    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
+        project_id=project.id, filename="result.json", artifact_type="score_table", content_type="application/json",
+    ), user)
+    body = b'{"result": 1}'
+    Store.objects[upload.object_key] = body
+    payload = UploadComplete(checksum_sha256=hashlib.sha256(body).hexdigest())
+    if failure == "lineage":
+        invalid = payload.model_copy(update={"lineage_edges": [ArtifactLineageEdgeCreate(parent_artifact_id=uuid.uuid4())]})
+        with pytest.raises(DomainError, match="lineage parent"):
+            artifact_service.complete_upload(session, upload, invalid, project, user)
+    else:
+        artifact_service.complete_upload(session, upload, payload, project, user)
+    session.rollback()
+    assert upload.object_key in Store.objects
+    artifact = artifact_service.complete_upload(session, upload, payload, project, user)
+    session.commit()
+    assert Store.objects[artifact.object_key] == body
+
+
+def test_completion_stores_the_exact_bytes_it_validated(monkeypatch, service_session) -> None:
+    session, user, project = service_session
+    body = b'{"result": 1}'
+    mutated = b'{"result": 999}'
+
+    class Store(FakeStorage):
+        data = body
+        written = b""
+
+        def read_bytes(self, key, *, max_bytes):
+            verified = self.data
+            self.data = mutated
+            return verified
+
+        def promote(self, source, target):
+            Store.written = self.data
+
+        def put_bytes(self, key, data, content_type):
+            Store.written = data
+
+    monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
+    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
+        project_id=project.id, filename="result.json", artifact_type="score_table", content_type="application/json",
+    ), user)
+    artifact = artifact_service.complete_upload(session, upload, UploadComplete(
+        checksum_sha256=hashlib.sha256(body).hexdigest(),
+    ), project, user)
+    assert Store.written == body
+    assert hashlib.sha256(Store.written).hexdigest() == artifact.checksum_sha256
 
 
 def test_two_phase_upload_success_is_idempotent(monkeypatch, service_session) -> None:
@@ -508,4 +587,34 @@ def test_complete_upload_rejects_invalid_declared_format(monkeypatch, service_se
     session.refresh(upload)
     assert upload.status == "failed"
     assert upload.error == "artifact_format_invalid"
-    assert InvalidPdbStorage.removed == "staging/invalid"
+    # Cleanup belongs to the reconciler; another in-flight completion may still read staging.
+    assert InvalidPdbStorage.removed is None
+
+
+@pytest.mark.parametrize("change", ["failed", "missing", "duplicate"])
+def test_completion_checks_locked_upload_and_duplicate_lineage(monkeypatch, service_session, change) -> None:
+    session, user, project = service_session
+    monkeypatch.setattr(artifact_service, "ObjectStorage", FakeStorage)
+    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
+        project_id=project.id, filename="data.pdb", artifact_type="structure", content_type="chemical/x-pdb",
+    ), user)
+    upload_id = upload.id
+    session.commit()
+
+    class Store(FakeStorage):
+        def put_bytes(self, key, body, content_type):
+            if change == "duplicate":
+                return
+            with session.get_bind().begin() as conn:
+                table = ArtifactUpload.__table__
+                statement = table.delete() if change == "missing" else table.update().values(status="failed")
+                conn.execute(statement.where(table.c.id == upload_id))
+
+    monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
+    edge = ArtifactLineageEdgeCreate(parent_artifact_id=uuid.uuid4())
+    payload = UploadComplete(checksum_sha256=hashlib.sha256(FakeStorage.data).hexdigest(),
+                             lineage_edges=[edge, edge] if change == "duplicate" else [])
+    expected = {"failed": "upload_expired", "missing": "upload_not_found", "duplicate": "lineage_duplicate"}
+    with pytest.raises(DomainError) as caught:
+        artifact_service.complete_upload(session, upload, payload, project, user)
+    assert caught.value.error_code == expected[change]

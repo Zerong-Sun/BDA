@@ -1077,7 +1077,7 @@ def test_artifact_upload_and_target_structure_contract(domain_client, monkeypatc
         def read_bytes(self, key: str, *, max_bytes: int) -> bytes:
             return self.data
 
-        def promote(self, source: str, target: str) -> None:
+        def put_bytes(self, key: str, body: bytes, content_type: str) -> None:
             return None
 
         def remove(self, key: str) -> None:

@@ -9,9 +9,20 @@ validation message. This affects every schema that validates with a plain
 
 from __future__ import annotations
 
+import asyncio
 import json
 
-from backend_v2.app.core.problem import _json_safe
+from backend_v2.app.core.problem import _json_safe, http_error_handler
+from fastapi import HTTPException, Request
+
+
+def test_http_errors_preserve_protocol_headers() -> None:
+    request = Request({"type": "http", "path": "/resource", "headers": []})
+    for status, headers in [(405, {"Allow": "GET"}), (401, {"WWW-Authenticate": "Bearer"})]:
+        response = asyncio.run(http_error_handler(request, HTTPException(status, headers=headers)))
+        assert response.status_code == status
+        for key, value in headers.items():
+            assert response.headers[key] == value
 
 
 def test_exception_objects_become_readable_strings() -> None:

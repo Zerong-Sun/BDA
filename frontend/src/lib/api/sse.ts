@@ -76,8 +76,8 @@ export async function streamServerEvents(path: string, { onEvent, signal }: Stre
       }
     }
   } finally {
-    // Releasing the lock lets the body be cancelled by an aborted signal rather
-    // than leaving the connection open until the tab closes.
+    // A consumer exception stops reading without aborting fetch. Close the body too.
+    await reader.cancel().catch(() => {})
     reader.releaseLock()
   }
 }
