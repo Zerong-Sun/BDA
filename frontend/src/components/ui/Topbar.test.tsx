@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { server } from '../../test/mocks/handlers'
@@ -67,6 +67,13 @@ describe('Topbar logout', () => {
     expect(useAppStore.getState().language).toBe('zh')
     expect(useAppStore.getState().copilotOpen).toBe(false)
     expect(window.location.hash).toContain('/login')
+  })
+
+  it('shows the active project name before the dropdown has been opened', async () => {
+    renderWithProviders(<Topbar />)
+    const selector = await screen.findByRole('combobox')
+    await waitFor(() => expect(selector).toHaveTextContent('Live Project'))
+    expect(selector).not.toHaveTextContent('proj_live')
   })
 
   it('renders mobile-accessible primary navigation links', async () => {

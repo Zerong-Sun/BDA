@@ -57,6 +57,7 @@ try {
     const card = page.locator('[data-tour-anchor="project-selector"]')
     await card.waitFor()
     const target = page.locator('[data-tour-id="project-selector"] [role="combobox"]')
+    assert.ok(!(await target.innerText()).includes('proj_browser'), 'Project name is shown before opening the list')
     const frame = page.getByTestId('tour-spotlight')
     await frame.waitFor()
     await page.getByRole('button', { name: language === 'zh' ? '定位到高亮位置' : 'Locate highlighted area' }).click()
