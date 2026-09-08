@@ -3,9 +3,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
-
 from backend_v2.app.workflows.schemas import WorkflowNodeResponse
+from pydantic import ValidationError
 
 
 @pytest.mark.parametrize(("stored", "response"), [("not_started", "draft"), ("completed", "succeeded"), ("skipped", "skipped")])
