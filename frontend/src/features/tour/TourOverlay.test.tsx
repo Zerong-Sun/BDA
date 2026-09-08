@@ -147,6 +147,45 @@ describe('TourOverlay', () => {
     expect(useAppStore.getState().tourState.stepId).toBe('project-library')
   })
 
+  it('locates the actual project dropdown without clicking its wrapper, and permits Next', async () => {
+    setReducedMotion(true)
+    startAtProjectSelector()
+    const open = vi.fn()
+    renderWithProviders(<>
+      <div data-tour-id="project-selector"><span>Project label</span>
+        <button type="button" role="combobox" aria-expanded="false" onClick={open}>Choose project</button>
+      </div>
+      <TourOverlay />
+    </>)
+    fireEvent.click(screen.getByText('Project label'))
+    expect(useAppStore.getState().tourState.stepId).toBe('project-selector')
+    fireEvent.click(await screen.findByRole('button', { name: 'Locate highlighted area' }))
+    expect(screen.getByRole('combobox')).toHaveFocus()
+    expect(open).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowLeft' })
+    expect(useAppStore.getState().tourState.stepId).toBe('project-selector')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('project-library')
+  })
+
+  it('waits for the project list to close and keeps guide cards out of its way', async () => {
+    setReducedMotion(true)
+    startAtProjectSelector()
+    renderWithProviders(<>
+      <div data-tour-id="project-selector">
+        <button type="button" role="combobox" aria-expanded="false">Choose project</button>
+      </div>
+      <TourOverlay />
+    </>)
+    const target = screen.getByRole('combobox')
+    await act(async () => target.setAttribute('aria-expanded', 'true'))
+    expect(useAppStore.getState().tourState.stepId).toBe('project-selector')
+    expect(screen.queryByTestId('tour-card')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('The tour continues when the list closes')
+    await act(async () => target.setAttribute('aria-expanded', 'false'))
+    expect(useAppStore.getState().tourState.stepId).toBe('project-library')
+  })
+
   it('falls back to a modal Dialog and localized Alert when an anchor cannot be found', async () => {
     vi.useFakeTimers()
     startAtProjectSelector()
@@ -164,7 +203,7 @@ describe('TourOverlay', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toHaveAttribute('data-slot', 'button')
   })
 
-  it('advances only after the required safe target is clicked', async () => {
+  it('automatically advances when the highlighted target is clicked', async () => {
     vi.useFakeTimers()
     startAtProjectSelector()
     renderWithProviders(

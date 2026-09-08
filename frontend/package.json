@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:workflow-ux": "npm run build && node scripts/browser-workflow-gates.mjs",
-    "test:browser": "node scripts/browser-vertical-slice.mjs"
+    "test:browser": "node scripts/browser-vertical-slice.mjs",
+    "test:tour-ux": "npm run build && node scripts/browser-tour.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

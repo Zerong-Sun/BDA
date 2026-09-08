@@ -4,6 +4,7 @@ import {
   CaretRightIcon,
   CheckCircleIcon,
   QuestionIcon,
+  CursorClickIcon,
   WarningIcon,
   XIcon,
 } from '@phosphor-icons/react'
@@ -105,7 +106,11 @@ function useTourAnchor(
 
     const connect = () => {
       if (disposed || target) return
-      const candidate = document.querySelector<HTMLElement>(step.anchor!.selector)
+      const root = document.querySelector<HTMLElement>(step.anchor!.selector)
+      // Use the actual dropdown control rather than its label and surrounding whitespace.
+      const candidate = step.anchor!.id === 'project-selector'
+        ? root?.querySelector<HTMLElement>('[role="combobox"]') ?? root
+        : root
       if (!candidate) {
         attempts += 1
         if (attempts === ANCHOR_ATTEMPTS) {
@@ -131,15 +136,27 @@ function useTourAnchor(
       }
 
       if (step.advance === 'target-click') {
-        const onClick = () => {
-          if (prefersReducedMotion) {
-            advanceTour()
-            return
-          }
-          schedule(advanceTour, TARGET_ADVANCE_DELAY_MS)
+        let advanced = false
+        const advance = () => {
+          if (advanced) return
+          advanced = true
+          if (prefersReducedMotion) advanceTour()
+          else schedule(advanceTour, TARGET_ADVANCE_DELAY_MS)
         }
-        candidate.addEventListener('click', onClick, { once: true })
-        removeTargetListener = () => candidate.removeEventListener('click', onClick)
+        // Keep the guide in place until the dropdown closes. Advancing on open
+        // would put the next callout over the options the user is choosing.
+        if (candidate.getAttribute('role') === 'combobox') {
+          let opened = candidate.getAttribute('aria-expanded') === 'true'
+          const observer = new MutationObserver(() => {
+            if (candidate.getAttribute('aria-expanded') === 'true') opened = true
+            else if (opened) advance()
+          })
+          observer.observe(candidate, { attributes: true, attributeFilter: ['aria-expanded'] })
+          removeTargetListener = () => observer.disconnect()
+        } else {
+          candidate.addEventListener('click', advance, { once: true })
+          removeTargetListener = () => candidate.removeEventListener('click', advance)
+        }
       }
     }
 
@@ -169,12 +186,49 @@ function useTourAnchor(
   return resolution
 }
 
+function TourSpotlight({ target, clickable }: { target: HTMLElement; clickable: boolean }) {
+  const { language } = useI18n()
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  useEffect(() => {
+    const update = () => setRect(target.getBoundingClientRect())
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(target)
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [target])
+  if (!rect || rect.width === 0 || rect.height === 0) return null
+  const left = Math.max(4, rect.left - 5)
+  const top = Math.max(4, rect.top - 5)
+  const right = Math.min(window.innerWidth - 4, rect.right + 5)
+  const bottom = Math.min(window.innerHeight - 4, rect.bottom + 5)
+  if (right <= left || bottom <= top) return null
+  return (
+    <div data-testid="tour-spotlight" aria-hidden="true"
+      className="pointer-events-none fixed z-[45] rounded-lg border-[3px] border-primary"
+      style={{ left, top, width: right - left, height: bottom - top,
+        boxShadow: '0 0 0 9999px rgb(0 0 0 / 24%)' }}>
+      <span className="absolute left-0 top-0 flex -translate-y-full items-center gap-1 rounded-t-md bg-primary px-2 py-1 text-sm font-semibold text-primary-foreground"
+        style={top < 40 ? { translate: 'none', top: '100%' } : undefined}>
+        <CursorClickIcon aria-hidden="true" />
+        {language === 'zh' ? (clickable ? '点击框内控件' : '当前介绍区域') : (clickable ? 'Click inside the frame' : 'Current area')}
+      </span>
+    </div>
+  )
+}
+
 type TourCardProps = {
   section: TourSection
   step: TourStep
   stepIndex: number
   anchorMissing: boolean
   modal: boolean
+  locateTarget?: () => void
   backTour: () => void
   advanceTour: () => void
   skipTour: () => void
@@ -186,6 +240,7 @@ function TourCard({
   stepIndex,
   anchorMissing,
   modal,
+  locateTarget,
   backTour,
   advanceTour,
   skipTour,
@@ -200,10 +255,10 @@ function TourCard({
     <div className="grid min-w-0 gap-3" data-testid="tour-card">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
             {labels.controls.chapter} · {section.title[language]} · {stepIndex + 1}/{section.steps.length}
           </p>
-          <Heading className="mt-1 text-base">{copy.title}</Heading>
+          <Heading className="mt-1 text-xl leading-7">{copy.title}</Heading>
         </div>
         {modal ? (
           <DialogClose
@@ -262,9 +317,9 @@ function TourCard({
         <StepperPanel>
           {section.steps.map((sectionStep, index) => (
             <StepperContent key={sectionStep.id} value={index + 1}>
-              <Description>{sectionStep.copy[language].body}</Description>
+              <Description className="text-base leading-7">{sectionStep.copy[language].body}</Description>
               {sectionStep.copy[language].interactionHint && !anchorMissing ? (
-                <p className="mt-3 bg-info/10 px-3 py-2 text-xs text-info">
+                <p className="mt-3 bg-info/10 rounded-md px-3 py-2 text-base leading-7 text-info">
                   {sectionStep.copy[language].interactionHint}
                 </p>
               ) : null}
@@ -279,23 +334,27 @@ function TourCard({
         </StepperPanel>
       </Stepper>
 
+      {locateTarget ? (
+        <Button type="button" variant="outline" className="min-h-11 whitespace-normal text-base!" onClick={locateTarget}>
+          <CursorClickIcon aria-hidden="true" />
+          {language === 'zh' ? '定位到高亮位置' : 'Locate highlighted area'}
+        </Button>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          className="min-h-11 text-base!"
           disabled={stepIndex === 0}
           onClick={backTour}
         >
           <CaretLeftIcon aria-hidden="true" />
           {labels.controls.back}
         </Button>
-        {step.advance === 'button' || anchorMissing ? (
-          <Button type="button" size="sm" onClick={advanceTour}>
-            {labels.controls.next}
-            <CaretRightIcon aria-hidden="true" />
-          </Button>
-        ) : null}
+        <Button type="button" className="min-h-11 text-base!" onClick={advanceTour}>
+          {labels.controls.next}
+          <CaretRightIcon aria-hidden="true" />
+        </Button>
       </div>
     </div>
   )
@@ -327,6 +386,16 @@ export function TourOverlay() {
     prefersReducedMotion,
     advanceTour,
   )
+  const [expandedTarget, setExpandedTarget] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const target = anchorResolution.target
+    if (!target || target.getAttribute('role') !== 'combobox') return
+    const update = () => setExpandedTarget(target.getAttribute('aria-expanded') === 'true' ? target : null)
+    update()
+    const observer = new MutationObserver(update)
+    observer.observe(target, { attributes: true, attributeFilter: ['aria-expanded'] })
+    return () => observer.disconnect()
+  }, [anchorResolution.target])
   const rememberFocusOrigin = useCallback((preferred?: HTMLElement | null) => {
     if (preferred?.isConnected) {
       focusOriginRef.current = preferred
@@ -399,6 +468,8 @@ export function TourOverlay() {
         step?.anchor && !anchorResolution.target && !anchorResolution.missing,
       )
       if (event.key === 'Escape' && waitingForAnchor) handleSkip()
+      if (event.defaultPrevented || (event.target instanceof HTMLElement
+        && event.target.closest('input, textarea, select, [role="combobox"], [role="tablist"], [role="listbox"], [contenteditable="true"]'))) return
       if (event.key === 'ArrowLeft') backTour()
       if (event.key === 'ArrowRight' && step?.advance === 'button') handleAdvance()
     }
@@ -441,6 +512,11 @@ export function TourOverlay() {
       stepIndex={stepIndex}
       anchorMissing={anchorResolution.missing}
       modal={!step.anchor || anchorResolution.missing}
+      locateTarget={anchorResolution.target ? () => {
+        const target = anchorResolution.target!
+        target.scrollIntoView?.({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'center', inline: 'nearest' })
+        target.focus({ preventScroll: true })
+      } : undefined}
       backTour={backTour}
       advanceTour={handleAdvance}
       skipTour={handleSkip}
@@ -471,12 +547,15 @@ export function TourOverlay() {
     return <span className="sr-only" aria-live="polite">{step.copy[language].title}</span>
   }
 
+  if (expandedTarget === anchorResolution.target) {
+    return <div role="status" className="pointer-events-none fixed inset-x-3 bottom-4 z-50 mx-auto w-fit max-w-[calc(100vw-1.5rem)] rounded-lg bg-popover px-5 py-3 text-base leading-7 text-popover-foreground shadow-lg">
+      {language === 'zh' ? '请选择项目；关闭列表后，导览会继续。' : 'Choose a project. The tour continues when the list closes.'}
+    </div>
+  }
+
   return (
     <>
-      <div
-        className="pointer-events-none fixed inset-0 z-40 bg-foreground/10 motion-reduce:transition-none"
-        aria-hidden="true"
-      />
+      <TourSpotlight target={anchorResolution.target} clickable={step.advance === 'target-click'} />
       <Popover
         open
         modal={false}
@@ -491,11 +570,11 @@ export function TourOverlay() {
           collisionPadding={12}
           sticky
           side="bottom"
-          sideOffset={14}
+          sideOffset={42}
           align="start"
           initialFocus={false}
           finalFocus={false}
-          className="w-[min(22.5rem,calc(100vw-1.5rem))] motion-reduce:animate-none motion-reduce:duration-0"
+          className="max-h-[calc(100dvh-1.5rem)] w-[min(26rem,calc(100vw-1.5rem))] overflow-y-auto p-5 motion-reduce:animate-none motion-reduce:duration-0"
           data-tour-anchor={step.anchor.id}
           aria-live="polite"
         >
@@ -576,7 +655,7 @@ export function TourMenu({
                 <QuestionIcon className="size-5 text-primary" aria-hidden="true" />
                 {labels.menu.title}
               </DialogTitle>
-              <DialogDescription className="mt-1">{labels.menu.body}</DialogDescription>
+              <DialogDescription className="mt-1 text-base leading-7">{labels.menu.body}</DialogDescription>
             </div>
             <DialogClose
               render={(
@@ -608,11 +687,11 @@ export function TourMenu({
                 data-testid="tour-chapter"
               >
                 <span className="grid min-w-0 flex-1 gap-1">
-                  <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                  <span className="flex items-center justify-between gap-2 text-base font-medium">
                     <span>{tourSection.title[language]}</span>
                     {completed ? <CheckCircleIcon className="size-4 text-success" aria-hidden="true" /> : null}
                   </span>
-                  <span className="text-xs font-normal text-muted-foreground">
+                  <span className="text-sm leading-6 font-normal text-muted-foreground">
                     {tourSection.description[language]}
                   </span>
                 </span>
