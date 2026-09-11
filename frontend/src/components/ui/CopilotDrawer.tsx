@@ -3,6 +3,7 @@ import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/reac
 import { CopilotChat } from '../../features/copilot/CopilotChat'
 import { CopilotActions } from '../../features/copilot/CopilotActions'
 import { CopilotAgentRuns } from '../../features/copilot/CopilotAgentRuns'
+import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
 import { CopilotSettings } from '../../features/copilot/CopilotSettings'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
@@ -21,10 +22,12 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   const copilotWidth = useAppStore((s) => s.copilotWidth)
   const setCopilotWidth = useAppStore((s) => s.setCopilotWidth)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Chat and runs are the two ways to use the copilot, and they are alternatives
-  // rather than companions: a transcript and a conversation both want the whole
-  // drawer, and showing them at once would leave neither readable.
-  const [surface, setSurface] = useState<'chat' | 'runs'>('chat')
+  // Chat, runs and MCP grants are alternatives rather than companions: a
+  // transcript and a conversation both want the whole drawer, and showing them at
+  // once would leave neither readable. MCP sits here rather than in settings
+  // because a grant is scoped to a run and a project, which is what this drawer
+  // is already about - settings is where the model provider lives.
+  const [surface, setSurface] = useState<'chat' | 'runs' | 'mcp'>('chat')
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -87,6 +90,15 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             </Button>
             <Button
               type="button"
+              variant={surface === 'mcp' ? 'secondary' : 'outline'}
+              size="sm"
+              aria-pressed={surface === 'mcp'}
+              onClick={() => setSurface((value) => (value === 'mcp' ? 'chat' : 'mcp'))}
+            >
+              {t.copilot.mcp.toggle}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={() => setSettingsOpen((value) => !value)}
@@ -109,7 +121,11 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             <CopilotSettings />
           </ScrollArea>
         ) : null}
-        {surface === 'runs' ? (
+        {surface === 'mcp' ? (
+          <ScrollArea className="min-h-0 flex-1">
+            <CopilotMcpSessions />
+          </ScrollArea>
+        ) : surface === 'runs' ? (
           <ScrollArea className="min-h-0 flex-1">
             <CopilotAgentRuns />
           </ScrollArea>

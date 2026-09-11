@@ -1,8 +1,19 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.models import Base, UUIDVersionMixin
@@ -174,3 +185,54 @@ class CopilotAgentTask(UUIDVersionMixin, Base):
     tool_call_id: Mapped[str] = mapped_column(String(120), default="")
     result: Mapped[dict] = mapped_column(JSON, default=dict)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# --- MCP sessions ------------------------------------------------------------
+#
+# One row is one authorization to reach the copilot tool registry from outside
+# BDA, over MCP. It exists because the two things that authorize a chat turn are
+# both absent for an external client: there is no bearer token belonging to a
+# person in the request, and there is no user-written message to read intent from.
+#
+# So the row carries both. `issued_by` is the person who granted it and whose RLS
+# context every call runs under; `agent_run_id` names the run whose `goal` is the
+# user's own words, which is what `actions.request_allows` needs and what
+# `agent_loop` already passes for exactly this reason. A session without a run is
+# not an error - it is a read-only session, and the write tools are not listed
+# for it at all.
+
+
+class CopilotMcpSession(UUIDVersionMixin, Base):
+    __tablename__ = "copilot_mcp_sessions"
+    __table_args__ = (
+        # A session must name a project: `tools.py:_project_of` refuses a call
+        # without one, but a NULL here would mean the refusal happens per call
+        # rather than at the point the grant was written.
+        CheckConstraint("length(label) > 0", name="ck_copilot_mcp_session_label"),
+        Index("ix_copilot_mcp_sessions_project", "project_id", "created_at"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    #: The run whose goal is this session's mandate. Nullable, and a NULL is what
+    #: makes the session read-only - see `mcp.available_tools`.
+    agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("copilot_agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: The person who granted this, not a service account. Every tool call runs
+    #: under this user's RLS context, so the fence an MCP client sees is the one
+    #: its issuer sees and never a wider one.
+    issued_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    label: Mapped[str] = mapped_column(String(120))
+    #: Capability ids. Intersected with the project's own `enabled_skills` on
+    #: every call rather than only at issue time, so revoking a capability from
+    #: the project narrows the sessions already outstanding.
+    granted_capabilities: Mapped[list] = mapped_column(JSON, default=list)
+    #: Stored the way `refresh_sessions.token_hash` is stored. The raw token is
+    #: returned once, at issue, and never again.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    call_count: Mapped[int] = mapped_column(Integer, default=0)

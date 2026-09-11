@@ -17,13 +17,13 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs
+from . import agent_runs, mcp
 from .capabilities import (
     COPILOT_CAPABILITIES,
     capability_ids,
     normalize_capabilities,
 )
-from .models import CopilotAgentRun, CopilotConfig
+from .models import CopilotAgentRun, CopilotConfig, CopilotMcpSession
 from .provider import complete as complete_with_provider
 from .provider import credential_available
 from .repository import CopilotRepository
@@ -44,6 +44,10 @@ from .schemas import (
     CopilotConfigUpdate,
     InterpretationCreate,
     InterpretationResponse,
+    McpSessionCreate,
+    McpSessionIssued,
+    McpSessionPage,
+    McpSessionResponse,
     MessagePage,
     MessageResponse,
     RoutePlanCreate,
@@ -57,7 +61,13 @@ from .service import (
     create_route_plan as create_route_plan_service,
 )
 from .service import (
+    issue_mcp_session as issue_mcp_session_service,
+)
+from .service import (
     put_config as put_config_service,
+)
+from .service import (
+    revoke_mcp_session as revoke_mcp_session_service,
 )
 from .service import (
     start_agent_run as start_agent_run_service,
@@ -432,3 +442,129 @@ def cancel_agent_run(
     cancelled = agent_runs.cancel(session, run, reason=f"cancelled by {user.username}")
     response.headers["ETag"] = etag(run.version)
     return AgentRunCancelled(run=_run_response(session, run), cancelled_runs=cancelled)
+
+
+# --- MCP sessions ------------------------------------------------------------
+#
+# One grant lets an external MCP client reach this project's copilot tools. The
+# endpoints are deliberately thin: what a grant can actually do is decided in
+# `mcp.available_tools` on every call, never stored, so these routes only create,
+# read and revoke the row.
+
+
+def _mcp_session_response(session: Session, row: CopilotMcpSession) -> McpSessionResponse:
+    """The row plus what it currently grants.
+
+    `tools` is derived on read for the same reason it is derived on call: the
+    project configuration, the bound run's status and the run's goal can all move
+    after the grant was written, and a stored list would go stale silently.
+    """
+    described = mcp.describe(session, row)
+    return McpSessionResponse(
+        id=row.id,
+        project_id=row.project_id,
+        agent_run_id=row.agent_run_id,
+        issued_by=row.issued_by,
+        label=row.label,
+        granted_capabilities=list(row.granted_capabilities or []),
+        mandate_live=bool(described["mandate_live"]),
+        tools=list(described["tools"]),
+        write_tools=list(described["write_tools"]),
+        expires_at=row.expires_at,
+        revoked_at=row.revoked_at,
+        last_used_at=row.last_used_at,
+        call_count=row.call_count,
+        version=row.version,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _require_mcp_session(session: Session, session_id: uuid.UUID, user: User) -> CopilotMcpSession:
+    row = CopilotRepository(session).mcp_session(session_id)
+    if row is None:
+        raise DomainError("copilot_mcp_session_not_found", "The MCP session was not found", status_code=404)
+    require_project(session, row.project_id, user)
+    return row
+
+
+@router.post(
+    "/mcp-sessions",
+    response_model=McpSessionIssued,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={"x-permission": "copilot.mcp.issue"},
+)
+def issue_mcp_session(
+    payload: McpSessionCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> McpSessionIssued:
+    """Grant an external client this user's authority, and no more.
+
+    `require_command` plus the project write fence, the same pair that guards
+    starting an agent run: a grant can only do what its issuer could already do,
+    and `mcp._authorize_write` re-checks that authority on every write rather
+    than trusting this moment.
+    """
+    project = require_project(session, payload.project_id, user)
+    row, token = issue_mcp_session_service(session, project, user, payload)
+    return McpSessionIssued(
+        session=_mcp_session_response(session, row),
+        token=token,
+        endpoint="/mcp",
+    )
+
+
+@router.get("/projects/{project_id}/mcp-sessions", response_model=McpSessionPage)
+def list_mcp_sessions(
+    project_id: uuid.UUID,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> McpSessionPage:
+    require_project(session, project_id, user)
+    rows = CopilotRepository(session).list_mcp_sessions(project_id, decode_cursor(cursor), limit)
+    page = rows[:limit]
+    return McpSessionPage(
+        items=[_mcp_session_response(session, item) for item in page],
+        next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
+    )
+
+
+@router.get("/mcp-sessions/{session_id}", response_model=McpSessionResponse)
+def get_mcp_session(
+    session_id: uuid.UUID,
+    response: Response,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> McpSessionResponse:
+    row = _require_mcp_session(session, session_id, user)
+    response.headers["ETag"] = etag(row.version)
+    return _mcp_session_response(session, row)
+
+
+@router.post(
+    "/mcp-sessions/{session_id}/revocations",
+    response_model=McpSessionResponse,
+    openapi_extra={"x-permission": "copilot.mcp.revoke"},
+)
+def revoke_mcp_session(
+    session_id: uuid.UUID,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> McpSessionResponse:
+    row = _require_mcp_session(session, session_id, user)
+    expected = parse_if_match(if_match)
+    if expected is not None and expected != row.version:
+        raise DomainError(
+            "version_conflict",
+            "The MCP session changed since it was read",
+            status_code=412,
+        )
+    project = require_project(session, row.project_id, user)
+    revoke_mcp_session_service(session, row, user, project)
+    response.headers["ETag"] = etag(row.version)
+    return _mcp_session_response(session, row)

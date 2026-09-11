@@ -26,6 +26,7 @@ reports are maintained only in the private BDA-demo archive.
 - [Copilot validation report](COPILOT_VALIDATION_REPORT.md)
 - [Data catalog](DATA_CATALOG.md)
 - [Dual-mode operation plan (automated / manual)](DUAL_MODE_OPERATION_PLAN.md)
+- [MCP capability surface](MCP_CAPABILITY_SURFACE.md)
 - [Plugin interface](PLUGIN_INTERFACE.md)
 - [QM cluster operating rules](QM_CLUSTER_OPERATION_RULES.md)
 - [Research interface usage](RESEARCH_INTERFACE_USAGE_GUIDE.md)
