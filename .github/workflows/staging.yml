@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0057_plugin_output_routing
+            BDA_SCHEMA_REVISION=0058_staged_port_paths
           provenance: mode=max
           sbom: true
       - id: frontend
