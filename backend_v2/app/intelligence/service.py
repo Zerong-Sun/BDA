@@ -33,9 +33,16 @@ def create_run(session: Session, project: Project, payload: IntelligenceCreate, 
 def apply_route(session: Session, route: DesignRoute, run: IntelligenceRun, user: User) -> WorkflowRun:
     if route.applied_workflow_id:
         return session.get(WorkflowRun, route.applied_workflow_id)  # type: ignore[return-value]
-    workflow = WorkflowRun(project_id=run.project_id, name=route.name, graph=route.workflow_spec, created_by=user.id)
-    session.add(workflow)
-    session.flush()
+    from ..workflows.schemas import WorkflowCreate
+    from ..workflows.service import create_workflow
+
+    project = session.get(Project, run.project_id)
+    if project is None:
+        raise DomainError("project_not_found", "Project not found", status_code=404)
+    workflow = create_workflow(
+        session, project, WorkflowCreate.model_validate({**route.workflow_spec, "name": route.name}), user
+    )
+    workflow.graph = {**workflow.graph, "source_intelligence_run_id": str(run.id)}
     route.applied_workflow_id = workflow.id
     route.status = "applied"
     route.version += 1

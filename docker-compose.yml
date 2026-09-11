@@ -81,22 +81,25 @@ services:
         http_proxy: ${BDA_BUILD_PROXY:-}
         https_proxy: ${BDA_BUILD_PROXY:-}
     env_file: .env
-    environment: &v2_environment
+    environment:
       BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
-      BDA_V2_REDIS_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/0
-      BDA_V2_RATE_LIMIT_ENABLED: "true"
-      BDA_V2_RATE_LIMIT_FAIL_CLOSED: "true"
-      BDA_V2_CELERY_BROKER_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/1
-      BDA_V2_MINIO_ENDPOINT: minio-v2:9000
-      BDA_V2_MINIO_PUBLIC_ENDPOINT: ${BDA_V2_MINIO_PUBLIC_ENDPOINT:-localhost:9002}
-      BDA_V2_MINIO_ACCESS_KEY: ${BDA_V2_MINIO_ACCESS_KEY:?BDA_V2_MINIO_ACCESS_KEY must be set}
-      BDA_V2_MINIO_SECRET_KEY: ${BDA_V2_MINIO_SECRET_KEY:?BDA_V2_MINIO_SECRET_KEY must be set}
-      BDA_V2_LLM_LOCAL_SECRET_DIR: /var/lib/bda/secrets
-      BDA_V2_DATABASE_POOL_SIZE: "5"
-      BDA_V2_DATABASE_MAX_OVERFLOW: "5"
-      BDA_V2_BUILD_REVISION: local
-      BDA_V2_SCHEMA_REVISION: 0055_autopilot_worker_rls
-      BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot
+      <<: &v2_environment
+        BDA_V2_REDIS_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/0
+        BDA_V2_RATE_LIMIT_ENABLED: "true"
+        BDA_V2_RATE_LIMIT_FAIL_CLOSED: "true"
+        BDA_V2_CELERY_BROKER_URL: redis://:${BDA_V2_REDIS_PASSWORD}@redis-v2:6379/1
+        BDA_V2_MINIO_ENDPOINT: minio-v2:9000
+        BDA_V2_MINIO_PUBLIC_ENDPOINT: ${BDA_V2_MINIO_PUBLIC_ENDPOINT:-localhost:9002}
+        BDA_V2_MINIO_ACCESS_KEY: ${BDA_V2_MINIO_ACCESS_KEY:?BDA_V2_MINIO_ACCESS_KEY must be set}
+        BDA_V2_MINIO_SECRET_KEY: ${BDA_V2_MINIO_SECRET_KEY:?BDA_V2_MINIO_SECRET_KEY must be set}
+        BDA_V2_LLM_LOCAL_SECRET_DIR: /var/lib/bda/secrets
+        BDA_V2_DATABASE_POOL_SIZE: "5"
+        BDA_V2_DATABASE_MAX_OVERFLOW: "5"
+        BDA_V2_BUILD_REVISION: local
+        BDA_V2_SCHEMA_REVISION: 0057_plugin_output_routing
+        BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot,scheduler
+        # Mask the retired shared scheduler credential if an old .env still has it.
+        BDA_V2_SCHEDULER_DATABASE_URL: ""
     command: >-
       sh -c "BDA_V2_DATABASE_URL=postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@postgres-v2:5432/bda_v2
       alembic -c backend_v2/alembic.ini upgrade head &&
@@ -127,6 +130,7 @@ services:
     env_file: .env
     environment:
       <<: *v2_environment
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
       BDA_V2_DATABASE_POOL_SIZE: "2"
       BDA_V2_DATABASE_MAX_OVERFLOW: "0"
       BDA_V2_WORKER_QUEUES: dispatch,poll,collect,maintenance
@@ -140,6 +144,7 @@ services:
     env_file: .env
     environment:
       <<: *v2_environment
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
       BDA_V2_DATABASE_POOL_SIZE: "2"
       BDA_V2_DATABASE_MAX_OVERFLOW: "0"
       BDA_V2_WORKER_QUEUES: research
@@ -153,6 +158,7 @@ services:
     env_file: .env
     environment:
       <<: *v2_environment
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
       BDA_V2_DATABASE_POOL_SIZE: "2"
       BDA_V2_DATABASE_MAX_OVERFLOW: "0"
       BDA_V2_WORKER_QUEUES: copilot
@@ -163,11 +169,30 @@ services:
       api-v2:
         condition: service_healthy
 
+  scheduler-worker-v2:
+    image: bda-api-v2:local
+    restart: unless-stopped
+    env_file:
+      - .env
+      - ${BDA_V2_SCHEDULER_ENV_FILE:-./secrets/scheduler.env}
+    environment:
+      <<: *v2_environment
+      # Dedicated non-superuser BYPASSRLS login; never give it operation queues.
+      # Provision with backend_v2/deploy/postgres/scheduler.sql before starting.
+      BDA_V2_DATABASE_POOL_SIZE: "2"
+      BDA_V2_DATABASE_MAX_OVERFLOW: "0"
+      BDA_V2_WORKER_QUEUES: scheduler
+    command: python -m backend_v2.scripts.run_scheduler_worker
+    depends_on:
+      api-v2:
+        condition: service_healthy
+
   beat-v2:
     image: bda-api-v2:local
     env_file: .env
     environment:
       <<: *v2_environment
+      BDA_V2_DATABASE_URL: postgresql+psycopg://bda:${BDA_V2_POSTGRES_PASSWORD}@pgbouncer-v2:5432/bda_v2
       BDA_V2_DATABASE_POOL_SIZE: "1"
       BDA_V2_DATABASE_MAX_OVERFLOW: "0"
     command: celery -A backend_v2.app.compute.tasks.celery_app beat --loglevel=info

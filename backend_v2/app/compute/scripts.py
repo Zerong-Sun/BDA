@@ -75,6 +75,10 @@ class ScriptContext:
     # collect outputs the same way, so the job needs no network access at all.
     # "presigned": the job fetches and pushes against the object store itself.
     staging_mode: str = "presigned"
+    # Names of the plugin's declared input ports. Their directories are created before
+    # the command runs, whether or not anything was bound to them - see
+    # ``_input_port_directories``.
+    input_ports: list[str] = field(default_factory=list)
 
 
 # Emitted at the end of an ssh-staged job. Walks the output directory and writes the
@@ -113,6 +117,11 @@ def preview_context(node, plugin, backend: str, command: str, parameters: dict |
     from the submitted script only in those tokens. Everything a reviewer cares about -
     directives, resources, runtime preamble, the command - is rendered by the same code
     that LSFAdapter uses.
+
+    That includes the staging mode. It used to take the default, so a deployment staging
+    over SSH reviewed the presigned branch and submitted the other one: a different
+    preamble, different environment variables, and none of the input-port directories.
+    A preview that shows a script the cluster will not run is worse than no preview.
     """
     from ..core.config import get_settings
 
@@ -130,6 +139,12 @@ def preview_context(node, plugin, backend: str, command: str, parameters: dict |
         resources=resources,
         runtime_setup=list(getattr(plugin, "runtime_setup", None) or []),
         parameters=parameters if parameters is not None else dict(node.parameters or {}),
+        staging_mode=settings.lsf_staging_mode,
+        input_ports=[
+            str(port["name"])
+            for port in (getattr(plugin, "input_ports", None) or [])
+            if isinstance(port, dict) and port.get("name")
+        ],
     )
 
 
@@ -178,6 +193,38 @@ def _resource_directives(resources: dict) -> list[str]:
     return directives
 
 
+
+def _input_port_directories(ctx: ScriptContext) -> list[str]:
+    """Create one directory per declared input port, bound or not.
+
+    Staging writes to ``inputs/<port>/``, so an unbound port leaves no directory behind.
+    Plugin commands probe for their optional inputs with
+
+        staged="$(find "$BDA_INPUT_DIR/<port>" ... 2>/dev/null | sort | head -1)"
+
+    and under the ``set -Eeuo pipefail`` this renderer emits, ``find`` on a missing
+    directory exits 1, ``pipefail`` carries it out of the pipeline, and ``set -e`` kills
+    the job on the assignment - with the message swallowed by the command's own
+    ``2>/dev/null``. The job then reports exit 1 having written nothing at all.
+
+    This is not a rare edge. An exclusive group marks every alternative ``required`` yet
+    exactly one is ever bound, so ProteinMPNN dies on ``jsonl_path`` when you bind
+    ``pdb_path`` and on ``pdb_path`` when you bind ``jsonl_path`` - it can never run.
+    Measured 2026-09-11: 5 of 18 registered plugins, including every version of
+    ProteinMPNN and RFdiffusion.
+
+    The platform owns this: it declares the ports and chooses the layout, so it creates
+    the directories. An empty one makes ``find`` succeed with no output, which is what
+    those commands already expect, and each plugin's own "was anything staged?" guard
+    then runs as written.
+    """
+    ports = sorted({name for port in ctx.input_ports if (name := str(port).strip())})
+    if not ports:
+        return []
+    # $BDA_INPUT_DIR stays expanded; only the port name is quoted as a literal.
+    return ["mkdir -p " + " ".join(f'"$BDA_INPUT_DIR"/{shlex.quote(name)}' for name in ports)]
+
+
 def _render_lsf(ctx: ScriptContext) -> str:
     header = [
         "#!/bin/bash",
@@ -197,6 +244,7 @@ def _render_lsf(ctx: ScriptContext) -> str:
             f"export BDA_JOB_NAME={shlex.quote(ctx.job_name)}",
             f"export BDA_CPUS={declared_cpus(ctx.resources)}",
             'mkdir -p "$BDA_OUTPUT_DIR"',
+            *_input_port_directories(ctx),
             *_parameter_exports(ctx.parameters),
             *_runtime_preamble(ctx),
             ctx.command,

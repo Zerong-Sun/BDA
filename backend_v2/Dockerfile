@@ -1,15 +1,16 @@
 FROM python:3.13-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0055_autopilot_worker_rls
+ARG BDA_SCHEMA_REVISION=0057_plugin_output_routing
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)
 # ahead of the next python:3.13-slim image refresh, to keep the Trivy CVE gate green.
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends openssh-client ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-client ca-certificates dssp \
     && rm -rf /var/lib/apt/lists/*
 COPY backend_v2 backend_v2
+RUN python backend_v2/scripts/install_dssp_data.py
 COPY frontend/public/research-packages frontend/public/research-packages
 # pip and setuptools are build tooling, and nothing at runtime uses them - the image runs
 # uvicorn and alembic, neither of which installs anything. Leaving them in ships the base

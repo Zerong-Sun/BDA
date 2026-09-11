@@ -13,10 +13,12 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.exceptions import _Error as _JsonSchemaError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..compute.binding import binding_blockers, edge_port_blockers
 from ..registry.models import ModelPlugin
+from ..registry.ports import parse_output_ports
 from ..registry.runtime_validation import runtime_validation_is_current
 from .models import WorkflowRun
 from .repository import WorkflowRepository
@@ -39,8 +41,14 @@ def parameter_blockers(node: Any, plugin: Any) -> list[dict]:
         # schema, so a malformed one would otherwise surface as an unhandled error
         # during iter_errors and turn preflight into a 500.
         Draft202012Validator.check_schema(plugin.parameter_schema)
+        deferred = set((getattr(node, "configuration", None) or {}).get("parameter_links", {}))
+        schema = {
+            **plugin.parameter_schema,
+            "required": [k for k in plugin.parameter_schema.get("required", []) if k not in deferred],
+        }
+        parameters = {k: v for k, v in (node.parameters or {}).items() if k not in deferred}
         errors = sorted(
-            Draft202012Validator(plugin.parameter_schema).iter_errors(node.parameters or {}),
+            Draft202012Validator(schema).iter_errors(parameters),
             key=lambda item: list(item.path),
         )
     except (SchemaError, _JsonSchemaError):
@@ -102,6 +110,120 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
                 "message": "Every node is a manual stage; there is nothing to submit",
             }
         )
+
+    from pydantic import ValidationError
+
+    from ..core.problem import DomainError
+    from .assistance import validate_configuration
+    from .gate_schemas import GatePolicy
+
+    for node in nodes:
+        try:
+            plugin = session.get(ModelPlugin, node.model_plugin_id) if node.model_plugin_id else None
+            validate_configuration(node.configuration or {}, plugin)
+            for name, link in (node.configuration or {}).get("parameter_links", {}).items():
+                if not any(
+                    b.get("source") == "upstream" and b.get("from_node") == link["from_node"]
+                    for b in node.input_bindings
+                ):
+                    raise ValueError(f"Parameter {name} must reference a connected upstream node")
+        except (ValueError, DomainError) as exc:
+            blockers.append({"code": "node_configuration_invalid", "node_key": node.node_key, "message": str(exc)})
+    by_key = {n.node_key: n for n in nodes}
+    signatures = {
+        (e.get("source"), e.get("target"), e.get("source_port"), e.get("target_port"))
+        for e in workflow.graph.get("edges", [])
+        if e.get("gate", {}).get("mode") != "dependency"
+    }
+    for node in nodes:
+        for b in node.input_bindings:
+            if (
+                b.get("source") == "upstream"
+                and (b.get("from_node"), node.node_key, b.get("from_port"), b.get("port")) not in signatures
+            ):
+                blockers.append(
+                    {
+                        "code": "binding_connection_missing",
+                        "node_key": node.node_key,
+                        "message": "Input binding requires a matching data connection and gate",
+                    }
+                )
+    for edge in workflow.graph.get("edges", []):
+        if getattr(by_key.get(edge.get("target")), "execution_mode", "dispatch") == "manual":
+            continue
+        try:
+            policy = GatePolicy.model_validate(edge.get("gate") or {})
+            source = by_key.get(edge.get("source"))
+            inherited = (
+                (source.configuration or {}).get("output_policy") if source and policy.mode != "integrity" else None
+            )
+            if not edge.get("id") or not policy.configured:
+                raise ValueError("Configure the connection gate before submitting")
+            if policy.mode != "dependency" and not (edge.get("source_port") and edge.get("target_port")):
+                raise ValueError("Connect explicit input/output ports")
+            if policy.mode != "dependency":
+                target = by_key.get(edge.get("target"))
+                if target is None or not any(
+                    b.get("source") == "upstream"
+                    and b.get("from_node") == edge["source"]
+                    and b.get("from_port") == edge.get("source_port")
+                    and b.get("port") == edge.get("target_port")
+                    for b in target.input_bindings
+                ):
+                    raise ValueError("Data connection requires a matching input binding")
+            if policy.mode == "integrity":
+                source_plugin = (
+                    session.get(ModelPlugin, source.model_plugin_id) if source and source.model_plugin_id else None
+                )
+                from ..registry.ports import parse_output_ports
+
+                out = next(
+                    (
+                        p
+                        for p in parse_output_ports(getattr(source_plugin, "output_ports", []))
+                        if p.name == edge.get("source_port")
+                    ),
+                    None,
+                )
+                if not out or (
+                    out.kind not in {"params", "msa", "ligand"}
+                    and (source is None or source.node_type not in {"target_intake", "interface_constraints"})
+                ):
+                    raise ValueError(
+                        "Candidate outputs require candidate screening; integrity gates are for reference inputs"
+                    )
+            from .gate_service import script_preview_valid
+
+            if not script_preview_valid(session, workflow, edge, inherited):
+                raise ValueError("Preview this script and policy on an upstream result set before enabling it")
+            inherited_rules = GatePolicy.model_validate(inherited) if inherited else None
+            inherited_configured = (
+                inherited_rules
+                and inherited_rules.configured
+                and (
+                    inherited_rules.rules.conditions
+                    or inherited_rules.rules.top_n
+                    or inherited_rules.structure
+                    or inherited_rules.script
+                )
+            )
+            if policy.mode == "automatic" and not (
+                policy.rules.conditions
+                or policy.rules.top_n
+                or policy.structure
+                or policy.script
+                or inherited_configured
+            ):
+                raise ValueError("Automatic candidate gates require an output standard or a screening rule")
+        except (ValueError, ValidationError) as exc:
+            blockers.append(
+                {
+                    "code": "connection_gate_unconfigured",
+                    "node_key": edge.get("target"),
+                    "edge_id": edge.get("id"),
+                    "message": str(exc),
+                }
+            )
 
     # Route authors use this flag for a stronger, project-specific readiness gate:
     # inputs may be described in the method yet not be present as immutable artifacts.
@@ -192,6 +314,8 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
     blockers.extend(upstream_blockers)
     blockers.extend(_edge_blockers(workflow, nodes_by_key, plugins, skip=checked_edges))
     warnings.extend(plugin_warnings[key] for key in sorted(plugin_warnings))
+    warnings.extend(unroutable_output_warnings(workflow, plugins))
+    warnings.extend(queue_capability_warnings(session, nodes, plugins))
 
     return (
         blockers,
@@ -207,6 +331,107 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
             "dispatch_node_count": len(nodes) - len(manual_nodes),
         },
     )
+
+
+
+def unroutable_output_warnings(workflow: WorkflowRun, plugins: dict[str, Any]) -> list[dict]:
+    """Connections whose source port can never be attached to a collected file.
+
+    Collection tags an output with a port in one of two ways: the file sits under
+    ``outputs/<port>/``, or its name matches the port's ``filename_glob``. A glob of
+    ``*`` is deliberately not matched - it would claim every file for whichever port
+    happened to be declared first - so a port left at the default can only ever be
+    filled by the directory route.
+
+    When neither applies the artifact is stored untyped, the gate finds no records on
+    that port and settles as ``error``, and the downstream node waits forever. That is
+    the state a real run reached on 2026-09-11: ProteinMPNN succeeded on the cluster,
+    three outputs were collected and verified, and the gate could not see any of them.
+    """
+    findings: dict[str, dict] = {}
+    for edge in workflow.graph.get("edges", []):
+        if (edge.get("gate") or {}).get("mode") == "dependency":
+            continue
+        source_key, port_name = edge.get("source"), edge.get("source_port")
+        plugin = plugins.get(str(source_key))
+        if not port_name or plugin is None:
+            continue
+        port = next(
+            (item for item in parse_output_ports(plugin.output_ports) if item.name == port_name), None
+        )
+        if port is None or port.filename_glob not in {"", "*"}:
+            continue
+        findings[f"{plugin.plugin_key}:{port_name}"] = {
+            "code": "output_port_unroutable",
+            "message": (
+                f"Plugin '{plugin.plugin_key}' declares output port '{port_name}' with no filename "
+                f"pattern, so a collected file can only be attached to it by being written to "
+                f"outputs/{port_name}/. If the model writes elsewhere the gate on this connection "
+                f"will find no results and stop with an error."
+            ),
+            "plugin_key": plugin.plugin_key,
+            "plugin_id": str(plugin.id),
+            "port": str(port_name),
+        }
+    return [findings[key] for key in sorted(findings)]
+
+
+def queue_capability_warnings(session: Session, nodes: list, plugins: dict[str, Any]) -> list[dict]:
+    """A node whose queue contradicts what its plugin says it needs.
+
+    The platform cannot tell a GPU queue from a CPU one by its name - ``63``, ``v3-64``
+    and ``4v100-16-e5`` are all just strings. It can tell when the deployment has said
+    so: a ``compute_nodes`` row names a queue and labels its ``gpu_count``. Nothing is
+    reported for a queue nobody registered, so this is silent until it can be right.
+
+    Both directions matter and both have been paid for here. A GPU plugin on a queue with
+    no GPUs pends or dies. A CPU-only stage on a GPU queue holds an exclusive card it
+    never uses, which this project treats as a violation rather than a notice - and the
+    queue can merge that request in on its own, so an absent ``-gpu`` line is no defence.
+    """
+    from ..registry.models import ComputeNode
+
+    registered = session.scalars(select(ComputeNode).where(ComputeNode.enabled.is_(True))).all()
+    by_queue = {node.queue: node for node in registered if node.queue}
+    if not by_queue:
+        return []
+    findings: list[dict] = []
+    for node in nodes:
+        if getattr(node, "execution_mode", "dispatch") == "manual" or not node.queue:
+            continue
+        plugin = plugins.get(node.node_key)
+        target = by_queue.get(node.queue)
+        if plugin is None or target is None:
+            continue
+        labels = target.labels if isinstance(target.labels, dict) else {}
+        available = labels.get("gpu_count")
+        if not isinstance(available, int):
+            continue
+        resources = plugin.resources if isinstance(plugin.resources, dict) else {}
+        wanted = int(resources.get("gpu_count") or 1) if resources.get("gpu") else 0
+        if wanted and not available:
+            message = (
+                f"Plugin '{plugin.plugin_key}' declares {wanted} GPU(s) but queue '{node.queue}' is "
+                f"registered with none; the job will ask for hardware the queue cannot give it."
+            )
+        elif available and not wanted:
+            message = (
+                f"Plugin '{plugin.plugin_key}' declares no GPU but queue '{node.queue}' is registered "
+                f"with {available}; the queue can attach one anyway and the job would hold it unused."
+            )
+        else:
+            continue
+        findings.append(
+            {
+                "code": "node_queue_capability_mismatch",
+                "message": message,
+                "node_key": node.node_key,
+                "node_id": str(node.id),
+                "queue": node.queue,
+                "plugin_key": plugin.plugin_key,
+            }
+        )
+    return findings
 
 
 def _upstream_binding_blockers(

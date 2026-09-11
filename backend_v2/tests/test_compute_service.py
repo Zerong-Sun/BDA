@@ -43,7 +43,7 @@ def compute_session() -> Generator[tuple[Session, User, Project, WorkflowRun]]:
             project_id=project.id,
             name="workflow",
             status="draft",
-            graph={"nodes": [{"key": "a"}, {"key": "b"}], "edges": [{"source": "a", "target": "b"}]},
+            graph={"nodes": [{"key": "a"}, {"key": "b"}], "edges": [{"id": "ab", "source": "a", "target": "b", "gate": {"mode": "dependency", "configured": True}}]},
             created_by=user.id,
         )
         session.add(workflow)

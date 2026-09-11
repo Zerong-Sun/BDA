@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     lsf_ssh_user: str | None = None
     lsf_remote_root: str = ""
     lsf_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    # How long one remote command may take, end to end. Separate from the connect
+    # timeout above: on a cluster whose login shell sources conda and module files
+    # from a networked home, `ssh host true` costs the same ~80s as `ssh host bjobs`,
+    # because the cost is the session, not the command. That was hardcoded at 60s,
+    # so every LSF operation on such a site timed out with nothing to configure.
+    lsf_command_timeout_seconds: int = Field(default=60, ge=10, le=1800)
     lsf_queue: str = "normal"
     lsf_upload_wrapper: str = "/usr/local/bin/bda-minio-upload"
     # ssh: the API stages inputs and retrieves outputs over SFTP, and the job only ever
@@ -80,9 +86,10 @@ class Settings(BaseSettings):
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0055_autopilot_worker_rls"
+    schema_revision: str = "0057_plugin_output_routing"
     worker_queues: str = ""
     required_worker_queues: str = ""
+    scheduler_dispatch_paused: bool = False
     writes_enabled: bool = True
     oidc_providers_json: str = "{}"
     otel_endpoint: str | None = None

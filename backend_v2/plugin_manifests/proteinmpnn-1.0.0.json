@@ -21,12 +21,12 @@
     {"name": "fixed_positions", "kind": "params", "accepts": ["fixed_positions"], "required": false, "multiple": false}
   ],
   "outputs": [
-    {"name": "sequence_set", "kind": "protein_sequence", "artifact_type": "sequence_set", "filename_glob": "**/*.fa*"},
-    {"name": "score_table", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "**/*.csv"}
+    {"name": "sequence_set", "kind": "protein_sequence", "artifact_type": "sequence_set", "filename_glob": "*.fa*"},
+    {"name": "score_table", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "*.csv"}
   ],
   "resources": {"cpus": 1, "gpu": true, "gpu_count": 1, "walltime_minutes": 720},
   "runtime": {"mode": "conda", "reference": "site://proteinmpnn/1.0.0", "image_digest": null, "setup": []},
   "output_parser": null,
   "input_adapter": null,
-  "checksum_sha256": "8802f699f33141028d118909af9c92cf9278614145499e33a95e745b9b8ac42c"
+  "checksum_sha256": "7d3ce1d58d8b6856649d2c0d05c0c07c15711e0d8d46f22760d65d049ad1b040"
 }

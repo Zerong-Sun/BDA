@@ -5,7 +5,14 @@ import type {
   WorkflowNodeStatus as ApiWorkflowNodeStatus,
 } from '../../lib/schemas/workflow'
 import { themeColor } from '../../lib/theme/themeColor'
-import type { BdaWorkflowEdge, BdaWorkflowNode, WorkflowNodeData, WorkflowNodeStatus } from './workflowTypes'
+import {
+  ORDER_SOURCE_HANDLE,
+  ORDER_TARGET_HANDLE,
+  type BdaWorkflowEdge,
+  type BdaWorkflowNode,
+  type WorkflowNodeData,
+  type WorkflowNodeStatus,
+} from './workflowTypes'
 
 const NODE_META: Record<
   string,
@@ -63,6 +70,7 @@ const CANVAS_STATUS: Record<ApiWorkflowNodeStatus, WorkflowNodeStatus> = {
   running: 'running',
   collecting: 'running',
   cancel_requested: 'running',
+  skipped: 'skipped',
   succeeded: 'completed',
   failed: 'failed',
   cancelled: 'skipped',
@@ -168,11 +176,17 @@ export function mapApiGraphToGraph(apiNodes: WorkflowNode[], apiEdges: WorkflowE
   return {
     nodes: mapApiNodesToGraph(apiNodes),
     edges: apiEdges.map((edge, index) => ({
-      id: `edge-${index}-${edge.source}-${edge.target}`,
+      id: edge.id ?? `edge-${index}-${edge.source}-${edge.target}`,
+      data: { gate: edge.gate },
       source: apiNodes.find((node) => node.node_key === edge.source)?.id ?? edge.source,
       target: apiNodes.find((node) => node.node_key === edge.target)?.id ?? edge.target,
-      sourceHandle: 'output',
-      targetHandle: 'input',
+      // A connection with no ports is an ordering relationship - a `dependency` gate, or
+      // an edge saved before ports existed. It has to anchor on the ordering handles:
+      // React Flow drops an edge whose handle id names nothing the card rendered, and
+      // once cards started rendering named ports, four of the six arrows on a real route
+      // vanished along with the gate badge that was the only way to configure them.
+      sourceHandle: edge.source_port ?? ORDER_SOURCE_HANDLE,
+      targetHandle: edge.target_port ?? ORDER_TARGET_HANDLE,
       type: 'workflowEdge',
       markerEnd: { type: MarkerType.ArrowClosed, color: themeColor('--accent', '#D08A2A') },
       animated: false,
