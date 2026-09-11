@@ -344,8 +344,8 @@ def test_read_tool_runs_and_is_counted(session: Session) -> None:
     project, user = _project(session)
     grant, _ = _grant(session, project, user)
 
-    result = mcp.call_tool(session, grant, "list_proteins", {})
-    assert result is not None
+    call = mcp.call_tool(session, grant, "list_proteins", {})
+    assert call.result is not None
     assert grant.call_count == 1
     assert grant.last_used_at is not None
 
@@ -365,7 +365,7 @@ def test_the_cutover_write_fence_is_rebuilt_per_tool(
     assert excinfo.value.status_code == 503
 
     # Reads are untouched: a cutover stops writes, it does not blind the surface.
-    assert mcp.call_tool(session, grant, "list_proteins", {}) is not None
+    assert mcp.call_tool(session, grant, "list_proteins", {}).result is not None
 
 
 def test_describe_reports_what_the_grant_can_do_now(session: Session) -> None:

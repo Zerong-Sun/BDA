@@ -33,6 +33,7 @@ them would put a second executor on one run. `tool_context` also leaves
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -42,6 +43,7 @@ from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..core.database import set_request_rls_context
 from ..core.problem import DomainError
+from . import citations as citation_policy
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .capabilities import (
     normalize_capabilities,
@@ -240,10 +242,25 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
     )
 
 
+@dataclass(frozen=True)
+class ToolCall:
+    """A tool result and the evidence it rests on, kept together.
+
+    They are one object because separating them is how the evidence gets lost.
+    A chat turn stores both on the message row; MCP has no message row, so the
+    pair has to survive as far as the protocol can carry it - see
+    `mcp_app._call`, which turns `citations` into resource links the client can
+    hold on to and come back with.
+    """
+
+    result: Any
+    citations: list[dict[str, Any]] = field(default_factory=list)
+
+
 def call_tool(
     session: Session, grant: CopilotMcpSession, tool_id: str, arguments: dict[str, Any] | None
-) -> Any:
-    """Run one tool for one grant.
+) -> ToolCall:
+    """Run one tool for one grant, and say what the answer rests on.
 
     The availability check is done against `available_tools` rather than against
     the capability alone, so the call goes through the same narrowing the listing
@@ -259,13 +276,77 @@ def call_tool(
     spec = REGISTRY.get(tool_id)
     assert spec is not None  # available_tools only returns registered specs
     _authorize_write(session, grant, spec)
-    result = REGISTRY.execute(
-        tool_id, tool_context(session, grant), dict(arguments or {}), granted=None
-    )
+    context = tool_context(session, grant)
+    result = REGISTRY.execute(tool_id, context, dict(arguments or {}), granted=None)
     grant.last_used_at = datetime.now(UTC)
     grant.call_count = (grant.call_count or 0) + 1
     _audit(session, grant, spec)
-    return result
+    # Same interpreter chat uses, same policy object, same output. A second way
+    # to cite the same result is a second answer to one question.
+    cited = citation_policy.dedupe(
+        citation_policy.citations_for(spec, result, context.research, context.project)
+    )
+    return ToolCall(result=result, citations=cited)
+
+
+def read_resource(session: Session, grant: CopilotMcpSession, uri: str) -> dict[str, Any]:
+    """Dereference a `bda://` citation URI handed out by an earlier call.
+
+    This is what makes a citation an address rather than a label. A client that
+    kept the URI - in its own notes, in a report, in a decision record - can come
+    back and read the evidence, under this grant's fence and no wider.
+
+    The research workspace, datasets and references resolve exactly, because
+    their context service supports lookup by id and they are where evidence
+    citations come from. A `project_database` citation resolves to its own
+    citation record: the authoritative row lives behind `/api/v2`, and returning
+    a near-miss found by scanning a capped list would be worse than saying so.
+    """
+    try:
+        source, kind, identifier = citation_policy.parse_uri(uri)
+    except ValueError as exc:
+        raise DomainError("mcp_resource_uri_invalid", f"{uri!r} is not a BDA citation URI", status_code=422) from exc
+
+    _actors(session, grant)
+    capabilities = granted_capabilities(session, grant)
+    if source in {"research", "literature"} and "research-read" not in capabilities:
+        raise DomainError(
+            "mcp_resource_not_available",
+            "This MCP session cannot read the research workspace",
+            status_code=403,
+        )
+    if source == "project" and "project-read" not in capabilities:
+        raise DomainError(
+            "mcp_resource_not_available",
+            "This MCP session cannot read project data",
+            status_code=403,
+        )
+
+    context = tool_context(session, grant)
+    payload = _resolve(context, source, kind, identifier)
+    if payload is None:
+        raise DomainError("mcp_resource_not_found", f"Nothing is addressed by {uri}", status_code=404)
+    return {"uri": uri, "mimeType": "application/json", "payload": payload}
+
+
+def _resolve(context: ToolContext, source: str, kind: str, identifier: str) -> Any:
+    research = context.research
+    if source == "literature" or (source == "research" and kind == "reference"):
+        return research.get_reference(identifier)
+    if kind == "dataset":
+        return research.get_dataset_slice(identifier)
+    if source == "research":
+        items = research.get_research_items(kind, ids=[identifier])
+        return items[0] if items else None
+    # A project citation is addressed, not embedded: say where the row is rather
+    # than scan a capped list and risk answering with the wrong one.
+    return {
+        "source_type": "project_database",
+        "workspace_type": kind,
+        "entity_id": identifier,
+        "authoritative_path": f"/api/v2/{kind}s/{identifier}",
+        "note": "Read the row through the platform API; this surface addresses it, it does not copy it.",
+    }
 
 
 def _audit(session: Session, grant: CopilotMcpSession, spec: ToolSpec) -> None:

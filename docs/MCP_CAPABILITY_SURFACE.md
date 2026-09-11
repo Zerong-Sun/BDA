@@ -2,11 +2,11 @@
 
 状态：活跃 / §6 四步全部已实现
 
-最后核验：2026-09-11（Asia/Shanghai；本轮实现四步并实跑全部门禁）
+最后核验：2026-09-12（Asia/Shanghai；本轮补齐 citation 过协议边界并实跑全部门禁）
 
 权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
-数据来源：`backend_v2/app/copilot/{registry,tools,capabilities,actions,agent_loop,tasks,mcp,mcp_app}.py`、`backend_v2/app/main.py`、`backend_v2/app/module_registry.py`、`backend_v2/app/identity/deps.py`、`backend_v2/app/autopilot/models.py`、`backend_v2/openapi.json`、`backend_v2/tests/test_copilot_mcp{,_transport}.py`。
+数据来源：`backend_v2/app/copilot/{registry,tools,capabilities,actions,agent_loop,tasks,citations,mcp,mcp_app}.py`、`backend_v2/app/main.py`、`backend_v2/app/module_registry.py`、`backend_v2/app/identity/deps.py`、`backend_v2/app/autopilot/models.py`、`backend_v2/openapi.json`、`backend_v2/tests/test_copilot_{mcp,mcp_transport,citations}.py`。
 
 替代关系：不取代任何现有文档。本文是 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 的传输层补充，其冻结的禁止事项在 MCP 上原样生效。
 
@@ -32,7 +32,8 @@
 
 1. 把 `ToolSpec.schema()` 翻译成 MCP 的 `tools/list` 响应；
 2. 把 MCP 的 `tools/call` 翻译成 `REGISTRY.execute(tool_id, context, arguments, granted=…)`；
-3. 构造那个 `ToolContext`——这是全部实质工作所在，见 §3。
+3. 构造那个 `ToolContext`——这是全部实质工作所在，见 §3；
+4. 把 `ToolSpec.citation` 判出的引用**随结果一起送过边界**，并让它可被解引用，见 §4.1。
 
 ## 3. 四个必须解决的问题
 
@@ -99,6 +100,41 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 
 `granted_capabilities` 取交集而非并集：`copilot_configs.enabled_skills` 是项目对 copilot 的授权上限，MCP 会话不得超过它。一个项目关掉了 `wetlab-authoring`，MCP 就拿不到它——不需要第二处开关。
 
+### 4.1 引用如何过协议边界
+
+**问题。** chat 把引用存在 `copilot_messages.citations` 上——一条论断旁边就是它依据的可寻址对象。
+MCP 没有 message 行，`tools/call` 的结果又只是内容块，所以第一版里 `ToolSpec.citation`
+判出来的东西到了边界就没了：外部模型拿到数据，却拿不到"这条数据是什么、能不能被复核"。
+这与决策树准入规则第二条（依据必须是仓库内可寻址的对象）直接冲突。
+
+**做法，三件事，都不新建第二套逻辑。**
+
+1. **一个解释器。** `_cite` / `_dedupe_citations` 从 `research_agent.py` 移到
+   `copilot/citations.py`，chat 与 MCP 都调它。两套引用逻辑会让同一个结果在两个界面上
+   被引成不同的样子，而且不会有任何测试失败——`test_copilot_citations.py` 的
+   `test_chat_and_mcp_cite_a_result_identically` 钉的就是这一条。
+2. **引用以两种形态同时上路**，因为读它的是两种读者：
+   - `resource_link` 内容块——模型**内联看得见、能原样引用**的那一份，
+     `uri` 为 `bda://<source>/<kind>/<id>`，`description` 带上 evidence_grade 与
+     review_status（只写 "finding" 会让一份待审草稿和一个已复核结果看起来一样）；
+   - `structuredContent.citations`——**完整记录**：checksum、reference_ids、retrieval_trace_id。
+     这些是审计需要而一条链接装不下的东西。
+   `source` 段是身份的一部分而不是解析时猜的：research 的 `finding` 和 project 的 `finding`
+   是不同的行，共用一个 URI 会把它们撞在一起。
+3. **`resources/read` 让链接真的能解引用。** 这是"引用是地址而不是标签"的那一步：
+   一个把 URI 记进自己笔记、报告或决策记录的客户端，可以回来把证据读出来，
+   且**仍在本 grant 的围栏内**——read 时重新校验能力，URI 不是凭证。
+   research workspace / dataset / reference 精确解析（它们的 context service 支持按 id 查，
+   证据引用也几乎都来自这里）；`project_database` 的引用返回它自己的引用记录与权威 API 路径，
+   因为权威行在 `/api/v2` 后面，而**扫一个有上限的列表去猜一个近似命中比直说更糟**。
+
+因此 `initialize` 现在声明 `resources` 能力——服务了 `resources/read` 就得声明，
+否则那些链接是"装成地址的标签"。`resources/list` 返回空列表而不是 method-not-found：
+这里的 resource 是工具结果发出来的那些，把项目实体全枚举出去等于开第二个没有能力把关的读面。
+
+`initialize.instructions` 里加了引用义务，措辞与 `tasks.py` 的 chat system prompt 对齐。
+这是本界面**对另一端行为唯一的杠杆**：引了 `bda://` 的答案事后能拿回 BDA 核对，没引的不能。
+
 ## 5. 明确不做
 
 - **不暴露 251 个 REST operation。** §1。
@@ -142,20 +178,27 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 - **协议子集**：`initialize` / `ping` / `tools/list` / `tools/call`，外加对通知（无 `id`）回 202。
   prompts、resources、sampling **未实现且不声明**。没有引入 MCP SDK 依赖：这个子集是几百行 JSON-RPC，
   而代价会是在一个安全面的请求路径上增加一个运行时依赖，代码仍然要读。
+- **引用**：`mcp.call_tool` 返回 `ToolCall(result, citations)`——两者是一个对象，
+  因为把它们分开正是证据丢失的方式。`mcp_app._call` 把 `citations` 转成 `resource_link`
+  与 `structuredContent`，`resources/read` 负责把 URI 解回证据。见 §4.1。
 - **审计**：写工具在 `actions._once` 的行之外，另记一条 `copilot.mcp.<tool>`，
   `entity_type="copilot_mcp_session"`。前者记的是**授权依据**（run），后者记的是**谁握着 token**——
   事故是从后一个问题开始查的。读不记：注册表已有的规则是「一条读一行会把真正重要的写埋掉」。
 - **UI**：copilot 抽屉的第三个面。token 只显示一次并明说不可找回；每行的工具数与写工具数
   是**服务器此刻的判断**而非签发时的存量，因此绑定 run 结束后该行直接显示「只读」。
 
-### 6.2 防止它自己腐化的那一个测试
+### 6.2 防止它自己腐化的那两个测试
 
 `test_copilot_mcp.py::test_listing_never_leaves_the_registry` 断言列出的每个工具都能在
 `REGISTRY` 里查到，且 `inputSchema` **就是** `ToolSpec.parameters` 这个对象本身。
 它防的是有人为 MCP 手写一份工具定义——那会工作，并且会成为工具被声明的第四处。
 与 `check_decision_coverage.py` 在决策树里的角色相同。
 
-`test_unbound_session_lists_no_write_tool` 是第二条：钉住整个模块存在的理由。
+`test_copilot_citations.py::test_chat_and_mcp_cite_a_result_identically` 是同一形状的第二条：
+chat 与 MCP 必须用同一个解释器引用同一个结果。两套引用逻辑不会让任何测试变红，只会让
+两个界面对同一份证据给出不同的说法。
+
+`test_unbound_session_lists_no_write_tool` 则钉住整个模块存在的理由。
 
 ## 7. 门禁清单与本轮实跑结果
 
@@ -163,7 +206,7 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 | --- | --- |
 | `ruff check backend_v2` | 通过 |
 | `mypy`（CI 方式，无 `--config-file`） | 通过，247 个文件 |
-| `pytest backend_v2/tests` | 通过（835 用例，新增 37） |
+| `pytest backend_v2/tests` | 通过（860 用例，新增 62） |
 | `export_openapi.py` 后 `git diff` | 无漂移（已重新导出，189 条路径） |
 | `npm run generate:api` 后 `git diff` | 无漂移（已重新生成） |
 | `check_flow_matrix.py` | 通过，78 张表 / 189 条路径 |
@@ -178,18 +221,21 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 | `check_coverage.py` | **未达 85%**，见下 |
 
 **覆盖率说明。** 本机实测（含 `BDA_V2_RUN_DB_TESTS=1`，在一次性数据库上跑）：
-HEAD 基线 **81.78%**，本次改动后 **81.86%**。新增两个模块自身为
-`mcp.py` 89.9% / `mcp_app.py` 94.7%，高于总体，因此**是把总数抬上去的**。
+HEAD 基线 **81.78%**，本次改动后 **81.92%**。新增三个模块自身为
+`mcp.py` 86.4% / `mcp_app.py` 95.6% / `citations.py` 98%，高于总体，因此**是把总数抬上去的**。
 85% 的差额在本机是既有状态，不是本次引入；在能复现 CI 环境的机器上需要单独核对。
 
 ## 8. 已知边界
 
-- **`citation` 在协议边界上会丢。** 28 个工具的 `ToolSpec.citation` 规定了结果如何变成引用，
-  而 MCP 协议本身没有引用概念，`tools/call` 的结果是文本内容块。因此**经 MCP 产生的结论，
-  其可审计性弱于经 BDA 自己的 chat 产生的结论**——这与决策树准入规则第二条（依据必须是
-  仓库内可寻址的对象）直接相关，不是实现细节。当前的处置是：MCP 的写工具全部落在
-  pending-review 形态上，且每次写都留下 `copilot.mcp.<tool>` 审计行；把引用带过协议边界
-  需要另一个决定。
+- **引用已经过边界，但结论仍然在另一端形成。** §4.1 解决的是证据侧：引用随结果上路、
+  完整、可解引用。剩下的不对称是结构性的，**不是这一侧能修的**——外部模型的行文活在它自己那边，
+  BDA 不持有那段文字，因此也无法像 chat 那样把一条论断和它的引用存在同一行上。
+  能做的三件事都已经做了：引用可寻址、写工具一律 pending-review、每次写留 `copilot.mcp.<tool>`
+  审计行。再往前一步需要客户端在写入时把它实际读过的 `bda://` 交回来，那是一个协议之外的约定，
+  不是这一侧可以强制的。
+- **`resources/read` 对 `project_database` 引用不复制行。** 它返回引用记录与权威 API 路径。
+  这是有意的：project context service 没有按 id 查的入口，扫一个有上限的列表可能答错行，
+  而一个可能答错的解引用比一个明说"去 API 读"的更危险。
 - **对端客户端的提示词注入不在防护范围内。** 能约束的只有能力交集、run 绑定、意图门、
   写闸与每次调用的角色复核；一个被注入的对端模型仍然可以在其授权范围内做出错误但合法的调用。
   这与给一个人类账号授权的风险同型，不同的是频率。

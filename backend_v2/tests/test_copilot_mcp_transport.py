@@ -15,6 +15,7 @@ from contextlib import contextmanager
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
+from backend_v2.app.candidates.models import Candidate
 from backend_v2.app.copilot import agent_runs, mcp_app
 from backend_v2.app.copilot.registry import REGISTRY
 from backend_v2.app.copilot.schemas import McpSessionCreate
@@ -124,10 +125,13 @@ def test_initialize_reports_only_what_is_implemented(client: TestClient, session
     result = _call(client, token, "initialize", {"protocolVersion": mcp_app.PROTOCOL_VERSION}).json()["result"]
 
     assert result["protocolVersion"] == mcp_app.PROTOCOL_VERSION
-    # Prompts, resources and sampling are not implemented and are not claimed.
-    assert set(result["capabilities"]) == {"tools"}
+    # Resources are claimed because `resources/read` is served - a citation link
+    # has to dereference. Prompts and sampling are not implemented, not claimed.
+    assert set(result["capabilities"]) == {"tools", "resources"}
     assert result["serverInfo"]["name"] == "bda-copilot"
     assert "read-only" in result["instructions"]
+    # The citation duty is the only lever this surface has over the other end.
+    assert "bda://" in result["instructions"]
 
 
 def test_initialize_falls_back_on_an_unknown_protocol_version(client: TestClient, session: Session) -> None:
@@ -152,8 +156,19 @@ def test_ping_answers_empty(client: TestClient, session: Session) -> None:
 
 def test_unknown_method_is_method_not_found(client: TestClient, session: Session) -> None:
     token = _token(session)
-    error = _call(client, token, "resources/list").json()["error"]
+    error = _call(client, token, "prompts/list").json()["error"]
     assert error["code"] == mcp_app.METHOD_NOT_FOUND
+
+
+def test_resources_list_is_empty_rather_than_an_error(client: TestClient, session: Session) -> None:
+    """The resources here are what a tool result hands out, not a catalogue.
+
+    Enumerating the project's entities would be a second read surface with no
+    capability behind it, so the list is empty - but the method exists, because
+    the server declares the resources capability.
+    """
+    token = _token(session)
+    assert _call(client, token, "resources/list").json()["result"] == {"resources": []}
 
 
 def test_unparseable_body_is_a_parse_error(client: TestClient, session: Session) -> None:
@@ -217,3 +232,97 @@ def test_a_refused_tool_keeps_the_platform_error_code(client: TestClient, sessio
     ).json()["error"]
     assert error["data"]["error_code"] == "mcp_tool_not_available"
     assert error["data"]["status"] == 403
+
+
+# --- Citations across the boundary -------------------------------------------
+
+
+def _cited_project(session: Session) -> tuple[str, str]:
+    """A project with one candidate in it, and a grant that can read it."""
+    n = next(_counter)
+    user = User(username=f"cite-{n}", display_name="C", role="researcher", enabled=True)
+    organization = Organization(name=f"Cite Org {n}")
+    session.add_all([user, organization])
+    session.flush()
+    session.add(OrganizationMember(organization_id=organization.id, user_id=user.id, role="admin"))
+    project = Project(
+        organization_id=organization.id, owner_id=user.id, name=f"cite-{n}", project_type="protein_design"
+    )
+    session.add(project)
+    session.flush()
+    candidate = Candidate(
+        project_id=project.id,
+        candidate_key=f"cand-{n}",
+        name="Binder 7",
+        candidate_kind="design_candidate",
+        status="proposed",
+    )
+    session.add(candidate)
+    session.flush()
+    _, raw = issue_mcp_session(
+        session,
+        project,
+        user,
+        McpSessionCreate(project_id=project.id, label="cite", capabilities=["project-read"]),
+    )
+    session.flush()
+    return raw, str(candidate.id)
+
+
+def test_a_result_carries_its_evidence_as_resource_links(client: TestClient, session: Session) -> None:
+    """The chat path stores citations on the message row. This is the equivalent."""
+    token, candidate_id = _cited_project(session)
+    result = _call(
+        client, token, "tools/call", {"name": "list_project_candidates", "arguments": {}}
+    ).json()["result"]
+
+    links = [block for block in result["content"] if block["type"] == "resource_link"]
+    assert [link["uri"] for link in links] == [f"bda://project/candidate/{candidate_id}"]
+    assert links[0]["name"] == "Binder 7"
+
+
+def test_the_full_citation_record_travels_in_structured_content(
+    client: TestClient, session: Session
+) -> None:
+    """A link cannot hold a checksum or a reference id; structuredContent can."""
+    token, candidate_id = _cited_project(session)
+    result = _call(
+        client, token, "tools/call", {"name": "list_project_candidates", "arguments": {}}
+    ).json()["result"]
+
+    citations = result["structuredContent"]["citations"]
+    assert [citation["entity_id"] for citation in citations] == [candidate_id]
+    assert citations[0]["source_type"] == "project_database"
+
+
+def test_a_handed_out_uri_can_be_read_back(client: TestClient, session: Session) -> None:
+    """This is what makes the citation an address rather than a label."""
+    token, candidate_id = _cited_project(session)
+    called = _call(
+        client, token, "tools/call", {"name": "list_project_candidates", "arguments": {}}
+    ).json()["result"]
+    uri = next(b["uri"] for b in called["content"] if b["type"] == "resource_link")
+
+    contents = _call(client, token, "resources/read", {"uri": uri}).json()["result"]["contents"]
+    assert contents[0]["uri"] == uri
+    assert candidate_id in contents[0]["text"]
+
+
+def test_reading_a_uri_the_grant_cannot_reach_is_refused(client: TestClient, session: Session) -> None:
+    """A URI is not a capability. The fence is re-applied on read."""
+    token, _ = _cited_project(session)  # project-read only
+    error = _call(
+        client, token, "resources/read", {"uri": "bda://research/finding/abc"}
+    ).json()["error"]
+    assert error["data"]["error_code"] == "mcp_resource_not_available"
+
+
+def test_a_uri_this_server_did_not_mint_is_refused(client: TestClient, session: Session) -> None:
+    token = _token(session)
+    error = _call(client, token, "resources/read", {"uri": "file:///etc/passwd"}).json()["error"]
+    assert error["data"]["error_code"] == "mcp_resource_uri_invalid"
+
+
+def test_read_without_a_uri_is_invalid_params(client: TestClient, session: Session) -> None:
+    token = _token(session)
+    assert _call(client, token, "resources/read", {}).json()["error"]["code"] == mcp_app.INVALID_PARAMS
