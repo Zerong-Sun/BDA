@@ -1113,6 +1113,7 @@ export const bundleZh = {
         finding_ids: '研究发现',
         experiment_result_ids: '实验结果',
         protein_ids: '构建体',
+        autopilot_campaign_ids: 'Autopilot 计划',
         external_refs: '外部引用',
       },
       lane: {

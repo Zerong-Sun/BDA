@@ -23,6 +23,11 @@ PROVENANCE_KEYS = frozenset(
         # entries pointing at them.
         "experiment_result_ids",
         "protein_ids",
+        # A confirmed Autopilot campaign is where a frozen protocol lives. Before this
+        # key, a decision that rested on one had to describe it in prose or file it under
+        # `external_refs` - which is for things the platform does *not* own, and is
+        # exactly how 49 LSF job numbers ended up as strings nothing could resolve.
+        "autopilot_campaign_ids",
         "external_refs",
     }
 )

@@ -48,6 +48,9 @@ describe('emptyDraft', () => {
   it('offers every allowed provenance key and no others', () => {
     expect(Object.keys(emptyDraft().provenance).sort()).toEqual([
       'artifact_ids',
+      // A frozen Autopilot protocol is a row the platform owns, so it gets its own key
+      // rather than being filed under external_refs.
+      'autopilot_campaign_ids',
       'candidate_ids',
       'experiment_result_ids',
       'external_refs',

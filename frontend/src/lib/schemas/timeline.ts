@@ -47,6 +47,7 @@ export const PROVENANCE_KEYS = [
   'finding_ids',
   'experiment_result_ids',
   'protein_ids',
+  'autopilot_campaign_ids',
   'external_refs',
 ] as const
 

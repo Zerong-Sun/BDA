@@ -1142,6 +1142,7 @@ export const bundleEn = {
         finding_ids: 'Findings',
         experiment_result_ids: 'Experiment results',
         protein_ids: 'Constructs',
+        autopilot_campaign_ids: 'Autopilot campaigns',
         external_refs: 'External references',
       },
       lane: {

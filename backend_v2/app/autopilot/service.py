@@ -16,6 +16,7 @@ from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
+from ..projects.models import Project
 from ..research.models import ResearchGeneration
 from .models import (
     AutopilotCampaign,
@@ -134,7 +135,87 @@ def confirm_draft(
         project_id=campaign.project_id,
         actor_id=user.id,
     )
+    _record_confirmation_decision(session, campaign, stage_keys, user)
     return campaign
+
+
+def _record_confirmation_decision(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage_keys: list,
+    user: User,
+) -> None:
+    """Put the confirmation on the project's decision record, not only in the ledger.
+
+    Confirming a campaign closes options: these stages and not others, this budget
+    ceiling, this autonomy level. That is the platform's own test for what belongs on the
+    decision tree - it shuts a door, it has a reviewable basis, and reopening it needs a
+    new campaign rather than an edit, because the spec is frozen.
+
+    Until now the only trace was the ledger, which answers "what did Autopilot do" for
+    operations. It does not answer "why did the project go this way", so a confirmed
+    campaign was invisible in the view that question is asked in, and the tree could not
+    show that a branch was taken by an agent's proposal at all.
+
+    `decided_by="agent_proposed_human_confirmed"` is the accurate reading: the spec was
+    normalised from a prompt by a model, and `POST .../confirm` is a person accepting it
+    under `If-Match`. `outcome="unspecified"` because confirming is not a finding - the
+    campaign has not run. `lane="unspecified"` rather than `dry`: the spec may schedule
+    bench stages, and asserting a half the spec does not state would be a guess.
+
+    Written through the timeline domain's own service, per the cross-domain rule, and
+    failure is not swallowed: a confirmation that silently skipped the record would
+    reproduce the D080-D099 gap with a machine doing the forgetting.
+    """
+    from ..timeline.schemas import Alternative, TimelineEntryCreate
+    from ..timeline.service import create_entry as create_timeline_entry
+
+    project = session.get(Project, campaign.project_id)
+    if project is None:  # pragma: no cover - the campaign's FK guarantees it
+        return
+    stages = ", ".join(str(key) for key in stage_keys)
+    budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id))
+    limits = []
+    if budget is not None and budget.gpu_seconds_limit is not None:
+        limits.append(f"GPU {budget.gpu_seconds_limit}s")
+    if budget is not None and budget.money_micros_limit is not None:
+        limits.append(f"{budget.money_micros_limit} micros")
+    create_timeline_entry(
+        session,
+        project,
+        TimelineEntryCreate(
+            occurred_at=datetime.now(UTC),
+            entry_type="decision",
+            outcome="unspecified",
+            lane="unspecified",
+            title=f"Autopilot campaign confirmed: {campaign.name}",
+            summary=(
+                f"{campaign.autonomy} autonomy over stages {stages}."
+                + (f" Hard budget: {'; '.join(limits)}." if limits else " No compute budget set.")
+            ),
+            body=(
+                "The protocol below was normalised from a prompt and frozen at "
+                "confirmation; it cannot be edited afterwards, only superseded by a new "
+                f"campaign.\n\nPrompt:\n{campaign.frozen_prompt}"
+            ),
+            # The frozen spec is addressable: it is a row, and this is the key that names
+            # it. Not `external_refs` - the platform owns this one.
+            provenance={"autopilot_campaign_ids": [str(campaign.id)]},
+            alternatives=[
+                Alternative(
+                    option="Run the stages by hand",
+                    rejected_because=(
+                        "Confirmed as an automatic campaign instead; the spec is frozen so "
+                        "budget and permission checks hold, and a person can take it back "
+                        "through takeover."
+                    ),
+                )
+            ],
+            tags=["autopilot"],
+        ),
+        user,
+        decided_by="agent_proposed_human_confirmed",
+    )
 
 
 def _reserve_budget(
