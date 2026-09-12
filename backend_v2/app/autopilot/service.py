@@ -479,6 +479,7 @@ def release_stage(
         )
     if stage.released_at is not None:
         return stage
+    reason = gates.explain(stage.stage_key)
     stage.released_at = datetime.now(UTC)
     stage.released_by = user.id
     stage.version += 1
@@ -491,10 +492,29 @@ def release_stage(
                 "stage_id": str(stage.id),
                 "stage_key": stage.stage_key,
                 "risk_tier": stage.risk_tier,
-                "reason": gates.explain(stage.stage_key),
+                "reason": reason,
             },
         )
     )
+    # Releasing has to *do* something. Recording the signature and leaving the stage in
+    # `awaiting_release` would be a gate with no other side: the campaign would sit there
+    # for ever and the approval would have bought nothing.
+    resource = activate_stage(session, campaign, stage)
+    if resource is not None:
+        session.add(
+            AutopilotLedgerEntry(
+                campaign_id=campaign.id,
+                # Signed by the person, not the worker principal: this row exists because
+                # they released it, and "who caused this run" is the question it answers.
+                writer_user_id=user.id,
+                event_type="stage.resource_created",
+                payload={
+                    "stage_id": str(stage.id),
+                    "resource_type": resource[0],
+                    "resource_id": str(resource[1]),
+                },
+            )
+        )
     record_audit(
         session,
         action="autopilot.stage.release",
@@ -512,3 +532,29 @@ def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
     if stage is None:
         raise DomainError("autopilot_stage_not_found", "Autopilot stage was not found", status_code=404)
     return stage
+
+
+#: Stage statuses that have not yet acted. `execute_campaign` looks at the frontmost of
+#: these rather than at `pending` alone: a held stage sits in `awaiting_release`, and a
+#: query that skipped it would advance to the stage *behind* the gate on the next
+#: redelivery - walking past the exact thing the gate exists to stop.
+UNSTARTED_STAGE_STATUSES = ("pending", "awaiting_release")
+
+
+def activate_stage(
+    session: Session, campaign: AutopilotCampaign, stage: AutopilotStage
+) -> tuple[str, uuid.UUID] | None:
+    """Make one stage act, or hold it.
+
+    One function for both callers - the worker on dispatch and a person on release -
+    because two copies of "may this stage act, and if so create its resource" is how the
+    gate ends up enforced on one path and not the other. Returns the resource the adapter
+    created, or None if the stage is held or has nothing to create.
+    """
+    from .adapters import ensure_stage_resource
+
+    if stage.held:
+        stage.status = "awaiting_release"
+        return None
+    stage.status = "ready"
+    return ensure_stage_resource(session, campaign, stage)

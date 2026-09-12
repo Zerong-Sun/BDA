@@ -13,6 +13,8 @@ one word changes here instead of someone having to notice the question arose.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from backend_v2.app.autopilot import gates
 
@@ -174,3 +176,136 @@ def test_a_stale_release_is_refused(domain_client, stale: str) -> None:
         json={},
     )
     assert response.status_code == 412
+
+
+# --- The gate has to bind on both paths ---------------------------------------
+#
+# Two defects these pin, both found by reading the code after it shipped:
+#
+# 1. `execute_campaign` selected the first *pending* stage. A held stage sits in
+#    `awaiting_release`, so a redelivery stepped over it and started the stage behind the
+#    gate - the exact thing the gate exists to stop.
+# 2. Releasing wrote the signature and nothing else, leaving the stage in
+#    `awaiting_release` for ever. A gate with no other side is not an approval, it is a
+#    dead end.
+
+
+def _start(client, campaign_id: str, key: str) -> str:
+    """Start a campaign and return the operation id the reservation is keyed on.
+
+    The worker finds its reservation by `operation_id == self.request.id`, so a test that
+    drives it has to run the task under that id - otherwise it fails before reaching the
+    code under test.
+    """
+    started = client.post(
+        f"/api/v2/autopilot-campaigns/{campaign_id}/start",
+        json={"idempotency_key": key, "gpu_seconds": 60, "money_micros": 10},
+    )
+    assert started.status_code == 202, started.text
+    return started.json()["operation_id"]
+
+
+def _held_campaign(client, project_id: str, stages: list[str]) -> dict:
+    draft = client.post(
+        "/api/v2/autopilot-drafts",
+        json={"project_id": project_id, "structured_brief": {"objective": "Gate", "stages": stages}},
+    )
+    assert draft.status_code == 201, draft.text
+    confirmed = client.post(
+        f"/api/v2/autopilot-drafts/{draft.json()['id']}/confirm",
+        headers={"If-Match": draft.headers["etag"]},
+        json={"name": f"Gate {stages}", "autonomy": "supervised", "budget": {"gpu_seconds_limit": 600}},
+    )
+    assert confirmed.status_code == 201, confirmed.text
+    return confirmed.json()
+
+
+def test_dispatch_does_not_step_over_a_held_stage(domain_client, monkeypatch) -> None:
+    """The stage behind the gate must not start because the gate is in the way."""
+    from backend_v2.app.autopilot import tasks as autopilot_tasks
+    from backend_v2.tests.test_autopilot_formalization import _fixture_scope
+
+    client, ids = domain_client
+    # `express` is irreversible and therefore held; `compute` behind it is not.
+    campaign = _held_campaign(client, str(ids["project"]), ["express", "compute"])
+    monkeypatch.setattr(autopilot_tasks, "session_scope", _fixture_scope(ids))
+    first_op = _start(client, campaign["id"], "gate-0001")
+    first = autopilot_tasks.execute_campaign.apply(args=[campaign["id"]], task_id=first_op).get()
+    assert first["status"] == "awaiting_release"
+
+    # A second start under a different idempotency key is a second reservation and a
+    # second dispatch - not a redelivery, so the ledger idempotency check does not
+    # short-circuit it. This is the reachable path that used to walk past the gate.
+    second_op = _start(client, campaign["id"], "gate-0001-again")
+    autopilot_tasks.execute_campaign.apply(args=[campaign["id"]], task_id=second_op).get()
+
+    after = client.get(f"/api/v2/autopilot-campaigns/{campaign['id']}").json()
+    by_key = {stage["stage_key"]: stage for stage in after["stages"]}
+    assert by_key["express"]["status"] == "awaiting_release"
+    assert by_key["express"]["held"] is True
+    # The stage behind the gate has not been touched.
+    assert by_key["compute"]["status"] == "pending"
+    assert by_key["compute"]["resource_id"] is None
+
+
+def test_releasing_a_stage_actually_makes_it_act(domain_client, monkeypatch) -> None:
+    """Recording the signature is not the point; letting the work proceed is."""
+    from backend_v2.app.autopilot import tasks as autopilot_tasks
+    from backend_v2.tests.test_autopilot_formalization import _fixture_scope
+
+    client, ids = domain_client
+    campaign = _held_campaign(client, str(ids["project"]), ["express"])
+    monkeypatch.setattr(autopilot_tasks, "session_scope", _fixture_scope(ids))
+    op = _start(client, campaign["id"], "gate-0002")
+    autopilot_tasks.execute_campaign.apply(args=[campaign["id"]], task_id=op).get()
+
+    stage = client.get(f"/api/v2/autopilot-campaigns/{campaign['id']}").json()["stages"][0]
+    assert stage["status"] == "awaiting_release"
+
+    released = client.post(
+        f"/api/v2/autopilot-campaigns/{campaign['id']}/stages/{stage['id']}/release",
+        headers={"If-Match": f'W/"{stage["version"]}"'},
+        json={},
+    )
+    assert released.status_code == 200, released.text
+    # It moved. Before this fix it stayed in `awaiting_release` for ever.
+    assert released.json()["status"] == "ready"
+    assert released.json()["held"] is False
+
+
+def test_the_release_is_recorded_as_the_reason_the_work_started(domain_client, monkeypatch) -> None:
+    """A resource created by a release is signed by the person, not the worker principal.
+
+    "Who caused this run" is the question the ledger is read for, and a service principal
+    on that row would answer it wrongly.
+    """
+    from backend_v2.app.autopilot import tasks as autopilot_tasks
+    from backend_v2.app.autopilot.models import AutopilotLedgerEntry
+    from backend_v2.tests.test_autopilot_formalization import _fixture_scope
+    from sqlalchemy import select
+
+    client, ids = domain_client
+    campaign = _held_campaign(client, str(ids["project"]), ["wetlab"])
+    monkeypatch.setattr(autopilot_tasks, "session_scope", _fixture_scope(ids))
+    op = _start(client, campaign["id"], "gate-0003")
+    autopilot_tasks.execute_campaign.apply(args=[campaign["id"]], task_id=op).get()
+    stage = client.get(f"/api/v2/autopilot-campaigns/{campaign['id']}").json()["stages"][0]
+    client.post(
+        f"/api/v2/autopilot-campaigns/{campaign['id']}/stages/{stage['id']}/release",
+        headers={"If-Match": f'W/"{stage["version"]}"'},
+        json={},
+    )
+
+    with ids["session_factory"]() as session:
+        rows = list(
+            session.scalars(
+                select(AutopilotLedgerEntry).where(
+                    AutopilotLedgerEntry.campaign_id == uuid.UUID(campaign["id"]),
+                    AutopilotLedgerEntry.event_type == "stage.released",
+                )
+            )
+        )
+    assert len(rows) == 1
+    assert rows[0].writer_user_id is not None
+    assert rows[0].service_principal_id is None
+    assert "nothing undoes it" in rows[0].payload["reason"]

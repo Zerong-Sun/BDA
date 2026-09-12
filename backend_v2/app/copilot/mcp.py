@@ -338,15 +338,65 @@ def _resolve(context: ToolContext, source: str, kind: str, identifier: str) -> A
     if source == "research":
         items = research.get_research_items(kind, ids=[identifier])
         return items[0] if items else None
-    # A project citation is addressed, not embedded: say where the row is rather
-    # than scan a capped list and risk answering with the wrong one.
-    return {
+    return _project_pointer(kind, identifier)
+
+
+#: Every citation kind `ProjectContextService` can emit. A URI this server handed out has
+#: to dereference - a link that 404s is the dead link the whole surface exists to avoid,
+#: and running it for real is how this list was found to be short.
+#:
+#: The value is the single-resource route where one exists, and None where it does not.
+#: None still resolves: the URI names a real row, so answering "nothing is addressed by
+#: this" would be false. It just cannot offer a canonical GET for it.
+#:
+#: Written out rather than derived by pluralising the kind, because pluralising is wrong
+#: for most of them: `experiment_result` is served under `/projects/{id}/experiment-results`
+#: and `finding` under `/research-findings/{id}`, so the obvious `f"/api/v2/{kind}s/{id}"`
+#: produced URLs that resolve to nothing. Handing an agent a fabricated address is worse
+#: than handing it none.
+PROJECT_ROUTES: dict[str, str | None] = {
+    "candidate": "/api/v2/candidates/{id}",
+    "compute_job": "/api/v2/jobs/{id}",
+    "job": "/api/v2/jobs/{id}",
+    "finding": "/api/v2/research-findings/{id}",
+    "workflow": "/api/v2/workflow-runs/{id}",
+    "workflow_run": "/api/v2/workflow-runs/{id}",
+    "artifact": "/api/v2/artifacts/{id}",
+    "timeline_entry": "/api/v2/timeline/{id}",
+    # Real rows with no single-resource GET. They are addressed, not fetchable, and saying
+    # so beats inventing a path or pretending the row does not exist.
+    "target": None,
+    "experiment_result": None,
+    "compute_draft": None,
+    "knowledge_entry": None,
+}
+
+
+def _project_pointer(kind: str, identifier: str) -> dict[str, Any] | None:
+    """A project citation is addressed, not embedded.
+
+    The project context service has no lookup by id, and scanning a capped list risks
+    answering with the wrong row - so this returns where the row lives rather than a copy
+    of it.
+
+    A kind this platform never emits returns None, which the caller turns into a 404: that
+    URI names nothing, and the code previously answered any string at all with a success
+    and a made-up path. A kind it *does* emit always resolves, with `authoritative_path`
+    only when a single-resource route exists - because a link this server handed out must
+    never come back as "nothing is addressed by this".
+    """
+    if kind not in PROJECT_ROUTES:
+        return None
+    route = PROJECT_ROUTES[kind]
+    pointer: dict[str, Any] = {
         "source_type": "project_database",
         "workspace_type": kind,
         "entity_id": identifier,
-        "authoritative_path": f"/api/v2/{kind}s/{identifier}",
         "note": "Read the row through the platform API; this surface addresses it, it does not copy it.",
     }
+    if route is not None:
+        pointer["authoritative_path"] = route.format(id=identifier)
+    return pointer
 
 
 def _audit(session: Session, grant: CopilotMcpSession, spec: ToolSpec) -> None:

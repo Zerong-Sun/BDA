@@ -377,3 +377,72 @@ def test_describe_reports_what_the_grant_can_do_now(session: Session) -> None:
     assert described["mandate_live"] is True
     assert "start_literature_search" in described["write_tools"]
     assert set(described["write_tools"]) <= set(described["tools"])
+
+
+# --- Addresses have to be real ------------------------------------------------
+
+
+def test_every_declared_project_route_exists_in_the_api() -> None:
+    """A citation URI that resolves to a fabricated path is worse than none.
+
+    `PROJECT_ROUTES` used to be `f"/api/v2/{kind}s/{id}"`, which is wrong for most kinds -
+    `experiment_result` is served under `/projects/{id}/experiment-results` and `finding`
+    under `/research-findings/{id}`. This pins each declared route against the real
+    OpenAPI document, so renaming a route fails here rather than silently handing an
+    external agent a dead link.
+    """
+    import json
+    from pathlib import Path
+
+    document = json.loads((Path(__file__).resolve().parents[1] / "openapi.json").read_text())
+    paths = set(document["paths"])
+    for kind, route in mcp.PROJECT_ROUTES.items():
+        if route is None:
+            continue  # addressed but not fetchable; there is no path to check
+        # The template uses `{id}`; the document names its own parameter.
+        prefix = route.split("{")[0]
+        assert any(
+            path.startswith(prefix) and path.count("/") == route.count("/") for path in paths
+        ), f"{kind}: {route} matches no path in openapi.json"
+
+
+def test_every_kind_this_server_can_emit_dereferences(session: Session) -> None:
+    """A link the server handed out must never come back as "nothing is addressed by this".
+
+    The kinds are read out of `ProjectContextService` rather than listed here, so adding a
+    citable kind to the context service without teaching `PROJECT_ROUTES` about it fails
+    right here. That is how this was missed the first time: `PROJECT_ROUTES` was written
+    from the kinds that came to mind, and `target` - the first one a real server emitted -
+    was not among them.
+    """
+    import re
+    from pathlib import Path as _Path
+
+    source = (_Path(mcp.__file__).parent / "project_context.py").read_text()
+    emitted = set(re.findall(r'_item\(\s*\n\s*"([a-z_]+)"', source))
+    assert emitted, "the extraction stopped matching; fix the pattern, not the assertion"
+
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user)
+    for kind in sorted(emitted):
+        uri = f"bda://project/{kind}/11111111-1111-1111-1111-111111111111"
+        found = mcp.read_resource(session, grant, uri)
+        assert found["uri"] == uri
+        assert found["payload"]["workspace_type"] == kind
+
+
+def test_an_unknown_project_kind_addresses_nothing(session: Session) -> None:
+    """Previously any string at all came back as a success with a made-up path."""
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user)
+    with pytest.raises(DomainError) as excinfo:
+        mcp.read_resource(session, grant, "bda://project/frobnicate/whatever")
+    assert excinfo.value.error_code == "mcp_resource_not_found"
+    assert excinfo.value.status_code == 404
+
+
+def test_a_known_project_kind_points_at_its_real_route(session: Session) -> None:
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user)
+    found = mcp.read_resource(session, grant, "bda://project/candidate/abc-123")
+    assert found["payload"]["authoritative_path"] == "/api/v2/candidates/abc-123"

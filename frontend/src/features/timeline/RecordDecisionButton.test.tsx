@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it } from 'vitest'
 import { server } from '../../test/mocks/handlers'
@@ -72,5 +72,22 @@ describe('RecordDecisionButton', () => {
   it('does not open an editor until asked', () => {
     renderWithProviders(<RecordDecisionButton projectId="p1" seed={{}} />)
     expect(screen.queryByLabelText(/Title/)).not.toBeInTheDocument()
+  })
+})
+
+describe('where the editor renders', () => {
+  it('opens in a dialog, not inside whatever row the button sits in', async () => {
+    // The editor is a full two-column form written for a page column. Inline it lands in
+    // a results-table cell or a narrow job drawer - which is exactly where this button is
+    // useful and where that layout is not.
+    server.use(
+      http.get('/api/v2/jobs', () => HttpResponse.json({ items: [], next_cursor: null })),
+    )
+    renderWithProviders(<RecordDecisionButton projectId="p1" seed={{ lane: 'dry' }} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /record a decision/i }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(await within(dialog).findByLabelText(/Title/)).toBeInTheDocument()
   })
 })

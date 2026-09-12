@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-12（Asia/Shanghai；本轮七条规则全部落地并实跑门禁）
+最后核验：2026-09-12（Asia/Shanghai；本轮七条规则全部落地，并经一次对抗性复查修掉六个缺陷）
 
 权威范围：本文只规定「一个判断如何被归属、证据如何被引用、哪些步骤必须由人放行、一次批准可以承载多少」。MCP 能力面见 [MCP 能力面](MCP_CAPABILITY_SURFACE.md)；Autopilot 的执行与预算模型见 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md)；Copilot 自身的能力边界见 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)。
 
@@ -93,12 +93,12 @@
 
 **预填的只有平台知道的事实**，标题、结论与被否分支留空，且有测试盯着。预填一个判断等于把模型的意见放在人的签名之下，而这条记录存在的目的恰恰是说清一个判断是谁的。
 
-## 3. 本轮实跑门禁
+## 3. 实跑门禁
 
 | 检查 | 结果 |
 | --- | --- |
 | `ruff` / `mypy`（250 文件） | 通过 |
-| `pytest backend_v2/tests` | 通过 |
+| `pytest backend_v2/tests` | 通过（901 用例） |
 | `npm --prefix frontend test` / `run build` | 通过 |
 | `check_flow_matrix.py` | 通过，78 表 / 190 路径 |
 | `check_document_inventory.py` | 通过 |
@@ -109,7 +109,25 @@
 
 覆盖率差额在本机是既有状态。本轮新增模块自身为 `core/review.py` 100% / `copilot/citations.py` 100% / `mcp_app.py` 95.6% / `autopilot/gates.py` 91.7% / `mcp.py` 86.4%，全部高于总体，因此是把总数抬上去的。
 
-## 4. 已知边界
+## 4. 复查中修掉的缺陷
+
+七条规则落地后做了一次对抗性复查（需求完整性 / 逻辑正确性 / 边界情况 / 代码质量 / 测试覆盖 / 真实运行），
+发现并修掉六个缺陷。其中两个只有**把服务器真的跑起来**才会暴露：
+
+| # | 缺陷 | 为什么会发生 |
+| --- | --- | --- |
+| 1 | `execute_campaign` 只查 `pending` 阶段，被扣留的阶段状态是 `awaiting_release`，**第二次 start 会跳过门直接启动门后面的阶段** | 门写在一处，选阶段的查询写在另一处 |
+| 2 | `release_stage` 只写 ledger，阶段永远停在 `awaiting_release`，**放行什么也不做** | 只测了"扣留成立"，没测"放行之后呢" |
+| 3 | `resources/read` 用 `f"/api/v2/{kind}s/{id}"` 拼路径，对多数 kind 是**不存在的 URL** | 凭印象拼复数，没有对着 OpenAPI 核 |
+| 4 | `RecordDecisionButton` 把整页宽的内联编辑器渲染进 DataGrid 单元格 | 只测了行为，没看过渲染结果 |
+| 5 | 没有任何测试走 `main.py` 里真正挂载的 `/mcp` 路由 | 传输层测试自建了 Starlette app |
+| 6 | 服务器发出 `bda://project/target/…`，自己却 404 —— `PROJECT_ROUTES` 少了实际会发出的 kind | 名单是凭印象写的，`target` 恰好是真实服务器发出的第一个 |
+
+1 和 2 合并成一个共享的 `activate_stage`，两条路径（worker 派发与人工放行）不能再分歧。
+3 和 6 的修法是把「本服务器发得出的每个 kind 都必须能解引用」变成从 `ProjectContextService`
+源码派生的测试——名单凭印象写就会漏，派生就不会。
+
+## 5. 已知边界
 
 - **`recommended` 参数来源没有数据源。** route plan 算出的 `default_parameters` 到不了画布；接通它需要一条从 route plan 到 NodeBuilder 的路径，那是独立的改动。
 - **`compute` 未扣留是一个会过期的决定。** 它成立的前提是「没有阶段会提交」。这个前提一旦变化，`gates.STAGE_TIERS` 里的一个词必须同时变化，而目前没有任何机械检查会提醒这件事——检查它需要先有提交路径。

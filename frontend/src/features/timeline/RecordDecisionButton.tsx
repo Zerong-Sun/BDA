@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { NotePencilIcon } from '@phosphor-icons/react'
 import { Button } from '../../components/ui/Button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog'
+import { ScrollArea } from '../../components/ui/scroll-area'
 import { useI18n } from '../../lib/i18n'
 import { TimelineEntryEditor } from './TimelineEntryEditor'
 import type { DecisionSeed } from './timelineEntryForm'
@@ -23,6 +30,11 @@ import type { DecisionSeed } from './timelineEntryForm'
  * what it produced. The conclusion, the outcome and the rejected alternative are left
  * empty on purpose. Prefilling a judgement would be a machine's opinion carrying a
  * person's signature, and this record exists precisely to say whose judgement a thing was.
+ *
+ * The editor opens in a dialog rather than in place. It is a full two-column form with a
+ * chooser per provenance key, written for a page column; rendered inline it lands inside a
+ * results-table cell or a narrow job drawer, which is where this button is useful and
+ * where that layout is not.
  */
 
 interface RecordDecisionButtonProps {
@@ -54,9 +66,24 @@ export function RecordDecisionButton({
         <NotePencilIcon aria-hidden="true" className="size-3.5" />
         {t.timeline.recordDecision}
       </Button>
-      {open ? (
-        <TimelineEntryEditor projectId={projectId} seed={seed} onClose={() => setOpen(false)} />
-      ) : null}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85vh] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{t.timeline.recordDecision}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            {/* Mounted only while open, so the editor's draft starts from the seed each
+                time rather than from whatever the last cancelled attempt left behind. */}
+            {open ? (
+              <TimelineEntryEditor
+                projectId={projectId}
+                seed={seed}
+                onClose={() => setOpen(false)}
+              />
+            ) : null}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
