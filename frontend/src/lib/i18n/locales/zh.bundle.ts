@@ -971,6 +971,7 @@ export const bundleZh = {
     submitSelectedNode: '提交所选节点',
     submitting: '提交中…',
     noJobs: '尚无任务。运行节点或提交工作流以创建任务。',
+    decisionSeedSummary: '{plugin} 运行{status}。',
     unknownPlugin: '未知插件',
     logTail: '日志尾部',
     cancel: '取消',
@@ -1137,7 +1138,8 @@ export const bundleZh = {
         method: '方法',
         milestone: '里程碑',
       },
-        decidedBy: {
+        recordDecision: '记一条决策',
+      decidedBy: {
         human: '人判定',
         agent: 'agent 判定',
         agent_proposed_human_confirmed: 'agent 起草 · 人接受',

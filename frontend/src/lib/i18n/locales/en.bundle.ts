@@ -1000,6 +1000,7 @@ export const bundleEn = {
     submitSelectedNode: 'Submit selected node',
     submitting: 'Submitting…',
     noJobs: 'No jobs yet. Run a node or submit the workflow to create one.',
+    decisionSeedSummary: '{plugin} run {status}.',
     unknownPlugin: 'unknown plugin',
     logTail: 'Log tail',
     cancel: 'Cancel',
@@ -1166,7 +1167,8 @@ export const bundleEn = {
         method: 'Method',
         milestone: 'Milestone',
       },
-        decidedBy: {
+        recordDecision: 'Record a decision',
+      decidedBy: {
         human: 'decided by a person',
         agent: 'decided by an agent',
         agent_proposed_human_confirmed: 'agent drafted, person accepted',

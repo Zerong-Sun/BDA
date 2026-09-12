@@ -29,7 +29,9 @@ import {
   draftFromEntry,
   draftToBody,
   emptyDraft,
+  seededDraft,
   validateDraft,
+  type DecisionSeed,
   type DraftError,
   type TimelineEntryDraft,
 } from './timelineEntryForm'
@@ -57,6 +59,9 @@ interface Props {
    *  the editor still works where the caller has no list to hand; the two selects then
    *  offer only "nothing", which is honest rather than broken. */
   entries?: TimelineEntry[]
+  /** Facts the caller already had, for a new entry opened from where the work happened.
+   *  Ignored when editing: an existing entry's own record wins over a caller's guess. */
+  seed?: DecisionSeed
   onClose: () => void
 }
 
@@ -73,12 +78,12 @@ function isConflict(error: unknown): boolean {
   return status === 412
 }
 
-export function TimelineEntryEditor({ projectId, entry, entries = [], onClose }: Props) {
+export function TimelineEntryEditor({ projectId, entry, entries = [], seed, onClose }: Props) {
   const { t, format } = useI18n()
   const tl = t.timeline
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<TimelineEntryDraft>(() =>
-    entry ? draftFromEntry(entry) : emptyDraft(),
+    entry ? draftFromEntry(entry) : seed ? seededDraft(seed) : emptyDraft(),
   )
   const [submitted, setSubmitted] = useState(false)
 
