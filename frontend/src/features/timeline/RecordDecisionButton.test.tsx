@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { RecordDecisionButton } from './RecordDecisionButton'

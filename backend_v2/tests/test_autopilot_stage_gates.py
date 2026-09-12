@@ -14,9 +14,9 @@ one word changes here instead of someone having to notice the question arose.
 from __future__ import annotations
 
 import pytest
+from backend_v2.app.autopilot import gates
 
 pytest_plugins = ["backend_v2.tests.test_v2_domains"]
-from backend_v2.app.autopilot import gates
 
 
 class TestTierTable:
