@@ -42,6 +42,33 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "chat_tools": ["list_project_candidates", "list_experiment_results"],
     },
     {
+        "id": "structure-analysis",
+        "title": "Structure analysis",
+        "description": (
+            "Read an uploaded structure artifact at residue level: chains, "
+            "sequences, numbering gaps, ligands, disulfides, interface contacts "
+            "and per-site neighbourhoods. Reports measurements, never function."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": [
+            "analyse_structure",
+            "list_structure_contacts",
+            "describe_structure_site",
+        ],
+    },
+    {
+        "id": "failure-diagnosis",
+        "title": "Failure diagnosis",
+        "description": (
+            "Explain a failed compute job from its recorded evidence: error, "
+            "attempt history, events and the runtime spec it declared."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": ["get_compute_status", "diagnose_compute_failure"],
+    },
+    {
         "id": "knowledge-authoring",
         "title": "Knowledge drafting",
         "description": "Search project knowledge and create pending-review Copilot notes",
@@ -160,6 +187,8 @@ CAPABILITY_ALIASES = {
         "wetlab-authoring",
         "research-trace-authoring",
         "agent-orchestration",
+        "structure-analysis",
+        "failure-diagnosis",
     },
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
@@ -169,6 +198,8 @@ CAPABILITY_ALIASES = {
         "target-intelligence",
         "research-gap-repair",
     },
+    "structure": {"project-read", "structure-analysis"},
+    "diagnosis": {"project-read", "failure-diagnosis"},
     "route-planning": {"project-read", "workflow-planning"},
     "interpretation": {"project-read", "result-interpretation"},
 }

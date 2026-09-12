@@ -254,4 +254,60 @@ describe('CopilotChat', () => {
     })
     expect(screen.getByRole('button', { name: 'Save to project review' })).toBeInTheDocument()
   })
+  it('sends the selected bot instead of a matched skill, and only one of them', async () => {
+    // The API rejects a request carrying both hints. This is where the two
+    // could meet: an explicit pick, plus a message the skill matcher also
+    // recognises.
+    server.use(
+      http.get('/api/v2/copilot/bots', () =>
+        HttpResponse.json([
+          {
+            id: 'planner',
+            title: 'Planner',
+            title_zh: '路线规划',
+            phase: 4,
+            summary: 'Choose the route and draft the compute.',
+            charter: 'Draft only; never confirm or submit.',
+            capabilities: ['project-read', 'workflow-planning'],
+            handoff: [],
+            triggers: ['route'],
+          },
+        ]),
+      ),
+    )
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Copilot bot' }))
+    const planner = await screen.findByRole('option', { name: 'Planner' })
+    fireEvent.pointerDown(planner, { button: 0 })
+    fireEvent.pointerUp(planner, { button: 0 })
+    fireEvent.click(planner)
+
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Adjust the workflow threshold' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
+    expect(payload?.bot).toBe('planner')
+    expect(payload?.skill).toBeUndefined()
+  })
+
+  it('falls back to the skill hint when the roster is unavailable', async () => {
+    // The picker is absent and the chat still works. A roster that failed to
+    // load must not take the copilot down with it.
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Adjust the workflow threshold' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
+    expect(payload?.bot).toBeUndefined()
+    expect(payload?.skill).toBe('workflow-planning')
+    expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
+  })
 })

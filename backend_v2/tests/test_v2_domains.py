@@ -479,6 +479,8 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "workflow-planning",
         "compute-drafting",
         "agent-orchestration",
+        "structure-analysis",
+        "failure-diagnosis",
     }
     assert {
         item["execution_mode"]
@@ -1181,3 +1183,63 @@ def test_project_prompt_draft_create_and_get(domain_client) -> None:
     assert fetched.json()["prompt"] is None
 
     assert client.get(f"/api/v2/projects/prompt-drafts/{uuid.uuid4()}").status_code == 404
+
+
+def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
+    domain_client: tuple[TestClient, dict],
+) -> None:
+    """The roster over HTTP, and the three ways a bot hint must not widen a turn.
+
+    Selecting a bot is the only hint a client can send that names a *set* of
+    capabilities, so it is the one that has to be provably incapable of adding
+    one the project did not enable.
+    """
+    client, ids = domain_client
+    project_id = str(ids["project"])
+
+    roster = client.get("/api/v2/copilot/bots")
+    assert roster.status_code == 200
+    bots = roster.json()
+    assert [bot["phase"] for bot in bots] == sorted(bot["phase"] for bot in bots)
+    by_id = {bot["id"]: bot for bot in bots}
+    assert {"briefing", "librarian", "structuralist", "medic", "archivist"} <= set(by_id)
+    assert by_id["structuralist"]["capabilities"] == ["project-read", "structure-analysis"]
+    # Every handoff resolves, so the model is never told to call for an operator
+    # a client cannot then select.
+    for bot in bots:
+        assert set(bot["handoff"]) <= set(by_id)
+
+    assert client.put(
+        f"/api/v2/copilot/projects/{project_id}/config",
+        json={"llm_provider_id": None, "settings": {}, "enabled_skills": ["structure"]},
+    ).status_code == 200
+
+    # A bot the project cannot support, an unknown bot, and two hints at once.
+    assert client.post(
+        "/api/v2/copilot/chat",
+        json={"project_id": project_id, "message": "Find papers", "bot": "librarian"},
+    ).status_code == 422
+    assert client.post(
+        "/api/v2/copilot/chat",
+        json={"project_id": project_id, "message": "Hello", "bot": "ghost"},
+    ).status_code == 404
+    assert client.post(
+        "/api/v2/copilot/chat",
+        json={
+            "project_id": project_id,
+            "message": "Hello",
+            "bot": "structuralist",
+            "skill": "project-read",
+        },
+    ).status_code == 422
+
+    accepted = client.post(
+        "/api/v2/copilot/chat",
+        json={
+            "project_id": project_id,
+            "message": "Which residues of chain A contact chain B?",
+            "bot": "structuralist",
+        },
+    )
+    assert accepted.status_code == 202
+    assert accepted.json()["message"]["context"]["bot_hint"] == "structuralist"

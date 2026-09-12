@@ -217,6 +217,8 @@ export const bundleEn = {
       citationProject: 'Project',
       citationExternal: 'External',
       citationSourceFallback: 'Source {index}',
+      botLabel: 'Copilot bot',
+      botAuto: 'Auto',
     },
     loading: {
       connecting: 'Connecting to Copilot…',

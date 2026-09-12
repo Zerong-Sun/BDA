@@ -105,6 +105,12 @@ class CopilotAgentRun(UUIDVersionMixin, Base):
     #: What the run was asked to do, kept verbatim. A resumed run re-reads this
     #: rather than trusting a summary of it.
     goal: Mapped[str] = mapped_column(Text, default="")
+
+    #: The roster bot this run was created for, or None for an undifferentiated
+    #: run. The id, not the charter: the loop reads the charter from the roster
+    #: each turn, so editing a charter changes how in-flight runs behave rather
+    #: than leaving each run with a snapshot of what it said at creation.
+    bot: Mapped[str | None] = mapped_column(String(80), nullable=True)
     # No index=True: `status` leads the composite index above, so a separate
     # single-column one would cost every write and answer nothing new.
     status: Mapped[str] = mapped_column(String(24), default="running")

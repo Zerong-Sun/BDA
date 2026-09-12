@@ -1,0 +1,284 @@
+# BDA Copilot Bot Roster
+
+状态：活跃
+
+最后核验：2026-09-13（Asia/Shanghai；本轮新增 bot 名册、结构分析与故障诊断能力）
+
+权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
+
+数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
+
+替代关系：不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威），也不取代 [MCP capability surface](MCP_CAPABILITY_SURFACE.md)（外部调用契约）。本文在两者之上定义“谁负责链条的哪一段”。
+
+## Why a roster rather than one assistant
+
+Until now BDA had one Copilot with a configurable capability set. That is enough
+to answer questions and enough to run one bounded agent run, but it leaves the
+research chain without owners: the same undifferentiated assistant is asked to
+turn a vague sentence into a research question, to sort literature, to pick a
+route, to wait on a cluster job, to explain why that job died, and to write the
+result back into the record. Those are different jobs with different failure
+modes, and one system prompt cannot state the boundary of all of them at once.
+
+A **bot** is a named operator that owns one phase of the chain. It is not a new
+execution engine and not a second tool layer. It is a declaration of:
+
+- which capabilities the phase needs, and — more importantly — which it does not,
+- what the operator is accountable for and what it must refuse,
+- which bot the work goes to next.
+
+The one law that makes the roster safe to add:
+
+> **A bot narrows; a bot never widens.**
+> The capabilities in force are `bot.capabilities ∩ project.enabled_skills`.
+> Naming a bot can only take capabilities away. A bot that names a capability
+> the project has not enabled does not get it, and a project that enabled
+> everything still gets only what the bot declares.
+
+This is the rule `capabilities_for_turn` already applies to a single-capability
+hint, generalised from one to a set. It is what stops “select the planner bot”
+from becoming a privilege-escalation path, and it is the property the adversarial
+tests exist to attack.
+
+## The chain and its nine bots
+
+The phases run in order, but the chain is a loop, not a line: `medic` sends work
+back to `planner`, and `archivist` sends the next question back to `briefing`.
+
+| # | Bot | 中文 | Owns | Capabilities | Hands off to |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `briefing` | 选题起草 | Turning an intent into a stated, falsifiable research question with success criteria | `project-read`, `research-read`, `knowledge-authoring` | `librarian`, `scout` |
+| 1 | `librarian` | 文献整理 | Finding, ingesting and organising literature with retrievable provenance | `research-read`, `literature-search` | `briefing`, `scout` |
+| 2 | `scout` | 靶点情报 | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair` | `structuralist`, `planner` |
+| 3 | `structuralist` | 结构与残基 | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis` | `planner`, `analyst` |
+| 4 | `planner` | 路线规划 | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting` | `runner` |
+| 5 | `runner` | 步骤推进 | Advancing a confirmed run step by step and waiting for jobs to settle | `project-read`, `workflow-planning`, `agent-orchestration` | `medic`, `analyst` |
+| 6 | `medic` | 故障诊断 | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis` | `planner`, `runner` |
+| 7 | `analyst` | 结果解读 | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring` | `archivist`, `structuralist` |
+| 8 | `archivist` | 记录归档 | Attaching evidence to research goals and drafting the record of what was decided | `research-read`, `research-trace-authoring`, `knowledge-authoring` | `briefing` |
+
+### What each bot must refuse
+
+A bot's charter is mostly a list of refusals, because that is the part a
+capability set cannot express. These go into the `charter` string and reach the
+model verbatim.
+
+- `briefing` — must not answer the research question it is drafting. Its output
+  is a question, its success criteria and its unknowns, saved as a pending-review
+  note. A brief that already contains the conclusion was written backwards.
+- `librarian` — must not summarise a paper it has not retrieved. A queued search
+  is queued, not done; a citation without a checksum-backed excerpt is a lead,
+  not evidence.
+- `scout` — must not invent target identity. Composite or modified molecular
+  identities stay `requires_review` until one exact entity maps to a UniProt
+  accession. Scientific gaps are not “repaired”; only retrievable ones are.
+- `structuralist` — must not infer function from geometry. It reports residues,
+  distances, gaps and confidence. “These residues are within 4.5 Å” is a
+  measurement; “this is the active site” is a claim that needs evidence from
+  `librarian` or a recorded experiment. It must state model confidence whenever
+  the structure is predicted, because a contact list computed from a
+  low-confidence loop is arithmetic on noise.
+- `planner` — must not confirm or submit. It produces a draft and the reasons for
+  it, including the reasons against the routes it did not pick.
+- `runner` — must not poll and must not assume an outcome. It calls the waiting
+  tool and is resumed with the result. A failed job is a result to report, not an
+  error to retry silently.
+- `medic` — must not guess. Every diagnosis names the evidence it rests on and
+  says plainly when that evidence does not determine the cause.
+- `analyst` — must not invent measurements, and must not rank by a score whose
+  mechanism it has not checked. It reports what was recorded, with units and the
+  analysis version that produced it.
+- `archivist` — must not decide. It records the decision that was made, who made
+  it and what it rested on, and marks a goal answered only when a linked result
+  answers it.
+
+### Handoff protocol
+
+A handoff is a statement in the answer, not a transfer of control: the bot names
+which operator should take the next step and what that operator needs. The
+platform does not switch bots by itself, because a bot that could re-select
+itself with wider capabilities would defeat the narrowing law. The client — chat
+UI, agent-run creation, or an MCP caller — selects the next bot explicitly.
+
+`handoff` is therefore advisory, and validated only for referential integrity:
+every named bot must exist. It is surfaced to the model so it can name the right
+next operator, and to the UI so it can offer that operator as one click.
+
+## New capabilities this roster adds
+
+Two phases had no capability to stand on, so the roster adds two, both read-only.
+
+### `structure-analysis` — 结构与残基分析
+
+The platform stored structures and rendered them in the browser, but nothing on
+the server could answer a question about a residue. `structuralist` needs that,
+and so does every bot that wants to talk about an interface.
+
+Implemented as a table-free domain, `backend_v2/app/structures/`:
+
+- `kernels.py` — pure functions over PDB/mmCIF **text**. No database, no object
+  storage, no network. The parsing and the geometry live here, and this is what
+  the unit tests exercise directly.
+- `service.py` — the one impure step: artifact id → project check → bytes from
+  object storage → kernel. It mirrors `wetlab/analysis.py`, which already
+  established that shape for instrument files.
+
+It declares no models and no router, so it needs no migration, no flow-matrix row
+and no module descriptor. Structures arrive as artifacts, which are already
+write-once and checksummed; a second table would only be somewhere for a copy to
+go stale.
+
+Three tools:
+
+| Tool | Answers |
+| --- | --- |
+| `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, heteroatoms and ligands, disulfides, and a pLDDT or B-factor summary |
+| `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
+| `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
+
+All three are `execution_mode="read"` under capability `structure-analysis`, and
+therefore appear on the MCP surface automatically: an external MCP client holding
+a grant for a project can analyse that project's structures with no new transport
+code.
+
+### `failure-diagnosis` — 故障诊断
+
+`get_compute_status` reports `error_code` and `error_message`. That is enough to
+see that a job failed and never enough to see why. The recurring failures in this
+project are not exceptions in the platform; they are disagreements between what a
+job declared and what it was actually given:
+
+- a stage whose comment says it needs no GPU, submitted to a queue that merges
+  `GPU_REQ` into every job;
+- `-n`, `span[ptile=]` and the tool's own thread count disagreeing;
+- a plugin registry row whose declaration makes the job exit in seconds with an
+  empty log;
+- a staged-input loop that verified a manifest which never listed the missing
+  file.
+
+`diagnose_compute_failure` gathers the recorded evidence for one job — status,
+error code and message, attempt history, recent job events, and the declared
+`runtime_spec` — and runs an explicit rule set over it. Each rule produces a
+finding with a confidence of `confirmed` (the evidence states it) or `possible`
+(the evidence is consistent with it), the evidence it used, and a remedy. A job
+whose evidence matches no rule returns no findings and says so: an invented cause
+is worse than no cause, because it ends the investigation.
+
+The rules are data, not prose, so they can be tested one at a time and extended
+without touching the tool.
+
+## Skill and MCP inventory
+
+“Skill” in this repository means one capability id, and the capability is what
+grants tools. After this change the full list is:
+
+| Capability (skill) | Mode | Tools | Bots that hold it |
+| --- | --- | --- | --- |
+| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | briefing, scout, structuralist, planner, runner, medic, analyst |
+| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | briefing, librarian, scout, planner, archivist |
+| `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
+| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | structuralist |
+| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | medic |
+| `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
+| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | briefing, archivist |
+| `workflow-planning` | draft | `get_workflow_status` | planner, runner |
+| `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
+| `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
+| `research-trace-authoring` | draft | `attach_to_research_goal` | archivist |
+| `literature-search` | queue | `start_literature_search` | librarian |
+| `target-intelligence` | queue | `start_target_intelligence` | scout |
+| `research-gap-repair` | queue | `resolve_research_gaps` | scout |
+| `agent-orchestration` | read (async) | `await_compute_job`, `spawn_subagent` | runner |
+
+Everything in that table is reachable over MCP except `agent-orchestration`,
+which is excluded by construction: its tools declare `requires="agent_run"`, an
+MCP client has no run to suspend, and `mcp.py` refuses to list them. `runner` is
+therefore the one bot whose full capability set exists only inside a durable
+agent run.
+
+## Surfaces
+
+One declaration, three surfaces, no duplication:
+
+- `GET /copilot/bots` lists the roster with its capabilities, charter, phase and
+  handoffs. The frontend reads that response rather than restating it — the
+  hand-written skill registry it sits beside kept its own copy of the backend's
+  capability list, and a copy is what drifts.
+- `POST /copilot/agent-runs` accepts `bot`. The server resolves the bot to its
+  capability set, intersects it with the project configuration, and derives
+  `allowed_tools` from the result — the client never names a tool.
+- `POST /copilot/chat` accepts `bot` as a turn hint, with the same intersection.
+  The existing single-capability `skill` hint stays, and `bot` and `skill` are
+  mutually exclusive: two narrowing hints in one request is an ambiguity, not a
+  finer filter.
+
+### The charter has to travel with the run
+
+A durable run records its bot (`copilot_agent_runs.bot`, migration
+`0059_copilot_agent_run_bot`). Narrowing the tools alone would not have been
+enough: most of the roster shares a tool set with some other bot, and two bots
+with the same tools and the same instructions are the same operator. The column
+holds the **id**, never the charter text, so the loop reads the charter from the
+roster on every turn — editing a charter changes how runs already in flight
+behave, instead of leaving each run operating under a snapshot of what the
+charter said the day it started. An id the roster no longer knows contributes
+nothing, which leaves an undifferentiated run rather than a broken one.
+
+A subagent inherits its parent's bot unless given one. A child doing part of the
+medic's work is still doing the medic's work, and a child that silently lost its
+parent's refusals would be the one place the roster stopped applying.
+
+## What this does not change
+
+- No bot executes shell commands, reads arbitrary paths, or reaches credentials.
+- No bot confirms or submits compute, applies a route, cancels a job, approves
+  evidence, or deletes project data. Those remain user actions, as recorded in
+  the capability plan.
+- Write tools still require the user's own words to authorise them in the same
+  turn. Selecting a bot is not a request; `actions.request_allows` is unchanged.
+- Budgets, depth limits, audit attribution and citation policy are unchanged. A
+  bot is a narrower mandate inside the existing envelope, never a wider one.
+
+## Acceptance
+
+Each of these holds, and has a test that fails when it stops holding.
+
+| # | Property | Where |
+| --- | --- | --- |
+| 1 | Every bot's capabilities are registered ids; every `handoff` names a bot that exists; a roster that breaks either fails at import | `test_copilot_bots.py` |
+| 2 | For every bot and every project configuration, resolved == declared ∩ enabled | `test_copilot_bots.py` |
+| 3 | A bot cannot reach a capability the project disabled, and its tools are absent from `allowed_tools` | `test_copilot_bots.py` |
+| 4 | An unknown bot hint resolves to nothing rather than to the project ceiling; `bot` + `skill` together are denied, at the API and again in `narrow` | `test_copilot_bots.py`, `test_v2_domains.py` |
+| 5 | An unknown bot id is 404 from the API and from run creation, never a silent fallback | `test_copilot_bots.py`, `test_v2_domains.py` |
+| 6 | A run created for a bot carries that bot's charter into every turn; a run without one carries only the loop policy; a retired id degrades to undifferentiated; a subagent inherits | `test_copilot_bots.py` |
+| 7 | PDB and mmCIF of the same structure yield the same chains, residues and sequences; numbering gaps are reported rather than closed; a FASTA, a JSON and prose are refused | `test_structure_kernels.py` |
+| 8 | Contacts are symmetric — (A, B) is the transpose of (B, A) — reported by closest atom pair, monotonic in cutoff, and exclude solvent | `test_structure_kernels.py` |
+| 9 | A predicted model's B-factor column is labelled possible pLDDT only when the file declares no resolution; a malformed resolution is absent, not zero | `test_structure_kernels.py` |
+| 10 | Structure tools refuse an artifact from another project, a deleted one, and one over the size cap; a non-structure is 422, not 500 | `test_structure_service.py` |
+| 11 | Every diagnosis rule fires on the evidence it claims to read and stays silent on a baseline that lacks it; unrecognised evidence yields no findings and says so | `test_compute_diagnosis.py` |
+| 12 | Every finding names its evidence, its remedy and its confidence; the evidence bundle carries no object keys or credentials | `test_compute_diagnosis.py` |
+| 13 | `diagnose_compute_failure` refuses a job id from another project | `test_compute_diagnosis.py` |
+| 14 | The new capabilities reach an external MCP client with no transport code of their own | `test_copilot_mcp.py` |
+| 15 | The chat sends a selected bot instead of a matched skill and never both; a roster that failed to load leaves the chat working, unhinted | `CopilotChat.test.tsx`, `bots/registry.test.ts` |
+
+Gates run for this change, on `bda-public/main`:
+
+| Gate | Result |
+| --- | --- |
+| `ruff check backend_v2` | pass |
+| `mypy backend_v2/app backend_v2/scripts` (CI form, no `--config-file`) | pass, 255 files |
+| `pytest backend_v2/tests` | pass, 1007 tests |
+| `pytest` with `BDA_V2_RUN_DB_TESTS=1` against PostgreSQL | pass |
+| `check_coverage.py` | pass, overall 86.32% |
+| `package_validation` branch coverage | pass, 96.57% |
+| `export_openapi.py` then `git diff` | no drift |
+| `npm run generate:api` then `git diff` | no drift |
+| `npm test` / `npm run build` | pass, 115 files / 596 tests |
+| `check_flow_matrix.py` | pass, 78 tables / 191 paths |
+| `check_document_inventory.py` | pass, 21 active documents |
+| `check_plugin_cpu_declarations.py` | pass |
+| `alembic upgrade head`, `alembic check`, `alembic downgrade base` | pass, on a throwaway database |
+
+The flow matrix is unchanged because `structures` declares no table: a structure
+reaches it as an artifact, which is already write-once and checksummed, and a
+second table would only be somewhere for a derived residue list to go stale.

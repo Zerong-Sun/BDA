@@ -1,5 +1,6 @@
 import { getTranslations } from '../../lib/i18n'
 import { matchSkill } from './skills/registry'
+import { matchBot, useCopilotBots } from './bots/registry'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
@@ -63,6 +64,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastMode, setLastMode] = useState<string | null>(() => getLatestCopilotMode())
+  // null means "let the message decide". A bot the user picked stays picked
+  // across turns, because a phase of work is several messages long and having
+  // to re-select the operator every turn is how a picker stops being used.
+  const [bot, setBot] = useState<string | null>(null)
+  const { data: bots } = useCopilotBots()
   const usableMessages = messages.filter(
     (message) => message.content.trim().length > 0 && message.content !== legacyCopilotIntro,
   )
@@ -71,7 +77,10 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const trimmed = input.trim()
     if (!trimmed || loading) return
 
-    const skill = matchSkill(trimmed)?.name
+    // A bot and a skill are both narrowing hints and the API rejects both at
+    // once, so the bot wins and the skill is only consulted when no bot applies.
+    const activeBot = bot ?? matchBot(trimmed, bots ?? [])?.id
+    const skill = activeBot ? undefined : matchSkill(trimmed)?.name
     const reviewIntent = detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
@@ -94,6 +103,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
       skill,
+      bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,
       context: {
@@ -162,5 +172,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     }
   }
 
-  return { messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages, lastMode }
+  return {
+    messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages,
+    lastMode, bots: bots ?? [], bot, setBot,
+  }
 }

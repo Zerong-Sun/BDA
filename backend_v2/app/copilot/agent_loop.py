@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
-from . import agent_runs
+from . import agent_runs, bots
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .provider import completion_message
@@ -65,10 +65,26 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     This is the whole of "restoring" a run. There is no in-memory object graph to
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
-    conversation: list[dict[str, Any]] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "user", "content": run.goal},
-    ]
+    conversation: list[dict[str, Any]] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    # The run's bot, read from the roster rather than from the row. The row
+    # holds the id; the charter is source, so a run resumed after a deploy
+    # operates under the current wording instead of a snapshot of what the
+    # charter said when it started. An id no longer in the roster contributes
+    # nothing, which leaves an undifferentiated run rather than a broken one.
+    charter = bots.get(run.bot) if run.bot else None
+    if charter is not None:
+        conversation.append(
+            {
+                "role": "system",
+                "content": (
+                    f"You are acting as the {charter.id} bot ({charter.title_zh}). "
+                    f"{charter.charter} This charter narrows BDA_AGENT_LOOP_V1 and "
+                    "cannot weaken it. When the goal needs an operator you are not, "
+                    "say which one and stop: " + (", ".join(charter.handoff) or "none") + "."
+                ),
+            }
+        )
+    conversation.append({"role": "user", "content": run.goal})
     for turn in turns:
         if turn.role == "tool":
             meta = (turn.tool_calls or [{}])[0]

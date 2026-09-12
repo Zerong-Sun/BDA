@@ -57,6 +57,7 @@ def create_run(
     parent_run_id: uuid.UUID | None = None,
     max_turns: int = 24,
     max_cost_usd_cents: int | None = None,
+    bot: str | None = None,
 ) -> CopilotAgentRun:
     if parent_run_id is not None:
         parent = require_run(session, parent_run_id)
@@ -69,6 +70,11 @@ def create_run(
         # A child cannot reach further than its parent. Enforced by intersecting
         # rather than trusting the caller's list.
         allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
+        # A child inherits its parent's charter unless it was given one. A
+        # subagent spawned by the medic is still doing the medic's work, and a
+        # child that silently lost the refusals its parent was operating under
+        # would be the one place the roster stopped applying.
+        bot = bot or parent.bot
 
     run = CopilotAgentRun(
         project_id=project_id,
@@ -76,6 +82,7 @@ def create_run(
         created_by=user_id,
         goal=goal,
         status="running",
+        bot=bot,
         parent_run_id=parent_run_id,
         allowed_tools=sorted(set(allowed_tools)),
         max_turns=max_turns,

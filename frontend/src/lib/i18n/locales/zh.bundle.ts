@@ -212,6 +212,8 @@ export const bundleZh = {
       citationProject: '项目内',
       citationExternal: '外部',
       citationSourceFallback: '来源 {index}',
+      botLabel: 'Copilot 机器人',
+      botAuto: '自动',
     },
     loading: {
       connecting: '正在连接 Copilot…',

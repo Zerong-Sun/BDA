@@ -20,6 +20,7 @@ from ..projects.models import Project
 from ..registry.models import LLMProvider, ModelPlugin
 from ..targets.repository import TargetRepository
 from . import agent_runs
+from . import bots as bot_roster
 from .capabilities import (
     configurable_capability_ids,
     normalize_capabilities,
@@ -396,7 +397,25 @@ def start_agent_run(
     """
     config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == project.id))
     enabled = normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
-    if payload.skills:
+    if payload.bot and payload.skills:
+        raise DomainError(
+            "copilot_hint_conflict",
+            "Pass either a bot or an explicit skill list, not both.",
+            status_code=422,
+        )
+    if payload.bot:
+        # `require` raises 404 for an unknown id rather than falling through to
+        # the project's full set, which is the one way this narrowing could
+        # widen a run.
+        bot = bot_roster.require(payload.bot)
+        capabilities = set(bot.capabilities) & enabled
+        if not capabilities:
+            raise DomainError(
+                "copilot_capability_disabled",
+                f"This project has enabled none of the capabilities {bot.id!r} needs.",
+                status_code=422,
+            )
+    elif payload.skills:
         requested = normalize_capabilities(payload.skills)
         unknown = sorted(set(payload.skills) - configurable_capability_ids())
         if unknown:
@@ -431,6 +450,7 @@ def start_agent_run(
         conversation_id=payload.conversation_id,
         max_turns=payload.max_turns,
         max_cost_usd_cents=payload.max_cost_usd_cents,
+        bot=payload.bot or None,
     )
     operation = enqueue_operation(
         session,

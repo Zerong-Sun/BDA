@@ -25,6 +25,18 @@ import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+//: The "no bot" option. Radix Select refuses an empty string as an item value,
+//: and null cannot round-trip through it, so the absence of a choice needs a
+//: value of its own.
+const AUTO_BOT = '__auto__'
 
 export function CopilotChat({ pageContext }: { pageContext?: string }) {
   const { t, format, language } = useI18n()
@@ -39,6 +51,9 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
     send,
     resetMessages,
     lastMode,
+    bots,
+    bot,
+    setBot,
   } = useCopilotChat(projectId, pageContext, language)
   const [input, setInput] = useState('')
   const copilotDraft = useAppStore((state) => state.copilotDraft)
@@ -110,17 +125,37 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t.copilot.chat.resetAriaLabel}
-          title={t.copilot.chat.resetTitle}
-          disabled={loading}
-          onClick={resetMessages}
-        >
-          <ArrowCounterClockwiseIcon aria-hidden="true" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {bots.length > 0 ? (
+            <Select
+              value={bot ?? AUTO_BOT}
+              onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
+            >
+              <SelectTrigger className="h-7 w-40 text-xs" aria-label={t.copilot.chat.botLabel}>
+                <SelectValue placeholder={t.copilot.chat.botAuto} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={AUTO_BOT}>{t.copilot.chat.botAuto}</SelectItem>
+                {bots.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id} title={entry.summary}>
+                    {language === 'zh' ? entry.title_zh : entry.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t.copilot.chat.resetAriaLabel}
+            title={t.copilot.chat.resetTitle}
+            disabled={loading}
+            onClick={resetMessages}
+          >
+            <ArrowCounterClockwiseIcon aria-hidden="true" />
+          </Button>
+        </div>
       </div>
       <ScrollArea className="min-h-0 flex-1" aria-label={t.copilot.chat.conversationLabel}>
         <div className="space-y-3 p-4 pr-6">

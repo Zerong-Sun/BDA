@@ -23,6 +23,12 @@ class ChatCreate(BaseModel):
     context: CopilotTurnContext = Field(default_factory=CopilotTurnContext)
     intent: Literal["chat", "review_section"] = "chat"
     skill: str | None = Field(default=None, max_length=80)
+    #: A roster bot id. Mutually exclusive with `skill`: both narrow the turn,
+    #: and two narrowing hints in one request is an ambiguity rather than a
+    #: finer filter. Narrows only - a bot never grants a disabled capability.
+    #: `min_length` so an empty string is a validation error here rather than
+    #: something each endpoint decides for itself whether to ignore.
+    bot: str | None = Field(default=None, min_length=1, max_length=80)
 
 
 class MessageResponse(BaseModel):
@@ -106,6 +112,18 @@ class SkillResponse(BaseModel):
     requires_confirmation: bool = False
 
 
+class BotResponse(BaseModel):
+    id: str
+    title: str
+    title_zh: str
+    phase: int
+    summary: str
+    charter: str
+    capabilities: list[str] = Field(default_factory=list)
+    handoff: list[str] = Field(default_factory=list)
+    triggers: list[str] = Field(default_factory=list)
+
+
 class RoutePlanCreate(BaseModel):
     project_id: uuid.UUID
     goal: str = Field(min_length=1, max_length=5000)
@@ -182,6 +200,9 @@ class AgentRunCreate(BaseModel):
     skills: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
         default_factory=list, max_length=20
     )
+    #: A roster bot id. Mutually exclusive with `skills`, and narrowing only:
+    #: the run gets `bot.capabilities & project.enabled_skills`.
+    bot: str | None = Field(default=None, min_length=1, max_length=80)
     max_turns: int = Field(default=24, ge=1, le=200)
     max_cost_usd_cents: int | None = Field(default=None, ge=0, le=1_000_000)
 
@@ -195,6 +216,9 @@ class AgentRunResponse(BaseModel):
     created_by: uuid.UUID
     goal: str
     status: str
+    #: The roster bot this run acts as, if any. Read from the run rather than
+    #: recomputed, so the UI shows the operator the run is actually using.
+    bot: str | None = None
     parent_run_id: uuid.UUID | None
     allowed_tools: list
     max_turns: int

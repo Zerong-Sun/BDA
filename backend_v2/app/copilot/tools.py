@@ -967,3 +967,153 @@ _register(
         handler=_spawn_subagent,
     )
 )
+
+
+# --- Structure (read) --------------------------------------------------------
+# Residue-level reads over an uploaded structure artifact. All three are
+# measurements: they report what the coordinates say and never what it means.
+# `structures.service` does the artifact lookup and the project check, so these
+# handlers stay as thin as the rest of the catalogue.
+
+
+def _structure_handler(kind: str):
+    def handler(ctx: ToolContext, args: dict[str, Any]) -> Any:
+        from ..structures import service as structures
+
+        artifact_id = uuid.UUID(_arg_str(args, "artifact_id"))
+        project_id = _project_of(ctx)
+        if kind == "analyse":
+            return structures.analyse(ctx.session, project_id, artifact_id)
+        if kind == "contacts":
+            return structures.contacts(
+                ctx.session,
+                project_id,
+                artifact_id,
+                chain_a=_arg_str(args, "chain_a"),
+                chain_b=_arg_str(args, "chain_b"),
+                cutoff_angstrom=float(args.get("cutoff_angstrom") or 4.5),
+            )
+        residue = args.get("residue_seq")
+        return structures.site(
+            ctx.session,
+            project_id,
+            artifact_id,
+            chain=_arg_str(args, "chain") or None,
+            residue_seq=int(residue) if residue is not None else None,
+            ligand=_arg_str(args, "ligand") or None,
+            radius_angstrom=float(args.get("radius_angstrom") or 5.0),
+        )
+
+    return handler
+
+
+_register(
+    ToolSpec(
+        id="analyse_structure",
+        description=(
+            "Read a PDB or mmCIF artifact: chains, residue counts, per-chain "
+            "sequence, numbering gaps, ligands, disulfides and B-factor/pLDDT "
+            "statistics. Start here before asking about any residue, because the "
+            "chain ids and numbering this returns are what the other structure "
+            "tools take as arguments."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"artifact_id": {"type": "string"}},
+            "required": ["artifact_id"],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_structure_handler("analyse"),
+    )
+)
+
+_register(
+    ToolSpec(
+        id="list_structure_contacts",
+        description=(
+            "Residue pairs across two chains within a heavy-atom cutoff, each with "
+            "its closest atom pair and distance in angstroms. This is the interface "
+            "as measurement; it does not identify an epitope or a binding site."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "chain_a": {"type": "string"},
+                "chain_b": {"type": "string"},
+                "cutoff_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 4.5},
+            },
+            "required": ["artifact_id", "chain_a", "chain_b"],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_structure_handler("contacts"),
+    )
+)
+
+_register(
+    ToolSpec(
+        id="describe_structure_site",
+        description=(
+            "Residues within a radius of one named centre - a residue given as "
+            "chain plus residue_seq, or a ligand given by its component code. "
+            "Name exactly one; the tool will not choose a centre for you."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "chain": {"type": "string"},
+                "residue_seq": {"type": "integer"},
+                "ligand": {"type": "string"},
+                "radius_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 5.0},
+            },
+            "required": ["artifact_id"],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_structure_handler("site"),
+    )
+)
+
+
+# --- Failure diagnosis (read) ------------------------------------------------
+
+
+def _diagnose_compute_failure(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..compute import diagnosis
+
+    return diagnosis.diagnose(
+        ctx.session, _project_of(ctx), uuid.UUID(_arg_str(args, "job_id"))
+    )
+
+
+_register(
+    ToolSpec(
+        id="diagnose_compute_failure",
+        description=(
+            "Gather one job's recorded evidence - status, error, attempt history, "
+            "events and the runtime spec it declared - and report the failure "
+            "causes that evidence supports, each marked confirmed or possible. "
+            "An empty finding list means the evidence determines no cause; do not "
+            "supply one."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"job_id": {"type": "string"}},
+            "required": ["job_id"],
+            "additionalProperties": False,
+        },
+        capability="failure-diagnosis",
+        execution_mode="read",
+        requires="session",
+        handler=_diagnose_compute_failure,
+    )
+)

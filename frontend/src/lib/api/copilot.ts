@@ -53,7 +53,10 @@ export interface CopilotMessage {
 export interface CopilotChatRequest {
   messages: CopilotMessage[]
   project_id?: string
+  /** One capability id. Mutually exclusive with `bot`; the API rejects both. */
   skill?: string
+  /** One roster bot id. Narrows the turn to that bot's capabilities. */
+  bot?: string
   conversation_id?: string | null
   intent?: 'chat' | 'review_section'
   context?: {
@@ -395,6 +398,7 @@ export function sendCopilotMessage(payload: CopilotChatRequest) {
   return postChatApiV2CopilotChatPost<true>({ body: {
     project_id: body.project_id, message,
     skill: body.skill,
+    bot: body.bot,
     conversation_id: body.conversation_id ?? undefined,
     intent: body.intent ?? 'chat',
     context: {
@@ -432,6 +436,7 @@ export async function streamCopilotMessage(
   const { data: accepted } = await postChatApiV2CopilotChatPost<true>({ body: {
     project_id: body.project_id, message: body.messages.at(-1)?.content ?? '',
     skill: body.skill,
+    bot: body.bot,
     conversation_id: body.conversation_id ?? undefined,
     intent: body.intent ?? 'chat',
     context: {

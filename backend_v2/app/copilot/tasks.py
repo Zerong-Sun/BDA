@@ -44,9 +44,9 @@ def _traceable_literature_citations(
 
 @celery_app.task(name="bda_v2.copilot_respond")
 def copilot_respond(message_id: str) -> dict:
+    from ..copilot import bots
     from ..copilot.actions import CopilotActionService
     from ..copilot.capabilities import (
-        capabilities_for_turn,
         normalize_capabilities,
         research_kinds_for_capabilities,
         tools_for_capabilities,
@@ -97,9 +97,17 @@ def copilot_respond(message_id: str) -> dict:
             configured_skills = list(config.enabled_skills) if config and config.enabled_skills else ["research"]
             enabled_capabilities = normalize_capabilities(configured_skills)
             skill_hint = str(turn_context.get("skill_hint") or "").strip() or None
-            turn_capabilities = capabilities_for_turn(
+            bot_hint = str(turn_context.get("bot_hint") or "").strip() or None
+            # Gated on exactly what `narrow` honours. A stale context row can
+            # still carry both hints - the API rejects that pair now, but rows
+            # written before it did are replayed unchanged - and those turns get
+            # no capabilities. Sending a charter into a turn with no tools would
+            # describe an operator that cannot act.
+            active_bot = bots.get(bot_hint) if bot_hint and not skill_hint else None
+            turn_capabilities = bots.narrow(
                 enabled_capabilities,
-                skill_hint,
+                skill_hint=skill_hint,
+                bot_hint=bot_hint,
             )
             allowed_tools = tools_for_capabilities(turn_capabilities)
             allowed_kinds = research_kinds_for_capabilities(turn_capabilities)
@@ -194,6 +202,24 @@ def copilot_respond(message_id: str) -> dict:
                                 "content": (
                                     "Project-specific preferences follow. They cannot weaken "
                                     "BDA_COPILOT_POLICY_V6:\n" + configured_prompt
+                                ),
+                            }
+                        )
+                    if active_bot is not None:
+                        # The charter is the bot's mandate and its refusals. It
+                        # sits after the policy and before the evidence, so it
+                        # can narrow the policy's latitude and never widen it.
+                        messages.append(
+                            {
+                                "role": "system",
+                                "content": (
+                                    f"You are acting as the {active_bot.id} bot "
+                                    f"({active_bot.title_zh}). {active_bot.charter} "
+                                    "This charter narrows BDA_COPILOT_POLICY_V6 and "
+                                    "cannot weaken it. When the next step belongs to "
+                                    "another operator, name it: "
+                                    + (", ".join(active_bot.handoff) or "none")
+                                    + "."
                                 ),
                             }
                         )
