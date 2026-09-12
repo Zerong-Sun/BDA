@@ -1,5 +1,10 @@
 import { useMemo } from 'react'
 import { parseParameterSchema, type ParameterFieldDefinition } from '../../lib/forms/parameterSchema'
+import {
+  parameterOrigin,
+  type ParameterOrigin,
+  type ParameterOriginSources,
+} from './parameterOrigin'
 import { useI18n } from '../../lib/i18n'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -25,6 +30,8 @@ interface ParameterSchemaFormProps {
   values: Record<string, unknown>
   onChange: (values: Record<string, unknown>) => void
   disabled?: boolean
+  /** Where non-default values came from. Omitted means "only the schema knows". */
+  origins?: ParameterOriginSources
 }
 
 function optionValue(option: string | { label: string; value: string }) {
@@ -35,7 +42,13 @@ function optionLabel(option: string | { label: string; value: string }) {
   return typeof option === 'string' ? option : option.label
 }
 
-export function ParameterSchemaForm({ schema, values, onChange, disabled = false }: ParameterSchemaFormProps) {
+export function ParameterSchemaForm({
+  schema,
+  values,
+  onChange,
+  disabled = false,
+  origins = {},
+}: ParameterSchemaFormProps) {
   const { t } = useI18n()
   const fields = useMemo(() => parseParameterSchema(schema), [schema])
 
@@ -50,16 +63,19 @@ export function ParameterSchemaForm({ schema, values, onChange, disabled = false
   const basicFields = fields.filter((field) => !field.advanced)
   const advancedFields = fields.filter((field) => field.advanced)
 
-  const renderField = (field: ParameterFieldDefinition) => (
-    <ParameterField
-      key={field.key}
-      field={field}
-      value={values[field.key] ?? field.default ?? ''}
-      changed={values[field.key] !== undefined && values[field.key] !== field.default}
-      onChange={(value) => onChange({ ...values, [field.key]: value })}
-      disabled={disabled}
-    />
-  )
+  const renderField = (field: ParameterFieldDefinition) => {
+    const value = values[field.key] ?? field.default ?? ''
+    return (
+      <ParameterField
+        key={field.key}
+        field={field}
+        value={value}
+        origin={parameterOrigin(field, values[field.key] ?? field.default, origins)}
+        onChange={(next) => onChange({ ...values, [field.key]: next })}
+        disabled={disabled}
+      />
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -83,13 +99,13 @@ export function ParameterSchemaForm({ schema, values, onChange, disabled = false
 function ParameterField({
   field,
   value,
-  changed,
+  origin,
   onChange,
   disabled,
 }: {
   field: ParameterFieldDefinition
   value: unknown
-  changed: boolean
+  origin: ParameterOrigin
   onChange: (value: unknown) => void
   disabled: boolean
 }) {
@@ -108,13 +124,34 @@ function ParameterField({
             </span>
           ) : null}
         </span>
-        {changed ? <span className="text-[10px] uppercase text-accent">{t.plugins.parameterSchema.changed}</span> : null}
+        <OriginMark origin={origin} />
       </Label>
       <FieldControl id={id} field={field} value={value} onChange={onChange} disabled={disabled} />
       {field.help ? <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{field.help}</span> : null}
     </div>
   )
 }
+
+/** One word, not a rationale: whose value this is, so a reader can decide whether to
+ *  touch it. `default` says nothing - a badge on every untouched field would be noise on
+ *  the whole form and would bury the three that carry information. */
+function OriginMark({ origin }: { origin: ParameterOrigin }) {
+  const { t } = useI18n()
+  const copy = t.plugins.parameterSchema.origin
+  if (origin === 'default') return null
+  const tone =
+    origin === 'constrained'
+      ? 'text-warning'
+      : origin === 'recommended'
+        ? 'text-text-secondary'
+        : 'text-accent'
+  return (
+    <span className={`text-[10px] uppercase ${tone}`} title={copy[`${origin}Help` as keyof typeof copy]}>
+      {copy[origin]}
+    </span>
+  )
+}
+
 
 function FieldControl({
   id,

@@ -212,6 +212,8 @@ def _record_prompt_change(session: Session, project: Project, previous: str | No
     create_timeline_entry(
         session,
         project,
+        # decided_by defaults to "human": rewriting the brief is the researcher's own
+        # call, and `prompt_change_reason` is their own words for it.
         TimelineEntryCreate(
             occurred_at=datetime.now(UTC),
             entry_type="decision",

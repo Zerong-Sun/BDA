@@ -198,3 +198,14 @@ export type WorkflowLayout = z.infer<typeof WorkflowLayoutSchema>
 export function isRetryableJob(status: string | undefined): boolean {
   return status === 'failed' || status === 'cancelled'
 }
+
+/** Has this run stopped moving?
+ *
+ *  A judgement about a job still in flight is a plan, not a decision: the thing being
+ *  judged can still change. Reads `TERMINAL_JOB_STATUSES` rather than repeating it, so the
+ *  two cannot disagree about what "stopped" means - including `failed`, because a negative
+ *  result is the most expensive thing this project owns and the easiest to leave
+ *  unrecorded. */
+export function isSettledJob(status: string | undefined): boolean {
+  return Boolean(status) && (TERMINAL_JOB_STATUSES as readonly string[]).includes(status as string)
+}

@@ -58,6 +58,24 @@ OUTCOMES = ("supported", "refuted", "inconclusive", "unspecified")
 # they actually said, rather than being silently labelled `dry` in bulk.
 LANES = ("dry", "wet", "both", "unspecified")
 
+# Who actually made the call. Three real values plus an explicit "not stated".
+#
+# This exists to make one question answerable with data instead of opinion: when an agent
+# chose the parameters and when a person did, which went better. That question cannot be
+# asked at all unless the attribution is stored at the time, and it is the question the
+# platform will be asked as soon as more of the work is delegated.
+#
+# `agent_proposed_human_confirmed` is the value most of the interesting rows will carry,
+# and it is deliberately not collapsed into either neighbour: a judgement a model drafted
+# and a person accepted is not the same artefact as one a person reasoned to, and it is
+# not the same as one nobody reviewed. Collapsing it would destroy the only comparison
+# worth making.
+#
+# `unspecified` is the default so that rows written before this column keep saying what
+# they actually said, rather than being relabelled `human` in bulk - the same reason
+# `lane` has one.
+DECIDED_BY = ("human", "agent", "agent_proposed_human_confirmed", "unspecified")
+
 
 class ProjectTimelineEntry(UUIDVersionMixin, Base):
     __tablename__ = "project_timeline_entries"
@@ -145,3 +163,13 @@ class ProjectTimelineEntry(UUIDVersionMixin, Base):
     )
     tags: Mapped[list] = mapped_column(JSON, default=list)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Whose judgement this was. See DECIDED_BY. Set by the service from the identity of
+    # the writer, never from the request body: an attribution a caller supplies is a
+    # claim about authorship, and a claim is not what makes the comparison above
+    # possible. Same discipline as the decision number, which only the orchestrator
+    # allocates, and as autopilot_ledger's one-writer constraint.
+    #
+    # No index, for the same reason `lane` has none: it is only ever filtered inside one
+    # project, where ix_timeline_project_occurred already leads with project_id, and the
+    # row count per project is small.
+    decided_by: Mapped[str] = mapped_column(String(40), default="unspecified")

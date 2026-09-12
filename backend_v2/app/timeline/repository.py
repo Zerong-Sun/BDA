@@ -21,6 +21,7 @@ class TimelineRepository:
         entry_type: str | None = None,
         phase: str | None = None,
         outcome: str | None = None,
+        decided_by: str | None = None,
     ) -> list[ProjectTimelineEntry]:
         """Chronological (oldest first), keyset-paged on (occurred_at, id).
 
@@ -36,6 +37,8 @@ class TimelineRepository:
             query = query.where(ProjectTimelineEntry.phase == phase)
         if outcome:
             query = query.where(ProjectTimelineEntry.outcome == outcome)
+        if decided_by:
+            query = query.where(ProjectTimelineEntry.decided_by == decided_by)
         if after is not None:
             moment, last_id = after
             query = query.where(

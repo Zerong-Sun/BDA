@@ -87,6 +87,31 @@ function LaneMarks({ entry }: { entry: TimelineEntry }) {
   )
 }
 
+/** Whose call this was, shown only when the record actually says.
+ *
+ *  `unspecified` renders nothing. A badge reading "not stated" on the majority of a
+ *  seeded project's rows would be noise on every card, and worse, it would make the rows
+ *  that *do* carry an attribution harder to pick out - which is the only reason to show
+ *  this at all. The value that matters visually is `agent`: a judgement nothing human
+ *  reviewed is the one a reader should be able to find without filtering. */
+function DecidedByMark({ entry }: { entry: TimelineEntry }) {
+  const { t } = useI18n()
+  const copy = t.timeline.decidedBy
+  if (entry.decided_by === 'unspecified') return null
+  const label = copy[entry.decided_by as keyof typeof copy] ?? entry.decided_by
+  const tone =
+    entry.decided_by === 'agent'
+      ? 'bg-warning-bg text-warning'
+      : entry.decided_by === 'agent_proposed_human_confirmed'
+        ? 'bg-surface-2 text-text-secondary'
+        : 'bg-surface-2 text-text-muted'
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[11px] ${tone}`} title={copy.help}>
+      {label}
+    </span>
+  )
+}
+
 function DecisionCard({ node }: { node: DecisionNode }) {
   const actions = useContext(TreeActionsContext)
   const { t, format } = useI18n()
@@ -113,6 +138,7 @@ function DecisionCard({ node }: { node: DecisionNode }) {
           tone={outcomeTone(entry.outcome)}
         />
         <LaneMarks entry={entry} />
+        <DecidedByMark entry={entry} />
         <time className="font-mono text-[11px] text-text-muted" dateTime={entry.occurred_at}>
           {entry.occurred_at.slice(0, 10)}
         </time>

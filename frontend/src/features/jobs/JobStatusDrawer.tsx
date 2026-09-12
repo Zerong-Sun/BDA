@@ -6,9 +6,10 @@ import { submitWorkflowNode } from '../../lib/api/workflow'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { useJobEventStream } from './useJobEventStream'
 import type { Job } from '../../lib/schemas/job'
-import { isCancellableJob, isRetryableJob } from '../../lib/schemas/workflow'
+import { isCancellableJob, isRetryableJob, isSettledJob } from '../../lib/schemas/workflow'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { statusTone } from '../../components/ui/statusTone'
+import { RecordDecisionButton } from '../timeline/RecordDecisionButton'
 import { useToastStore } from '../../components/ui/toastStore'
 import { useI18n } from '../../lib/i18n'
 import { DEFAULT_GPU_QUEUE } from '../../lib/config/cluster'
@@ -346,6 +347,28 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
                     resourceType="job"
                     resourceId={selectedJob.id}
                   />
+                  {/* Offered where the run is, and only once it has settled: a decision
+                      about a job that is still running is a plan, and the ids that make
+                      the record checkable are already on screen here. A finished run is
+                      the moment the judgement actually gets made. */}
+                  {isSettledJob(selectedJob.status) ? (
+                    <RecordDecisionButton
+                      projectId={selectedJob.project_id}
+                      seed={{
+                        lane: 'dry',
+                        summary: format(t.jobs.decisionSeedSummary, {
+                          plugin: selectedJob.model_plugin ?? t.jobs.unknownPlugin,
+                          status: selectedJob.status,
+                        }),
+                        provenance: {
+                          job_ids: [selectedJob.id],
+                          // The external id is the cluster's, not ours: it belongs under
+                          // the one key that exists for things the platform does not own.
+                          external_refs: selectedJob.external_id ? [selectedJob.external_id] : [],
+                        },
+                      }}
+                    />
+                  ) : null}
                   {selectedJob.external_id ? (
                     <Button type="button"
                       variant="outline"

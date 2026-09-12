@@ -94,6 +94,46 @@ function emptyProvenance(): Record<ProvenanceKey, string> {
 
 /** A blank draft. `occurred_at` defaults to now (UTC, minute precision) because an entry
  *  written today about work done today is the common case; back-dating is one edit. */
+/** What an event site knows about the decision it is offering to record.
+ *
+ *  Everything here is a *fact the platform already holds* - which run this was, which half
+ *  of the loop it belongs to, what it produced. Nothing here is the judgement: the title
+ *  is a placeholder and the conclusion is empty, because the point is to lower the cost of
+ *  writing the record down, not to write it for the researcher. A prefilled conclusion
+ *  would be a machine's opinion wearing a person's signature. */
+export interface DecisionSeed {
+  title?: string
+  summary?: string
+  lane?: TimelineEntryDraft['lane']
+  phase?: string
+  provenance?: Partial<Record<ProvenanceKey, string[]>>
+  /** Comma separated, as the draft stores them. */
+  tags?: string
+}
+
+/** An empty draft with the facts the caller already had filled in.
+ *
+ *  This is the whole of the capture fix. `provenance` stayed empty for the life of the
+ *  table not because the field was wrong but because filling it meant leaving the thing
+ *  you were looking at, going to another page, and retyping an id you could see. Here the
+ *  ids are already in hand, so citing costs nothing. */
+export function seededDraft(seed: DecisionSeed, now: Date = new Date()): TimelineEntryDraft {
+  const draft = emptyDraft(now)
+  const provenance = { ...draft.provenance }
+  for (const [key, ids] of Object.entries(seed.provenance ?? {})) {
+    if (ids?.length) provenance[key as ProvenanceKey] = ids.join('\n')
+  }
+  return {
+    ...draft,
+    title: seed.title ?? draft.title,
+    summary: seed.summary ?? draft.summary,
+    lane: seed.lane ?? draft.lane,
+    phase: seed.phase ?? draft.phase,
+    tags: seed.tags ?? draft.tags,
+    provenance,
+  }
+}
+
 export function emptyDraft(now: Date = new Date()): TimelineEntryDraft {
   return {
     occurred_at: now.toISOString().slice(0, 16),

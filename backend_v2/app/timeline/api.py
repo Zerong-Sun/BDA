@@ -36,6 +36,7 @@ def list_timeline(
     entry_type: str | None = Query(default=None),
     phase: str | None = Query(default=None),
     outcome: str | None = Query(default=None),
+    decided_by: str | None = Query(default=None),
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> TimelineEntryPage:
@@ -43,11 +44,18 @@ def list_timeline(
 
     Filters are the questions this table exists to answer: "what did we rule out"
     (outcome=refuted), "what happened in phase 2" (phase=phase-2), "show only the
-    problems" (entry_type=problem).
+    problems" (entry_type=problem), and - the reason `decided_by` is filterable at all -
+    "which of these did an agent decide" (decided_by=agent).
     """
     require_project(session, project_id, user)
     rows = TimelineRepository(session).list_project(
-        project_id, decode_time_cursor(cursor), limit, entry_type=entry_type, phase=phase, outcome=outcome
+        project_id,
+        decode_time_cursor(cursor),
+        limit,
+        entry_type=entry_type,
+        phase=phase,
+        outcome=outcome,
+        decided_by=decided_by,
     )
     page = rows[:limit]
     return TimelineEntryPage(

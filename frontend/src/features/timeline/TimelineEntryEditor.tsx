@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { useI18n } from '../../lib/i18n'
+import { ProvenanceField } from './ProvenanceField'
 import {
   createTimelineEntry,
   deleteTimelineEntry,
@@ -28,7 +29,9 @@ import {
   draftFromEntry,
   draftToBody,
   emptyDraft,
+  seededDraft,
   validateDraft,
+  type DecisionSeed,
   type DraftError,
   type TimelineEntryDraft,
 } from './timelineEntryForm'
@@ -56,6 +59,9 @@ interface Props {
    *  the editor still works where the caller has no list to hand; the two selects then
    *  offer only "nothing", which is honest rather than broken. */
   entries?: TimelineEntry[]
+  /** Facts the caller already had, for a new entry opened from where the work happened.
+   *  Ignored when editing: an existing entry's own record wins over a caller's guess. */
+  seed?: DecisionSeed
   onClose: () => void
 }
 
@@ -72,12 +78,12 @@ function isConflict(error: unknown): boolean {
   return status === 412
 }
 
-export function TimelineEntryEditor({ projectId, entry, entries = [], onClose }: Props) {
+export function TimelineEntryEditor({ projectId, entry, entries = [], seed, onClose }: Props) {
   const { t, format } = useI18n()
   const tl = t.timeline
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<TimelineEntryDraft>(() =>
-    entry ? draftFromEntry(entry) : emptyDraft(),
+    entry ? draftFromEntry(entry) : seed ? seededDraft(seed) : emptyDraft(),
   )
   const [submitted, setSubmitted] = useState(false)
 
@@ -340,17 +346,15 @@ export function TimelineEntryEditor({ projectId, entry, entries = [], onClose }:
       <fieldset className="mt-4 rounded-md border border-border-soft p-3">
         <legend className="px-1 text-xs font-medium text-text-primary">{tl.sectionProvenance}</legend>
         <p className="text-[11px] text-text-muted">{tl.sectionProvenanceHelp}</p>
-        <div className="mt-2 grid gap-2 md:grid-cols-2">
+        <div className="mt-2 grid gap-3 md:grid-cols-2">
           {PROVENANCE_KEYS.map((key) => (
-            <label key={key} className="grid gap-1 text-xs text-text-secondary">
-              {tl.provenanceKey[key]}
-              <Textarea
-                rows={2}
-                value={draft.provenance[key]}
-                onChange={(event) => setProvenance(key, event.target.value)}
-                aria-label={tl.provenanceKey[key]}
-              />
-            </label>
+            <ProvenanceField
+              key={key}
+              fieldKey={key}
+              projectId={projectId}
+              value={draft.provenance[key]}
+              onChange={(next) => setProvenance(key, next)}
+            />
           ))}
         </div>
         {message(errorFor(shown, 'provenance')) ? (

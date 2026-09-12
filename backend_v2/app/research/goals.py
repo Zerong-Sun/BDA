@@ -317,6 +317,11 @@ def import_decision_tree(
                 tags=["bootstrap"],
             ),
             user,
+            # A model drafted these branches and a person accepted them one at a time
+            # (`POST /projects/{id}/decision-tree` takes a reviewed proposal, never a
+            # draft id). That is neither a human judgement nor an unreviewed agent one,
+            # and recording it as either would lose the distinction the column exists for.
+            decided_by="agent_proposed_human_confirmed",
         )
         entries.append(entry)
         # `goal_title` was checked against the proposal's own goals by the schema, so a

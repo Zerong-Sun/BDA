@@ -145,3 +145,31 @@ describe('editing from the tree', () => {
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd-edit' }))
   })
 })
+
+describe('attribution on a decision card', () => {
+  it('marks an agent-decided entry, because nothing human reviewed it', () => {
+    renderWithProviders(
+      <DecisionTreeView goals={[goal('g', ['d'])]} entries={[entry('d', { decided_by: 'agent' })]} />,
+    )
+    expect(screen.getByText(/decided by an agent/i)).toBeInTheDocument()
+  })
+
+  it('distinguishes agent-drafted-and-accepted from both neighbours', () => {
+    renderWithProviders(
+      <DecisionTreeView
+        goals={[goal('g', ['d'])]}
+        entries={[entry('d', { decided_by: 'agent_proposed_human_confirmed' })]}
+      />,
+    )
+    expect(screen.getByText(/agent drafted, person accepted/i)).toBeInTheDocument()
+  })
+
+  it('says nothing when the record says nothing', () => {
+    // A badge on every seeded row would bury the rows that do carry an attribution,
+    // which is the only reason to show it at all.
+    renderWithProviders(
+      <DecisionTreeView goals={[goal('g', ['d'])]} entries={[entry('d')]} />,
+    )
+    expect(screen.queryByText(/attribution not stated/i)).not.toBeInTheDocument()
+  })
+})

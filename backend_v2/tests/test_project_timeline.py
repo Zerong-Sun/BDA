@@ -445,3 +445,70 @@ def test_every_write_leaves_an_audit_row(env) -> None:
         for row in env["session"].query(AuditLog).filter(AuditLog.entity_type == "project_timeline_entry")
     }
     assert actions == {"timeline.create", "timeline.update", "timeline.delete"}
+
+
+# --- Attribution --------------------------------------------------------------
+#
+# `decided_by` exists so that "were the agent's parameters better than mine" can be
+# answered from rows rather than from memory. These pin the two properties that make the
+# answer trustworthy: the attribution cannot be supplied by whoever is writing the row,
+# and it is filterable.
+
+
+def test_an_entry_is_attributed_to_a_person_by_default(env: dict) -> None:
+    entry = create_entry(
+        env["session"],
+        env["project"],
+        TimelineEntryCreate(occurred_at=BASE, title="Ruled out route B"),
+        env["user"],
+    )
+    assert entry.decided_by == "human"
+
+
+def test_a_machine_written_entry_has_to_say_so(env: dict) -> None:
+    entry = create_entry(
+        env["session"],
+        env["project"],
+        TimelineEntryCreate(occurred_at=BASE, title="Drafted branch"),
+        env["user"],
+        decided_by="agent_proposed_human_confirmed",
+    )
+    # created_by and decided_by answer different questions and both survive.
+    assert entry.created_by == env["user"].id
+    assert entry.decided_by == "agent_proposed_human_confirmed"
+
+
+def test_the_request_body_cannot_claim_an_attribution(env: dict) -> None:
+    """A caller that could set this could write "human" over an agent's work."""
+    assert "decided_by" not in TimelineEntryCreate.model_fields
+    assert "decided_by" not in TimelineEntryUpdate.model_fields
+
+
+def test_an_invented_attribution_is_refused(env: dict) -> None:
+    with pytest.raises(DomainError) as excinfo:
+        create_entry(
+            env["session"],
+            env["project"],
+            TimelineEntryCreate(occurred_at=BASE, title="Whose call?"),
+            env["user"],
+            decided_by="the vibes",
+        )
+    assert excinfo.value.error_code == "timeline_decided_by_invalid"
+    assert excinfo.value.status_code == 422
+
+
+def test_entries_can_be_read_back_by_who_decided(env: dict) -> None:
+    session, project, user = env["session"], env["project"], env["user"]
+    for index, attribution in enumerate(("human", "agent", "agent_proposed_human_confirmed")):
+        create_entry(
+            session,
+            project,
+            TimelineEntryCreate(occurred_at=BASE + timedelta(minutes=index), title=attribution),
+            user,
+            decided_by=attribution,
+        )
+    session.flush()
+
+    only_agent = TimelineRepository(session).list_project(project.id, None, 50, decided_by="agent")
+    assert [row.title for row in only_agent] == ["agent"]
+    assert len(TimelineRepository(session).list_project(project.id, None, 50)) == 3
