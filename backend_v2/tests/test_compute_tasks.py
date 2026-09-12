@@ -414,6 +414,87 @@ def test_cross_project_beat_tasks_are_isolated_on_scheduler_queue() -> None:
         assert item["options"]["queue"] == "scheduler"
 
 
+@pytest.mark.parametrize("topic,task_name", [
+    ("target.structure.import", "bda_v2.target_structure_import"),
+    ("gate.evaluate", "bda_v2.evaluate_workflow_gate"),
+    ("gate.resume", "bda_v2.evaluate_workflow_gate"),
+])
+def test_outbox_recovery_publishes_only_selected_due_events_once(task_database, monkeypatch, topic, task_name) -> None:
+    factory, ids = task_database
+    selected, unrelated, dead = (uuid.uuid4() for _ in range(3))
+    with factory() as session:
+        for event_id in (selected, unrelated, dead):
+            session.add(OutboxEvent(
+                id=event_id, topic=topic, aggregate_id=ids["target"],
+                payload={"project_id": str(ids["project"]), "pdb_id": "6PXV", "attach_to_target": False},
+                dead_lettered_at=datetime.now(UTC) if event_id == dead else None,
+            ))
+        session.commit()
+    sent = []
+    monkeypatch.setattr(tasks.celery_app, "send_task", lambda name, **kwargs: sent.append((name, kwargs)))
+    assert tasks.publish_outbox.run(event_ids=[])["published"] == 0
+    assert tasks.publish_outbox.run(event_ids=[str(selected), str(dead)])["published"] == 1
+    assert tasks.publish_outbox.run(event_ids=[str(selected)])["published"] == 0
+    assert len(sent) == 1
+    name, message = sent[0]
+    assert name == task_name
+    assert message["task_id"] == str(selected)
+    assert message["headers"] == {"bda_project_id": str(ids["project"])}
+    if topic == "target.structure.import":
+        assert message["args"][1]["attach_to_target"] is False
+    else:
+        assert message["args"] == [str(ids["target"])]
+        assert celery_app_module.celery_app.conf.task_routes[task_name]["queue"] == "collect"
+    with factory() as session:
+        assert session.get(OutboxEvent, unrelated).published_at is None
+        assert session.get(OutboxEvent, unrelated).attempts == 0
+        assert session.get(OutboxEvent, dead).published_at is None
+
+
+def test_outbox_recovery_rejects_invalid_allowlist_before_sending(task_database, monkeypatch) -> None:
+    sent = []
+    monkeypatch.setattr(tasks.celery_app, "send_task", lambda *args, **kwargs: sent.append(kwargs))
+    for event_ids in ([str(uuid.uuid4()), "invalid"], [str(uuid.uuid4())] * 101):
+        with pytest.raises(ValueError):
+            tasks.publish_outbox.run(event_ids=event_ids)
+    assert sent == []
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"batch_size": 0}, {"batch_size": -1}, {"batch_size": 1001}, {"batch_size": True},
+    {"batch_size": 1.5}, {"batch_size": "4"}, {"event_ids": "not-a-list"},
+    {"event_ids": [None]}, {"event_ids": [1]}, {"event_ids": {}},
+    {"event_ids": [str(uuid.uuid4()), str(uuid.uuid4())], "batch_size": 1},
+])
+def test_outbox_recovery_invalid_input_never_opens_database(monkeypatch, kwargs) -> None:
+    def forbidden():
+        pytest.fail("Invalid recovery input reached the database")
+
+    monkeypatch.setattr(tasks, "session_scope", forbidden)
+    with pytest.raises(ValueError):
+        tasks.publish_outbox.run(**kwargs)
+
+
+def test_outbox_recovery_preserves_future_events_and_deduplicates_ids(task_database, monkeypatch) -> None:
+    factory, ids = task_database
+    due, future = uuid.uuid4(), uuid.uuid4()
+    with factory() as session:
+        for event_id in (due, future):
+            session.add(OutboxEvent(
+                id=event_id, topic="target.structure.import", aggregate_id=ids["target"],
+                payload={"project_id": str(ids["project"]), "pdb_id": "6PXV"},
+                available_at=datetime.now(UTC) + timedelta(days=1 if event_id == future else -1),
+            ))
+        session.commit()
+    sent = []
+    monkeypatch.setattr(tasks.celery_app, "send_task", lambda *args, **kwargs: sent.append(kwargs))
+    assert tasks.publish_outbox.run(batch_size=2, event_ids=[str(due), str(due), str(future)])["published"] == 1
+    assert [message["task_id"] for message in sent] == [str(due)]
+    with factory() as session:
+        assert session.get(OutboxEvent, future).published_at is None
+        assert session.get(OutboxEvent, future).attempts == 0
+
+
 def test_celery_hooks_bind_and_reset_project_context(monkeypatch) -> None:
     marker: ContextVar[str | None] = ContextVar("test_worker_project", default=None)
     bound: list[object | None] = []

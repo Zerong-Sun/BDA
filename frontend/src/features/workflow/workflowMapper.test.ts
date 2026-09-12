@@ -148,6 +148,24 @@ describe('workflowMapper', () => {
     expect(footerFromMetrics(node)).toBe('Needs plugin: RosettaDock, HADDOCK')
   })
 
+  it('anchors a connection with no ports on the ordering handles', () => {
+    // React Flow drops an edge whose handle id names nothing the card rendered. Once
+    // cards started rendering one handle per declared port, 'output'/'input' named
+    // nothing and every pre-port edge disappeared from the canvas - taking with it the
+    // gate badge that is the only way to configure the connection.
+    const nodes = [
+      apiNode({ id: 'a', node_key: 'backbones' }),
+      apiNode({ id: 'b', node_key: 'sequences' }),
+    ]
+    const { edges } = mapApiGraphToGraph(nodes, [
+      { id: 'ordering', source: 'backbones', target: 'sequences', source_port: null, target_port: null },
+      { id: 'typed', source: 'backbones', target: 'sequences', source_port: 'backbone_set', target_port: 'pdb_path' },
+    ])
+
+    expect(edges[0]).toMatchObject({ sourceHandle: '__order_out', targetHandle: '__order_in' })
+    expect(edges[1]).toMatchObject({ sourceHandle: 'backbone_set', targetHandle: 'pdb_path' })
+  })
+
   it('keeps the progress footer when nothing is missing', () => {
     const node = apiNode({
       node_key: 'receptor_complex_prediction',

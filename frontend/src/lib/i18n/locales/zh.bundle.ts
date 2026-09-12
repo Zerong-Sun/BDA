@@ -780,6 +780,9 @@ export const bundleZh = {
       readinessUnavailableBody: '在靶标就绪服务恢复前，工作流修改保持锁定。',
       preflightReadyTitle: '执行预检已通过',
       preflightBlockedTitle: '执行预检未通过',
+      preflightCounts: '{blockers} 项阻断 · {warnings} 项提示',
+      preflightShowAll: '展开全部 {count} 项',
+      preflightShowLess: '收起',
       validatePlugin: '验证声明',
       validatingPlugin: '验证中…',
       pluginValidationComplete: '插件声明验证已完成。',
@@ -803,7 +806,7 @@ export const bundleZh = {
       emptyTitle: '空工作流',
       emptyBody:
         '从左侧面板添加模型节点，或在上方输入目标以生成推荐路线。从输出句柄拖到下一节点输入以连接节点。',
-      connectHint: '从输出拖到输入以连接节点。',
+      connectHint: '从输出端口拖到输入端口以传递数据；拖动空心圆点表示仅先后次序、不传数据。',
       statusLegendAria: '工作流状态图例',
     },
     inspector: {

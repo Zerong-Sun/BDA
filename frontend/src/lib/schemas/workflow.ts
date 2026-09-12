@@ -34,6 +34,7 @@ export const WorkflowNodeStatusSchema = z.enum([
   'queued',
   'running',
   'collecting',
+  'skipped',
   'cancel_requested',
   'succeeded',
   'failed',
@@ -55,6 +56,7 @@ export const JobStatusSchema = z.enum([
   'queued',
   'running',
   'collecting',
+  'skipped',
   'cancel_requested',
   'succeeded',
   'failed',
@@ -108,6 +110,7 @@ export const WorkflowNodeSchema = z.object({
   command: z.string().nullable(),
   queue: z.string().nullable(),
   status: WorkflowNodeStatusSchema,
+  configuration: JsonRecordSchema.default({}),
   parameters: JsonRecordSchema,
   input_bindings: z.array(WorkflowInputBindingSchema).default([]),
   error_message: z.string().nullable(),
@@ -123,6 +126,8 @@ export type WorkflowNodeStatus = z.infer<typeof WorkflowNodeStatusSchema>
 export type SubmitStatus = z.infer<typeof SubmitStatusSchema>
 
 export const WorkflowEdgeSchema = z.object({
+  id: z.string().optional(),
+  gate: JsonRecordSchema.optional(),
   source: z.string(),
   target: z.string(),
   source_port: z.string().nullable().optional(),

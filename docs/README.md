@@ -16,6 +16,10 @@ reports are maintained only in the private BDA-demo archive.
 
 ## Active guides
 
+- [Workflow connections and gates](WORKFLOW_GATES.md)
+- [Workflow gate validation and repairs](WORKFLOW_GATES_REVIEW.md)
+- [System operability review](SYSTEM_OPERABILITY_REVIEW.md)
+
 - [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
 - [Backend v2](BACKEND_V2.md)
 - [Frontend v2](FRONTEND_V2.md)

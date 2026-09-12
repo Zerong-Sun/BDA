@@ -11,12 +11,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '../../components/ui/toastStore'
 import { listModelPlugins } from '../../lib/api/registry'
 import {
+  getWorkflowGraph,
   getWorkflowPreflight,
   previewWorkflowNodeScript,
   updateWorkflowNode,
   type ScriptPreviewResponse,
 } from '../../lib/api/workflow'
 import { ParameterSchemaForm } from '../plugins'
+import { NodeAssistance } from './NodeAssistance'
 import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
 import { parseParameterSchema } from '../../lib/forms/parameterSchema'
 import { InputBindingPanel } from './InputBindingPanel'
@@ -40,6 +42,7 @@ import {
 
 interface WorkflowInspectorProps {
   workflowRunId?: string
+  workflowVersion?: number
   selectedNode?: WorkflowNode | null
   selectedArtifact?: Artifact | null
   nodeCount?: number
@@ -62,6 +65,7 @@ export function WorkflowInspector(props: WorkflowInspectorProps) {
 
 function WorkflowInspectorContent({
   workflowRunId,
+  workflowVersion,
   selectedNode,
   selectedArtifact,
   nodeCount = 0,
@@ -69,10 +73,12 @@ function WorkflowInspectorContent({
   nodes = [],
   readOnly = false,
 }: WorkflowInspectorProps) {
+  const [baseVersion, setBaseVersion] = useState(workflowVersion)
   const parameters = selectedNode?.parameters ?? {}
   const metrics = typeof selectedNode?.parameters.metrics === 'object' && selectedNode.parameters.metrics
     ? selectedNode.parameters.metrics as Record<string, unknown>
     : {}
+  const [draftConfiguration, setDraftConfiguration] = useState<Record<string, unknown>>(selectedNode?.configuration ?? {})
   const [draftParameters, setDraftParameters] = useState<Record<string, unknown>>(parameters)
   const [draftBindings, setDraftBindings] = useState<WorkflowInputBinding[]>(
     selectedNode?.input_bindings ?? [],
@@ -149,13 +155,17 @@ function WorkflowInspectorContent({
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
       if (!workflowRunId || !selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       return updateWorkflowNode(workflowRunId, selectedNode.id, {
+        configuration: draftConfiguration,
         parameters: effectiveParameters,
         input_bindings: draftBindings,
         queue: queueName.trim() || null,
-      })
+      }, baseVersion)
     },
     onSuccess: async () => {
       showToast(t.workflowExt.toasts.paramsSaved, 'success')
+      const latest = await getWorkflowGraph(workflowRunId!)
+      setBaseVersion(latest.workflow.version)
+      queryClient.setQueryData(['workflow-graph', workflowRunId], latest)
       await queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
       await queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
     },
@@ -171,6 +181,8 @@ function WorkflowInspectorContent({
       if (!selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       return previewWorkflowNodeScript(selectedNode.id, {
         override_params: effectiveParameters,
+        configuration: draftConfiguration,
+        input_bindings: draftBindings,
         compute_backend: previewBackend,
       })
     },
@@ -314,6 +326,7 @@ function WorkflowInspectorContent({
                   </p>
                 </div>
               </div>
+              {workflowRunId && selectedNode && <NodeAssistance workflowId={workflowRunId} node={{ ...selectedNode, parameters: draftParameters }} nodes={nodes} configuration={draftConfiguration} onConfiguration={setDraftConfiguration} onParameter={(key, value) => setDraftParameters(p => ({ ...p, [key]: value }))} readOnly={readOnly} allowedParameters={parameterFields.map(f => f.key)} />}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button"
                   variant="outline"
@@ -328,7 +341,7 @@ function WorkflowInspectorContent({
                 </Button>
                 <Button type="button"
                   size="sm"
-                  disabled={previewScript.isPending || nodePreflight.data?.allowed !== true}
+                  disabled={previewScript.isPending}
                   onClick={() => previewScript.mutate()}
                 >
                   <FileCode className="h-3.5 w-3.5" />

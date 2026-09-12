@@ -804,6 +804,9 @@ export const bundleEn = {
         'Workflow changes are locked until the target readiness service is available.',
       preflightReadyTitle: 'Execution preflight passed',
       preflightBlockedTitle: 'Execution preflight is blocked',
+      preflightCounts: '{blockers} blocking · {warnings} advisory',
+      preflightShowAll: 'Show all {count}',
+      preflightShowLess: 'Show less',
       validatePlugin: 'Validate declaration',
       validatingPlugin: 'Validating...',
       pluginValidationComplete: 'Plugin declaration validation finished.',
@@ -828,7 +831,7 @@ export const bundleEn = {
       emptyTitle: 'Empty workflow',
       emptyBody:
         'Add model nodes from the left panel, or enter an objective above to generate a recommended route. Connect nodes by dragging from an output handle to the next node input.',
-      connectHint: 'Connect nodes by dragging from output to input.',
+      connectHint: 'Drag an output port to an input port to pass data; drag the hollow handles to run one stage after another without passing data.',
       statusLegendAria: 'Workflow status legend',
     },
     inspector: {
