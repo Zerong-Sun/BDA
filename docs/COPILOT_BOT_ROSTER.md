@@ -274,6 +274,7 @@ Gates run for this change, on `bda-public/main`:
 | `export_openapi.py` then `git diff` | no drift |
 | `npm run generate:api` then `git diff` | no drift |
 | `npm test` / `npm run build` | pass, 115 files / 596 tests |
+| `npm run test:browser` (browser vertical slice) | pass, 148/148 cases |
 | `check_flow_matrix.py` | pass, 78 tables / 191 paths |
 | `check_document_inventory.py` | pass, 21 active documents |
 | `check_plugin_cpu_declarations.py` | pass |

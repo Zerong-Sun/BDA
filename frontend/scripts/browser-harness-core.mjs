@@ -1311,6 +1311,35 @@ function createStrictRoutes({ scenario, routeId }) {
     settings: { llm_api_base: '', llm_model: '', system_prompt: 'Browser acceptance fixture' },
     enabled_skills: [],
   }))
+  // The bot roster is a server-side declaration, not project data, so it is the
+  // same in every scenario - including `empty`, where a project with no data
+  // still has the same nine operators available to it. Two entries rather than
+  // all nine: the harness asserts that the picker renders, and a full copy here
+  // would be a second roster to keep in step with `copilot/bots.py`.
+  add('GET', '/api/v2/copilot/bots', {}, () => ok([
+    {
+      id: 'structuralist',
+      title: 'Structuralist',
+      title_zh: '结构与残基',
+      phase: 3,
+      summary: 'Read structures at residue level: chains, gaps, contacts, sites and confidence.',
+      charter: 'You report geometry as measurement. Never infer function from geometry.',
+      capabilities: ['project-read', 'structure-analysis'],
+      handoff: ['planner'],
+      triggers: ['structure', 'residue'],
+    },
+    {
+      id: 'planner',
+      title: 'Planner',
+      title_zh: '路线规划',
+      phase: 4,
+      summary: 'Choose the route and draft the compute that implements it.',
+      charter: 'You choose the route and draft the compute, and you stop there.',
+      capabilities: ['project-read', 'workflow-planning', 'compute-drafting'],
+      handoff: [],
+      triggers: ['route', 'workflow'],
+    },
+  ]))
   add('GET', '/api/v2/compute-drafts', { limit: '200', project_id: PROJECT_ID }, () => ok({
     items: scenario === 'pending'
       ? [{ id: 'draft_browser', status: 'pending', project_id: PROJECT_ID, created_at: NOW }]
