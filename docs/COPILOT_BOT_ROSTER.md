@@ -136,6 +136,14 @@ Three tools:
 | `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
+`structuralist` pairs this with `project-read` and nothing else, and the pairing
+is load-bearing rather than incidental: the structure tools all take an
+`artifact_id`, and `project-read` is the bot's only route to one. Targets carry
+`structure_artifact_id`; candidates carry both `structure_artifact_id` and
+`complex_artifact_id`, and the second is what an interface question is actually
+asked about. Drop `project-read` from this bot and it keeps three tools it can
+never supply an argument to.
+
 All three are `execution_mode="read"` under capability `structure-analysis`, and
 therefore appear on the MCP surface automatically: an external MCP client holding
 a grant for a project can analyse that project's structures with no new transport

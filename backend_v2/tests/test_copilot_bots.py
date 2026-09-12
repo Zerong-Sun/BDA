@@ -431,3 +431,20 @@ def test_a_subagent_inherits_its_parents_charter(session: Session) -> None:
     )
 
     assert child.bot == "medic"
+
+
+def test_the_structuralist_can_reach_a_structure_to_analyse() -> None:
+    """Its only route to an artifact id is `project-read`.
+
+    `structuralist` deliberately has no `research-read`, so nothing else in its
+    tool set returns an artifact id. Trimming `project-read` off it would leave
+    three structure tools that need an `artifact_id` and no way to obtain one -
+    a bot that looks configured and can never do anything. The ids it needs are
+    on targets (`structure_artifact_id`) and on candidates (`structure_artifact_id`
+    and `complex_artifact_id`, the latter being what an interface question is
+    actually asked about).
+    """
+    granted = tools_for_capabilities(bots.capabilities_for_bot("structuralist", ALL_CAPABILITIES))
+
+    assert {"list_project_targets", "list_project_candidates"} <= granted
+    assert {"analyse_structure", "list_structure_contacts", "describe_structure_site"} <= granted
