@@ -1105,6 +1105,12 @@ export const bundleZh = {
       errBadTimestamp: '不是有效的日期时间。',
       errLaneEvidence: '已定论的湿实验或干湿兼有的决策必须指名台面证据：补一个实验结果或一个构建体。',
       errAlternativeIncomplete: '选项和它的理由是一对 \u2014 要么都填，要么清空这一行。',
+      provenanceFreeHelp: '用于平台不拥有的东西 — LSF 作业号、工单号。每行一个。',
+      provenanceIdHelp: '粘贴行 ID。每行一个。',
+      provenanceNotAddressable: '不是 ID，无法解析：{items}',
+      provenanceUnlisted: '另引用：{items}',
+      provenanceLoadFailed: '无法加载本项目可引用的对象。',
+      provenanceNothingToCite: '本项目还没有这类对象。',
       provenanceKey: {
         job_ids: '作业',
         candidate_ids: '候选物',

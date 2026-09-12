@@ -1134,6 +1134,12 @@ export const bundleEn = {
       errBadTimestamp: 'Not a valid date and time.',
       errLaneEvidence: 'A settled wet or dry-and-wet decision must name bench evidence: add an experiment result or a construct.',
       errAlternativeIncomplete: 'An option and its reason go together \u2014 fill both, or clear the row.',
+      provenanceFreeHelp: 'For things the platform does not own — an LSF job id, a ticket. One per line.',
+      provenanceIdHelp: 'Paste the row id. One per line.',
+      provenanceNotAddressable: 'Not an id, so nothing can resolve it: {items}',
+      provenanceUnlisted: 'also citing: {items}',
+      provenanceLoadFailed: 'Could not load what this project has to cite.',
+      provenanceNothingToCite: 'Nothing of this kind in this project yet.',
       provenanceKey: {
         job_ids: 'Jobs',
         candidate_ids: 'Candidates',
