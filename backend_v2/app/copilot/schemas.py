@@ -257,3 +257,59 @@ class AgentRunAccepted(BaseModel):
 class AgentRunCancelled(BaseModel):
     run: AgentRunResponse
     cancelled_runs: int
+
+
+# --- MCP sessions ------------------------------------------------------------
+
+
+class McpSessionCreate(BaseModel):
+    project_id: uuid.UUID
+    label: str = Field(min_length=1, max_length=120)
+    #: The run whose goal is this grant's mandate. Omit for a read-only grant -
+    #: `mcp.available_tools` lists no write tool without one.
+    agent_run_id: uuid.UUID | None = None
+    #: Capability ids, not tool ids, for the same reason `AgentRunCreate.skills`
+    #: takes capabilities: the server derives the tools, so a client cannot name
+    #: one its project has not enabled.
+    capabilities: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=list, max_length=20
+    )
+    expires_in_hours: int = Field(default=24, ge=1, le=720)
+
+
+class McpSessionResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    agent_run_id: uuid.UUID | None
+    issued_by: uuid.UUID
+    label: str
+    granted_capabilities: list[str]
+    #: Whether the bound run is still live. False means the grant is read-only
+    #: right now, whether or not it names a run.
+    mandate_live: bool
+    #: What this grant can actually call, after the project configuration, the
+    #: run vocabulary and the intent gate have all narrowed it. Derived on read
+    #: rather than stored, because every one of those inputs can change after the
+    #: grant was written.
+    tools: list[str]
+    write_tools: list[str]
+    expires_at: datetime
+    revoked_at: datetime | None
+    last_used_at: datetime | None
+    call_count: int
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class McpSessionIssued(BaseModel):
+    session: McpSessionResponse
+    #: Returned exactly once. Only the SHA-256 hash is stored, so this value
+    #: cannot be shown again - reissue instead of recovering it.
+    token: str
+    endpoint: str
+
+
+class McpSessionPage(BaseModel):
+    items: list[McpSessionResponse]
+    next_cursor: str | None = None

@@ -16,14 +16,17 @@ from .schemas import (
     AutopilotDraftCreate,
     AutopilotDraftResponse,
     AutopilotOperationAccepted,
+    AutopilotStageResponse,
     AutopilotStart,
 )
 from .service import (
     cancel_campaign,
     confirm_draft,
     create_draft,
+    release_stage,
     require_campaign,
     require_draft,
+    require_stage,
     start_campaign,
     take_over_campaign,
 )
@@ -155,3 +158,37 @@ def post_takeover(
     take_over_campaign(session, campaign, parse_if_match(if_match), user)
     response.headers["ETag"] = etag(campaign.version)
     return AutopilotCampaignResponse.model_validate(campaign)
+
+
+@router.post(
+    "/autopilot-campaigns/{campaign_id}/stages/{stage_id}/release",
+    response_model=AutopilotStageResponse,
+    openapi_extra={"x-permission": "autopilot.stage.release"},
+)
+def post_stage_release(
+    campaign_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    # `current_user` plus the project's own `autopilot` permission, matching every other
+    # route here: the permission check is where the authority actually lives.
+    user: User = Depends(current_user),
+) -> AutopilotStageResponse:
+    """Let one held stage act.
+
+    Per stage rather than per campaign, which is the whole point: `autonomy` is a dial with
+    two positions, and a supervised campaign that asks about everything trains the reviewer
+    to approve without reading. What needs a person is decided by what the step does - see
+    `gates.py` - so the approval is granted where that question is answerable.
+
+    `If-Match` for the same reason every other mutation here carries it: two people
+    releasing the same stage from two stale tabs must not both believe they did. The
+    release is idempotent, so a retry is not a second signature.
+    """
+    campaign = require_campaign(session, campaign_id)
+    require_project_permission(session, campaign.project_id, user, "autopilot")
+    stage = require_stage(session, stage_id)
+    released = release_stage(session, campaign, stage, user, parse_if_match(if_match))
+    response.headers["ETag"] = etag(released.version)
+    return AutopilotStageResponse.model_validate(released)

@@ -522,3 +522,45 @@ def test_a_campaign_cannot_be_taken_over_from_another_project(domain_client) -> 
         assert refused.status_code in (403, 404)
     finally:
         app.dependency_overrides[current_user] = previous
+
+
+def test_confirming_a_campaign_lands_on_the_project_decision_record(domain_client) -> None:
+    """A confirmation closes options, so it belongs on the tree, not only in the ledger.
+
+    The ledger answers "what did Autopilot do" for operations. It cannot answer "why did
+    this project go this way", which is the question the timeline is read for - so before
+    this, a confirmed campaign was invisible in the only view that asks it.
+    """
+    client, ids = domain_client
+    campaign = _confirmed_campaign(client, str(ids["project"]), name="Recorded campaign")
+
+    timeline = client.get(f"/api/v2/projects/{ids['project']}/timeline?decided_by=agent_proposed_human_confirmed")
+    assert timeline.status_code == 200
+    entries = [item for item in timeline.json()["items"] if "autopilot" in item["tags"]]
+    assert len(entries) == 1, timeline.text
+    entry = entries[0]
+
+    assert entry["entry_type"] == "decision"
+    # Confirming is not a finding: the campaign has not run.
+    assert entry["outcome"] == "unspecified"
+    # The spec may schedule bench stages, so claiming a half would be a guess.
+    assert entry["lane"] == "unspecified"
+    # The frozen spec is addressable, and by the key that names it - not external_refs,
+    # which is for things the platform does not own.
+    assert entry["provenance"] == {"autopilot_campaign_ids": [campaign["id"]]}
+    assert entry["alternatives"], "a decision with no closed branch is a flowchart"
+    assert "Recorded campaign" in entry["title"]
+
+
+def test_the_confirmation_entry_is_not_attributed_to_the_person_alone(domain_client) -> None:
+    """The spec was normalised by a model; the person accepted it under If-Match.
+
+    Recording that as `human` would lose exactly the distinction the column was added
+    for, and recording it as `agent` would claim nobody reviewed it.
+    """
+    client, ids = domain_client
+    _confirmed_campaign(client, str(ids["project"]), name="Attribution campaign")
+
+    everything = client.get(f"/api/v2/projects/{ids['project']}/timeline").json()["items"]
+    confirmations = [item for item in everything if "autopilot" in item["tags"]]
+    assert [item["decided_by"] for item in confirmations] == ["agent_proposed_human_confirmed"]

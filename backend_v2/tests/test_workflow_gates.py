@@ -525,7 +525,7 @@ def test_migration_upgrade_and_downgrade():
     from alembic.operations import Operations
     from sqlalchemy import create_engine, inspect
 
-    migration = importlib.import_module("backend_v2.alembic.versions.0056_workflow_gates")
+    migration = importlib.import_module("backend_v2.alembic.versions.0059_workflow_gates")
     engine = create_engine("sqlite+pysqlite://")
     with engine.begin() as connection:
         for table in ["projects", "users", "jobs", "workflow_runs", "workflow_nodes"]:

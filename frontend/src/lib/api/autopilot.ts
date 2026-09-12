@@ -1,4 +1,5 @@
 import {
+  postStageReleaseApiV2AutopilotCampaignsCampaignIdStagesStageIdReleasePost,
   getCampaignApiV2AutopilotCampaignsCampaignIdGet,
   postCancelApiV2AutopilotCampaignsCampaignIdCancelPost,
   postConfirmApiV2AutopilotDraftsDraftIdConfirmPost,
@@ -90,4 +91,24 @@ export async function takeOverAutopilotCampaign(
     throwOnError: true,
   })
   return data as AutopilotCampaignResponse
+}
+
+/**
+ * Let one held stage act.
+ *
+ * Per stage rather than per campaign: `autonomy` is a dial with two positions, and a
+ * campaign that asks about everything trains the reviewer to approve without reading.
+ * What needs a person is decided by what the step does, so the approval is asked for where
+ * that question is answerable.
+ *
+ * `If-Match` because two people releasing from two stale tabs must not both believe they
+ * did. The server is idempotent, so a retry is not a second signature.
+ */
+export async function releaseAutopilotStage(campaignId: string, stageId: string, version: number) {
+  const released = await postStageReleaseApiV2AutopilotCampaignsCampaignIdStagesStageIdReleasePost<true>({
+    path: { campaign_id: campaignId, stage_id: stageId },
+    headers: { 'If-Match': `W/"${version}"` },
+    throwOnError: true,
+  })
+  return released.data
 }

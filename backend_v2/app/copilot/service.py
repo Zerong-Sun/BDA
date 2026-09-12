@@ -1,10 +1,13 @@
 import os
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..audit.service import record_audit
 from ..candidates.models import Candidate
 from ..core.config import get_settings
 from ..core.problem import DomainError
@@ -22,13 +25,21 @@ from .capabilities import (
     normalize_capabilities,
     tools_for_capabilities,
 )
-from .models import CopilotAgentRun, CopilotConfig, CopilotConversation, CopilotMessage
+from .mcp import hash_token as hash_mcp_token
+from .models import (
+    CopilotAgentRun,
+    CopilotConfig,
+    CopilotConversation,
+    CopilotMcpSession,
+    CopilotMessage,
+)
 from .route_catalog import DesignRoute, recommended_parameters, routes_for
 from .schemas import (
     AgentRunCreate,
     CopilotConfigUpdate,
     InterpretationCreate,
     InterpretationResponse,
+    McpSessionCreate,
     RoutePlanCreate,
     RoutePlanKnowledgeRef,
     RoutePlanModule,
@@ -432,3 +443,125 @@ def start_agent_run(
         payload={"run_id": str(run.id)},
     )
     return run, operation
+
+
+# --- MCP sessions ------------------------------------------------------------
+
+
+def _requested_capabilities(session: Session, project: Project, requested: list[str]) -> set[str]:
+    """Validate a capability request against the project's configuration.
+
+    Same two failures and the same codes `start_agent_run` raises, because they
+    are the same two mistakes: naming a capability that does not exist, and
+    naming one this project has switched off. A grant is not a way around the
+    project configuration.
+    """
+    if not requested:
+        raise DomainError(
+            "copilot_mcp_session_without_capabilities",
+            "An MCP session with no capability can call nothing; grant at least one.",
+            status_code=422,
+        )
+    unknown = sorted(set(requested) - configurable_capability_ids())
+    if unknown:
+        raise DomainError(
+            "copilot_capability_not_found",
+            "Unknown Copilot capabilities: " + ", ".join(unknown),
+            status_code=422,
+        )
+    config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == project.id))
+    enabled = normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
+    wanted = normalize_capabilities(requested)
+    disabled = sorted(wanted - enabled)
+    if disabled:
+        raise DomainError(
+            "copilot_capability_disabled",
+            "Capabilities disabled for this project: " + ", ".join(disabled),
+            status_code=422,
+        )
+    return wanted
+
+
+def issue_mcp_session(
+    session: Session,
+    project: Project,
+    user: User,
+    payload: McpSessionCreate,
+) -> tuple[CopilotMcpSession, str]:
+    """Grant one external client access to this project's copilot tools.
+
+    Returns the row and the raw token, which is the only time the token exists
+    outside the caller's hands: the column holds a SHA-256 hash, the way
+    `refresh_sessions` does.
+
+    The bound run is checked here rather than only at call time so that issuing a
+    grant against a finished run fails loudly. `mcp.bound_run` still re-checks on
+    every call, because a run that finishes afterwards has to degrade the grant
+    to read-only without anyone revoking it.
+    """
+    capabilities = _requested_capabilities(session, project, list(payload.capabilities))
+    if payload.agent_run_id is not None:
+        run = session.get(CopilotAgentRun, payload.agent_run_id)
+        if run is None or run.project_id != project.id:
+            raise DomainError(
+                "copilot_agent_run_not_found",
+                "The agent run was not found in this project",
+                status_code=404,
+            )
+        if run.status not in ("running", "awaiting_tasks"):
+            raise DomainError(
+                "copilot_agent_run_not_live",
+                f"Agent run {run.id} is {run.status}; its goal can no longer authorize writes.",
+                status_code=422,
+            )
+    raw = secrets.token_urlsafe(48)
+    row = CopilotMcpSession(
+        project_id=project.id,
+        agent_run_id=payload.agent_run_id,
+        issued_by=user.id,
+        label=payload.label,
+        granted_capabilities=sorted(capabilities),
+        token_hash=hash_mcp_token(raw),
+        expires_at=datetime.now(UTC) + timedelta(hours=payload.expires_in_hours),
+    )
+    session.add(row)
+    session.flush()
+    record_audit(
+        session,
+        action="copilot.mcp.session.issue",
+        entity_type="copilot_mcp_session",
+        entity_id=row.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        actor_id=user.id,
+        payload={
+            "label": row.label,
+            "capabilities": row.granted_capabilities,
+            "agent_run_id": str(row.agent_run_id) if row.agent_run_id else None,
+        },
+    )
+    return row, raw
+
+
+def revoke_mcp_session(
+    session: Session, row: CopilotMcpSession, user: User, project: Project
+) -> CopilotMcpSession:
+    """Idempotent. Revoking twice is one revocation, not two.
+
+    A second row would make "when did this stop being usable" unanswerable, which
+    is the only question a revocation record exists to answer.
+    """
+    if row.revoked_at is None:
+        row.revoked_at = datetime.now(UTC)
+        row.version += 1
+        record_audit(
+            session,
+            action="copilot.mcp.session.revoke",
+            entity_type="copilot_mcp_session",
+            entity_id=row.id,
+            project_id=project.id,
+            organization_id=project.organization_id,
+            actor_id=user.id,
+            payload={"label": row.label},
+        )
+    return row

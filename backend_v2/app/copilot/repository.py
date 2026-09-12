@@ -11,6 +11,7 @@ from .models import (
     CopilotAgentTurn,
     CopilotConfig,
     CopilotConversation,
+    CopilotMcpSession,
     CopilotMessage,
 )
 
@@ -78,3 +79,14 @@ class CopilotRepository:
 
     def llm_provider(self, provider_id: uuid.UUID) -> LLMProvider | None:
         return self.session.get(LLMProvider, provider_id)
+
+    def list_mcp_sessions(
+        self, project_id: uuid.UUID, after: uuid.UUID | None, limit: int
+    ) -> list[CopilotMcpSession]:
+        query = select(CopilotMcpSession).where(CopilotMcpSession.project_id == project_id)
+        if after:
+            query = query.where(CopilotMcpSession.id > after)
+        return list(self.session.scalars(query.order_by(CopilotMcpSession.id).limit(limit + 1)))
+
+    def mcp_session(self, session_id: uuid.UUID) -> CopilotMcpSession | None:
+        return self.session.get(CopilotMcpSession, session_id)

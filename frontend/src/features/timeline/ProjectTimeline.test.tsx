@@ -26,6 +26,7 @@ const ENTRY: TimelineEntry = {
   entry_type: 'decision',
   decision_ref: 'D8',
   lane: 'dry',
+    decided_by: 'human',
   phase: 'phase-2',
   title: 'a recorded call',
   summary: '',

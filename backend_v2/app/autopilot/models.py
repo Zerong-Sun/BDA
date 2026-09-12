@@ -145,8 +145,38 @@ class AutopilotStage(UUIDVersionMixin, Base):
     )
     resource_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
     resource_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    #: The stage's risk tier, copied from `gates.STAGE_TIERS` when the campaign is
+    #: confirmed. Stored rather than looked up on every read, because the tier is part of
+    #: what was approved: reclassifying a stage key later must not silently re-open a
+    #: campaign someone confirmed under the old classification.
+    risk_tier: Mapped[str] = mapped_column(String(32), default="reversible_draft")
+    #: When a held stage was let through, and by whom. Both NULL on a stage that was never
+    #: held - and a held stage with these NULL is precisely the state the worker refuses
+    #: to advance past.
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     campaign: Mapped[AutopilotCampaign] = relationship(back_populates="stages")
+
+    @property
+    def held(self) -> bool:
+        """Does a person still have to let this stage through?
+
+        Derived rather than stored so it cannot disagree with the two columns it is
+        computed from. An unknown tier reads as held, matching `gates.UNKNOWN_TIER`: a row
+        whose classification this code does not recognise is not one to wave through.
+        """
+        from . import gates
+
+        return gates.TIERS.get(self.risk_tier, True) and self.released_at is None
+
+    @property
+    def hold_reason(self) -> str | None:
+        from . import gates
+
+        return gates.explain(self.stage_key) if self.held else None
 
 
 class AutopilotLedgerEntry(Base):

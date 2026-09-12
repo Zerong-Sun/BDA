@@ -14,6 +14,7 @@ import {
   createAutopilotDraft,
   getAutopilotCampaign,
   startAutopilotCampaign,
+  releaseAutopilotStage,
   takeOverAutopilotCampaign,
 } from '../lib/api/autopilot'
 import type { AutopilotCampaignResponse, AutopilotDraftResponse } from '../lib/api/generated/types.gen'
@@ -66,6 +67,14 @@ export function AutopilotPage() {
   const takeoverMutation = useMutation({
     mutationFn: () => takeOverAutopilotCampaign(campaign!.id, campaign!.version),
     onSuccess: setCampaign,
+  })
+  // Releasing changes one stage, so the campaign is re-read rather than patched locally:
+  // the server decides whether the hold is now clear, and a client that decided for itself
+  // would be the second authority the gate exists to prevent.
+  const releaseMutation = useMutation({
+    mutationFn: (stage: { id: string; version: number }) =>
+      releaseAutopilotStage(campaign!.id, stage.id, stage.version),
+    onSuccess: () => refreshMutation.mutate(),
   })
   const error =
     draftMutation.error ??
@@ -155,10 +164,30 @@ export function AutopilotPage() {
           </p>
           <ol className="space-y-2">
             {campaign.stages.map((stage) => (
-              <li key={stage.id} className="flex flex-wrap items-baseline gap-2 border-l-2 border-l-border pl-3 text-sm">
+              <li
+                key={stage.id}
+                className={`flex flex-wrap items-baseline gap-2 border-l-2 pl-3 text-sm ${
+                  stage.held ? 'border-l-warning' : 'border-l-border'
+                }`}
+              >
                 <span className="font-medium">{stage.stage_key}</span>
                 <span className="text-xs text-muted-foreground">{stage.status}</span>
-                {stage.resource_type === 'workflow_run' && stage.resource_id ? (
+                {stage.held ? (
+                  <>
+                    {/* The reason travels with the hold: a stop nobody can explain reads
+                        as a failure rather than as a decision. */}
+                    <span className="text-xs text-warning">{stage.hold_reason}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={releaseMutation.isPending}
+                      onClick={() => releaseMutation.mutate(stage)}
+                    >
+                      {language === 'zh' ? '放行这一阶段' : 'Release this stage'}
+                    </Button>
+                  </>
+                ) : stage.resource_type === 'workflow_run' && stage.resource_id ? (
                   <Link className="text-xs underline" to={`/workflow?run=${stage.resource_id}`}>
                     {language === 'zh' ? '在 Workflow 页打开' : 'Open in Workflow'}
                   </Link>

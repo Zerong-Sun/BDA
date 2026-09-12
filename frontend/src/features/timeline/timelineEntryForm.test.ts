@@ -16,6 +16,7 @@ function entry(overrides: Partial<TimelineEntry> = {}): TimelineEntry {
     entry_type: 'decision',
     decision_ref: 'D7',
     lane: 'dry',
+    decided_by: 'human',
     phase: 'phase-2',
     title: 'a gate decision',
     summary: 'the middle setting passed',
@@ -47,6 +48,9 @@ describe('emptyDraft', () => {
   it('offers every allowed provenance key and no others', () => {
     expect(Object.keys(emptyDraft().provenance).sort()).toEqual([
       'artifact_ids',
+      // A frozen Autopilot protocol is a row the platform owns, so it gets its own key
+      // rather than being filed under external_refs.
+      'autopilot_campaign_ids',
       'candidate_ids',
       'experiment_result_ids',
       'external_refs',

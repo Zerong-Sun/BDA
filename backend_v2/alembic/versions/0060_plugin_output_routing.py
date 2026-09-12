@@ -22,8 +22,8 @@ directory is never created and the bound structure is placed somewhere the comma
 not look. The parameter ``requires_input_structure`` is a different thing and is left
 untouched.
 
-Revision ID: 0057_plugin_output_routing
-Revises: 0056_workflow_gates
+Revision ID: 0060_plugin_output_routing
+Revises: 0059_workflow_gates
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0057_plugin_output_routing"
-down_revision: str | None = "0056_workflow_gates"
+revision: str = "0060_plugin_output_routing"
+down_revision: str | None = "0059_workflow_gates"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -98,11 +98,11 @@ def _retarget_command(bind, *, frm: str, to: str) -> None:
         )
     ).fetchone()
     if row is None:
-        print("0057: RFdiffusion 1.1.0 is not registered, command left alone")
+        print("0060: RFdiffusion 1.1.0 is not registered, command left alone")
         return
     plugin_id, command = row
     if frm not in (command or ""):
-        print(f"0057: RFdiffusion 1.1.0 does not probe {frm}, command left alone")
+        print(f"0060: RFdiffusion 1.1.0 does not probe {frm}, command left alone")
         return
     bind.execute(
         sa.text(
@@ -123,7 +123,7 @@ def _apply_globs(bind, *, fill_defaults: bool) -> None:
             try:
                 ports = json.loads(raw or "[]")
             except json.JSONDecodeError:
-                print(f"0057: {plugin_key} {plugin_version} has unparsable output_ports, skipped")
+                print(f"0060: {plugin_key} {plugin_version} has unparsable output_ports, skipped")
                 continue
             if not isinstance(ports, list):
                 continue

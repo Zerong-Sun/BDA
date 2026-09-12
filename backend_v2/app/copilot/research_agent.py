@@ -9,6 +9,8 @@ from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .actions import CopilotActionService
+from .citations import citations_for
+from .citations import dedupe as dedupe_citations
 from .project_context import ProjectContextService
 from .provider import completion_message
 from .registry import REGISTRY, ToolContext
@@ -474,7 +476,7 @@ def complete_research_turn(
             content = message.get("content")
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("llm_response_empty")
-            return ResearchAgentResult(content.strip(), _dedupe_citations(citations), call_log)
+            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log)
         if len(call_log) - len(initial_tool_calls) >= max_tool_calls:
             conversation.append(
                 {
@@ -486,7 +488,7 @@ def complete_research_turn(
             content = final.get("content")
             if not isinstance(content, str) or not content.strip():
                 content = "Research tool-call limit reached; the remaining workspace scope was not covered."
-            return ResearchAgentResult(content.strip(), _dedupe_citations(citations), call_log, True)
+            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True)
         conversation.append(
             {
                 "role": "assistant",
@@ -673,57 +675,6 @@ def repair_grounded_scientific_answer(
     return content.strip()
 
 
-def _cite(
-    spec: Any,
-    result: Any,
-    context: ResearchContextService,
-    project_context: ProjectContextService | None,
-) -> list[dict[str, Any]]:
-    """Turn a tool result into citations, following the tool's declared policy.
-
-    The policy lives on the ToolSpec rather than in a branch here, so a new tool
-    states how it is cited at the point it is declared and cannot be added
-    without answering the question.
-    """
-    policy = getattr(spec, "citation", "none")
-    if policy == "none" or result is None:
-        return []
-    if policy == "project_items" and project_context is not None:
-        return [project_context.citation_for_item(item) for item in result]
-    if policy == "project_compute" and project_context is not None:
-        rows = [*result.get("drafts", []), *result.get("jobs", [])]
-        return [project_context.citation_for_item(item) for item in rows]
-    if policy == "research_items":
-        return [context.citation_for_item(item) for item in result]
-    if policy == "research_dataset":
-        return [
-            context.citation_for_item(
-                {
-                    "kind": "dataset",
-                    "id": str(result.get("id")),
-                    "label": str(
-                        (result.get("title") or {}).get("default") or result.get("key") or "dataset"
-                    ),
-                    "data": result,
-                }
-            )
-        ]
-    if policy == "research_reference":
-        return [
-            context.citation_for_item(
-                {
-                    "kind": "reference",
-                    "id": str(result.get("document_id")),
-                    "label": str(
-                        (result.get("title") or {}).get("default") or result.get("ref_id")
-                    ),
-                    "data": result,
-                }
-            )
-        ]
-    return []
-
-
 def _execute(
     context: ResearchContextService,
     name: str,
@@ -757,15 +708,4 @@ def _execute(
         # The agent loop reports tool failures as ValueError with a short code;
         # keeping that shape means the turn handling above is unchanged.
         raise ValueError(error.error_code) from error
-    return result, _cite(spec, result, context, project_context)
-
-
-def _dedupe_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-    for citation in citations:
-        key = (str(citation.get("workspace_type")), str(citation.get("entity_id")))
-        if key not in seen:
-            result.append(citation)
-            seen.add(key)
-    return result
+    return result, citations_for(spec, result, context, project_context)

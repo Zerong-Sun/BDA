@@ -20,6 +20,21 @@ export const TIMELINE_LANES = ['dry', 'wet', 'both', 'unspecified'] as const
 
 export type TimelineLane = (typeof TIMELINE_LANES)[number]
 
+/** Whose judgement an entry records. `agent_proposed_human_confirmed` is the value most
+ *  delegated work carries and is deliberately its own case: a judgement a model drafted
+ *  and a person accepted is not the same artefact as one a person reasoned to, and not
+ *  the same as one nobody reviewed. Collapsing it would destroy the only comparison the
+ *  column exists to make possible. `unspecified` is what rows written before the column
+ *  say, and it is not a synonym for `human`. */
+export const TIMELINE_DECIDED_BY = [
+  'human',
+  'agent',
+  'agent_proposed_human_confirmed',
+  'unspecified',
+] as const
+
+export type TimelineDecidedBy = (typeof TIMELINE_DECIDED_BY)[number]
+
 /** Every key `provenance` may carry, in step with backend `app/timeline/schemas.py`.
  *  The backend rejects anything else rather than storing it, so an editor must offer
  *  these by name: the whole point of the restriction is that nobody invents a ninth
@@ -32,6 +47,7 @@ export const PROVENANCE_KEYS = [
   'finding_ids',
   'experiment_result_ids',
   'protein_ids',
+  'autopilot_campaign_ids',
   'external_refs',
 ] as const
 
@@ -63,6 +79,7 @@ export const TimelineEntrySchema = z.object({
   summary: z.string(),
   body: z.string(),
   outcome: z.enum(TIMELINE_OUTCOMES),
+  decided_by: z.enum(TIMELINE_DECIDED_BY).default('unspecified'),
   provenance: z.record(z.string(), z.unknown()),
   alternatives: z.array(AlternativeSchema).default([]),
   code_refs: z.array(CodeRefSchema),

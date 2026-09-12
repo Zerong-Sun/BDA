@@ -12,11 +12,14 @@ from ..campaigns.models import Campaign
 from ..compute.models import Job
 from ..compute.repository import ComputeRepository
 from ..compute.service import transition_job
+from ..core import review
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
+from ..projects.models import Project
 from ..research.models import ResearchGeneration
+from . import gates
 from .models import (
     AutopilotCampaign,
     AutopilotDraft,
@@ -27,9 +30,29 @@ from .models import (
 )
 from .schemas import AutopilotConfirm, AutopilotDraftCreate, AutopilotStart
 
+DEFAULT_STAGE_KEYS = ["research", "plan", "compute", "review"]
+
 
 def _render_brief(brief: dict) -> str:
     return "Autopilot protocol\n\n" + json.dumps(brief, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _stage_keys(spec: dict) -> list:
+    declared = spec.get("stages")
+    return list(declared) if declared else list(DEFAULT_STAGE_KEYS)
+
+
+def _check_stage_budget(spec: dict) -> None:
+    """Confirming accepts every stage at once, so the list has to be readable.
+
+    Checked at draft creation so an over-long spec never becomes something to confirm, and
+    again at confirm because that is the approval act and a draft may predate the rule -
+    the same both-ends discipline `check_lane_evidence` uses on create and update.
+    """
+    try:
+        review.check_review_budget("autopilot.stages", len(_stage_keys(spec)), unit="stages")
+    except ValueError as exc:
+        raise DomainError("autopilot_stage_budget_exceeded", str(exc), status_code=422) from exc
 
 
 def create_draft(session: Session, payload: AutopilotDraftCreate, user: User) -> AutopilotDraft:
@@ -37,6 +60,7 @@ def create_draft(session: Session, payload: AutopilotDraftCreate, user: User) ->
     prompt = payload.prompt or _render_brief(brief)
     spec = dict(brief)
     spec.setdefault("schema_version", "autopilot-spec-v1")
+    _check_stage_budget(spec)
     draft = AutopilotDraft(
         project_id=payload.project_id,
         created_by=user.id,
@@ -82,6 +106,7 @@ def confirm_draft(
         raise DomainError("version_conflict", "Autopilot draft changed", status_code=412)
     if draft.confirmed_campaign_id is not None:
         return require_campaign(session, draft.confirmed_campaign_id)
+    _check_stage_budget(draft.normalized_spec)
     if payload.manual_campaign_id is not None:
         manual = session.get(Campaign, payload.manual_campaign_id)
         if manual is None or manual.project_id != draft.project_id:
@@ -106,13 +131,17 @@ def confirm_draft(
             money_micros_limit=budget_input.money_micros_limit if budget_input else None,
         )
     )
-    stage_keys = campaign.frozen_spec.get("stages") or ["research", "plan", "compute", "review"]
+    stage_keys = _stage_keys(campaign.frozen_spec)
     for position, stage_key in enumerate(stage_keys):
+        key = str(stage_key)[:80]
         session.add(
             AutopilotStage(
                 campaign_id=campaign.id,
-                stage_key=str(stage_key)[:80],
+                stage_key=key,
                 position=position,
+                # Frozen with the spec: the tier is part of what is being approved, so a
+                # later reclassification must not re-open a confirmed campaign.
+                risk_tier=gates.tier_for(key),
             )
         )
     draft.status = "confirmed"
@@ -134,7 +163,87 @@ def confirm_draft(
         project_id=campaign.project_id,
         actor_id=user.id,
     )
+    _record_confirmation_decision(session, campaign, stage_keys, user)
     return campaign
+
+
+def _record_confirmation_decision(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage_keys: list,
+    user: User,
+) -> None:
+    """Put the confirmation on the project's decision record, not only in the ledger.
+
+    Confirming a campaign closes options: these stages and not others, this budget
+    ceiling, this autonomy level. That is the platform's own test for what belongs on the
+    decision tree - it shuts a door, it has a reviewable basis, and reopening it needs a
+    new campaign rather than an edit, because the spec is frozen.
+
+    Until now the only trace was the ledger, which answers "what did Autopilot do" for
+    operations. It does not answer "why did the project go this way", so a confirmed
+    campaign was invisible in the view that question is asked in, and the tree could not
+    show that a branch was taken by an agent's proposal at all.
+
+    `decided_by="agent_proposed_human_confirmed"` is the accurate reading: the spec was
+    normalised from a prompt by a model, and `POST .../confirm` is a person accepting it
+    under `If-Match`. `outcome="unspecified"` because confirming is not a finding - the
+    campaign has not run. `lane="unspecified"` rather than `dry`: the spec may schedule
+    bench stages, and asserting a half the spec does not state would be a guess.
+
+    Written through the timeline domain's own service, per the cross-domain rule, and
+    failure is not swallowed: a confirmation that silently skipped the record would
+    reproduce the D080-D099 gap with a machine doing the forgetting.
+    """
+    from ..timeline.schemas import Alternative, TimelineEntryCreate
+    from ..timeline.service import create_entry as create_timeline_entry
+
+    project = session.get(Project, campaign.project_id)
+    if project is None:  # pragma: no cover - the campaign's FK guarantees it
+        return
+    stages = ", ".join(str(key) for key in stage_keys)
+    budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id))
+    limits = []
+    if budget is not None and budget.gpu_seconds_limit is not None:
+        limits.append(f"GPU {budget.gpu_seconds_limit}s")
+    if budget is not None and budget.money_micros_limit is not None:
+        limits.append(f"{budget.money_micros_limit} micros")
+    create_timeline_entry(
+        session,
+        project,
+        TimelineEntryCreate(
+            occurred_at=datetime.now(UTC),
+            entry_type="decision",
+            outcome="unspecified",
+            lane="unspecified",
+            title=f"Autopilot campaign confirmed: {campaign.name}",
+            summary=(
+                f"{campaign.autonomy} autonomy over stages {stages}."
+                + (f" Hard budget: {'; '.join(limits)}." if limits else " No compute budget set.")
+            ),
+            body=(
+                "The protocol below was normalised from a prompt and frozen at "
+                "confirmation; it cannot be edited afterwards, only superseded by a new "
+                f"campaign.\n\nPrompt:\n{campaign.frozen_prompt}"
+            ),
+            # The frozen spec is addressable: it is a row, and this is the key that names
+            # it. Not `external_refs` - the platform owns this one.
+            provenance={"autopilot_campaign_ids": [str(campaign.id)]},
+            alternatives=[
+                Alternative(
+                    option="Run the stages by hand",
+                    rejected_because=(
+                        "Confirmed as an automatic campaign instead; the spec is frozen so "
+                        "budget and permission checks hold, and a person can take it back "
+                        "through takeover."
+                    ),
+                )
+            ],
+            tags=["autopilot"],
+        ),
+        user,
+        decided_by="agent_proposed_human_confirmed",
+    )
 
 
 def _reserve_budget(
@@ -334,3 +443,118 @@ def take_over_campaign(
         actor_id=user.id,
     )
     return campaign
+
+
+def release_stage(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage: AutopilotStage,
+    user: User,
+    expected_version: int,
+) -> AutopilotStage:
+    """Let one held stage through, on the record and signed by a person.
+
+    Idempotent, for the reason takeover is: two release records would make "who let this
+    through" unanswerable, which is the only question a release record exists to answer.
+
+    A stage that was never held cannot be released. That is not pedantry - a release on an
+    ungated stage would be a signature on something nobody was asked to approve, and it
+    would make the release log read as though more had been reviewed than was.
+    """
+    if stage.version != expected_version:
+        raise DomainError("version_conflict", "Autopilot stage changed", status_code=412)
+    if stage.campaign_id != campaign.id:
+        raise DomainError("autopilot_stage_not_found", "Stage does not belong to this campaign", status_code=404)
+    if campaign.status in ("cancelled", "manual_takeover"):
+        raise DomainError(
+            "autopilot_campaign_not_running",
+            f"A {campaign.status} campaign has no stage to release",
+            status_code=409,
+        )
+    if not gates.TIERS.get(stage.risk_tier, True):
+        raise DomainError(
+            "autopilot_stage_not_held",
+            f"Stage {stage.stage_key!r} is not held; there is nothing to release",
+            status_code=409,
+        )
+    if stage.released_at is not None:
+        return stage
+    reason = gates.explain(stage.stage_key)
+    stage.released_at = datetime.now(UTC)
+    stage.released_by = user.id
+    stage.version += 1
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            writer_user_id=user.id,
+            event_type="stage.released",
+            payload={
+                "stage_id": str(stage.id),
+                "stage_key": stage.stage_key,
+                "risk_tier": stage.risk_tier,
+                "reason": reason,
+            },
+        )
+    )
+    # Releasing has to *do* something. Recording the signature and leaving the stage in
+    # `awaiting_release` would be a gate with no other side: the campaign would sit there
+    # for ever and the approval would have bought nothing.
+    resource = activate_stage(session, campaign, stage)
+    if resource is not None:
+        session.add(
+            AutopilotLedgerEntry(
+                campaign_id=campaign.id,
+                # Signed by the person, not the worker principal: this row exists because
+                # they released it, and "who caused this run" is the question it answers.
+                writer_user_id=user.id,
+                event_type="stage.resource_created",
+                payload={
+                    "stage_id": str(stage.id),
+                    "resource_type": resource[0],
+                    "resource_id": str(resource[1]),
+                },
+            )
+        )
+    record_audit(
+        session,
+        action="autopilot.stage.release",
+        entity_type="autopilot_stage",
+        entity_id=stage.id,
+        project_id=campaign.project_id,
+        actor_id=user.id,
+        payload={"stage_key": stage.stage_key, "risk_tier": stage.risk_tier},
+    )
+    return stage
+
+
+def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
+    stage = session.get(AutopilotStage, stage_id)
+    if stage is None:
+        raise DomainError("autopilot_stage_not_found", "Autopilot stage was not found", status_code=404)
+    return stage
+
+
+#: Stage statuses that have not yet acted. `execute_campaign` looks at the frontmost of
+#: these rather than at `pending` alone: a held stage sits in `awaiting_release`, and a
+#: query that skipped it would advance to the stage *behind* the gate on the next
+#: redelivery - walking past the exact thing the gate exists to stop.
+UNSTARTED_STAGE_STATUSES = ("pending", "awaiting_release")
+
+
+def activate_stage(
+    session: Session, campaign: AutopilotCampaign, stage: AutopilotStage
+) -> tuple[str, uuid.UUID] | None:
+    """Make one stage act, or hold it.
+
+    One function for both callers - the worker on dispatch and a person on release -
+    because two copies of "may this stage act, and if so create its resource" is how the
+    gate ends up enforced on one path and not the other. Returns the resource the adapter
+    created, or None if the stage is held or has nothing to create.
+    """
+    from .adapters import ensure_stage_resource
+
+    if stage.held:
+        stage.status = "awaiting_release"
+        return None
+    stage.status = "ready"
+    return ensure_stage_resource(session, campaign, stage)

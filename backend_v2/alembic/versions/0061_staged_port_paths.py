@@ -24,8 +24,8 @@ The thirteen plugins that already resolve their inputs with
 idiom, written the safe way, with ``|| true`` so the lookup cannot abort the job even on
 a deployment whose renderer does not pre-create the port directories.
 
-Revision ID: 0058_staged_port_paths
-Revises: 0057_plugin_output_routing
+Revision ID: 0061_staged_port_paths
+Revises: 0060_plugin_output_routing
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0058_staged_port_paths"
-down_revision: str | None = "0057_plugin_output_routing"
+revision: str = "0061_staged_port_paths"
+down_revision: str | None = "0060_plugin_output_routing"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -74,14 +74,14 @@ def upgrade() -> None:
             {"key": plugin_key, "ver": plugin_version},
         ).fetchone()
         if row is None:
-            print(f"0058: {plugin_key} {plugin_version} is not registered, skipped")
+            print(f"0061: {plugin_key} {plugin_version} is not registered, skipped")
             continue
         plugin_id, command = row
         command = command or ""
         if MARKER in command:
             continue
         if f'"${name}"' not in command:
-            print(f"0058: {plugin_key} {plugin_version} does not read ${name} directly, skipped")
+            print(f"0061: {plugin_key} {plugin_version} does not read ${name} directly, skipped")
             continue
         bind.execute(
             sa.text(

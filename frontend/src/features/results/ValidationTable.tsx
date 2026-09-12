@@ -13,6 +13,7 @@ import { DataGridTable } from '@/components/reui/data-grid/data-grid-table'
 import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../../components/ui/AppFrame'
 import type { ExperimentResult } from '../../lib/schemas/candidate'
+import { RecordDecisionButton } from '../timeline/RecordDecisionButton'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { ApiState } from '../../components/ui/ApiState'
 import { useI18n } from '../../lib/i18n'
@@ -59,11 +60,27 @@ export function ValidationTable({ results, loading, isError, error, candidateId,
       // A measured result is the answer to a question; this is where it gets filed
       // under one. Every other attach point in the app leads back to the same tree.
       cell: ({ row }) => (
-        <AttachToGoalButton
-          projectId={row.original.project_id}
-          resourceType="experiment_result"
-          resourceId={row.original.id}
-        />
+        <div className="flex flex-wrap items-center gap-1">
+          <AttachToGoalButton
+            projectId={row.original.project_id}
+            resourceType="experiment_result"
+            resourceId={row.original.id}
+          />
+          {/* The bench half of the same move. A wet decision has to cite bench evidence -
+              the service refuses it otherwise - and this is the one place the assay's id
+              is already in hand, so the requirement costs nothing to satisfy here and a
+              trip to another page anywhere else. */}
+          <RecordDecisionButton
+            projectId={row.original.project_id}
+            seed={{
+              lane: 'wet',
+              provenance: {
+                experiment_result_ids: [row.original.id],
+                candidate_ids: row.original.candidate_id ? [row.original.candidate_id] : [],
+              },
+            }}
+          />
+        </div>
       ),
     }),
   ], [v])

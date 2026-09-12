@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import make_asgi_app
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .copilot.mcp_app import endpoint as mcp_endpoint
 from .core.config import get_settings
 from .core.metrics import MetricsMiddleware
 from .core.problem import (
@@ -69,4 +70,17 @@ api = APIRouter(prefix="/api/v2")
 for router in routers():
     api.include_router(router)
 app.include_router(api)
+
+# The MCP surface is mounted beside /api/v2, not inside it, and this is the
+# reason: `production_write_gate` above decides from the HTTP method and the path
+# prefix, while every MCP call is one `POST /mcp`. Inside /api/v2 the middleware
+# could only block the whole surface during cutover or exempt it - and exempting
+# it would be a documented way around the fence. `copilot.mcp._authorize_write`
+# rebuilds the same check per tool, where the execution mode is known.
+#
+# It is also why the sub-app cannot go through `module_registry`: `routers()`
+# requires an APIRouter and raises otherwise. The REST routes that issue and
+# revoke grants are ordinary copilot routes and do go through it.
+app.add_route("/mcp", mcp_endpoint, methods=["POST"])
+app.add_route("/mcp/", mcp_endpoint, methods=["POST"])
 app.mount("/internal/metrics", make_asgi_app())

@@ -66,6 +66,20 @@ class AutopilotStageResponse(BaseModel):
     stage_key: str
     position: int
     status: str
+    #: Frozen at confirmation, not read from the table on each request: the tier is part
+    #: of what was approved.
+    risk_tier: str
+    #: True when a person still has to let this stage through. Derived rather than stored,
+    #: so it cannot disagree with the tier and the release it is computed from.
+    held: bool = False
+    released_at: datetime | None = None
+    released_by: uuid.UUID | None = None
+    #: One line saying why this stage is held. Shown where the hold is, because a hold
+    #: nobody can explain reads as a failure.
+    hold_reason: str | None = None
+    #: Exposed because releasing carries `If-Match`, and a client that cannot read the
+    #: version cannot satisfy a precondition the server requires.
+    version: int
     resource_type: str | None
     resource_id: uuid.UUID | None
 

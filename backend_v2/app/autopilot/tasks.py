@@ -6,7 +6,6 @@ from sqlalchemy import select
 
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
-from .adapters import ensure_stage_resource
 from .models import (
     AutopilotCampaign,
     AutopilotLedgerEntry,
@@ -15,6 +14,7 @@ from .models import (
     BudgetReservation,
     CampaignBudget,
 )
+from .service import UNSTARTED_STAGE_STATUSES, activate_stage
 
 
 def _worker_principal(session) -> AutopilotServicePrincipal:
@@ -80,16 +80,25 @@ def execute_campaign(self, campaign_id: str) -> dict:
         if _ledger_exists(session, parsed, "campaign.execution_dispatched", operation_id):
             return {"campaign_id": campaign_id, "status": campaign.status, "idempotent": True}
         reservation.status = "dispatched"
+        # The frontmost stage that has not acted, which is *not* the same as the first
+        # `pending` one: a held stage sits in `awaiting_release`, and selecting on
+        # `pending` alone would step over it to the stage behind the gate.
         first = session.scalar(
             select(AutopilotStage)
-            .where(AutopilotStage.campaign_id == parsed, AutopilotStage.status == "pending")
+            .where(
+                AutopilotStage.campaign_id == parsed,
+                AutopilotStage.status.in_(UNSTARTED_STAGE_STATUSES),
+            )
             .order_by(AutopilotStage.position)
             .limit(1)
         )
         resource = None
+        held = first is not None and first.held
         if first is not None:
-            first.status = "ready"
-            resource = ensure_stage_resource(session, campaign, first)
+            # The gate binds before the adapter runs, because creating the stage's
+            # resource is the act. Shared with the release path so the two cannot
+            # disagree about whether a stage may act.
+            resource = activate_stage(session, campaign, first)
         principal = _worker_principal(session)
         session.add(
             AutopilotLedgerEntry(
@@ -100,6 +109,10 @@ def execute_campaign(self, campaign_id: str) -> dict:
                     "operation_id": operation_id,
                     "reservation_id": str(reservation.id),
                     "first_stage_id": str(first.id) if first else None,
+                    # Why the campaign stopped where it did, in the ledger rather than
+                    # only in the UI: a hold nobody can explain reads as a failure.
+                    "held": bool(held),
+                    "hold_reason": first.hold_reason if first is not None else None,
                 },
             )
         )
@@ -120,7 +133,7 @@ def execute_campaign(self, campaign_id: str) -> dict:
                     },
                 )
             )
-    return {"campaign_id": campaign_id, "status": "running"}
+    return {"campaign_id": campaign_id, "status": "awaiting_release" if held else "running"}
 
 
 @celery_app.task(name="bda_v2.autopilot_cancel", bind=True)
