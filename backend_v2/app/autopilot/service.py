@@ -19,6 +19,7 @@ from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
 from ..research.models import ResearchGeneration
+from . import gates
 from .models import (
     AutopilotCampaign,
     AutopilotDraft,
@@ -132,11 +133,15 @@ def confirm_draft(
     )
     stage_keys = _stage_keys(campaign.frozen_spec)
     for position, stage_key in enumerate(stage_keys):
+        key = str(stage_key)[:80]
         session.add(
             AutopilotStage(
                 campaign_id=campaign.id,
-                stage_key=str(stage_key)[:80],
+                stage_key=key,
                 position=position,
+                # Frozen with the spec: the tier is part of what is being approved, so a
+                # later reclassification must not re-open a confirmed campaign.
+                risk_tier=gates.tier_for(key),
             )
         )
     draft.status = "confirmed"
@@ -438,3 +443,72 @@ def take_over_campaign(
         actor_id=user.id,
     )
     return campaign
+
+
+def release_stage(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage: AutopilotStage,
+    user: User,
+    expected_version: int,
+) -> AutopilotStage:
+    """Let one held stage through, on the record and signed by a person.
+
+    Idempotent, for the reason takeover is: two release records would make "who let this
+    through" unanswerable, which is the only question a release record exists to answer.
+
+    A stage that was never held cannot be released. That is not pedantry - a release on an
+    ungated stage would be a signature on something nobody was asked to approve, and it
+    would make the release log read as though more had been reviewed than was.
+    """
+    if stage.version != expected_version:
+        raise DomainError("version_conflict", "Autopilot stage changed", status_code=412)
+    if stage.campaign_id != campaign.id:
+        raise DomainError("autopilot_stage_not_found", "Stage does not belong to this campaign", status_code=404)
+    if campaign.status in ("cancelled", "manual_takeover"):
+        raise DomainError(
+            "autopilot_campaign_not_running",
+            f"A {campaign.status} campaign has no stage to release",
+            status_code=409,
+        )
+    if not gates.TIERS.get(stage.risk_tier, True):
+        raise DomainError(
+            "autopilot_stage_not_held",
+            f"Stage {stage.stage_key!r} is not held; there is nothing to release",
+            status_code=409,
+        )
+    if stage.released_at is not None:
+        return stage
+    stage.released_at = datetime.now(UTC)
+    stage.released_by = user.id
+    stage.version += 1
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            writer_user_id=user.id,
+            event_type="stage.released",
+            payload={
+                "stage_id": str(stage.id),
+                "stage_key": stage.stage_key,
+                "risk_tier": stage.risk_tier,
+                "reason": gates.explain(stage.stage_key),
+            },
+        )
+    )
+    record_audit(
+        session,
+        action="autopilot.stage.release",
+        entity_type="autopilot_stage",
+        entity_id=stage.id,
+        project_id=campaign.project_id,
+        actor_id=user.id,
+        payload={"stage_key": stage.stage_key, "risk_tier": stage.risk_tier},
+    )
+    return stage
+
+
+def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
+    stage = session.get(AutopilotStage, stage_id)
+    if stage is None:
+        raise DomainError("autopilot_stage_not_found", "Autopilot stage was not found", status_code=404)
+    return stage

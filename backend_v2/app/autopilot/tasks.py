@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
+from . import gates
 from .adapters import ensure_stage_resource
 from .models import (
     AutopilotCampaign,
@@ -87,7 +88,13 @@ def execute_campaign(self, campaign_id: str) -> dict:
             .limit(1)
         )
         resource = None
-        if first is not None:
+        held = first is not None and gates.TIERS.get(first.risk_tier, True) and first.released_at is None
+        if first is not None and held:
+            # The gate binds here, before the adapter runs, because creating the stage's
+            # resource is the act. A hold that only changed a label would be a hold the
+            # next adapter could walk past without noticing it existed.
+            first.status = "awaiting_release"
+        elif first is not None:
             first.status = "ready"
             resource = ensure_stage_resource(session, campaign, first)
         principal = _worker_principal(session)
@@ -100,6 +107,10 @@ def execute_campaign(self, campaign_id: str) -> dict:
                     "operation_id": operation_id,
                     "reservation_id": str(reservation.id),
                     "first_stage_id": str(first.id) if first else None,
+                    # Why the campaign stopped where it did, in the ledger rather than
+                    # only in the UI: a hold nobody can explain reads as a failure.
+                    "held": bool(held),
+                    "hold_reason": gates.explain(first.stage_key) if first is not None and held else None,
                 },
             )
         )
@@ -120,7 +131,7 @@ def execute_campaign(self, campaign_id: str) -> dict:
                     },
                 )
             )
-    return {"campaign_id": campaign_id, "status": "running"}
+    return {"campaign_id": campaign_id, "status": "awaiting_release" if held else "running"}
 
 
 @celery_app.task(name="bda_v2.autopilot_cancel", bind=True)
