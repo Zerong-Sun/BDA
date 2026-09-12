@@ -1130,7 +1130,14 @@ export const bundleZh = {
         method: '方法',
         milestone: '里程碑',
       },
-      outcome: {
+        decidedBy: {
+        human: '人判定',
+        agent: 'agent 判定',
+        agent_proposed_human_confirmed: 'agent 起草 · 人接受',
+        unspecified: '未记录判定人',
+        help: '这条记录的是谁的判断。标为 agent 的是没有人复核过的。',
+      },
+    outcome: {
         supported: '成立',
         refuted: '被证否',
         inconclusive: '不确定',

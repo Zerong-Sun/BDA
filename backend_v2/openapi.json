@@ -13613,6 +13613,10 @@
             ],
             "title": "Created By"
           },
+          "decided_by": {
+            "title": "Decided By",
+            "type": "string"
+          },
           "decision_ref": {
             "anyOf": [
               {
@@ -13719,6 +13723,7 @@
           "summary",
           "body",
           "outcome",
+          "decided_by",
           "provenance",
           "alternatives",
           "code_refs",
@@ -99354,7 +99359,7 @@
     },
     "/api/v2/projects/{project_id}/timeline": {
       "get": {
-        "description": "The project's decision record, oldest first.\n\nFilters are the questions this table exists to answer: \"what did we rule out\"\n(outcome=refuted), \"what happened in phase 2\" (phase=phase-2), \"show only the\nproblems\" (entry_type=problem).",
+        "description": "The project's decision record, oldest first.\n\nFilters are the questions this table exists to answer: \"what did we rule out\"\n(outcome=refuted), \"what happened in phase 2\" (phase=phase-2), \"show only the\nproblems\" (entry_type=problem), and - the reason `decided_by` is filterable at all -\n\"which of these did an agent decide\" (decided_by=agent).",
         "operationId": "list_timeline_api_v2_projects__project_id__timeline_get",
         "parameters": [
           {
@@ -99441,6 +99446,22 @@
                 }
               ],
               "title": "Outcome"
+            }
+          },
+          {
+            "in": "query",
+            "name": "decided_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decided By"
             }
           }
         ],

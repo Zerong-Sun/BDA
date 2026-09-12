@@ -1159,7 +1159,14 @@ export const bundleEn = {
         method: 'Method',
         milestone: 'Milestone',
       },
-      outcome: {
+        decidedBy: {
+        human: 'decided by a person',
+        agent: 'decided by an agent',
+        agent_proposed_human_confirmed: 'agent drafted, person accepted',
+        unspecified: 'attribution not stated',
+        help: 'Whose judgement this records. An agent-decided entry is one no person reviewed.',
+      },
+    outcome: {
         supported: 'Supported',
         refuted: 'Refuted',
         inconclusive: 'Inconclusive',

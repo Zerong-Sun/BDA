@@ -8098,6 +8098,10 @@ export type TimelineEntryResponse = {
      */
     created_by: string | null;
     /**
+     * Decided By
+     */
+    decided_by: string;
+    /**
      * Decision Ref
      */
     decision_ref: string | null;
@@ -61612,6 +61616,10 @@ export type ListTimelineApiV2ProjectsProjectIdTimelineGetData = {
          * Outcome
          */
         outcome?: string | null;
+        /**
+         * Decided By
+         */
+        decided_by?: string | null;
     };
     url: '/api/v2/projects/{project_id}/timeline';
 };

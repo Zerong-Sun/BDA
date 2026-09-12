@@ -8,7 +8,12 @@ from ..identity.models import User
 from ..projects.models import Project
 from .models import ProjectTimelineEntry
 from .repository import TimelineRepository
-from .schemas import TimelineEntryCreate, TimelineEntryUpdate, check_lane_evidence
+from .schemas import (
+    TimelineEntryCreate,
+    TimelineEntryUpdate,
+    check_decided_by,
+    check_lane_evidence,
+)
 
 
 def _check_link(session: Session, project: Project, entry_id, field: str) -> None:
@@ -54,15 +59,36 @@ def _dump(items) -> list:
 
 
 def create_entry(
-    session: Session, project: Project, payload: TimelineEntryCreate, user: User
+    session: Session,
+    project: Project,
+    payload: TimelineEntryCreate,
+    user: User,
+    *,
+    decided_by: str = "human",
 ) -> ProjectTimelineEntry:
+    """Write one entry, attributed to whoever actually made the call.
+
+    ``decided_by`` defaults to ``human`` because that is what a request arriving at this
+    domain's own endpoint is, and it is keyword-only so that a machine-written entry has
+    to say so at the call site. It is not on the payload: see `check_decided_by`.
+
+    ``created_by`` and ``decided_by`` answer different questions and both are kept. The
+    former is who typed it in - an orchestrator recording an agent's judgement is still a
+    person's account. The latter is whose judgement it was.
+    """
     _check_link(session, project, payload.supersedes_id, "supersedes_id")
     _check_link(session, project, payload.caused_by_id, "caused_by_id")
     _check_decision_ref_free(session, project, payload.decision_ref)
+    try:
+        attribution = check_decided_by(decided_by)
+    except ValueError as exc:
+        raise DomainError("timeline_decided_by_invalid", str(exc), status_code=422) from exc
     data = payload.model_dump()
     data["code_refs"] = _dump(payload.code_refs)
     data["alternatives"] = _dump(payload.alternatives)
-    row = ProjectTimelineEntry(project_id=project.id, created_by=user.id, **data)
+    row = ProjectTimelineEntry(
+        project_id=project.id, created_by=user.id, decided_by=attribution, **data
+    )
     session.add(row)
     session.flush()
     record_audit(
@@ -73,6 +99,7 @@ def create_entry(
         project_id=project.id,
         organization_id=project.organization_id,
         actor_id=user.id,
+        payload={"decided_by": attribution},
     )
     return row
 

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .models import ENTRY_TYPES, LANES, OUTCOMES
+from .models import DECIDED_BY, ENTRY_TYPES, LANES, OUTCOMES
 
 # Keys allowed inside `provenance`. Restricted so a caller cannot invent a fifth spelling
 # of "job_ids" that no reader will ever look for; unknown keys are rejected loudly rather
@@ -47,6 +47,20 @@ def _check_outcome(value: str) -> str:
 def _check_lane(value: str) -> str:
     if value not in LANES:
         raise ValueError(f"lane must be one of {sorted(LANES)}")
+    return value
+
+
+def check_decided_by(value: str) -> str:
+    """Validate an attribution the *service* chose, not one a client sent.
+
+    There is deliberately no `decided_by` field on `TimelineEntryCreate` or
+    `TimelineEntryUpdate`. A caller that could set it could also write "human" over an
+    agent's work, and then the comparison the column exists for is comparing labels
+    rather than authorship. Call sites state it as a keyword; this checks they stated
+    something real.
+    """
+    if value not in DECIDED_BY:
+        raise ValueError(f"decided_by must be one of {sorted(DECIDED_BY)}")
     return value
 
 
@@ -231,6 +245,7 @@ class TimelineEntryResponse(BaseModel):
     summary: str
     body: str
     outcome: str
+    decided_by: str
     provenance: dict
     alternatives: list
     code_refs: list

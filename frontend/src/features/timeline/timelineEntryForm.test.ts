@@ -16,6 +16,7 @@ function entry(overrides: Partial<TimelineEntry> = {}): TimelineEntry {
     entry_type: 'decision',
     decision_ref: 'D7',
     lane: 'dry',
+    decided_by: 'human',
     phase: 'phase-2',
     title: 'a gate decision',
     summary: 'the middle setting passed',

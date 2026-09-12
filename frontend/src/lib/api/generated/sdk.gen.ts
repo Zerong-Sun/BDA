@@ -1783,7 +1783,8 @@ export const postTargetApiV2ProjectsProjectIdTargetsPost = <ThrowOnError extends
  *
  * Filters are the questions this table exists to answer: "what did we rule out"
  * (outcome=refuted), "what happened in phase 2" (phase=phase-2), "show only the
- * problems" (entry_type=problem).
+ * problems" (entry_type=problem), and - the reason `decided_by` is filterable at all -
+ * "which of these did an agent decide" (decided_by=agent).
  */
 export const listTimelineApiV2ProjectsProjectIdTimelineGet = <ThrowOnError extends boolean = false>(options: Options<ListTimelineApiV2ProjectsProjectIdTimelineGetData, ThrowOnError>): RequestResult<ListTimelineApiV2ProjectsProjectIdTimelineGetResponses, ListTimelineApiV2ProjectsProjectIdTimelineGetErrors, ThrowOnError> => (options.client ?? client).get<ListTimelineApiV2ProjectsProjectIdTimelineGetResponses, ListTimelineApiV2ProjectsProjectIdTimelineGetErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
