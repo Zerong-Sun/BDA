@@ -177,7 +177,7 @@ jobs:
         run: >-
           docker build -f backend_v2/Dockerfile
           --build-arg BDA_BUILD_REVISION=${GITHUB_SHA}
-          --build-arg BDA_SCHEMA_REVISION=0061_staged_port_paths
+          --build-arg BDA_SCHEMA_REVISION=0063_proteinmpnn_parser
           -t bda-backend-v2:ci .
       # The image ships without pip or setuptools. A library that reaches for pkg_resources
       # at import time would fail only at runtime, which no other step here would catch.

@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0061_staged_port_paths
+ARG BDA_SCHEMA_REVISION=0063_proteinmpnn_parser
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)
