@@ -1,3 +1,15 @@
+"""What the platform can grant, as one row per capability.
+
+A capability is what this repository calls a "skill": it is what grants tools,
+and `copilot_configs.enabled_skills` is a set of these ids. Who is accountable
+for using one - and what they must refuse - is a level up, in `bots.py`.
+
+Adding a row here means two other edits in the same change: a bot in `bots.py`
+must own it (a test fails otherwise, because an unowned capability is one no
+charter constrains), and `docs/COPILOT_BOT_ROSTER.md`'s inventory table lists
+it with its tools.
+"""
+
 from __future__ import annotations
 
 from typing import Any

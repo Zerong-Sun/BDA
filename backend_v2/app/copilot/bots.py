@@ -18,6 +18,12 @@ bearing, and it is intersected, never unioned.
 Handoffs are advisory by design. The platform does not switch bots on its own,
 because a bot that could re-select itself with a wider set would defeat the
 narrowing law. A bot names its successor in prose; the client selects it.
+
+`docs/COPILOT_BOT_ROSTER.md` is the prose half of this file - the chain, the
+charters and the skill/MCP inventory. Adding or retiring a bot here means
+editing that document in the same change; nothing checks it mechanically,
+because a gate that parses prose goes red on a reformat and teaches people to
+ignore red.
 """
 
 from __future__ import annotations
