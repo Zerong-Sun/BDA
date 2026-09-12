@@ -110,7 +110,7 @@ FastAPI 模块化单体 ─────► PostgreSQL
                              版本化计算制品与校验和
 ```
 
-该架构保持一个部署边界，但通过 module descriptor 注册模型、路由、Celery task、权限和指标，避免把领域拆成过早的微服务。`/api/v2` 是唯一活动 API；包含私有路径和旧研究运行的 v1 迁移档案只保存在私有恢复库，不随公开发行版发布。
+该架构保持一个部署边界，但通过 `app/module_registry.py` 的 module descriptor 集中登记模型、路由与 Celery task（并在同一处声明权限动作与指标前缀），避免把领域拆成过早的微服务。`/api/v2` 是唯一活动 API；包含私有路径和旧研究运行的 v1 迁移档案只保存在私有恢复库，不随公开发行版发布。
 
 ## 7. 本地启动
 
@@ -152,6 +152,7 @@ python scripts/check_public_data.py
 ## 9. 文档、贡献与引用
 
 - [文档索引](docs/README.md)
+- [工作区结构说明](docs/WORKSPACE_MAP.md)
 - [后端说明](docs/BACKEND_V2.md)
 - [前端说明](docs/FRONTEND_V2.md)
 - [插件接口](docs/PLUGIN_INTERFACE.md)

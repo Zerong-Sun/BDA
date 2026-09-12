@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
+最后核验：2026-09-12（Asia/Shanghai；核对领域清单与模块登记处）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -18,7 +18,7 @@ v2 是 FastAPI 模块化单体。API、通用 worker、research worker、copilot
 
 ## 2. 模块边界
 
-`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、audit 与 platform 划分。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
+`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、autopilot、timeline、ligands、wetlab、audit 与 platform 划分，共 22 个领域，登记在 `app/module_registry.py`。`app/core/` 与 `app/migration/` 不是领域：前者是跨域基础设施，后者是 v1 迁移原语。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
 
 跨域写入通过 service 或 outbox 事件完成。Copilot 只编排领域服务；compute 不直接访问 Campaign repository。请求使用短生命周期 SQLAlchemy session，SSE 建立前完成授权并释放连接。
 
