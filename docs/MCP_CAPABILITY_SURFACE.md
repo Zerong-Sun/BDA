@@ -206,7 +206,7 @@ chat 与 MCP 必须用同一个解释器引用同一个结果。两套引用逻�
 | --- | --- |
 | `ruff check backend_v2` | 通过 |
 | `mypy`（CI 方式，无 `--config-file`） | 通过，247 个文件 |
-| `pytest backend_v2/tests` | 通过（860 用例，新增 62） |
+| `pytest backend_v2/tests` | 通过（860 用例，新增 62；后续分支又增，见 [决策透明度](DECISION_TRANSPARENCY.md)） |
 | `export_openapi.py` 后 `git diff` | 无漂移（已重新导出，189 条路径） |
 | `npm run generate:api` 后 `git diff` | 无漂移（已重新生成） |
 | `check_flow_matrix.py` | 通过，78 张表 / 189 条路径 |

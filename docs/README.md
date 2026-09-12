@@ -25,6 +25,7 @@ reports are maintained only in the private BDA-demo archive.
 - [Copilot DeepSeek configuration](COPILOT_DEEPSEEK_配置指南.md)
 - [Copilot validation report](COPILOT_VALIDATION_REPORT.md)
 - [Data catalog](DATA_CATALOG.md)
+- [Decision transparency](DECISION_TRANSPARENCY.md)
 - [Dual-mode operation plan (automated / manual)](DUAL_MODE_OPERATION_PLAN.md)
 - [MCP capability surface](MCP_CAPABILITY_SURFACE.md)
 - [Plugin interface](PLUGIN_INTERFACE.md)
