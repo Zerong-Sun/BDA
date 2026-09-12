@@ -7,6 +7,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
 
+from ..core import review
+
 
 class BriefCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -471,13 +473,17 @@ class ResearchGoalUpdate(BaseModel):
 
 # --- The decision-tree bootstrap: prompt -> proposed goals and open branches ----------
 #
-# Bounded on purpose. An LLM asked for "the goal tree" will happily return forty nodes,
-# and a reviewer facing forty items stops reviewing and starts accepting - which defeats
-# the only safeguard here. Small enough to read in one sitting is a correctness property,
-# not a performance one.
-MAX_DRAFT_GOALS = 12
-MAX_DRAFT_BRANCHES = 12
-MAX_DRAFT_DEPTH = 3
+# Bounded on purpose: an LLM asked for "the goal tree" will happily return forty nodes,
+# and a reviewer facing forty items stops reviewing and starts accepting, which defeats the
+# only safeguard on this path. Small enough to read in one sitting is a correctness
+# property, not a performance one.
+#
+# The numbers are declared in `core/review.py` with every other single-act approval limit,
+# so they can be compared rather than each chosen in isolation. These three are the
+# original ones and are unchanged.
+MAX_DRAFT_GOALS = review.budget("decision_tree.goals")
+MAX_DRAFT_BRANCHES = review.budget("decision_tree.branches")
+MAX_DRAFT_DEPTH = review.budget("decision_tree.depth")
 
 
 class DraftAlternative(BaseModel):
@@ -528,11 +534,13 @@ class DecisionTreeProposal(BaseModel):
 
     @model_validator(mode="after")
     def _bounded_and_consistent(self) -> DecisionTreeProposal:
-        total = _count_goals(self.goals)
-        if total > MAX_DRAFT_GOALS:
-            raise ValueError(f"at most {MAX_DRAFT_GOALS} goals; got {total}")
-        if len(self.branches) > MAX_DRAFT_BRANCHES:
-            raise ValueError(f"at most {MAX_DRAFT_BRANCHES} branches; got {len(self.branches)}")
+        # The numbers and the reason live in `core/review.py` now: this is one instance
+        # of a rule that binds every place a person approves a machine-made batch, and a
+        # limit chosen per endpoint is a limit chosen by whoever wrote that endpoint.
+        review.check_review_budget("decision_tree.goals", _count_goals(self.goals), unit="goals")
+        review.check_review_budget(
+            "decision_tree.branches", len(self.branches), unit="open branches"
+        )
         if self.goals and _goal_depth(self.goals) > MAX_DRAFT_DEPTH:
             raise ValueError(f"goal tree is deeper than {MAX_DRAFT_DEPTH} levels")
 

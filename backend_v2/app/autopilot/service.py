@@ -12,6 +12,7 @@ from ..campaigns.models import Campaign
 from ..compute.models import Job
 from ..compute.repository import ComputeRepository
 from ..compute.service import transition_job
+from ..core import review
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.models import Operation
@@ -28,9 +29,29 @@ from .models import (
 )
 from .schemas import AutopilotConfirm, AutopilotDraftCreate, AutopilotStart
 
+DEFAULT_STAGE_KEYS = ["research", "plan", "compute", "review"]
+
 
 def _render_brief(brief: dict) -> str:
     return "Autopilot protocol\n\n" + json.dumps(brief, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _stage_keys(spec: dict) -> list:
+    declared = spec.get("stages")
+    return list(declared) if declared else list(DEFAULT_STAGE_KEYS)
+
+
+def _check_stage_budget(spec: dict) -> None:
+    """Confirming accepts every stage at once, so the list has to be readable.
+
+    Checked at draft creation so an over-long spec never becomes something to confirm, and
+    again at confirm because that is the approval act and a draft may predate the rule -
+    the same both-ends discipline `check_lane_evidence` uses on create and update.
+    """
+    try:
+        review.check_review_budget("autopilot.stages", len(_stage_keys(spec)), unit="stages")
+    except ValueError as exc:
+        raise DomainError("autopilot_stage_budget_exceeded", str(exc), status_code=422) from exc
 
 
 def create_draft(session: Session, payload: AutopilotDraftCreate, user: User) -> AutopilotDraft:
@@ -38,6 +59,7 @@ def create_draft(session: Session, payload: AutopilotDraftCreate, user: User) ->
     prompt = payload.prompt or _render_brief(brief)
     spec = dict(brief)
     spec.setdefault("schema_version", "autopilot-spec-v1")
+    _check_stage_budget(spec)
     draft = AutopilotDraft(
         project_id=payload.project_id,
         created_by=user.id,
@@ -83,6 +105,7 @@ def confirm_draft(
         raise DomainError("version_conflict", "Autopilot draft changed", status_code=412)
     if draft.confirmed_campaign_id is not None:
         return require_campaign(session, draft.confirmed_campaign_id)
+    _check_stage_budget(draft.normalized_spec)
     if payload.manual_campaign_id is not None:
         manual = session.get(Campaign, payload.manual_campaign_id)
         if manual is None or manual.project_id != draft.project_id:
@@ -107,7 +130,7 @@ def confirm_draft(
             money_micros_limit=budget_input.money_micros_limit if budget_input else None,
         )
     )
-    stage_keys = campaign.frozen_spec.get("stages") or ["research", "plan", "compute", "review"]
+    stage_keys = _stage_keys(campaign.frozen_spec)
     for position, stage_key in enumerate(stage_keys):
         session.add(
             AutopilotStage(
