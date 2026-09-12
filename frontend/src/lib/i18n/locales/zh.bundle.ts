@@ -1675,9 +1675,17 @@ export const bundleZh = {
   },
   plugins: {
     parameterSchema: {
+      origin: {
+        recommended: '推荐值',
+        recommendedHelp: '为本次运行提出的，不是插件默认值。',
+        edited: '你改过',
+        editedHelp: '你设的值，与默认值和任何推荐值都不同。',
+        constrained: '集群锁定',
+        constrainedHelp:
+          '由插件声明的槽位数锁定。-n、span[ptile] 与工具线程数来自同一个数字且必须一致；单改这里会让它们失同步。',
+      },
       noSchema: '该插件尚未注册参数 schema。',
       advancedParameters: '高级参数',
-      changed: '已修改',
       required: '插件 schema 要求必填',
     },
   },

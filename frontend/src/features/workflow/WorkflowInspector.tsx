@@ -17,6 +17,8 @@ import {
   type ScriptPreviewResponse,
 } from '../../lib/api/workflow'
 import { ParameterSchemaForm } from '../plugins'
+import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
+import { parseParameterSchema } from '../../lib/forms/parameterSchema'
 import { InputBindingPanel } from './InputBindingPanel'
 import { listProjectArtifacts } from '../../lib/api/artifacts'
 import { defaultsFromFields, fieldsFromParameterSchema } from '../../lib/forms/parameterSchema'
@@ -269,6 +271,15 @@ function WorkflowInspectorContent({
                 values={effectiveParameters}
                 onChange={setDraftParameters}
                 disabled={readOnly}
+                // Same reason as the node builder: the declared slot count drives three
+                // things that must agree, so a value it pins says so rather than looking
+                // like any other editable number.
+                origins={{
+                  constrained: clusterConstrainedParameters(
+                    activePlugin?.resources,
+                    parseParameterSchema(parameterSchema),
+                  ),
+                }}
               />
               <div className="mt-3 grid gap-2 rounded-md border border-border-soft bg-bg-app p-2">
                 <label className="grid gap-1 text-[11px] text-text-secondary">

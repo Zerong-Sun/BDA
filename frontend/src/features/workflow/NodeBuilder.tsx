@@ -5,6 +5,7 @@ import { DefaultNodeIcon, nodeIconMap, type NodeIconName } from './nodeIcons'
 import { nodeTemplates, type NodeTemplate } from './workflowTypes'
 import { createMethodPlugin, listMethodPlugins, listModelPlugins } from '../../lib/api/registry'
 import { ParameterSchemaForm } from '../plugins'
+import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
 import {
   defaultsFromFields,
   fieldsFromParameterSchema,
@@ -281,6 +282,13 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
     [template.parameterSchema],
   )
   const parameterSchemaForForm = useMemo(() => ({ fields: parameterFields }), [parameterFields])
+  // A plugin that declares slots pins its own thread count: `-n`, `span[ptile]` and the
+  // number the tool is told to use all come from `resources.cpus`, and a form that let one
+  // drift alone would produce the mismatch the cluster treats as a violation.
+  const constrainedParameters = useMemo(() => {
+    const plugin = plugins.find((item) => item.id === template.pluginId)
+    return clusterConstrainedParameters(plugin?.resources, parameterFields)
+  }, [plugins, template.pluginId, parameterFields])
 
   const selectTemplate = (item: NodeTemplate) => {
     setSelected(item.id)
@@ -601,6 +609,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
               values={{ ...defaultsFromFields(parameterFields), ...parameters }}
               onChange={setParameters}
               disabled={adding}
+              origins={{ constrained: constrainedParameters }}
             />
           </div>
           </FramePanel>

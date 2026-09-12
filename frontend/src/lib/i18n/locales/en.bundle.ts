@@ -1742,9 +1742,17 @@ export const bundleEn = {
   },
   plugins: {
     parameterSchema: {
+      origin: {
+        recommended: 'recommended',
+        recommendedHelp: 'Proposed for this run rather than being the plugin default.',
+        edited: 'edited',
+        editedHelp: 'You set this; it differs from the default and from anything proposed.',
+        constrained: 'fixed by the cluster',
+        constrainedHelp:
+          "Pinned by the plugin's declared slots. -n, span[ptile] and the tool's thread count come from one number and must agree; changing this alone desynchronises them.",
+      },
       noSchema: 'No parameter schema is registered for this plugin yet.',
       advancedParameters: 'Advanced parameters',
-      changed: 'changed',
       required: 'Required by the plugin schema',
     },
   },
