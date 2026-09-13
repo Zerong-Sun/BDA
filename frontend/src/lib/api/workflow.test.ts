@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 import { server } from '../../test/mocks/handlers'
-import { submitWorkflowNode, submitWorkflowRun } from './workflow'
+import { previewWorkflowNodeScript, submitWorkflowRun } from './workflow'
 
 describe('workflow submission backend selection', () => {
-  it('uses the server default unless a node submission explicitly overrides it', async () => {
+  it('submits the reviewed backend, workflow version and every node fingerprint', async () => {
+    let body: unknown
+    server.use(http.post('/api/v2/workflow-runs/reviewed/submissions', async ({ request }) => {
+      body = await request.json()
+      return HttpResponse.json({ id: 'submission', status: 'pending', jobs: [] })
+    }))
+    await submitWorkflowRun('reviewed', 7, { backend: 'lsf', fingerprints: { node: 'a'.repeat(64) } })
+    expect(body).toEqual({ workflow_version: 7, compute_backend: 'lsf', review_fingerprints: { node: 'a'.repeat(64) } })
+  })
+
+  it('submits the saved whole workflow using the server backend default', async () => {
     const requestBodies: Array<Record<string, unknown>> = []
     server.use(
       http.post('/api/v2/workflow-runs/workflow-default/submissions', async ({ request }) => {
@@ -20,11 +30,20 @@ describe('workflow submission backend selection', () => {
     )
 
     await submitWorkflowRun('workflow-default')
-    await submitWorkflowNode('workflow-default')
-    await submitWorkflowNode('workflow-default', { compute_backend: 'lsf' })
 
     expect(requestBodies[0]).not.toHaveProperty('compute_backend')
-    expect(requestBodies[1].compute_backend).toBeUndefined()
-    expect(requestBodies[2].compute_backend).toBe('lsf')
+    expect(requestBodies).toEqual([{}])
+  })
+})
+
+describe('script preview overrides', () => {
+  it('sends unsaved parameters only to the node preview endpoint', async () => {
+    let body: unknown
+    server.use(http.post('/api/v2/workflow-nodes/node-test/script-previews', async ({ request }) => {
+      body = await request.json()
+      return HttpResponse.json({ workflow_node_id: 'node-test', plugin_id: null, script: 'export num_designs=2', input_manifest: {} })
+    }))
+    await previewWorkflowNodeScript('node-test', { compute_backend: 'lsf', override_params: { num_designs: 2 } })
+    expect(body).toEqual({ compute_backend: 'lsf', overrides: { num_designs: 2 } })
   })
 })

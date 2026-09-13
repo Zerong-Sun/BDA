@@ -138,15 +138,13 @@ def granted_capabilities(session: Session, grant: CopilotMcpSession) -> set[str]
     Intersected on every call rather than frozen at issue time, so turning a
     capability off for the project immediately narrows the grants already out.
 
-    An empty `granted_capabilities` means *none*. `normalize_capabilities([])`
-    returns the full research alias set - correct for a project config, where
-    empty means "unconfigured, use the default", and wrong here, where empty
-    means the issuer granted nothing.
+    An empty grant or explicit empty project configuration means no tools.
+    Only a missing project configuration inherits the default capabilities.
     """
     if not grant.granted_capabilities:
         return set()
     config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == grant.project_id))
-    enabled = normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
+    enabled = normalize_capabilities(list(config.enabled_skills) if config else None)
     return normalize_capabilities(list(grant.granted_capabilities)) & enabled
 
 
@@ -171,7 +169,9 @@ def available_tools(session: Session, grant: CopilotMcpSession) -> list[ToolSpec
         writes = REGISTRY.write_ids()
         names = {name for name in names if name not in writes}
     else:
-        names &= set(run.allowed_tools or [])
+        from .agent_runs import transcript
+        from .task_contracts import available_step_tools
+        names &= available_step_tools(run, transcript(session, run))
         names = _intent_filtered(session, grant, run, names)
 
     # Selected by tool id over the whole registry, the way `agent_loop._schemas`
@@ -184,18 +184,17 @@ def available_tools(session: Session, grant: CopilotMcpSession) -> list[ToolSpec
         spec
         for spec in REGISTRY.all()
         if spec.id in names and spec.requires not in UNSUPPORTED_REQUIRES
+        and (not spec.needs_operator or (run is not None and run.bot))
     ]
 
 
 def _intent_filtered(
     session: Session, grant: CopilotMcpSession, run: CopilotAgentRun, names: set[str]
 ) -> set[str]:
-    """Drop writes the run's goal did not ask for.
+    """Filter domain writes by the saved task scope or original user's request.
 
-    Only the five action-service tools can be checked this way: `request_allows`
-    is defined over `actions._ACTION_REQUEST_TERMS` and knows no others. The rest
-    of the write tools are gated by the run binding alone, which is why a grant
-    without a run exposes none of them.
+    Delegated goals and MCP arguments cannot extend that mandate. Internal
+    handoff records are governed separately by the bound operator's charter.
     """
     from .research_agent import WRITE_TOOL_NAMES
 
@@ -203,10 +202,12 @@ def _intent_filtered(
     if not gated:
         return names
     from .actions import CopilotActionService
+    from .agent_loop import authorising_text
 
     project, user = _actors(session, grant)
     service = CopilotActionService(
-        session, project, user, request_text=run.goal, source_message_id=run.id
+        session, project, user, request_text=authorising_text(session, run), source_message_id=run.id,
+                authorized_writes=set(run.task_contract.get("authorized_writes", [])) if (run.task_contract or {}).get("version") else None
     )
     return {name for name in names if name not in WRITE_TOOL_NAMES or service.request_allows(name)}
 
@@ -215,10 +216,11 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
     """The services an MCP call may use.
 
     Mirrors `agent_loop._tool_context`, with two differences that are the point:
-    `agent_run` is left unset, and `request_text` comes from the bound run's goal
-    - never from the client's arguments.
+    `agent_run` is left unset, and authorization comes from the saved task
+    scope or originating user's request, never from the client's arguments.
     """
     from .actions import CopilotActionService
+    from .agent_loop import authorising_text
     from .project_context import ProjectContextService
     from .research_context import ResearchContextService
 
@@ -232,13 +234,15 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
         project=ProjectContextService(session, project),
         actions=(
             CopilotActionService(
-                session, project, user, request_text=run.goal, source_message_id=run.id
+                session, project, user, request_text=authorising_text(session, run), source_message_id=run.id,
+                authorized_writes=set(run.task_contract.get("authorized_writes", [])) if (run.task_contract or {}).get("version") else None
             )
             if run is not None
             else None
         ),
         allowed_kinds=research_kinds_for_capabilities(granted_capabilities(session, grant)),
         agent_run=None,
+        bot=run.bot if run is not None else None,
     )
 
 

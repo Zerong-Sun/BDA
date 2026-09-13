@@ -59,7 +59,20 @@ describe('ProjectChooser', () => {
     expect(setProjectId).toHaveBeenCalledWith('')
   })
 
-  it('keeps create disabled until a design prompt has been generated, then submits it', async () => {
+  it('creates a project from a plain-language objective without a model', async () => {
+    createProject.mockResolvedValue({ id: 'proj_new' })
+    renderWithProviders(<ProjectChooser />)
+    fireEvent.click(screen.getByRole('button', { name: /create project/i }))
+    fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'Manual project' } })
+    fireEvent.change(screen.getByLabelText(/objective.*constraints/i), { target: { value: 'Improve stability at room temperature.' } })
+    fireEvent.click(screen.getByRole('button', { name: /create and select/i }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Manual project', prompt: 'Improve stability at room temperature.',
+    })))
+    expect(createProjectPromptDraft).not.toHaveBeenCalled()
+  })
+
+  it('allows reviewing and submitting an AI-generated brief', async () => {
     createProjectPromptDraft.mockResolvedValue({ draft_id: 'draft_1' })
     waitForProjectPromptDraft.mockResolvedValue({ id: 'draft_1', status: 'ready', prompt: 'Generated design prompt.', error: null })
     createProject.mockResolvedValue({ id: 'proj_new' })
@@ -74,7 +87,7 @@ describe('ProjectChooser', () => {
     expect(createButton).toBeDisabled()
 
     fireEvent.click(screen.getByRole('button', { name: /generate design prompt/i }))
-    await waitFor(() => expect(screen.getByLabelText(/design prompt/i)).toHaveValue('Generated design prompt.'))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /design brief/i })).toHaveValue('Generated design prompt.'))
     expect(createButton).toBeEnabled()
 
     fireEvent.click(createButton)

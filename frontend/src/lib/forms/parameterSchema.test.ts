@@ -1,3 +1,4 @@
+import { prepareParameterValues } from './parameterSchema'
 import { describe, expect, it } from 'vitest'
 import {
   defaultsFromFields,
@@ -139,5 +140,31 @@ describe('fieldsFromParameterSchema', () => {
     // rule satisfied until the scientist fills exactly one of them.
     expect(defaults.ligand_smiles).toBe('')
     expect(defaults.ligand_ccd).toBe('')
+  })
+})
+
+describe('API parameter drafts', () => {
+  it('does not invent parameters for an explicitly empty plugin schema', () => {
+    expect(fieldsFromParameterSchema({ type: 'object', properties: {}, additionalProperties: false }, 'RFdiffusion')).toEqual([])
+  })
+})
+
+describe('prepareParameterValues', () => {
+  const fields = parseParameterSchema({ properties: {
+    targets: { type: 'array' }, settings: { type: 'object' },
+    count: { type: 'integer', minimum: 1, maximum: 500 },
+  }, required: ['count'] })
+  it('sends parsed JSON and preserves unrelated node metadata', () => {
+    expect(prepareParameterValues(fields, { targets: '["A"]', settings: '{"seed":7}', count: 500, note: 'keep' }))
+      .toEqual({ targets: ['A'], settings: { seed: 7 }, count: 500, note: 'keep' })
+  })
+  it.each(['', NaN, Infinity, 1.5, 0, 501])('rejects invalid experiment count %s', (count) => {
+    expect(() => prepareParameterValues(fields, { count })).toThrow('Count:')
+  })
+  it.each(['{', '{}', 'null'])('rejects invalid array draft %s', (targets) => {
+    expect(() => prepareParameterValues(fields, { targets, count: 1 })).toThrow('Targets:')
+  })
+  it('omits a cleared optional numeric parameter instead of submitting zero or null', () => {
+    expect(prepareParameterValues([{ key: 'seed', type: 'integer' }], { seed: '' })).toEqual({})
   })
 })

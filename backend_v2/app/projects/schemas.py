@@ -125,6 +125,8 @@ class ProjectPromptDraftCreate(BaseModel):
     project_type: str = Field(min_length=1, max_length=80)
     summary: str | None = Field(default=None, max_length=5000)
     llm_provider_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
+    language: str = Field(default="en", pattern="^(en|zh)$")
 
 
 class ProjectPromptDraftAccepted(BaseModel):

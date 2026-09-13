@@ -25,10 +25,13 @@ here too, which is what makes the sentence above true on all three surfaces.
 
 from __future__ import annotations
 
+import math
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+from jsonschema import Draft202012Validator
 
 from ..core.problem import DomainError
 
@@ -137,6 +140,9 @@ class ToolSpec:
     #:   research_dataset   - the returned dataset, cited as one entity
     #:   research_reference - the returned reference, cited as one entity
     citation: str = "none"
+    #: Compatibility for handlers that historically accepted numeric strings.
+    #: Coercion happens before schema validation, so bounds still apply.
+    coerce_numeric_strings: bool = False
 
     def schema(self) -> dict[str, Any]:
         """The tool as the model sees it."""
@@ -246,6 +252,25 @@ class ToolRegistry:
                 f"{tool_id} needs {spec.requires}, which is not enabled for this turn.",
                 status_code=409,
             )
+        if spec.execution_mode != "read" and spec.intent == "user":
+            if context.actions is None or not getattr(context.actions, "request_allows", lambda _: False)(tool_id):
+                raise DomainError("copilot_action_requires_explicit_user_request", "This action is outside the approved task scope.", status_code=403)
+        if spec.coerce_numeric_strings:
+            arguments = dict(arguments)
+            for name, schema in spec.parameters.get("properties", {}).items():
+                value = arguments.get(name)
+                kind = schema.get("type")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise DomainError("copilot_tool_arguments_invalid", "Numeric tool arguments must be finite.", status_code=422)
+                if isinstance(value, str) and kind in {"integer", "number"}:
+                    try:
+                        number = int(value) if kind == "integer" else float(value)
+                        if math.isfinite(number):
+                            arguments[name] = number
+                    except (ValueError, OverflowError):
+                        pass  # The original value is rejected by the schema below.
+        if not Draft202012Validator(spec.parameters).is_valid(arguments):
+            raise DomainError("copilot_tool_arguments_invalid", "Tool arguments do not match the declared schema.", status_code=422)
         return spec.handler(context, arguments)
 
 

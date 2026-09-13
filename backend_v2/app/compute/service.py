@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
+from jsonschema import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -24,12 +26,13 @@ from .schemas import ComputeDraftCreate, SubmissionCreate
 
 TERMINAL_STATES = TERMINAL_JOB_STATUSES
 ALLOWED_TRANSITIONS = {
-    "pending": {"dispatching", "cancel_requested", "cancelled", "failed"},
+    "pending": {"skipped", "dispatching", "cancel_requested", "cancelled", "failed"},
     "dispatching": {"queued", "running", "cancel_requested", "failed", "cancelled"},
     "queued": {"running", "collecting", "cancel_requested", "failed", "cancelled"},
     "running": {"collecting", "cancel_requested", "failed", "cancelled"},
     "collecting": {"succeeded", "cancel_requested", "failed"},
     "cancel_requested": {"cancelled", "failed"},
+    "skipped": set(),
     "succeeded": set(),
     "failed": set(),
     "cancelled": set(),
@@ -156,6 +159,12 @@ def create_submission(
     repo = ComputeRepository(session)
     scope = f"workflow:{workflow.id}:submit"
     digest = _payload_hash(workflow.id, payload)
+    session.scalar(
+        select(WorkflowRun)
+        .where(WorkflowRun.id == workflow.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     existing = repo.idempotency(user.id, scope, idempotency_key)
     if existing:
         if existing.request_hash != digest:
@@ -169,9 +178,31 @@ def create_submission(
             )
         return submission, repo.jobs_for_submission(submission.id)
 
+    if payload.workflow_version is not None and payload.workflow_version != workflow.version:
+        raise DomainError(
+            "version_conflict",
+            "The workflow changed after preview; review the new scripts before submitting",
+            status_code=412,
+        )
+    if workflow.status != "draft":
+        raise DomainError(
+            "workflow_locked",
+            "This workflow was already submitted; inspect its jobs or create a new run",
+            status_code=409,
+        )
     nodes = WorkflowRepository(session).nodes(workflow.id)
     if not nodes:
         raise DomainError("workflow_empty", "Workflow has no executable nodes", status_code=409)
+    from ..registry.models import ModelPlugin
+
+    # Hold declarations stable until their snapshots and jobs have been persisted.
+    list(session.scalars(select(ModelPlugin).where(ModelPlugin.id.in_(
+        [node.model_plugin_id for node in nodes if node.model_plugin_id]
+    )).order_by(ModelPlugin.id).with_for_update(read=True).execution_options(populate_existing=True)))
+    if payload.review_fingerprints is not None:
+        executable_ids = {node.id for node in nodes if node.execution_mode != "manual"}
+        if set(payload.review_fingerprints) != executable_ids:
+            raise DomainError("preview_incomplete", "Review every executable node before submitting", status_code=412)
     _record_lineage(session, workflow, nodes)
     settings = get_settings()
     backend = payload.compute_backend or settings.compute_backend
@@ -189,7 +220,7 @@ def create_submission(
     # a known blocker is how unvalidated commands used to reach the cluster.
     from ..workflows.preflight import evaluate_preflight
 
-    blockers, _, _ = evaluate_preflight(session, workflow)
+    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend=backend)
     if blockers:
         raise DomainError(
             "workflow_preflight_failed",
@@ -205,7 +236,8 @@ def create_submission(
     )
     session.add(submission)
     session.flush()
-    timeout_at = datetime.now(UTC) + timedelta(minutes=payload.timeout_minutes)
+    from ..workflows.assistance import node_command
+
     jobs = []
     for node in nodes:
         # Manual stages are part of the route but are not run here, so they get no job.
@@ -253,6 +285,16 @@ def create_submission(
                 status_code=409,
                 errors=exc.blockers,
             ) from exc
+        if payload.review_fingerprints is not None:
+            from .review import render_review
+
+            _, current_review = render_review(node, plugin, backend, {
+                "schema_version": "1", "parameters": node.parameters,
+                "inputs": resolved_inputs, "pending_inputs": pending_inputs,
+            })
+            if payload.review_fingerprints[node.id] != current_review:
+                raise DomainError("preview_changed", "Plugin, inputs or execution settings changed; refresh the preview", status_code=412)
+        command = node_command(node, plugin)
         job = Job(
             submission_id=submission.id,
             workflow_run_id=workflow.id,
@@ -260,7 +302,7 @@ def create_submission(
             project_id=project.id,
             compute_backend=backend,
             model_plugin=node.model_plugin,
-            timeout_at=timeout_at,
+            timeout_at=None,
             runtime_spec={
                 "parameters": node.parameters,
                 "node_key": node.node_key,
@@ -269,10 +311,22 @@ def create_submission(
                 # one, and dispatching that as an empty command ran `true` instead of the
                 # model. Same precedence as the preview endpoint, so what a scientist
                 # reviewed is what runs.
-                "command": (plugin.command if plugin else None) or node.command,
+                "command": command,
+                "command_sha256": hashlib.sha256(command.encode()).hexdigest(),
+                "workflow_version": workflow.version,
+                "node_version": node.version,
+                "configuration": node.configuration or {},
+                "workflow_edges": workflow.graph.get("edges", []),
+                "timeout_minutes": payload.timeout_minutes,
                 "queue": node.queue,
                 "plugin_snapshot": plugin_snapshot,
                 "manifest_version": "1",
+                "input_manifest_template": {
+                    "schema_version": "1",
+                    "parameters": node.parameters,
+                    "inputs": resolved_inputs,
+                    "pending_inputs": pending_inputs,
+                },
                 "input_manifest": {
                     "schema_version": "1",
                     "parameters": node.parameters,
@@ -318,9 +372,15 @@ def create_submission(
 def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: WorkflowRun) -> None:
     """Enqueue dependency-ready nodes and fail descendants blocked by terminal parents."""
     repo = ComputeRepository(session)
+    session.refresh(workflow, with_for_update=True)
     by_key = {key: job for job, key in repo.jobs_and_node_keys(submission.id)}
     dependencies: dict[str, set[str]] = {key: set() for key in by_key}
-    for edge in workflow.graph.get("edges", []):
+    frozen_edges = (
+        next(iter(by_key.values())).runtime_spec.get("workflow_edges", workflow.graph.get("edges", []))
+        if by_key
+        else []
+    )
+    for edge in frozen_edges:
         source, target = edge.get("source"), edge.get("target")
         if source in by_key and target in dependencies:
             dependencies[target].add(source)
@@ -336,12 +396,48 @@ def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: W
                 job.error_code = "upstream_failed"
                 transition_job(session, job, "failed")
                 changed = True
-            elif all(parent.status == "succeeded" for parent in parents) and not repo.has_outbox_event(
+            elif all(parent.status in {"succeeded", "skipped"} for parent in parents) and not repo.has_outbox_event(
                 "job.dispatch", job.id
             ):
-                if not _bind_upstream_inputs(session, job, dependencies[key], by_key):
+                if any(
+                    e["target"] == key
+                    and by_key.get(e["source"])
+                    and by_key[e["source"]].status == "skipped"
+                    and e.get("gate", {}).get("mode") == "dependency"
+                    for e in frozen_edges
+                ):
+                    job.error_code = "no_qualified_inputs"
+                    job.error_message = "Skipped: required execution dependency was skipped"
+                    transition_job(session, job, "skipped")
                     changed = True
                     continue
+                if "workflow_edges" in job.runtime_spec:
+                    from ..workflows.gate_runtime import gate_inputs
+
+                    active_parents = {k for k in dependencies[key] if by_key[k].status != "skipped"}
+                    state = gate_inputs(session, job, active_parents, by_key)
+                    if state == "waiting":
+                        continue
+                    if state == "empty":
+                        job.error_code = "no_qualified_inputs"
+                        job.error_message = "Skipped: no qualified upstream inputs"
+                        transition_job(session, job, "skipped")
+                        changed = True
+                        continue
+                elif not _bind_upstream_inputs(session, job, dependencies[key], by_key):
+                    changed = True
+                    continue
+                from ..workflows.assistance import resolve_parameter_links
+
+                try:
+                    resolve_parameter_links(job, by_key)
+                except (ValueError, KeyError, ValidationError) as exc:
+                    job.error_code = "runtime_parameters_invalid"
+                    job.error_message = str(exc)[:2000]
+                    transition_job(session, job, "failed")
+                    changed = True
+                    continue
+                job.timeout_at = datetime.now(UTC) + timedelta(minutes=job.runtime_spec.get("timeout_minutes", 180))
                 repo.enqueue(
                     "job.dispatch",
                     job.id,
@@ -350,7 +446,7 @@ def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: W
                 )
 
     statuses = {job.status for job in by_key.values()}
-    if statuses == {"succeeded"}:
+    if statuses and statuses <= {"succeeded", "skipped"}:
         submission.status = "succeeded"
         set_workflow_status(workflow, "succeeded")
     elif statuses and statuses <= TERMINAL_STATES:
@@ -394,9 +490,7 @@ def _original_timeout(job: Job) -> timedelta:
     return budget if budget > timedelta(minutes=5) else DEFAULT_JOB_TIMEOUT
 
 
-def _bind_upstream_inputs(
-    session: Session, job: Job, parent_keys: set[str], by_key: dict[str, Job]
-) -> bool:
+def _bind_upstream_inputs(session: Session, job: Job, parent_keys: set[str], by_key: dict[str, Job]) -> bool:
     """Fold succeeded parents' outputs into ``job``'s input manifest.
 
     Returns False (and fails the job) when a declared upstream binding produced nothing,
@@ -462,7 +556,11 @@ def retry_job(session: Session, job: Job, project: Project, user: User) -> Job:
     if job.status not in {"failed", "cancelled"}:
         raise DomainError("job_not_retryable", "Only failed or cancelled jobs can be retried", status_code=409)
     attempt_number = job.attempt_number + 1
-    runtime_spec = {**job.runtime_spec}
+    runtime_spec = copy.deepcopy(job.runtime_spec)
+    if "workflow_edges" in runtime_spec:
+        runtime_spec["input_manifest"] = copy.deepcopy(runtime_spec["input_manifest_template"])
+        runtime_spec.pop("selected_result_ids", None)
+        runtime_spec.pop("gate_selected_counts", None)
     retry = Job(
         submission_id=job.submission_id,
         workflow_run_id=job.workflow_run_id,
@@ -474,7 +572,7 @@ def retry_job(session: Session, job: Job, project: Project, user: User) -> Job:
         attempt_number=attempt_number,
         # Inherit the original submission's budget rather than silently granting a
         # different one; a retry is the same work, not a new request.
-        timeout_at=datetime.now(UTC) + _original_timeout(job),
+        timeout_at=None if "workflow_edges" in runtime_spec else datetime.now(UTC) + _original_timeout(job),
         runtime_spec=runtime_spec,
     )
     session.add(retry)

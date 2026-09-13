@@ -7,8 +7,7 @@ import {
   SpinnerGap,
   UploadSimple,
 } from '@phosphor-icons/react'
-import { listModelPlugins, listScriptAssets, uploadScriptAsset } from '../../lib/api/registry'
-import type { ScriptAsset } from '../../lib/schemas/registry'
+import { listScriptAssets, uploadScriptAsset } from '../../lib/api/registry'
 import { useToastStore } from '../../components/ui/toastStore'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
@@ -22,22 +21,9 @@ import {
 } from '../../components/reui/sortable'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../components/ui/select'
-
-function warningCount(asset: ScriptAsset): number {
-  void asset
-  return 0
-}
 
 export function ScriptAssetManager() {
   const { t, format } = useI18n()
-  const [modelPluginId, setModelPluginId] = useState('')
   const [relativePath, setRelativePath] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [lastResult, setLastResult] = useState<string>('')
@@ -47,29 +33,20 @@ export function ScriptAssetManager() {
   const showToast = useToastStore((s) => s.show)
   const { projectId } = useProjectContext()
 
-  const { data: plugins = [] } = useQuery({
-    queryKey: ['model-plugins'],
-    queryFn: listModelPlugins,
-  })
-
   const {
     data: scripts = [],
     isLoading,
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['script-assets', modelPluginId],
-    queryFn: () => listScriptAssets(modelPluginId || undefined),
+    queryKey: ['script-assets'],
+    queryFn: () => listScriptAssets(),
   })
 
-  const selectedModel = useMemo(
-    () => plugins.find((plugin) => plugin.id === modelPluginId),
-    [modelPluginId, plugins],
-  )
   const visibleScripts = useMemo(() => {
     const order = new Map(scriptOrder.map((id, index) => [id, index]))
     return scripts
-      .slice(0, 6)
+      .slice()
       .sort(
         (left, right) =>
           (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
@@ -81,29 +58,19 @@ export function ScriptAssetManager() {
     mutationFn: () => {
       if (!file) throw new Error(t.workflowExt.scriptAssets.selectFileFirst)
       return uploadScriptAsset(file, {
-        modelPluginId: modelPluginId || undefined,
         relativePath: relativePath.trim() || undefined,
         projectId: projectId || undefined,
       })
     },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['script-assets'] })
-      await queryClient.invalidateQueries({ queryKey: ['model-parameter-catalog'] })
       setFile(null)
       setLastResult(
         format(t.workflowExt.scriptAssets.successResult, {
           path: result.item.name,
-          params: result.item.parameter_observations,
-          warnings: result.item.parse_warnings,
         }),
       )
-      showToast(
-        format(t.workflowExt.scriptAssets.importSuccess, {
-          params: result.item.parameter_observations,
-          warnings: result.item.parse_warnings,
-        }),
-        'success',
-      )
+      showToast(t.workflowExt.scriptAssets.importSuccess, 'success')
     },
     onError: (error) => {
       setLastResult(
@@ -131,35 +98,11 @@ export function ScriptAssetManager() {
           <AlertDescription>{t.workflowExt.scriptAssets.importHint}</AlertDescription>
         </Alert>
         <label className="grid gap-1 text-xs text-text-secondary">
-          {t.workflowExt.scriptAssets.modelPlugin}
-          <Select
-            value={modelPluginId || 'all'}
-            onValueChange={(value) => setModelPluginId(value === 'all' ? '' : (value ?? ''))}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t.workflowExt.scriptAssets.autoDetect} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.workflowExt.scriptAssets.autoDetect}</SelectItem>
-              {plugins.map((plugin) => (
-                <SelectItem key={plugin.id} value={plugin.id}>
-                  {plugin.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="grid gap-1 text-xs text-text-secondary">
           {t.workflowExt.scriptAssets.archivePath}
           <Input
             value={relativePath}
             onChange={(event) => setRelativePath(event.target.value)}
-            placeholder={
-              selectedModel
-                ? format(t.workflowExt.scriptAssets.archivePathForModel, { modelName: selectedModel.name })
-                : t.workflowExt.scriptAssets.archivePathExample
-            }
+            placeholder={t.workflowExt.scriptAssets.archivePathExample}
           />
         </label>
 
@@ -187,7 +130,7 @@ export function ScriptAssetManager() {
         <div className="flex gap-2">
           <Button type="button"
             className="flex-1"
-            disabled={!file || upload.isPending}
+            disabled={!projectId || !file || upload.isPending}
             onClick={() => upload.mutate()}
           >
             {upload.isPending ? (
@@ -256,11 +199,7 @@ export function ScriptAssetManager() {
               <Badge variant="outline">{script.runtime}</Badge>
             </div>
             <p className="mt-1 truncate text-[11px] text-text-secondary">
-              {format(t.workflowExt.scriptAssets.scriptEntry, {
-                plugin: t.workflowExt.scriptAssets.auto,
-                scheduler: script.runtime,
-                count: warningCount(script),
-              })}
+              {t.workflowExt.scriptAssets.archiveOnly}
             </p>
             <p className="mt-1 truncate font-mono text-[10px] text-text-secondary">{script.checksum_sha256}</p>
           </article>

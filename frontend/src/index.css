@@ -258,6 +258,11 @@ textarea {
   stroke-linejoin: round;
 }
 
+/* Interactive gate labels must sit above the SVG hit area and node cards. */
+.react-flow__edgelabel-renderer {
+  z-index: 4;
+}
+
 .react-flow__edges {
   z-index: 2;
 }

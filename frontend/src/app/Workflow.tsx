@@ -1,4 +1,8 @@
+import { Disclosure } from '../components/ui/Disclosure'
+import type { Connection } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog'
+import { previewWorkflowNodeScript } from '../lib/api/workflow'
 import { TargetIdentityFix } from '../features/workflow/TargetIdentityFix'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkle, SpinnerGap } from '@phosphor-icons/react'
@@ -14,6 +18,7 @@ import { WorkflowToolbar } from '../features/workflow/WorkflowToolbar'
 import {
   defaultWorkflowEdges,
   defaultWorkflowNodes,
+  isOrderingHandle,
   type NodeTemplate,
 } from '../features/workflow/workflowTypes'
 import { ApiState } from '../components/ui/ApiState'
@@ -26,7 +31,11 @@ import {
   preflightBlockersFrom,
   submitWorkflowRun,
 } from '../lib/api/workflow'
-import { isTerminalWorkflowRun } from '../lib/schemas/workflow'
+import type { WorkflowEdge } from '../lib/schemas/workflow'
+import { saveConnections, listGates } from '../lib/api/workflowGates'
+import { GateInspector } from '../features/workflow/GateInspector'
+import { ConnectionPicker } from '../features/workflow/ConnectionPicker'
+import { gateLabel, emptyPolicy, type GatePolicy } from '../features/workflow/gates'
 import { applyRoutePlan, planRoute, type RoutePlan } from '../lib/api/copilot'
 import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listModelPlugins, validateModelPlugin } from '../lib/api/registry'
@@ -98,6 +107,9 @@ function routeTarget(
     project?.name?.trim() || objective.trim().split(/[.;\n]/)[0] || 'protein design target'
   return target.slice(0, 200)
 }
+
+/** How many preflight findings to show before the list has to be expanded. */
+const PREFLIGHT_PREVIEW_COUNT = 4
 
 const statusLegendKeys = [
   ['notStarted', 'border-border-soft'],
@@ -230,9 +242,11 @@ export function WorkflowPage() {
   const workflowSeed = useAppStore((s) => s.workflowSeed)
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
+  const [preflightExpanded, setPreflightExpanded] = useState(false)
   const [goal, setGoal] = useState(() =>
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
   )
+  const [confirmRun, setConfirmRun] = useState(false)
   const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<string | null>(null)
@@ -283,6 +297,9 @@ export function WorkflowPage() {
     enabled: Boolean(projectId),
   })
 
+  const [pendingNextSource, setPendingNextSource] = useState<string | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const [connectionPicker, setConnectionPicker] = useState<{source?: string; target?: string; edgeId?: string} | null>(null)
   const workflowRunId = selectedWorkflowRunId ?? currentWorkflowRun?.id
 
   const {
@@ -298,7 +315,7 @@ export function WorkflowPage() {
     refetchInterval: (query) => {
       const nodes = query.state.data?.nodes ?? []
       return nodes.some((node) =>
-        ['queued', 'staging', 'running', 'collecting_outputs'].includes(node.status),
+        ['pending', 'dispatching', 'queued', 'running', 'collecting', 'requires_review'].includes(node.status),
       )
         ? 3000
         : false
@@ -355,20 +372,92 @@ export function WorkflowPage() {
     return Array.from(byId.values())
   }, [artifacts, projectArtifacts])
 
-  const graph = useMemo(
-    () =>
-      workflowNodes.length > 0
-        ? mapApiGraphToGraph(workflowNodes, workflowGraph?.edges ?? [])
-        : null,
-    [workflowGraph?.edges, workflowNodes],
-  )
+  const gateQuery = useQuery({ queryKey: ['workflow-gates', workflowRunId], queryFn: () => listGates(workflowRunId!), enabled: !!workflowRunId && !isDemoMode, refetchInterval: 3000 })
+  const graph = useMemo(() => {
+    if (!workflowNodes.length) return null
+    const mapped = mapApiGraphToGraph(workflowNodes, workflowGraph?.edges ?? [])
+    mapped.nodes = mapped.nodes.map(n => {
+      const apiNode = workflowNodes.find(item => item.id === n.id)
+      const plugin = modelPlugins.find(p => p.id === apiNode?.model_plugin_id)
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          inputPorts: plugin?.input_ports.map(p => p.name),
+          outputPorts: plugin?.output_ports.map(p => p.name),
+          requiredPorts: plugin?.input_ports.filter(p => p.required).map(p => p.name),
+          boundPorts: (apiNode?.input_bindings ?? []).map(b => b.port),
+        },
+      }
+    })
+    mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { setSelectedEdgeId(e.id); setSelectedNodeId(null); setSelectedArtifactId(undefined) } } }))
+    return mapped
+  }, [workflowNodes, workflowGraph?.edges, modelPlugins, gateQuery.data, language, setSelectedEdgeId, setSelectedNodeId, setSelectedArtifactId])
+  const selectedEdge = workflowGraph?.edges.find(e => e.id === selectedEdgeId)
+  const persistConnections = async (edges: WorkflowEdge[]) => {
+    if (!workflowRunId || !workflowGraph) return
+    const saved = await saveConnections(workflowRunId, edges, workflowGraph.workflow.version)
+    queryClient.setQueryData(['workflow-graph', workflowRunId], saved)
+    await queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
+  }
+  /**
+   * Save one connection. `from`/`to` null means an ordering-only relationship: the
+   * server records it as a `dependency` gate, stages no data and adds no input binding,
+   * which is what "run B after A" has to mean when the two share no compatible port.
+   */
+  const connectPorts = async (source: string, target: string, from: string | null, to: string | null) => {
+    const existing = workflowGraph?.edges.find(e => e.id === connectionPicker?.edgeId)
+    const ordering = from === null || to === null
+    const edge = {
+      id: existing?.id ?? crypto.randomUUID(),
+      source,
+      target,
+      source_port: ordering ? null : from,
+      target_port: ordering ? null : to,
+      gate: ordering
+        ? { ...emptyPolicy(), mode: 'dependency' as const, configured: true }
+        : existing?.gate ?? emptyPolicy(),
+    }
+    await persistConnections([...(workflowGraph?.edges ?? []).filter(e => e.id !== existing?.id), edge])
+    setSelectedEdgeId(edge.id)
+    setSelectedNodeId(null)
+  }
+  const requestConnection = (connection: Connection) => {
+    // Dragging between the two ordering handles states the intent outright, so it does
+    // not need a port search or a dialog.
+    if (isOrderingHandle(connection.sourceHandle) && isOrderingHandle(connection.targetHandle)) {
+      void connectPorts(connection.source, connection.target, null, null).catch(e =>
+        showToast(e.message, 'error'),
+      )
+      return
+    }
+    const fromNode = workflowNodes.find(n => n.id === connection.source)
+    const toNode = workflowNodes.find(n => n.id === connection.target)
+    const from = modelPlugins.find(p => p.id === fromNode?.model_plugin_id)?.output_ports ?? []
+    const to = modelPlugins.find(p => p.id === toNode?.model_plugin_id)?.input_ports ?? []
+    const pairs = from.flatMap(a => to.filter(b => a.kind === b.kind && (!b.accepts.length || b.accepts.includes(a.artifact_type)) && (!connection.sourceHandle || isOrderingHandle(connection.sourceHandle) || connection.sourceHandle === a.name) && (!connection.targetHandle || isOrderingHandle(connection.targetHandle) || connection.targetHandle === b.name)).map(b => [a.name, b.name]))
+    if (pairs.length === 1) void connectPorts(connection.source, connection.target, pairs[0][0], pairs[0][1]).catch(e => showToast(e.message, 'error'))
+    else setConnectionPicker({ source: connection.source, target: connection.target })
+  }
+  const preflightBlockers = workflowPreflight.data?.blockers ?? []
+  const preflightWarnings = workflowPreflight.data?.warnings ?? []
+  const preflightItemCount = preflightBlockers.length + preflightWarnings.length
+  // Blockers stop a submission and warnings do not, so the short list is blockers first
+  // and warnings only fill the remaining slots.
+  const visiblePreflightBlockers = preflightExpanded
+    ? preflightBlockers
+    : preflightBlockers.slice(0, PREFLIGHT_PREVIEW_COUNT)
+  const visiblePreflightWarnings = preflightExpanded
+    ? preflightWarnings
+    : preflightWarnings.slice(0, Math.max(0, PREFLIGHT_PREVIEW_COUNT - preflightBlockers.length))
+
   const selectedNode = workflowNodes.find((node) => node.id === selectedNodeId) ?? null
   const selectedArtifact =
     visibleArtifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null
 
   const workflowRun = workflowGraph?.workflow ?? currentWorkflowRun
   const targetReady = targetReadiness.data?.ready_for_workflow === true
-  const readOnly = isDemoMode || !targetReady || isTerminalWorkflowRun(workflowRun?.status)
+  const readOnly = isDemoMode || !targetReady || Boolean(workflowRun && workflowRun.status !== 'draft')
   const showRoutePlanner =
     !isDemoMode &&
     targetReady &&
@@ -399,7 +488,7 @@ export function WorkflowPage() {
       }),
     onSuccess: (plan) => {
       const recommended =
-        plan.route_options.find((route) => route.recommended) ?? plan.route_options[0]
+        plan.route_options.find((route) => route.recommended)
       setRoutePlan(plan)
       setSelectedRouteId(recommended?.route_id ?? '')
       setSelectedModuleIds(
@@ -424,6 +513,7 @@ export function WorkflowPage() {
       return applyRoutePlan({
         project_id: projectId,
         route_id: selectedRoute.route_id,
+        workflow_spec: selectedRoute.workflow_spec,
         objective: routeObjective,
         target: routePlan?.target ?? routeTargetLabel,
         selected_module_ids: selectedModuleIds,
@@ -446,27 +536,47 @@ export function WorkflowPage() {
     onError: () => showToast(t.workflowExt.toasts.routeCreateFailed, 'error'),
   })
 
+  const submissionPreview = useQuery({
+    queryKey: ['submission-preview', workflowRunId, workflowGraph?.workflow.version, workflowPreflight.data?.checks],
+    enabled: confirmRun && Boolean(workflowRunId),
+    retry: false,
+    queryFn: () => {
+      const backend = workflowPreflight.data?.checks.compute_backend ?? 'lsf'
+      if (backend !== 'lsf' && backend !== 'docker') throw new Error('Unsupported compute backend')
+      return Promise.all(workflowNodes.filter((node) => node.execution_mode !== 'manual').map(async (node) => ({
+        name: node.model_plugin, ...(await previewWorkflowNodeScript(node.id, { compute_backend: backend })),
+      })))
+    },
+  })
   const startWorkflow = useMutation({
     mutationFn: () => {
       if (!workflowRunId) {
         throw new Error(t.workflowExt.toasts.noWorkflowRun)
       }
-      return submitWorkflowRun(workflowRunId)
+      if (!submissionPreview.isSuccess || submissionPreview.isFetching || !workflowGraph) throw new Error(language === 'zh' ? '请等待提交预览完成' : 'Wait for the submission preview')
+      return submitWorkflowRun(workflowRunId, workflowGraph.workflow.version, {
+        backend: String(workflowPreflight.data?.checks.compute_backend ?? 'lsf'),
+        fingerprints: Object.fromEntries(submissionPreview.data.map((item) => [item.workflow_node_id, item.review_fingerprint])),
+      })
     },
     onSuccess: () => {
+      setConfirmRun(false)
       showToast(t.workflowExt.toasts.submitted, 'success')
       queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-jobs', workflowRunId] })
     },
     onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: ['submission-preview', workflowRunId] })
       const blockers = preflightBlockersFrom(error)
       if (blockers.length > 0) {
         showToast(`${t.workflowExt.toasts.computeBlocked} ${blockers.join('; ')}`, 'info')
         queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
         return
       }
-      showToast(t.workflowExt.toasts.startFailed, 'error')
+      void queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
+      void queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
+      showToast(error instanceof Error ? error.message : t.workflowExt.toasts.startFailed, 'error')
     },
   })
 
@@ -535,7 +645,7 @@ export function WorkflowPage() {
               defaultName={activeProject ? projectText(activeProject, 'name', language) : undefined}
             />
           ) : (
-            <Button
+            <Button type="button"
               className="mt-3"
               render={
                 <Link
@@ -567,8 +677,21 @@ export function WorkflowPage() {
         onCreateRun={() => createWorkflow.mutate()}
         onNewRoute={() => createWorkflow.mutate()}
         onAddNode={() => setBuilderOpen((v) => !v)}
-        onStart={() => startWorkflow.mutate()}
+        onStart={() => setConfirmRun(true)}
       />
+
+      <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader><DialogTitle>{language === 'zh' ? '确认提交计算任务' : 'Review compute submission'}</DialogTitle>
+            <DialogDescription>{language === 'zh' ? '确认后将创建作业并交给后台执行。脚本中的预览标识会在提交时替换为真实任务标识。' : 'Confirmation creates jobs for the worker to execute. Preview identifiers are replaced by real job identifiers at submission.'}</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm">{language === 'zh' ? '执行后端' : 'Backend'}: {String(workflowPreflight.data?.checks.compute_backend ?? '—')} · {language === 'zh' ? '默认队列' : 'Default queue'}: {String(workflowPreflight.data?.checks.queue ?? '—')}</p>
+          {submissionPreview.isPending ? <p role="status">{language === 'zh' ? '正在准备提交预览…' : 'Preparing submission preview…'}</p> : null}
+          {submissionPreview.isError ? <div role="alert"><p>{submissionPreview.error.message}</p><Button type="button" variant="outline" onClick={() => void submissionPreview.refetch()}>{language === 'zh' ? '重新生成预览' : 'Retry preview'}</Button></div> : null}
+          {submissionPreview.data?.map((preview) => <Disclosure key={preview.workflow_node_id} className="rounded border p-3" title={preview.name}><pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs">{preview.script}</pre></Disclosure>)}
+          <Button type="button" disabled={startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
+        </DialogContent>
+      </Dialog>
 
       {!isDemoMode && workflowRun?.derived_from_id ? (
         <Frame variant="inverse" spacing="sm" className="mb-4">
@@ -583,15 +706,43 @@ export function WorkflowPage() {
           className="mb-4"
           variant={workflowPreflight.data.allowed ? 'success' : 'warning'}
         >
-          <AlertTitle>
-            {workflowPreflight.data.allowed
-              ? t.workflowExt.routePlanner.preflightReadyTitle
-              : t.workflowExt.routePlanner.preflightBlockedTitle}
+          <AlertTitle className="flex flex-wrap items-center gap-2">
+            <span>
+              {workflowPreflight.data.allowed
+                ? t.workflowExt.routePlanner.preflightReadyTitle
+                : t.workflowExt.routePlanner.preflightBlockedTitle}
+            </span>
+            {preflightItemCount > 0 ? (
+              <span className="text-xs font-normal text-text-secondary">
+                {format(t.workflowExt.routePlanner.preflightCounts, {
+                  blockers: workflowPreflight.data.blockers.length,
+                  warnings: workflowPreflight.data.warnings.length,
+                })}
+              </span>
+            ) : null}
+            {preflightItemCount > PREFLIGHT_PREVIEW_COUNT ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                aria-expanded={preflightExpanded}
+                onClick={() => setPreflightExpanded((open) => !open)}
+              >
+                {preflightExpanded
+                  ? t.workflowExt.routePlanner.preflightShowLess
+                  : format(t.workflowExt.routePlanner.preflightShowAll, {
+                      count: preflightItemCount,
+                    })}
+              </Button>
+            ) : null}
           </AlertTitle>
           <AlertDescription>
-          {workflowPreflight.data.blockers.length > 0 ? (
+          {/* Collapsed by default. A nine-node route routinely produces twenty lines here,
+              which pushed the canvas a full screen below the fold and made the list read
+              as a wall rather than as the few things to fix next. */}
+          {visiblePreflightBlockers.length > 0 ? (
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              {workflowPreflight.data.blockers.map((blocker, index) => (
+              {visiblePreflightBlockers.map((blocker, index) => (
                 <li key={`${blocker.code}-${blocker.node_key ?? blocker.port ?? index}`}>
                   {blocker.node_key ? `${blocker.node_key}: ` : ''}
                   {blocker.message}
@@ -600,7 +751,7 @@ export function WorkflowPage() {
             </ul>
           ) : null}
           {/* Keyed on plugin too: plugin-level warnings share a code, one per plugin. */}
-          {workflowPreflight.data.warnings.map((warning, index) => {
+          {visiblePreflightWarnings.map((warning, index) => {
             const plugin =
               modelPlugins.find((item) => item.id === warning.plugin_id) ??
               modelPlugins.find(
@@ -768,7 +919,7 @@ export function WorkflowPage() {
                       <Button type="button"
                         className="w-fit"
                         disabled={
-                          readOnly || applyPlannedRoute.isPending || selectedModuleIds.length === 0
+                          readOnly || applyPlannedRoute.isPending || selectedModuleIds.length !== selectedRoute.modules.length || Boolean((selectedRoute.constraints.missing_plugins as unknown[] | undefined)?.length)
                         }
                         onClick={() => applyPlannedRoute.mutate()}
                       >
@@ -828,7 +979,7 @@ export function WorkflowPage() {
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
         <div className="grid min-h-0 gap-4 xl:h-[calc(100vh-12rem)] xl:min-h-[38rem] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
-          <div className="order-2 min-h-0 xl:order-1">
+          <div className="order-3 min-h-0 xl:order-1">
             <WorkflowResourceSidebar
               projectId={projectId}
               artifacts={visibleArtifacts}
@@ -852,7 +1003,13 @@ export function WorkflowPage() {
             />
           </div>
 
-          <main className="order-1 min-w-0 xl:order-2" data-tour-id="workflow-canvas">
+          <main className="relative order-1 min-w-0 xl:order-2" data-tour-id="workflow-canvas">
+            {gateQuery.isError && <Alert variant="warning" className="mb-2">
+              <AlertDescription>{language === 'zh' ? '门控状态加载失败。' : 'Gate status could not be loaded.'} {gateQuery.error.message}</AlertDescription>
+              <Button type="button" size="sm" variant="outline" onClick={() => void gateQuery.refetch()}>{language === 'zh' ? '重新加载门控' : 'Reload gates'}</Button>
+            </Alert>}
+            {connectionPicker && <ConnectionPicker nodes={workflowNodes} plugins={modelPlugins} {...connectionPicker} onConnect={connectPorts} onClose={() => setConnectionPicker(null)} />}
+            {selectedNode && !readOnly && <div className="mb-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ target: selectedNode.id })}>{language === 'zh' ? '连接上一步' : 'Connect previous'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ source: selectedNode.id })}>{language === 'zh' ? '连接下一步' : 'Connect next'}</Button><Button type="button" size="sm" variant="outline" onClick={() => { setPendingNextSource(selectedNode.id); setBuilderOpen(true) }}>{language === 'zh' ? '添加下一步节点' : 'Add next node'}</Button></div>}
             {currentWorkflowLoading || workflowGraphLoading ? (
               <Frame className="h-full min-h-96" aria-label={t.shared.apiState.loadingDefault}>
                 <FramePanel className="grid h-full gap-3 p-4">
@@ -871,15 +1028,17 @@ export function WorkflowPage() {
               <>
                 <NodeBuilder
                   open={builderOpen && !readOnly}
-                  onClose={() => setBuilderOpen(false)}
+                  onClose={() => { setBuilderOpen(false); setPendingNextSource(null) }}
                   onAdd={async (template, nodeName, methods, parameters) => {
                     try {
-                      await canvasRef.current?.addNodeFromTemplate(
+                      if (!canvasRef.current) throw new Error(t.workflowExt.toasts.addNodeFailed)
+                      const createdId = await canvasRef.current.addNodeFromTemplate(
                         template,
                         nodeName,
                         methods,
                         parameters,
                       )
+                      if (createdId && pendingNextSource) { setConnectionPicker({ source: pendingNextSource, target: createdId }); setPendingNextSource(null) }
                       showToast(format(t.workflowExt.toasts.nodeAdded, { nodeName }), 'success')
                       setBuilderOpen(false)
                       queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
@@ -901,7 +1060,11 @@ export function WorkflowPage() {
                   initialEdges={graph?.edges ?? []}
                   workflowRunId={workflowRunId}
                   readOnly={readOnly}
+                  onConnectionRequested={requestConnection}
+                  onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
+                  onEdgeSelected={setSelectedEdgeId}
                   onNodeSelected={(nodeId) => {
+                    setSelectedEdgeId(null)
                     setSelectedNodeId(nodeId)
                     setSelectedArtifactId(undefined)
                   }}
@@ -924,16 +1087,17 @@ export function WorkflowPage() {
             )}
           </main>
 
-          <div className="order-3 min-h-0" data-tour-id="workflow-inspector">
-            <WorkflowInspector
+          <div className="order-2 min-h-0 xl:order-3" data-tour-id="workflow-inspector">
+            {selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
               workflowRunId={workflowRunId}
+              workflowVersion={workflowGraph?.workflow.version}
               readOnly={readOnly}
               selectedNode={selectedNode}
               selectedArtifact={selectedArtifact}
               nodeCount={workflowNodes.length}
               artifactCount={visibleArtifacts.length}
               nodes={workflowNodes}
-            />
+            />}
           </div>
         </div>
       </ApiState>

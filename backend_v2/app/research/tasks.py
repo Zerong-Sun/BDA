@@ -74,7 +74,7 @@ def _research_target_accession(session: Session, candidate) -> str:
     response = httpx.get(
         "https://rest.uniprot.org/uniprotkb/search",
         params={
-            "query": (f"(gene_exact:{gene}) AND (organism_id:9606) " "AND (reviewed:true)"),
+            "query": (f"(gene_exact:{gene}) AND (organism_id:9606) AND (reviewed:true)"),
             "format": "json",
             "size": 2,
             "fields": "accession,id,gene_names,protein_name,organism_name,length",
@@ -219,7 +219,7 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
         entry_id = str(prediction.get("entryId") or f"AF-{accession}-F1")
         version = prediction.get("latestVersion")
         filename = f"{entry_id}-model_v{version}.pdb" if version else f"{entry_id}.pdb"
-        object_key = f"projects/{project_id}/research-targets/{candidate_id}/" f"{artifact_id}.pdb"
+        object_key = f"projects/{project_id}/research-targets/{candidate_id}/{artifact_id}.pdb"
         ObjectStorage().put_bytes(object_key, body, "chemical/x-pdb")
         artifact = Artifact(
             id=artifact_id,
@@ -417,9 +417,7 @@ def research_gaps_resolve(research_target_id: str, payload: dict) -> dict:
     status = "completed_with_failures" if failed else "completed_with_remaining_scientific_gaps"
     operation_id = str(payload.get("operation_id") or "")
     with session_scope() as session:
-        candidate = session.scalar(
-            select(Candidate).where(Candidate.id == parsed).with_for_update()
-        )
+        candidate = session.scalar(select(Candidate).where(Candidate.id == parsed).with_for_update())
         if candidate is None:
             return {"research_target_id": research_target_id, "status": "missing"}
         properties = dict(candidate.properties or {})
@@ -507,8 +505,8 @@ def research_decision_tree_draft(draft_id: str) -> dict:
 
     import httpx
 
+    from ..copilot.provider_selection import select_provider
     from ..core.problem import DomainError
-    from ..projects.tasks import _select_llm_provider
     from .models import DecisionTreeDraft
     from .schemas import DecisionTreeProposal
 
@@ -519,7 +517,7 @@ def research_decision_tree_draft(draft_id: str) -> dict:
             return {"draft_id": draft_id, "status": "missing"}
 
         request = row.request or {}
-        provider = _select_llm_provider(session, request.get("llm_provider_id"))
+        provider = select_provider(session, request.get("llm_provider_id"), project_id=row.project_id)
         if provider is None:
             row.status = "failed"
             row.error = "no_llm_provider_configured"
@@ -527,8 +525,7 @@ def research_decision_tree_draft(draft_id: str) -> dict:
             return {"draft_id": draft_id, "status": row.status}
 
         user_message = (
-            f"Project type: {request.get('project_type') or ''}\n\n"
-            f"Design brief:\n{request.get('prompt') or ''}"
+            f"Project type: {request.get('project_type') or ''}\n\nDesign brief:\n{request.get('prompt') or ''}"
         )
         try:
             from ..copilot.provider import complete

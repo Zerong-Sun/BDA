@@ -1,3 +1,4 @@
+import { ModelResultGuide } from '../results/ModelResultGuide'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Copy, Download, FileCode, FloppyDisk, Gear, Network, PlugsConnected } from '@phosphor-icons/react'
 import type { WorkflowInputBinding, WorkflowNode } from '../../lib/schemas/workflow'
@@ -11,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '../../components/ui/toastStore'
 import { listModelPlugins } from '../../lib/api/registry'
 import {
+  getWorkflowGraph,
   getWorkflowPreflight,
   previewWorkflowNodeScript,
   updateWorkflowNode,
@@ -19,9 +21,10 @@ import {
 import { ParameterSchemaForm } from '../plugins'
 import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
 import { parseParameterSchema } from '../../lib/forms/parameterSchema'
+import { NodeAssistance } from './NodeAssistance'
 import { InputBindingPanel } from './InputBindingPanel'
 import { listProjectArtifacts } from '../../lib/api/artifacts'
-import { defaultsFromFields, fieldsFromParameterSchema } from '../../lib/forms/parameterSchema'
+import { defaultsFromFields, fieldsFromParameterSchema, prepareParameterValues } from '../../lib/forms/parameterSchema'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { ClusterDrafts } from '../copilot/ClusterDrafts'
@@ -40,6 +43,7 @@ import {
 
 interface WorkflowInspectorProps {
   workflowRunId?: string
+  workflowVersion?: number
   selectedNode?: WorkflowNode | null
   selectedArtifact?: Artifact | null
   nodeCount?: number
@@ -62,6 +66,7 @@ export function WorkflowInspector(props: WorkflowInspectorProps) {
 
 function WorkflowInspectorContent({
   workflowRunId,
+  workflowVersion,
   selectedNode,
   selectedArtifact,
   nodeCount = 0,
@@ -69,17 +74,21 @@ function WorkflowInspectorContent({
   nodes = [],
   readOnly = false,
 }: WorkflowInspectorProps) {
+  const [baseVersion, setBaseVersion] = useState(workflowVersion)
   const parameters = selectedNode?.parameters ?? {}
   const metrics = typeof selectedNode?.parameters.metrics === 'object' && selectedNode.parameters.metrics
     ? selectedNode.parameters.metrics as Record<string, unknown>
     : {}
+  const [draftConfiguration, setDraftConfiguration] = useState<Record<string, unknown>>(selectedNode?.configuration ?? {})
   const [draftParameters, setDraftParameters] = useState<Record<string, unknown>>(parameters)
   const [draftBindings, setDraftBindings] = useState<WorkflowInputBinding[]>(
     selectedNode?.input_bindings ?? [],
   )
-  const [scriptPreview, setScriptPreview] = useState<ScriptPreviewResponse | null>(null)
+  const [previewSnapshot, setPreviewSnapshot] = useState<{ preview: ScriptPreviewResponse; inputs: string } | null>(null)
   const [queueName, setQueueName] = useState(selectedNode?.queue ?? '')
-  const [previewBackend, setPreviewBackend] = useState('lsf')
+  const [previewBackend, setPreviewBackend] = useState<'lsf' | 'docker'>('lsf')
+  const unsavedPreviewInputs = (queueName.trim() || null) !== (selectedNode?.queue || null)
+    || JSON.stringify(draftBindings) !== JSON.stringify(selectedNode?.input_bindings ?? [])
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const { t, language } = useI18n()
@@ -144,18 +153,31 @@ function WorkflowInspectorContent({
     [draftParameters, parameterFields],
   )
 
+  // Keep the response tied to the inputs that produced it, including edits
+  // made while the request was in flight. A stale script is not a current review.
+  const previewInputs = JSON.stringify({
+    node: selectedNode?.id, version: selectedNode?.version, pluginVersion: activePlugin?.version,
+    parameters: effectiveParameters, configuration: draftConfiguration,
+    bindings: draftBindings, queue: queueName, backend: previewBackend,
+  })
+  const scriptPreview = previewSnapshot?.inputs === previewInputs ? previewSnapshot.preview : null
+
   const saveParameters = useMutation({
     mutationFn: () => {
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
       if (!workflowRunId || !selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       return updateWorkflowNode(workflowRunId, selectedNode.id, {
-        parameters: effectiveParameters,
+        configuration: draftConfiguration,
+        parameters: prepareParameterValues(parameterFields, effectiveParameters),
         input_bindings: draftBindings,
         queue: queueName.trim() || null,
-      })
+      }, baseVersion)
     },
     onSuccess: async () => {
       showToast(t.workflowExt.toasts.paramsSaved, 'success')
+      const latest = await getWorkflowGraph(workflowRunId!)
+      setBaseVersion(latest.workflow.version)
+      queryClient.setQueryData(['workflow-graph', workflowRunId], latest)
       await queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
       await queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
     },
@@ -167,15 +189,19 @@ function WorkflowInspectorContent({
   })
 
   const previewScript = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
-      return previewWorkflowNodeScript(selectedNode.id, {
+      if (unsavedPreviewInputs) throw new Error(t.workflowExt.inspector.savePreviewInputs)
+      const preview = await previewWorkflowNodeScript(selectedNode.id, {
         override_params: effectiveParameters,
+        configuration: draftConfiguration,
+        input_bindings: draftBindings,
         compute_backend: previewBackend,
       })
+      return { preview, inputs: previewInputs }
     },
-    onSuccess: (preview) => {
-      setScriptPreview(preview)
+    onSuccess: (snapshot) => {
+      setPreviewSnapshot(snapshot)
       showToast(t.workflowExt.toasts.scriptGenerated, 'success')
     },
     onError: (error) =>
@@ -240,6 +266,8 @@ function WorkflowInspectorContent({
               </div>
               <StatusPill label={selectedNode.status} tone={statusTone(selectedNode.status)} />
             </div>
+
+            <ModelResultGuide pluginKey={activePlugin?.plugin_key ?? selectedNode.model_plugin ?? selectedNode.node_type} />
 
             <RouteDisplayCatalog
               parameters={selectedNode.parameters}
@@ -314,6 +342,7 @@ function WorkflowInspectorContent({
                   </p>
                 </div>
               </div>
+              {workflowRunId && selectedNode && <NodeAssistance workflowId={workflowRunId} node={{ ...selectedNode, parameters: draftParameters }} nodes={nodes} configuration={draftConfiguration} onConfiguration={setDraftConfiguration} onParameter={(key, value) => setDraftParameters(p => ({ ...p, [key]: value }))} readOnly={readOnly} allowedParameters={parameterFields.map(f => f.key)} />}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button"
                   variant="outline"
@@ -328,7 +357,7 @@ function WorkflowInspectorContent({
                 </Button>
                 <Button type="button"
                   size="sm"
-                  disabled={previewScript.isPending || nodePreflight.data?.allowed !== true}
+                  disabled={previewScript.isPending || saveParameters.isPending || unsavedPreviewInputs}
                   onClick={() => previewScript.mutate()}
                 >
                   <FileCode className="h-3.5 w-3.5" />
@@ -337,6 +366,9 @@ function WorkflowInspectorContent({
                     : t.workflowExt.inspector.generateScript}
                 </Button>
               </div>
+              {unsavedPreviewInputs ? (
+                <p className="mt-2 text-xs text-text-secondary">{t.workflowExt.inspector.savePreviewInputs}</p>
+              ) : null}
               {nodePreflight.data && !nodePreflight.data.allowed ? (
                 <Alert className="mt-2" variant="warning">
                   <AlertDescription>
@@ -439,7 +471,6 @@ function WorkflowInspectorContent({
         workflowRunId={workflowRunId}
         readOnly={readOnly}
         selectedNodeId={selectedNode?.id ?? null}
-        overrideParams={effectiveParameters}
       />
       <div className="mt-3">
         <ClusterDrafts projectId={projectId} variant="panel" readOnly={readOnly} />

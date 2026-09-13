@@ -4,11 +4,11 @@
 
 最后核验：2026-09-13（Asia/Shanghai；本轮随 bot 名册新增 structure-analysis 与 failure-diagnosis 两个只读 capability，更新工具与能力计数）
 
-权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
+权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
 数据来源：`backend_v2/app/copilot/{registry,tools,capabilities,actions,agent_loop,tasks,citations,mcp,mcp_app}.py`、`backend_v2/app/main.py`、`backend_v2/app/module_registry.py`、`backend_v2/app/identity/deps.py`、`backend_v2/app/autopilot/models.py`、`backend_v2/openapi.json`、`backend_v2/tests/test_copilot_{mcp,mcp_transport,citations}.py`。
 
-替代关系：不取代任何现有文档。本文是 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 的传输层补充，其冻结的禁止事项在 MCP 上原样生效。
+替代关系：不取代任何现有文档。本文是 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 的传输层补充，其冻结的禁止事项在 MCP 上原样生效。
 
 ---
 
@@ -140,7 +140,7 @@ MCP 没有 message 行，`tools/call` 的结果又只是内容块，所以第一
 - **不暴露 251 个 REST operation。** §1。
 - **不新建第二套工具定义。** §2。
 - **不暴露 `spawn_subagent`。** 它的递归深度上限由 `copilot_agent_runs` 维护；MCP 客户端本身已经是一层编排者，再给它生成子 agent 的能力会让深度计数失去意义。
-- **不给文件系统、shell、凭证或数据库访问。** [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 已冻结此条，MCP 面不是重新讨论它的地方。
+- **不给文件系统、shell、凭证或数据库访问。** [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 已冻结此条，MCP 面不是重新讨论它的地方。
 - **不绕过 compute 的 draft → confirm → submit。** `create_compute_draft` 是 `draft` 模式；确认与提交仍然只有人能做。
 - **不为 MCP 放宽 `Idempotency-Key` 与 `If-Match`。** 对端重试比人频繁得多，这两个头在 MCP 上比在浏览器上更需要，而不是更不需要。
 

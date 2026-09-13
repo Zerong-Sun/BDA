@@ -36,7 +36,7 @@ def _write(tmp_path: Path, doc: str, seeder: str) -> dict:
 DOC_123 = "| D001 | a | b |\n| D002 | a | b |\n| D003 | a | b |\n"
 
 
-CONTRACT = REPO / "contracts/decision-records.yaml"
+CONTRACT = REPO / "private/contracts/decision-records.yaml"
 
 
 @pytest.mark.skipif(
@@ -46,7 +46,7 @@ CONTRACT = REPO / "contracts/decision-records.yaml"
 def test_the_repository_currently_passes_its_own_gate() -> None:
     """Not a tautology: the gate is a ratchet, so this fails the moment the committed
     baseline and the seeders disagree in either direction."""
-    assert main([]) == 0
+    assert main([str(CONTRACT)]) == 0
 
 
 def test_a_missing_contract_is_reported_and_not_an_error(tmp_path: Path) -> None:

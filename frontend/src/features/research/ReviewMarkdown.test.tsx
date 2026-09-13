@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReviewMarkdown } from './ReviewMarkdown'
 
 const LONG = [
@@ -36,6 +36,20 @@ describe('ReviewMarkdown', () => {
       const id = link.getAttribute('href')!.slice(1)
       expect(container.querySelector(`h2#${id}`)?.textContent).toBe(link.textContent)
     }
+  })
+
+  it('scrolls within the correct document without replacing the application hash', () => {
+    const { container } = render(<><ReviewMarkdown>{LONG}</ReviewMarkdown><ReviewMarkdown>{LONG}</ReviewMarkdown></>)
+    const ids = [...container.querySelectorAll('h2')].map((h) => h.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    const links = container.querySelectorAll('nav a')
+    const target = document.getElementById(links[4].getAttribute('href')!.slice(1))!
+    const scroll = vi.fn()
+    target.scrollIntoView = scroll
+    const hash = window.location.hash
+    fireEvent.click(links[4])
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' })
+    expect(window.location.hash).toBe(hash)
   })
 
   it('does not treat a ## line inside a fenced block as a section', () => {

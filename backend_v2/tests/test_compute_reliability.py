@@ -141,6 +141,7 @@ def test_lsf_adapter_submit_status_cancel_and_ssh(monkeypatch, runtime) -> None:
     monkeypatch.setattr(adapters, "ObjectStorage", FakeStorage)
     adapter = LSFAdapter.__new__(LSFAdapter)
     adapter.host, adapter.root, adapter.timeout = "lsf", "/work", 5
+    adapter.command_timeout = 60
     adapter.ssh_key, adapter.default_queue, adapter.upload_wrapper = "/key", "normal", "/upload"
     adapter.transport = KeySSHTransport("lsf", key_path="/key", connect_timeout=5)
     adapter.staging_mode = "presigned"
@@ -218,6 +219,7 @@ class _ForgetfulLSFTransport:
 def _forgetful_adapter(transport: _ForgetfulLSFTransport, *, staging_mode: str = "ssh") -> LSFAdapter:
     adapter = LSFAdapter.__new__(LSFAdapter)
     adapter.host, adapter.root, adapter.timeout = "qm", "/work", 5
+    adapter.command_timeout = 60
     adapter.ssh_key, adapter.default_queue, adapter.upload_wrapper = None, "normal", ""
     adapter.staging_mode = staging_mode
     adapter.transport = transport
@@ -475,3 +477,133 @@ def test_streaming_surfaces_a_failed_remote_process(monkeypatch) -> None:
         transport.put_stream("/work/x", iter([b"a"]))
     with pytest.raises(RuntimeError, match="ssh_stream_failed"):
         list(transport.stream("/work/x"))
+
+
+def test_blank_docker_host_uses_the_ambient_environment(monkeypatch) -> None:
+    """`BDA_V2_DOCKER_HOST=` must mean "ask the Docker environment", not "use mTLS".
+
+    Every local deployment sets it blank and lets the container's own DOCKER_HOST name
+    the mounted socket. Read literally, the empty string fell through to the mTLS branch
+    and docker-py raised TLSParameterError on the empty base_url, so a dispatched job
+    retried in `dispatching` on a growing backoff behind an error about TLS that the
+    deployment had never configured.
+    """
+    import docker.tls
+
+    sentinel = SimpleNamespace(name="ambient")
+    monkeypatch.setattr(docker, "from_env", lambda: sentinel)
+
+    def _refuse(**kwargs: object) -> None:
+        raise AssertionError(f"must not build an mTLS client for a blank host: {kwargs}")
+
+    monkeypatch.setattr(docker, "DockerClient", _refuse)
+    for host in ("", "   ", "unix:///var/run/docker.sock"):
+        monkeypatch.setattr(
+            adapters,
+            "get_settings",
+            lambda host=host: SimpleNamespace(docker_host=host, is_production=False),
+        )
+        assert adapters.DockerAdapter().client is sentinel
+
+    # A configured remote daemon still goes through TLS, with the host trimmed.
+    built: dict[str, object] = {}
+    # TLSConfig checks the certificate files exist; this test is about host handling.
+    monkeypatch.setattr(docker.tls, "TLSConfig", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(docker, "DockerClient", lambda **kwargs: built.update(kwargs) or sentinel)
+    monkeypatch.setattr(
+        adapters,
+        "get_settings",
+        lambda: SimpleNamespace(
+            docker_host=" tcp://daemon:2376 ",
+            is_production=False,
+            docker_tls_ca="ca.pem",
+            docker_tls_cert="cert.pem",
+            docker_tls_key="key.pem",
+            docker_tls_verify=True,
+        ),
+    )
+    adapters.DockerAdapter()
+    assert built["base_url"] == "tcp://daemon:2376"
+
+
+def test_blank_docker_host_is_still_refused_in_production(monkeypatch) -> None:
+    monkeypatch.setattr(
+        adapters, "get_settings", lambda: SimpleNamespace(docker_host="", is_production=True)
+    )
+    with pytest.raises(RuntimeError, match="docker_socket_forbidden_in_production"):
+        adapters.DockerAdapter()
+
+
+def test_lsf_command_timeout_is_configurable(monkeypatch) -> None:
+    """One remote command's budget must be settable, and per compute target.
+
+    On a cluster whose login shell sources conda and module files from a networked
+    home, `ssh host true` costs as much as `ssh host bjobs` - the session is the cost,
+    not the command. With the budget hardcoded at 60s every LSF operation on such a
+    site timed out and there was nothing to configure.
+    """
+    from backend_v2.app.compute.adapters import LSFAdapter
+
+    calls: list[int] = []
+
+    class _Transport:
+        def run(self, command: str, *, check: bool = True, timeout: int = 60):
+            calls.append(timeout)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(adapters, "_build_transport", lambda _settings: _Transport())
+    monkeypatch.setattr(
+        adapters,
+        "get_settings",
+        lambda: SimpleNamespace(
+            lsf_ssh_host="cluster",
+            lsf_remote_root="/work/root/",
+            lsf_connect_timeout_seconds=10,
+            lsf_command_timeout_seconds=300,
+            lsf_ssh_key_path=None,
+            lsf_queue="v3-64",
+            lsf_upload_wrapper="/usr/local/bin/bda-minio-upload",
+            lsf_staging_mode="ssh",
+        ),
+    )
+    LSFAdapter()._ssh("bjobs -V")
+    assert calls == [300]
+
+    # A compute target may raise it further without touching global configuration.
+    LSFAdapter({"lsf_command_timeout_seconds": 900})._ssh("bjobs -V")
+    assert calls[-1] == 900
+
+
+def test_lsf_failure_carries_the_reason_from_the_cluster(monkeypatch, runtime) -> None:
+    """A failed cluster job must arrive with evidence, not just the word "failed".
+
+    A real submission (LSF 4267468) reached the job record as `failed` with an empty
+    error_message, so the only way to learn why was to ssh to the cluster and read the
+    log by hand - the errand the workbench exists to remove.
+    """
+    monkeypatch.setattr(adapters, "ObjectStorage", FakeStorage)
+    adapter = LSFAdapter.__new__(LSFAdapter)
+    adapter.host, adapter.root, adapter.timeout = "qm", "/work", 5
+    adapter.command_timeout = 60
+    seen: list[str] = []
+
+    def _ssh(command: str, *, input_text=None, check: bool = True):
+        seen.append(command)
+        out = "EXIT" if "-o stat" in command else "Traceback: CUDA driver not found  Exited with exit code 1"
+        return subprocess.CompletedProcess([], 0, out, "")
+
+    adapter._ssh = _ssh
+    result = adapter.status(runtime, "4267468")
+    assert result.status == "failed"
+    assert "CUDA driver not found" in (result.error or "")
+    assert "Exited with exit code 1" in (result.error or "")
+    # The reason comes from the job's own directory, and bjobs is asked for the exit code.
+    assert any("stderr.log" in c and "4267468" in c for c in seen)
+
+    # A job that is merely queued must not pay for a log fetch.
+    seen.clear()
+    adapter._ssh = lambda command, **_: (
+        seen.append(command) or subprocess.CompletedProcess([], 0, "PEND", "")
+    )
+    assert adapter.status(runtime, "4267468") == adapters.AdapterStatus("queued")
+    assert len(seen) == 1

@@ -16,7 +16,7 @@ import type { HighlightedResidue } from './types'
 export type StructureFormat = 'pdb' | 'mmcif'
 
 export function structureFormatFromName(name: string): StructureFormat {
-  const lower = name.toLowerCase()
+  const lower = name.split(/[?#]/, 1)[0].toLowerCase()
   return lower.endsWith('.cif') || lower.endsWith('.mmcif') ? 'mmcif' : 'pdb'
 }
 
@@ -187,7 +187,14 @@ export async function loadStructureFromAuthenticatedUrl(
   if (!text.trim()) {
     throw new Error('Structure file is empty')
   }
-  await viewer.loadStructureFromData(text, structureFormatFromName(filename), {
+  // Uploaded artifacts have opaque object keys. Use the response's format evidence
+  // before falling back to a filename, which may only be a signed storage URL.
+  const contentType = (response.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase()
+  const format = contentType === 'chemical/x-mmcif' || contentType === 'chemical/x-cif'
+    || (/^\s*(?:#[^\n]*\n\s*)*data_\S+/i.test(text) && /(?:^|\n)_atom_site\./.test(text))
+    ? 'mmcif'
+    : structureFormatFromName(filename)
+  await viewer.loadStructureFromData(text, format, {
     dataLabel: filename,
   })
 }

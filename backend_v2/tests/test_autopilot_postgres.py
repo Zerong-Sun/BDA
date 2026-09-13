@@ -8,7 +8,7 @@ for logic and useless for the two properties that are about the *database*:
 * row-level security - SQLite has no RLS at all, and the owner role bypasses it, so both
   the policy and the role have to be real.
 
-`docs/DUAL_MODE_OPERATION_PLAN.md` listed both as not covered. They are covered here.
+`docs/plans/DUAL_MODE_OPERATION_PLAN.md` listed both as not covered. They are covered here.
 """
 
 from __future__ import annotations

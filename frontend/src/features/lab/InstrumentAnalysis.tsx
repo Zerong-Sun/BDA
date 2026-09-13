@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useI18n } from '../../lib/i18n'
 import { uploadArtifact } from '../../lib/api/artifacts'
-import { analyseAkta, analyseBli, analyseEnzyme, type AnalysisRecord } from '../../lib/api/wetlab'
+import { previewInstrumentAnalysis, analyseAkta, analyseBli, analyseEnzyme, type AnalysisRecord } from '../../lib/api/wetlab'
 import type {
   AktaSummary,
   BliSummary,
@@ -64,15 +64,16 @@ function formatNumber(value: number | null | undefined, digits = 3): string {
  * already call them; what was missing was the way a person does it. The order
  * here is the platform's upload contract, not a choice: the file goes
  * browser-direct to object storage, and only its artifact id is posted to the
- * analysis endpoint — the API never receives a file body.
+ * analysis endpoint. Standalone previews use the bounded ephemeral preview API;
+ * saving a preview returns to the same artifact upload and analysis path.
  *
  * The plots are drawn from the series the response carries, because the backend
  * has no plotting library on purpose. Numbers that did not converge are shown as
  * such rather than hidden: a KD that four methods agree on means something quite
  * different from one that only a single method produced.
  */
-export function InstrumentAnalysis({ projectId }: { projectId: string }) {
-  const { t } = useI18n()
+export function InstrumentAnalysis({ projectId, previewOnly = false }: { projectId: string; previewOnly?: boolean }) {
+  const { t, language } = useI18n()
   const copy = t.lab.instruments
 
   const [instrument, setInstrument] = useState<Instrument>('bli')
@@ -87,8 +88,13 @@ export function InstrumentAnalysis({ projectId }: { projectId: string }) {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const run = useMutation({
-    mutationFn: async (): Promise<Analysed> => {
+    mutationFn: async (save: boolean): Promise<Analysed> => {
       if (!file) throw new Error(copy.file)
+      if (previewOnly && !save) return previewInstrumentAnalysis(file, {
+        instrument, sample_id: sampleId.trim() || null, channel: channel.trim() || null,
+        t_assoc: optionalNumber(tAssoc), t_dissoc: optionalNumber(tDissoc), subtract_background: subtractBackground,
+      })
+      if (!projectId) throw new Error(language === 'zh' ? '请先选择保存到哪个项目' : 'Choose a project before saving')
       const artifact = await uploadArtifact(file, projectId)
       const candidate = candidateId.trim() || null
       if (instrument === 'bli') {
@@ -128,11 +134,13 @@ export function InstrumentAnalysis({ projectId }: { projectId: string }) {
       <div className="space-y-5 p-4">
         <p className="max-w-3xl text-sm text-text-secondary">{copy.intro}</p>
 
+        <fieldset disabled={run.isPending}>
         <form
+          onChange={() => setAnalysed(null)}
           className="flex flex-wrap items-end gap-3"
           onSubmit={(event) => {
             event.preventDefault()
-            run.mutate()
+            run.mutate(false)
           }}
         >
           <label className="flex flex-col gap-1 text-sm">
@@ -141,6 +149,7 @@ export function InstrumentAnalysis({ projectId }: { projectId: string }) {
               value={instrument}
               onValueChange={(next) => {
                 setInstrument((next as Instrument) ?? instrument)
+                setAnalysed(null)
                 // The chosen file belongs to the instrument it was picked for;
                 // a Unicorn zip handed to the BLI parser only produces a
                 // confusing 422.
@@ -253,9 +262,14 @@ export function InstrumentAnalysis({ projectId }: { projectId: string }) {
           </label>
 
           <Button type="submit" disabled={!file || run.isPending}>
-            {run.isPending ? copy.analysing : copy.analyse}
+            {run.isPending ? copy.analysing : previewOnly ? (language === 'zh' ? '预览分析（不保存）' : 'Preview without saving') : copy.analyse}
           </Button>
         </form>
+        </fieldset>
+        {previewOnly && analysed && !analysed.record.experiment_result_id ? <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-text-secondary">{language === 'zh' ? '预览未保存。选择项目后可保存原始文件和分析结果。' : 'Unsaved preview. Choose a project to save the source file and analysis.'}</p>
+          <Button type="button" disabled={!projectId || run.isPending} onClick={() => run.mutate(true)}>{language === 'zh' ? '保存到当前项目' : 'Save to current project'}</Button>
+        </div> : null}
 
         {run.error ? (
           <p role="alert" className="text-sm text-destructive">
@@ -329,7 +343,7 @@ function numberColumn<Row extends object>(
 }
 
 function AnalysisResult({ analysed }: { analysed: Analysed }) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const copy = t.lab.instruments
 
   return (
@@ -337,7 +351,7 @@ function AnalysisResult({ analysed }: { analysed: Analysed }) {
       <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <div className="flex gap-2">
           <dt className="text-text-secondary">{copy.recorded}</dt>
-          <dd className="font-mono text-xs">{analysed.record.experiment_result_id}</dd>
+          <dd className="font-mono text-xs">{analysed.record.experiment_result_id || (language === 'zh' ? '未保存预览' : 'Unsaved preview')}</dd>
         </div>
         <div className="flex gap-2">
           <dt className="text-text-secondary">{copy.analysisVersion}</dt>

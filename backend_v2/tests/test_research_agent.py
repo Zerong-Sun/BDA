@@ -121,7 +121,7 @@ def test_research_agent_executes_permission_checked_gap_resolution(monkeypatch) 
         initial_citations=[],
         initial_tool_calls=[],
         allowed_kinds={"research_target"},
-        actions=cast(Any, SimpleNamespace(resolve_research_gaps=resolve)),
+        actions=cast(Any, SimpleNamespace(resolve_research_gaps=resolve, request_allows=lambda name: name == "resolve_research_gaps")),
     )
 
     assert any(item["function"]["name"] == "resolve_research_gaps" for item in exposed_tools)
@@ -211,6 +211,7 @@ def test_copilot_agent_creates_compute_draft_without_submission(monkeypatch) -> 
         ]
     )
     actions = SimpleNamespace(
+        request_allows=lambda name: True,
         create_compute_draft=lambda name, backend, specification: {
             "compute_draft_id": draft_id,
             "status": "draft",
@@ -266,6 +267,7 @@ def test_research_agent_reports_project_scope_rejection_without_failing_turn(
         ]
     )
     actions = SimpleNamespace(
+        request_allows=lambda name: True,
         start_target_intelligence=lambda target_id, query: (_ for _ in ()).throw(
             DomainError(
                 "target_not_found",

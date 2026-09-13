@@ -54,6 +54,10 @@ def visible_operation(session: Session, operation_id: uuid.UUID) -> Operation | 
 def dependency_health() -> dict[str, str]:
     checks: dict[str, str] = {}
     settings = get_settings()
+    # Scheduling is essential even when a site's queue override predates its
+    # deployment. A healthy API without an outbox consumer cannot accept work.
+    required_queues = {"scheduler", *settings.required_worker_queue_list}
+    checks["scheduler_dispatch"] = "paused" if settings.scheduler_dispatch_paused else "ok"
     try:
         with SessionFactory() as session:
             repository = PlatformRepository(session)
@@ -68,15 +72,17 @@ def dependency_health() -> dict[str, str]:
                 and heartbeat.schema_revision == settings.schema_revision
                 for queue in heartbeat.queues
             }
-            missing_queues = set(settings.required_worker_queue_list) - valid_queues
+            missing_queues = required_queues - valid_queues
             MISSING_WORKER_QUEUES.set(len(missing_queues))
             checks["worker_heartbeats"] = "ok" if not missing_queues else "missing"
+            checks["scheduler_heartbeat"] = "missing" if "scheduler" in missing_queues else "ok"
         checks["postgresql"] = "ok"
     except Exception:
-        MISSING_WORKER_QUEUES.set(len(settings.required_worker_queue_list))
+        MISSING_WORKER_QUEUES.set(len(required_queues))
         checks["postgresql"] = "unavailable"
         checks["schema_revision"] = "unavailable"
         checks["worker_heartbeats"] = "unavailable"
+        checks["scheduler_heartbeat"] = "unavailable"
     try:
         Redis.from_url(settings.redis_url).ping()
         checks["redis"] = "ok"

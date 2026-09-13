@@ -5,6 +5,7 @@ import { CopilotActions } from '../../features/copilot/CopilotActions'
 import { CopilotChain } from '../../features/copilot/CopilotChain'
 import { CopilotAgentRuns } from '../../features/copilot/CopilotAgentRuns'
 import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
+import { CopilotWorkspace } from '../../features/copilot/CopilotWorkspace'
 import { CopilotSettings } from '../../features/copilot/CopilotSettings'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
@@ -21,7 +22,7 @@ interface CopilotDrawerProps {
 }
 
 export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const copilotWidth = useAppStore((s) => s.copilotWidth)
   const setCopilotWidth = useAppStore((s) => s.setCopilotWidth)
   // Written into the per-project session rather than passed down, because that is
@@ -41,7 +42,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   // buttons: arrow keys did not move between them, and four of them beside a
   // title and a close button wrapped in a 300px drawer. `Tabs` is already in the
   // repo and says the right thing to a screen reader without being told.
-  const [surface, setSurface] = useState<'chat' | 'chain' | 'runs' | 'mcp'>('chat')
+  const [surface, setSurface] = useState<'tasks' | 'chat' | 'chain' | 'runs' | 'mcp'>('tasks')
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -122,6 +123,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           className="shrink-0 border-b px-2 pb-1"
         >
           <TabsList variant="line" className="w-full justify-start gap-0.5 overflow-x-auto">
+            <TabsTrigger value="tasks">{language === 'zh' ? '任务' : 'Tasks'}</TabsTrigger>
             <TabsTrigger value="chat">{t.copilot.drawer.tabChat}</TabsTrigger>
             <TabsTrigger value="chain">{t.copilot.chain.toggle}</TabsTrigger>
             <TabsTrigger value="runs">{t.copilot.agentRuns.toggle}</TabsTrigger>
@@ -133,7 +135,9 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             <CopilotSettings />
           </ScrollArea>
         ) : null}
-        {surface === 'mcp' ? (
+        {surface === 'tasks' ? (
+          <CopilotWorkspace pageContext={pageContext} />
+        ) : surface === 'mcp' ? (
           <ScrollArea className="min-h-0 flex-1">
             <CopilotMcpSessions />
           </ScrollArea>

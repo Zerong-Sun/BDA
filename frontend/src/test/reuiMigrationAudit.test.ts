@@ -97,6 +97,8 @@ interface FileInputManifestEntry {
 }
 
 const fileInputManifest = new Map<string, FileInputManifestEntry>([
+  ['src/features/workflow/GatePolicyEditor.tsx', { intrinsicCount: 1, registryCount: 0, refInputCounts: { fileInputRef: 1 }, refTriggerCounts: { fileInputRef: 1 }, distinctReturnCount: 1, reason: 'Gate scripts are imported through a hidden Python file picker and a registry Button.' }],
+  ['src/features/workflow/NodeAssistance.tsx', { intrinsicCount: 1, registryCount: 0, refInputCounts: { fileInputRef: 1 }, refTriggerCounts: { fileInputRef: 1 }, distinctReturnCount: 1, reason: 'Node script imports need a hidden file picker; parsing does not execute the upload.' }],
   [
     'src/features/artifacts/ArtifactUploadDropzone.tsx',
     {

@@ -236,7 +236,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
     return [edge.source, edge.target, edge.predicate, workspaceText(edge.source_label, language), workspaceText(edge.target_label, language), workspaceText(edge.summary, language), workspaceText(edge.context, language)].join(' ').toLowerCase().includes(term)
   })
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-1 gap-4 [&>*]:min-w-0">
       <Frame>
         <FramePanel>
         <div className="flex flex-wrap items-start justify-between gap-4">

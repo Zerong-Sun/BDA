@@ -6,6 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 const nativeFileInputCounts = new Map([
+  ['src/features/workflow/GatePolicyEditor.tsx', 1],
+  ['src/features/workflow/NodeAssistance.tsx', 1],
   ['src/features/artifacts/ArtifactUploadDropzone.tsx', 1],
   ['src/features/lab/InstrumentAnalysis.tsx', 1],
   ['src/features/pdb-viewer/PDBFileUpload.tsx', 2],

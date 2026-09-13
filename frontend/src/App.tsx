@@ -179,6 +179,7 @@ export default function App() {
                 <Route path="/experiments" element={<Navigate to="/projects" replace />} />
                 <Route path="/workflow" element={<ProjectRequired><WorkflowPage /></ProjectRequired>} />
                 <Route path="/candidates" element={<ProjectRequired><CandidatesPage /></ProjectRequired>} />
+                <Route path="/tools" element={<LabPage toolbox />} />
                 <Route path="/lab" element={<ProjectRequired><LabPage /></ProjectRequired>} />
                 <Route path="/results" element={<ProjectRequired><ResultsPage /></ProjectRequired>} />
                 <Route path="/research" element={<ResearchPage />} />

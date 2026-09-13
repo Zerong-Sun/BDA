@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:workflow-ux": "npm run build && node scripts/browser-workflow-gates.mjs",
     "test:browser": "node scripts/browser-vertical-slice.mjs"
   },
   "dependencies": {

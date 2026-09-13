@@ -81,13 +81,23 @@ class DemoAdapter:
 class DockerAdapter:
     def __init__(self) -> None:
         import docker
-        from docker.tls import TLSConfig  # type: ignore[import-not-found]
+        from docker.tls import TLSConfig
 
         settings = get_settings()
-        if settings.docker_host.startswith("unix:"):
+        host = settings.docker_host.strip()
+        # A blank host means "use the ambient Docker environment", which is how every
+        # local deployment here is configured: `BDA_V2_DOCKER_HOST=` in .env, and the
+        # container's own DOCKER_HOST pointing at the mounted socket. Taking the empty
+        # string literally sent it into the mTLS branch, where docker-py rejects an empty
+        # base_url with TLSParameterError - a complaint about TLS for a deployment that
+        # configured none. The job then retried in `dispatching` on a growing backoff
+        # rather than failing with anything a reader could act on.
+        # Production never arrives here blank: settings validation already requires
+        # tcp:// or https:// plus CA, certificate and key before this runs.
+        if not host or host.startswith("unix:"):
             if settings.is_production:
                 raise RuntimeError("docker_socket_forbidden_in_production")
-            self.client = docker.from_env()  # type: ignore[attr-defined]
+            self.client = docker.from_env()
         else:
             client_cert: tuple[str, str] | None = None
             if settings.docker_tls_cert and settings.docker_tls_key:
@@ -99,7 +109,7 @@ class DockerAdapter:
                 ca_cert=settings.docker_tls_ca,
                 verify=settings.docker_tls_verify,
             )
-            self.client = docker.DockerClient(base_url=settings.docker_host, tls=tls)  # type: ignore[attr-defined]
+            self.client = docker.DockerClient(base_url=host, tls=tls)
 
     def ensure_submitted(self, job: RuntimeJob) -> str:
         import docker
@@ -107,7 +117,7 @@ class DockerAdapter:
         try:
             existing = self.client.containers.get(job.deterministic_name)
             return str(existing.id)
-        except docker.errors.NotFound:  # type: ignore[attr-defined]
+        except docker.errors.NotFound:
             pass
         image = str(job.runtime_spec.get("image") or job.model_plugin)
         command = job.runtime_spec.get("command")
@@ -203,6 +213,7 @@ class LSFAdapter:
         self.host = settings.lsf_ssh_host
         self.root = settings.lsf_remote_root.rstrip("/")
         self.timeout = settings.lsf_connect_timeout_seconds
+        self.command_timeout = settings.lsf_command_timeout_seconds
         self.ssh_key = settings.lsf_ssh_key_path
         self.default_queue = settings.lsf_queue
         self.upload_wrapper = settings.lsf_upload_wrapper
@@ -219,7 +230,7 @@ class LSFAdapter:
             target = command.split(">", 1)[1].strip() if ">" in command else ""
             self.transport.put_file(target.strip("'\""), input_text)
             return subprocess.CompletedProcess([], 0, "", "")
-        result = self.transport.run(command, check=check, timeout=60)
+        result = self.transport.run(command, check=check, timeout=self.command_timeout)
         return subprocess.CompletedProcess([], result.returncode, result.stdout, result.stderr)
 
     def remote_dir(self, job: RuntimeJob) -> str:
@@ -248,6 +259,11 @@ class LSFAdapter:
             runtime_setup=raw_setup if isinstance(raw_setup := snapshot.get("runtime_setup"), list) else [],
             parameters=raw_params if isinstance(raw_params := job.runtime_spec.get("parameters"), dict) else {},
             resources=raw_resources if isinstance(raw_resources := snapshot.get("resources"), dict) else {},
+            input_ports=[
+                str(port["name"])
+                for port in (snapshot.get("input_ports") or [])
+                if isinstance(port, dict) and port.get("name")
+            ],
         )
 
     def ensure_submitted(self, job: RuntimeJob) -> str:
@@ -269,6 +285,27 @@ class LSFAdapter:
             raise RuntimeError(f"lsf_submit_unrecognized:{submitted.stdout.strip()}")
         return match.group(1)
 
+    def _failure_reason(self, job: RuntimeJob, external_id: str) -> str | None:
+        """What the job said before it died, recorded on the job itself.
+
+        Prefers the job's own stderr. LSF's stdout carries its wrapper - the submitted
+        script and a resource summary - so a plain tail of that reports memory figures
+        rather than the error; the text after LSF's own marker is the real output. When
+        the job wrote nothing at all, `bjobs -l` still knows the exit code and any
+        TERM_* reason, which is the entire answer for a killed or preempted job.
+
+        One SSH round trip, and only once a job has already failed.
+        """
+        remote = shlex.quote(self.remote_dir(job))
+        result = self._ssh(
+            f"tail -c 4000 {remote}/stderr.log 2>/dev/null;"
+            f" sed -n '/The output (if any) follows/,$p' {remote}/stdout.log 2>/dev/null | head -c 4000;"
+            f" bjobs -l {shlex.quote(external_id)} 2>/dev/null | tr -d '\\n'"
+            " | grep -oE 'Exited with exit code [0-9]+|TERM_[A-Z_]+' | head -2",
+            check=False,
+        )
+        return " ".join(result.stdout.split())[:2000] or None
+
     def status(self, job: RuntimeJob, external_id: str) -> AdapterStatus:
         result = self._ssh(f"bjobs -a -noheader -o stat {shlex.quote(external_id)}", check=False)
         raw = result.stdout.strip().split()
@@ -282,7 +319,14 @@ class LSFAdapter:
             "ZOMBI": "failed",
         }
         if state in mapping:
-            return AdapterStatus(mapping[state])
+            resolved = mapping[state]
+            # A failure with no reason is what sends a reader to ssh into the cluster and
+            # read the log by hand, which is the one errand the workbench exists to
+            # remove. The reason is already in the job's own directory on the host this
+            # adapter is talking to, so fetch it - once, and only after a failure.
+            return AdapterStatus(
+                resolved, self._failure_reason(job, external_id) if resolved == "failed" else None
+            )
         if self._forgotten.search(f"{result.stdout}\n{result.stderr}"):
             return self._status_without_bjobs(job, external_id)
         # No state and no explanation. A busy or briefly unreachable mbatchd looks like

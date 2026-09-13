@@ -34,3 +34,19 @@ def test_category_separates_active_history_and_drafts(tmp_path: Path, monkeypatc
     assert inventory.category(tmp_path / "docs/guide.md") == "active"
     assert inventory.category(tmp_path / "docs/archive/old.md") == "history"
     assert inventory.category(tmp_path / "docs/superpowers/specs/draft.md") == "draft"
+    assert inventory.category(tmp_path / "docs/plans/plan.md") == "draft"
+
+
+def test_dated_archive_payloads_match_their_preservation_manifests():
+    """A rename merge must not silently rewrite a checksummed historical document."""
+    import hashlib
+    import json
+
+    root = Path(__file__).resolve().parents[2]
+    manifests = sorted((root / "docs/archive").glob("*/manifest.json"))
+    assert manifests
+    for manifest in manifests:
+        for item in json.loads(manifest.read_text())["documents"]:
+            notice, marker, original = (root / item["archive_path"]).read_bytes().partition(b"\n---\n\n")
+            assert marker and notice, item["archive_path"]
+            assert hashlib.sha256(original).hexdigest() == item["original_sha256"], item["archive_path"]

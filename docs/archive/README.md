@@ -1,0 +1,64 @@
+# 历史文档归档
+
+这里的内容仅用于追溯，不作为当前操作步骤、功能承诺或交付验收。最新入口见[文档导航](../README.md)。
+
+## 2026-09-13 合并批次
+
+[主线 Copilot 能力文档](2026-09-13/COPILOT_CAPABILITY_PLAN_V2.md)单独保存新增 bots 后的版本，来源提交及原文 SHA-256 见[清单](2026-09-13/manifest.json)。9 月 7 日归档仍保留当时的原文和校验值，两个版本不会互相覆盖。
+
+## 2026-09-07 清理批次
+
+本批次归档 9 份被替代、阶段性或已过时文档。每份文档开头注明原路径、归档原因和替代入口；提示区之后保留归档前的原始字节，包括当时的状态、日期、命令和路径。原文中的历史链接及行号可能已经失效。
+
+| 历史文档 | 归档原因 | 替代入口 |
+| --- | --- | --- |
+| [COPILOT_CAPABILITY_PLAN_V2.md](2026-09-07/copilot/COPILOT_CAPABILITY_PLAN_V2.md) | 能力规划缺少完整入口/API映射及新增实验服务 | [当前说明](../COPILOT_SERVICE_GUIDE.md) |
+| [COPILOT_DEEPSEEK_配置指南.md](2026-09-07/copilot/COPILOT_DEEPSEEK_配置指南.md) | 密钥、数据库与配置变量说明过时 | [当前说明](../COPILOT_SERVICE_GUIDE.md) |
+| [COPILOT_VALIDATION_REPORT.md](2026-09-07/copilot/COPILOT_VALIDATION_REPORT.md) | 仅保留当时验证证据，不作为当前能力承诺 | [当前说明](../COPILOT_SERVICE_GUIDE.md) |
+| [RESEARCH_INTERFACE_USAGE_GUIDE.md](2026-09-07/research/RESEARCH_INTERFACE_USAGE_GUIDE.md) | 旧五页签与当前四分区不符 | [当前说明](../GUIDED_PLATFORM_WORKFLOW.md) |
+| [BDA_RESEARCH_WORKSPACE_AND_BYOK.md](2026-09-07/research/BDA_RESEARCH_WORKSPACE_AND_BYOK.md) | 研究包与模型配置职责拆分，移除重复操作说明 | [当前说明](../RESEARCH_PACKAGES.md) |
+| [2026-07-26-frontend-reui-migration.md](2026-09-07/frontend/2026-07-26-frontend-reui-migration.md) | 阶段性界面迁移实施计划，当前规则由架构文档与自动检查维护 | [当前说明](../FRONTEND_V2.md) |
+| [Task-4-review.md](2026-09-07/frontend/Task-4-review.md) | 旧行号和阶段审查意见，仅供历史追溯 | [当前说明](../FRONTEND_V2.md) |
+| [2026-07-26-frontend-reui-migration-design.md](2026-09-07/frontend/2026-07-26-frontend-reui-migration-design.md) | 阶段性迁移设计，不代表当前页面入口清单 | [当前说明](../FRONTEND_V2.md) |
+| [V2_LOCAL_ACCEPTANCE.md](2026-09-07/validation/V2_LOCAL_ACCEPTANCE.md) | 旧测试数量与迁移head仅属于历史验收批次 | [当前说明](../STAGING_RELEASE_AND_RECOVERY.md) |
+
+[归档清单](2026-09-07/manifest.json)记录原路径、现路径、替代关系和原文 SHA-256，可校验原文未丢失。恢复时应先核对清单及归档提示后的原文，再审查其与当前代码的差异，不直接覆盖现行指南。
+
+尚未完成的双模工作没有归档，保留在[规划区](../plans/README.md)。后续归档同样按日期分批，并同步更新活跃文档中的引用。
+
+# 代码退役与主题归档
+
+状态：历史归档
+
+本目录保存已经完成或已被取代的文档。归档件不再是判断当前行为的依据——它们记录"当时是怎么想的、后来怎么收口的"。当前状态一律以 [文档索引](../README.md) 下的活跃文档为准。
+
+含私有路径或研究运行的历史文档不在这里，只保留在私有恢复库，不在公开树重建。
+
+## 归档目录
+
+| 目录 | 内容 | 当前以什么为准 |
+|---|---|---|
+| [2026-07-frontend-reui-migration/](2026-07-frontend-reui-migration/README.md) | 2026-07-26 前端 shadcn/ReUI 迁移的设计、实施计划与中途评审 | `frontend/src/test/reuiMigrationAudit.test.ts`（活契约）与 [前端 v2 说明](../FRONTEND_V2.md) |
+
+## 已退役的代码
+
+删除的代码由 Git 历史保存。下表记下它们是什么、为什么退役，以及取回的命令——这样"以前是不是有过这个东西"不必靠翻提交记录回答。
+
+取回某个文件：
+
+```bash
+git show 9b9ceff3:<路径> > <落点>
+```
+
+| 原路径 | 是什么 | 为什么退役 |
+|---|---|---|
+| `frontend/src/features/workflow/PluginRegistryPanel.tsx` | 展示已注册模型插件的 Frame 面板 | 没有任何路由渲染它。`model_plugins` 在数据流矩阵里声明的 `workflow` UI 落点由 `NodeBuilder` 满足；同时移除了只服务于它的 `workflowExt.pluginRegistry` 文案键 |
+| `frontend/src/lib/api/legacy.ts` | `GET /api/v2/legacy-ids/{entity_type}/{legacy_id}` 的薄封装 | 无调用方。接口仍在，需要时可直接用生成 SDK 的 `resolveLegacyIdApiV2LegacyIdsEntityTypeLegacyIdGet` |
+| `frontend/src/lib/ui/interactionStates.ts` | hover / selected / disabled 的 Tailwind 片段常量 | 无引用方；实际交互态直接写在组件里 |
+| `frontend/src/features/candidates/index.ts` 等 7 个 | 功能域的 re-export barrel（candidates、copilot、experiments、pdb-viewer、research、results、workflow） | 无引用方。保留下来的 barrel（artifacts、guide、jobs、plugins、tour）确有导入方，删掉空转的那批之后，"存在 barrel"才等于"这是该功能域对外的入口" |
+
+## 归档规则
+
+- 已完成的计划、设计与评审 → `docs/archive/<时间>-<主题>/`，附 README 写明退役原因与当前依据，并按原字节迁入、记录 SHA-256。
+- 跑完不会再跑的一次性脚本 → `backend_v2/scripts/archive/`，见 [脚本归档](../../backend_v2/scripts/archive/README.md)。
+- 没有引用方的代码 → 直接删除并登记在上表。

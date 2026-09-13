@@ -44,7 +44,7 @@ export function CopilotActions({ onNavigate }: CopilotActionsProps) {
         (activeProject ? projectText(activeProject, 'summary', language).trim() : '') ||
         `Design workflow for ${activeProject ? projectText(activeProject, 'name', language) : 'this project'}`
       const plan = await planRoute({ project_id: projectId, target: objective, objective })
-      const route = plan.route_options.find((option) => option.recommended) ?? plan.route_options[0]
+      const route = plan.route_options.find((option) => option.recommended && !(option.constraints?.missing_plugins as unknown[] | undefined)?.length)
       if (!route) throw new Error(t.copilot.actions.errorNoRoute)
       const moduleIds = route.modules
         .filter((module) => module.available)
@@ -52,6 +52,8 @@ export function CopilotActions({ onNavigate }: CopilotActionsProps) {
       await applyRoutePlan({
         project_id: projectId,
         route_id: route.route_id,
+        workflow_spec: route.workflow_spec,
+        module_parameters: Object.fromEntries(route.modules.map((module) => [module.module_id, module.default_parameters ?? {}])),
         objective,
         target: plan.target ?? objective,
         selected_module_ids: moduleIds,

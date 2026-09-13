@@ -1,6 +1,8 @@
 import './generatedTransport'
 import {
   getConcentrationApiV2ProjectsProjectIdWetlabConcentrationGet,
+  standaloneConcentrationApiV2WetlabConcentrationGet,
+  previewAnalysisApiV2WetlabAnalysisPreviewsPost,
   getDilutionSeriesApiV2WetlabDilutionSeriesGet,
   getUnitConversionApiV2WetlabUnitConversionGet,
   listProteinsApiV2ProjectsProjectIdProteinsGet,
@@ -110,6 +112,13 @@ export interface ConcentrationQuery {
 }
 
 export async function computeConcentration(projectId: string, query: ConcentrationQuery) {
+  if (!projectId) {
+    if (!query.ext_coeff || !query.molecular_weight) throw new Error('Provide extinction coefficient and molecular weight')
+    const result = await standaloneConcentrationApiV2WetlabConcentrationGet<true>({
+      query: { a280: query.a280, ext_coeff: query.ext_coeff, molecular_weight: query.molecular_weight, path_length_cm: query.path_length_cm ?? 1 }, throwOnError: true,
+    })
+    return result.data
+  }
   const result = await getConcentrationApiV2ProjectsProjectIdWetlabConcentrationGet<true>({
     path: { project_id: projectId },
     query: {
@@ -232,4 +241,20 @@ export async function analyseEnzyme(
     throwOnError: true,
   })
   return { ...record(result.data), summary: EnzymeSummarySchema.parse(result.data.summary) }
+}
+
+
+export async function previewInstrumentAnalysis(file: File, options: {
+  instrument: 'bli' | 'akta' | 'enzyme'; sample_id?: string | null; channel?: string | null;
+  t_assoc?: number | null; t_dissoc?: number | null; subtract_background?: boolean;
+}) {
+  if (file.size > 12 * 1024 * 1024) throw new Error('Preview files must be 12 MB or smaller')
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192))
+  const { data } = await previewAnalysisApiV2WetlabAnalysisPreviewsPost<true>({ body: { ...options, content_base64: btoa(binary) }, throwOnError: true })
+  const record: AnalysisRecord = { ...data, experiment_result_id: '', source_artifact_id: '' }
+  if (options.instrument === 'bli') return { instrument: 'bli' as const, record, summary: BliSummarySchema.parse(data.summary) }
+  if (options.instrument === 'akta') return { instrument: 'akta' as const, record, summary: AktaSummarySchema.parse(data.summary) }
+  return { instrument: 'enzyme' as const, record, summary: EnzymeSummarySchema.parse(data.summary) }
 }

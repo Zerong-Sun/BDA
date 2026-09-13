@@ -59,9 +59,9 @@ export interface SubmitWorkflowResponse {
   status: SubmitStatus
 }
 
-export function submitWorkflowRun(workflowRunId: string): Promise<SubmitWorkflowResponse> {
+export function submitWorkflowRun(workflowRunId: string, workflowVersion?: number, review?: { backend: string; fingerprints: Record<string, string> }): Promise<SubmitWorkflowResponse> {
   return submitWorkflowApiV2WorkflowRunsWorkflowIdSubmissionsPost<true>({ path: { workflow_id: workflowRunId },
-    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: {}, throwOnError: true,
+    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { workflow_version: workflowVersion, ...(review ? { compute_backend: review.backend, review_fingerprints: review.fingerprints } : {}) }, throwOnError: true,
   }).then(({ data: submission }) => ({ ...submission, workflow_run_id: workflowRunId }))
 }
 
@@ -82,21 +82,12 @@ export function preflightBlockersFrom(error: unknown): string[] {
     .filter(Boolean)
 }
 
-export interface SubmitNodeOptions {
-  /** Parameter overrides applied to the script preview. */
+export interface ScriptPreviewOptions {
+  /** Unsaved parameters may be previewed, but must be saved before submission. */
+  configuration?: Record<string, unknown>
+  input_bindings?: WorkflowInputBinding[]
   override_params?: Record<string, unknown>
-  /** Compute backend. Omit to let the server use its configured default. */
-  compute_backend?: string
-  timeout_minutes?: number
-}
-
-export function submitWorkflowNode(workflowRunId: string, options: SubmitNodeOptions = {}) {
-  return submitWorkflowApiV2WorkflowRunsWorkflowIdSubmissionsPost<true>({ path: { workflow_id: workflowRunId },
-    headers: { 'Idempotency-Key': crypto.randomUUID() }, body: {
-      compute_backend: options.compute_backend,
-      timeout_minutes: options.timeout_minutes ?? 180,
-    }, throwOnError: true,
-  }).then(({ data: submission }) => ({ job: submission.jobs[0] ?? null, status: submission.status }))
+  compute_backend?: 'lsf' | 'docker'
 }
 
 export interface ScriptPreviewResponse {
@@ -106,11 +97,13 @@ export interface ScriptPreviewResponse {
   input_manifest: Record<string, unknown>
 }
 
-export function previewWorkflowNodeScript(nodeRunId: string, options: SubmitNodeOptions = {}) {
+export function previewWorkflowNodeScript(nodeRunId: string, options: ScriptPreviewOptions = {}) {
   return previewNodeScriptApiV2WorkflowNodesNodeIdScriptPreviewsPost<true>({ path: { node_id: nodeRunId },
     body: {
       compute_backend: options.compute_backend,
       overrides: options.override_params ?? {},
+      configuration: options.configuration,
+      input_bindings: options.input_bindings,
     }, throwOnError: true,
   }).then(({ data }) => data)
 }
@@ -128,6 +121,7 @@ export function addWorkflowNode(
     key: string
     model_plugin?: string
     model_plugin_id?: string
+    configuration?: Record<string, unknown>
     parameters?: Record<string, unknown>
     position?: { x: number; y: number }
   },
@@ -151,16 +145,18 @@ export function updateWorkflowNode(
   workflowRunId: string,
   nodeRunId: string,
   payload: {
+    configuration?: Record<string, unknown>
     parameters?: Record<string, unknown>
     position?: { x: number; y: number }
     status?: string
     input_bindings?: WorkflowInputBinding[]
     queue?: string | null
   },
+  expectedVersion?: number,
 ) {
-  return workflowIfMatch(workflowRunId).then((headers) => patchWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesNodeIdPatch<true>({
+  return (expectedVersion === undefined ? workflowIfMatch(workflowRunId) : Promise.resolve({ 'If-Match': `W/"${expectedVersion}"` })).then((headers) => patchWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesNodeIdPatch<true>({
     path: { workflow_id: workflowRunId, node_id: nodeRunId }, headers, body: {
-      parameters: payload.parameters, position: payload.position,
+      configuration: payload.configuration, parameters: payload.parameters, position: payload.position,
       input_bindings: payload.input_bindings, queue: payload.queue,
     }, throwOnError: true,
   }).then(({ data }) => WorkflowNodeSchema.parse(data)))

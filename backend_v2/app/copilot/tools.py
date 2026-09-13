@@ -1036,6 +1036,7 @@ _register(
 _register(
     ToolSpec(
         id="list_structure_contacts",
+        coerce_numeric_strings=True,
         description=(
             "Residue pairs across two chains within a heavy-atom cutoff, each with "
             "its closest atom pair and distance in angstroms. This is the interface "
@@ -1062,6 +1063,7 @@ _register(
 _register(
     ToolSpec(
         id="describe_structure_site",
+        coerce_numeric_strings=True,
         description=(
             "Residues within a radius of one named centre - a residue given as "
             "chain plus residue_seq, or a ligand given by its component code. "
@@ -1580,3 +1582,22 @@ _register(
         handler=_review_compute_declaration,
     )
 )
+
+
+def _plan_workflow_route(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..projects.models import Project
+    from .schemas import RoutePlanCreate
+    from .service import create_route_plan
+
+    project = ctx.session.get(Project, _project_of(ctx))
+    if project is None:
+        raise ValueError("project_not_found")
+    # Deterministic catalog generation; this agent compares the returned choices.
+    return create_route_plan(ctx.session, project, RoutePlanCreate(project_id=project.id, goal=args["goal"])).model_dump(mode="json")
+
+
+_register(ToolSpec(
+    id="plan_workflow_route", description="Compare registered workflow routes and missing inputs. Does not create or submit a workflow.",
+    parameters={"type": "object", "properties": {"goal": {"type": "string", "minLength": 1, "maxLength": 5000}}, "required": ["goal"], "additionalProperties": False},
+    capability="workflow-planning", execution_mode="read", requires="session", handler=_plan_workflow_route,
+))

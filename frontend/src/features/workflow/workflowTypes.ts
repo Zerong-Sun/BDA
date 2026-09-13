@@ -1,5 +1,29 @@
 import type { Node, Edge } from '@xyflow/react'
 
+/**
+ * Handles for an ordering-only relationship ("run this after that"), as opposed to the
+ * per-port handles that carry data.
+ *
+ * Every node has them, including one whose plugin declares no ports at all. Without them
+ * two things were unreachable from the canvas: a `dependency` connection between stages
+ * with no type-compatible ports - the server has always accepted one, nothing could draw
+ * one - and an anchor for a legacy edge saved before ports existed, which React Flow
+ * dropped silently because `output`/`input` named no handle the card rendered.
+ */
+export const ORDER_SOURCE_HANDLE = '__order_out'
+export const ORDER_TARGET_HANDLE = '__order_in'
+
+/** Handles that mean ordering rather than a named data port. */
+export function isOrderingHandle(handle: string | null | undefined): boolean {
+  // 'output'/'input' are the pre-port spellings; edges saved with them still arrive.
+  return (
+    handle === ORDER_SOURCE_HANDLE ||
+    handle === ORDER_TARGET_HANDLE ||
+    handle === 'output' ||
+    handle === 'input'
+  )
+}
+
 export type WorkflowNodeStatus =
   | 'not_started'
   | 'queued'
@@ -17,6 +41,12 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   status: WorkflowNodeStatus
   footer: string
   resource?: 'cpu' | 'gpu' | 'local' | 'manual'
+  inputPorts?: string[]
+  outputPorts?: string[]
+  /** Input ports the plugin declares `required`. */
+  requiredPorts?: string[]
+  /** Input ports that already have a binding, from either an artifact or an upstream node. */
+  boundPorts?: string[]
   methods?: string[]
   parameters?: Record<string, unknown>
 }

@@ -39,8 +39,8 @@ MAX_SUBAGENT_DEPTH = 1
 _LIVE = {"running", "awaiting_tasks"}
 
 
-def require_run(session: Session, run_id: uuid.UUID) -> CopilotAgentRun:
-    run = session.get(CopilotAgentRun, run_id)
+def require_run(session: Session, run_id: uuid.UUID, *, for_update: bool = False) -> CopilotAgentRun:
+    run = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.id == run_id).with_for_update()) if for_update else session.get(CopilotAgentRun, run_id)
     if run is None:
         raise DomainError("agent_run_not_found", "Agent run was not found", status_code=404)
     return run
@@ -55,6 +55,7 @@ def create_run(
     allowed_tools: list[str],
     conversation_id: uuid.UUID | None = None,
     parent_run_id: uuid.UUID | None = None,
+    task_contract: dict | None = None,
     max_turns: int = 24,
     max_cost_usd_cents: int | None = None,
     bot: str | None = None,
@@ -89,11 +90,21 @@ def create_run(
         # exceed what the project authorised. The director never executes any of
         # it, which is what keeps routing from being escalation.
 
+    contract = dict(task_contract or {})
+    if parent_run_id is not None and (parent.task_contract or {}).get("version"):
+        from .registry import REGISTRY
+        from .task_contracts import build_contract
+        parent_writes = set((parent.task_contract or {}).get("authorized_writes", []))
+        contract = build_contract("custom", sorted(parent_writes & set(allowed_tools)))
+        allowed_tools = sorted(set(allowed_tools) - (REGISTRY.user_intent_write_ids() - parent_writes))
+
     run = CopilotAgentRun(
         project_id=project_id,
         conversation_id=conversation_id,
         created_by=user_id,
         goal=goal,
+        task_contract=contract,
+        outcome={},
         status="running",
         bot=bot,
         parent_run_id=parent_run_id,
@@ -400,6 +411,8 @@ def finish(
         )
     run.status = status
     run.error = error
+    if status == "failed":
+        run.outcome = {"status": "blocked", "summary": "", "missing": [error or "execution_failed"], "next_action": "Review the failure and continue after correcting the cause."}
     run.version += 1
     session.flush()
     announce_settled(session, run)
@@ -437,6 +450,7 @@ def cancel(session: Session, run: CopilotAgentRun, *, reason: str = "") -> int:
 
     run.status = "cancelled"
     run.error = reason or None
+    run.outcome = {"status": "cancelled", "summary": "", "missing": [], "next_action": ""}
     run.version += 1
     session.flush()
     # Cancelled is terminal too. A stage whose operator was stopped has to learn

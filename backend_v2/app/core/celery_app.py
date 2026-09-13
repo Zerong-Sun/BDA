@@ -55,6 +55,7 @@ celery_app.conf.update(
         "bda_v2.dispatch_job": {"queue": "dispatch"},
         "bda_v2.poll_job": {"queue": "poll"},
         "bda_v2.collect_job": {"queue": "collect"},
+        "bda_v2.evaluate_workflow_gate": {"queue": "collect"},
         "bda_v2.cancel_job": {"queue": "dispatch"},
         "bda_v2.copilot_respond": {"queue": "copilot"},
         "bda_v2.copilot_agent_step": {"queue": "copilot"},

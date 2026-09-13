@@ -52,4 +52,36 @@ class WorkflowNode(UUIDVersionMixin, Base):
     # Resolved into the job input manifest at submit (artifact) or at schedule time
     # (upstream), see compute/binding.py.
     input_bindings: Mapped[list] = mapped_column(JSON, default=list)
+    configuration: Mapped[dict] = mapped_column(JSON, default=dict)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class WorkflowResult(UUIDVersionMixin, Base):
+    """Immutable result identity within one compute attempt, including bundle members."""
+
+    __tablename__ = "workflow_results"
+    __table_args__ = (UniqueConstraint("job_id", "result_key", name="uq_workflow_result_job_key"),)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    result_key: Mapped[str] = mapped_column(String(500))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class GateEvaluation(UUIDVersionMixin, Base):
+    __tablename__ = "workflow_gate_evaluations"
+    __table_args__ = (UniqueConstraint("target_job_id", "edge_id", "revision", name="uq_gate_attempt_revision"),)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    workflow_run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workflow_runs.id", ondelete="CASCADE"), index=True)
+    target_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    edge_id: Mapped[str] = mapped_column(String(160))
+    revision: Mapped[int] = mapped_column(default=1)
+    status: Mapped[str] = mapped_column(String(40), default="waiting")
+    preview: Mapped[bool] = mapped_column(default=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    decisions: Mapped[list] = mapped_column(JSON, default=list)
+    selected_ids: Mapped[list] = mapped_column(JSON, default=list)
+    inputs: Mapped[list] = mapped_column(JSON, default=list)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    released_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

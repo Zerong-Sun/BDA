@@ -15,11 +15,11 @@ vi.mock('../../lib/api/artifacts', () => ({
 
 vi.mock('../../lib/api/wetlab', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('../../lib/api/wetlab')
-  return { ...actual, analyseBli: vi.fn(), analyseAkta: vi.fn(), analyseEnzyme: vi.fn() }
+  return { ...actual, analyseBli: vi.fn(), analyseAkta: vi.fn(), analyseEnzyme: vi.fn(), previewInstrumentAnalysis: vi.fn() }
 })
 
 const { uploadArtifact } = await import('../../lib/api/artifacts')
-const { analyseBli } = await import('../../lib/api/wetlab')
+const { analyseBli, previewInstrumentAnalysis } = await import('../../lib/api/wetlab')
 
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
@@ -38,6 +38,29 @@ beforeEach(() => vi.clearAllMocks())
 afterEach(() => vi.restoreAllMocks())
 
 describe('instrument analysis panel', () => {
+  it('previews without a project, then clears the result when the file changes', async () => {
+    vi.mocked(previewInstrumentAnalysis).mockResolvedValue({
+      instrument: 'bli', record: {
+        experiment_result_id: '', source_artifact_id: '', experiment_type: 'bli_affinity',
+        analysis_version: 'bli/2', value: 12.5, unit: 'nM',
+      },
+      summary: BliSummarySchema.parse({
+          sample_id: 'S1', samples_available: ['S1'], kd_nM: 12.5,
+          methods: { standard: { kd: 12.5, r2: 0.99 }, split: null, joint: null, steady: null, mixed: null },
+          phase: { t_assoc: 60, t_dissoc: 180 }, curves: [],
+        }),
+    } as never)
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+    render(<QueryClientProvider client={client}><InstrumentAnalysis projectId="" previewOnly /></QueryClientProvider>)
+    choose(new File(['export'], 'preview.csv'))
+    fireEvent.click(screen.getByRole('button', { name: 'Preview without saving' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save to current project' })).toBeDisabled())
+    expect(uploadArtifact).not.toHaveBeenCalled()
+    expect(analyseBli).not.toHaveBeenCalled()
+    choose(new File(['another export'], 'replacement.csv'))
+    expect(screen.queryByRole('button', { name: 'Save to current project' })).not.toBeInTheDocument()
+  })
+
   it('uploads the file first and posts only its artifact id', async () => {
     // The platform's upload contract, not a preference: the API never receives a
     // file body, so a panel that posted one would 422 on every real export.
