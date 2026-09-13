@@ -260,6 +260,8 @@ class ToolRegistry:
             for name, schema in spec.parameters.get("properties", {}).items():
                 value = arguments.get(name)
                 kind = schema.get("type")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise DomainError("copilot_tool_arguments_invalid", "Numeric tool arguments must be finite.", status_code=422)
                 if isinstance(value, str) and kind in {"integer", "number"}:
                     try:
                         number = int(value) if kind == "integer" else float(value)

@@ -259,3 +259,32 @@ def test_task_step_keeps_handoffs_without_unlocking_future_writes():
     offered = available_step_tools(run, [])
     assert "post_handoff" in offered
     assert "create_knowledge_draft" not in offered
+
+
+def test_saved_task_record_preserves_sections_and_source_calls(session: Session):
+    import uuid
+
+    from backend_v2.app.copilot.service import save_task_record
+    from backend_v2.app.timeline.models import ProjectTimelineEntry
+
+    project, user = _project(session)
+    run = _run(session, project, user)
+    run.status = "succeeded"
+    run.outcome = {
+        "summary": "Proposal summary", "sections": {"constraints": "Retain original files", "success_criteria": "Verified restore"},
+        "missing": ["Approval"], "next_action": "Review the proposal", "evidence_call_ids": ["source-1"],
+    }
+    save_task_record(session, run, user)
+    entry = session.get(ProjectTimelineEntry, uuid.UUID(run.outcome["decision_record_id"]))
+    assert entry is not None
+    for fragment in ("Retain original files", "Verified restore", "Approval", "Review the proposal", "source-1"):
+        assert fragment in entry.body
+    assert entry.outcome == "unspecified"
+    assert entry.provenance["external_refs"] == [f"copilot-agent-run:{run.id}"]
+
+
+@pytest.mark.parametrize("provenance", ["malformed", ["not a mapping"], 1, True])
+def test_malformed_excerpt_provenance_is_pending_instead_of_crashing(provenance):
+    result = {"chunk_id": "chunk", "content_provenance": provenance}
+    rows = progress(build_contract("literature", []), [_turn("get_reference_content", result)])
+    assert rows[1]["status"] == "pending"

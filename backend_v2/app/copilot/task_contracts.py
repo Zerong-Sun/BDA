@@ -120,7 +120,7 @@ def _has_excerpt(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     provenance = value.get("content_provenance") or value
-    if value.get("chunk_id") and provenance.get("content_checksum_sha256") and provenance.get("retrieval_trace_id"):
+    if isinstance(provenance, dict) and value.get("chunk_id") and provenance.get("content_checksum_sha256") and provenance.get("retrieval_trace_id"):
         return True
     return any(_has_excerpt(item) for item in value.values() if isinstance(item, (list, dict)))
 

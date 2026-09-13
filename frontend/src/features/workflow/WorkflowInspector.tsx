@@ -84,7 +84,7 @@ function WorkflowInspectorContent({
   const [draftBindings, setDraftBindings] = useState<WorkflowInputBinding[]>(
     selectedNode?.input_bindings ?? [],
   )
-  const [scriptPreview, setScriptPreview] = useState<ScriptPreviewResponse | null>(null)
+  const [previewSnapshot, setPreviewSnapshot] = useState<{ preview: ScriptPreviewResponse; inputs: string } | null>(null)
   const [queueName, setQueueName] = useState(selectedNode?.queue ?? '')
   const [previewBackend, setPreviewBackend] = useState<'lsf' | 'docker'>('lsf')
   const unsavedPreviewInputs = (queueName.trim() || null) !== (selectedNode?.queue || null)
@@ -153,6 +153,15 @@ function WorkflowInspectorContent({
     [draftParameters, parameterFields],
   )
 
+  // Keep the response tied to the inputs that produced it, including edits
+  // made while the request was in flight. A stale script is not a current review.
+  const previewInputs = JSON.stringify({
+    node: selectedNode?.id, version: selectedNode?.version, pluginVersion: activePlugin?.version,
+    parameters: effectiveParameters, configuration: draftConfiguration,
+    bindings: draftBindings, queue: queueName, backend: previewBackend,
+  })
+  const scriptPreview = previewSnapshot?.inputs === previewInputs ? previewSnapshot.preview : null
+
   const saveParameters = useMutation({
     mutationFn: () => {
       if (readOnly) throw new Error(t.workflowExt.canvas.readOnlyBanner)
@@ -180,18 +189,19 @@ function WorkflowInspectorContent({
   })
 
   const previewScript = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selectedNode) throw new Error(t.workflowExt.inspector.errorSelectNode)
       if (unsavedPreviewInputs) throw new Error(t.workflowExt.inspector.savePreviewInputs)
-      return previewWorkflowNodeScript(selectedNode.id, {
+      const preview = await previewWorkflowNodeScript(selectedNode.id, {
         override_params: effectiveParameters,
         configuration: draftConfiguration,
         input_bindings: draftBindings,
         compute_backend: previewBackend,
       })
+      return { preview, inputs: previewInputs }
     },
-    onSuccess: (preview) => {
-      setScriptPreview(preview)
+    onSuccess: (snapshot) => {
+      setPreviewSnapshot(snapshot)
       showToast(t.workflowExt.toasts.scriptGenerated, 'success')
     },
     onError: (error) =>

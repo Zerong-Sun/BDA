@@ -56,6 +56,8 @@
 
 ## 验证记录
 
+- [分支整合六维复核与修复](INTEGRATION_SIX_DIMENSION_REVIEW.md)
+
 - [六维复核与修复清单](GUIDED_PLATFORM_REVIEW.md)
 - [前端插件检查与修复](FRONTEND_PLUGIN_CHECK_2026-09-07.md)
 

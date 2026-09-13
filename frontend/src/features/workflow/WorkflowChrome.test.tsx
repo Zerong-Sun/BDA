@@ -9,6 +9,7 @@ import { WorkflowResourceSidebar } from './WorkflowResourceSidebar'
 
 const api = vi.hoisted(() => ({
   getWorkflowPreflight: vi.fn(),
+  previewWorkflowNodeScript: vi.fn(),
   getJobLogs: vi.fn(),
   listModelPlugins: vi.fn(),
   listScriptAssets: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('../../lib/api/registry', () => ({
 
 vi.mock('../../lib/api/workflow', () => ({
   getWorkflowPreflight: api.getWorkflowPreflight,
-  previewWorkflowNodeScript: vi.fn(),
+  previewWorkflowNodeScript: api.previewWorkflowNodeScript,
   updateWorkflowNode: vi.fn(),
 }))
 
@@ -114,6 +115,29 @@ describe('workflow chrome safeguards', () => {
     expect(screen.getByText('Save queue and input binding changes before previewing the script.')).toBeInTheDocument()
     fireEvent.change(queue, { target: { value: '' } })
     expect(preview).toBeEnabled()
+  })
+
+  it.each(['before response', 'after response'])('invalidates a script when its inputs change %s', async (timing) => {
+    let resolvePreview!: (value: unknown) => void
+    api.previewWorkflowNodeScript.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve }))
+    renderWithProviders(<WorkflowInspector workflowRunId="run_test" selectedNode={{
+      id: 'node_test', workflow_run_id: 'run_test', node_key: 'audit', execution_mode: 'dispatch', configuration: {}, node_type: 'compute',
+      model_plugin: 'audit', model_plugin_id: null, container_image: null, command: 'true',
+      queue: null, status: 'draft', parameters: {}, input_bindings: [], error_message: null, version: 1,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate script' }))
+    await waitFor(() => expect(resolvePreview).toBeDefined())
+    const changeQueue = () => fireEvent.change(screen.getByLabelText('LSF queue override'), { target: { value: 'changed-queue' } })
+    if (timing === 'before response') changeQueue()
+    resolvePreview({ workflow_node_id: 'node_test', plugin_id: null, script: 'echo old-review', review_fingerprint: 'a'.repeat(64) })
+    if (timing === 'after response') {
+      await screen.findByText('echo old-review')
+      changeQueue()
+    }
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate script' })).toBeDisabled())
+    expect(screen.queryByText('echo old-review')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /download script/i })).not.toBeInTheDocument()
   })
 
   it('hides the native script picker behind a localized registry trigger and names reorder handles', async () => {

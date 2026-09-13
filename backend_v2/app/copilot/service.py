@@ -800,7 +800,16 @@ def save_task_record(session: Session, run: CopilotAgentRun, user: User) -> None
     if outcome.get("decision_record_id"):
         return
     # This records a proposal, never an approved scientific conclusion.
-    body = str(outcome["summary"]) + "\n\nRemaining: " + "; ".join(outcome.get("missing", [])) + "\nNext: " + str(outcome.get("next_action", ""))
+    parts = [str(outcome["summary"])]
+    sections = outcome.get("sections", {})
+    if isinstance(sections, dict):
+        parts.extend(f"## {name.replace('_', ' ')}\n\n{value}" for name, value in sections.items() if isinstance(value, str))
+    parts.append("Remaining: " + "; ".join(outcome.get("missing", [])))
+    parts.append("Next: " + str(outcome.get("next_action", "")))
+    evidence_ids = outcome.get("evidence_call_ids", [])
+    if evidence_ids:
+        parts.append("Source tool calls: " + ", ".join(evidence_ids))
+    body = "\n\n".join(parts)
     entry = create_entry(session, project, TimelineEntryCreate(
         occurred_at=datetime.now(UTC), entry_type="plan", title=run.goal[:300], summary=str(outcome["summary"])[:1000],
         body=body, outcome="unspecified", phase="copilot_review", entry_key=f"copilot-task:{run.id}:{run.version}",

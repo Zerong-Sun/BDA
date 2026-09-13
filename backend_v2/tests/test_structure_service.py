@@ -299,3 +299,13 @@ def test_a_turn_with_no_project_cannot_reach_a_structure(session: Session, store
             {"artifact_id": str(uuid.uuid4())},
             granted={"structure-analysis"},
         )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), "nan", "inf", "20.0"])
+def test_numeric_compatibility_never_accepts_nonfinite_or_out_of_range_values(session: Session, stored, value):
+    project_id, _ = _stored_structure(session, stored)
+    with pytest.raises(DomainError) as error:
+        REGISTRY.execute("list_structure_contacts", _context(session, project_id), {
+            "artifact_id": str(uuid.uuid4()), "chain_a": "A", "chain_b": "B", "cutoff_angstrom": value,
+        }, granted={"structure-analysis"})
+    assert error.value.error_code == "copilot_tool_arguments_invalid"
