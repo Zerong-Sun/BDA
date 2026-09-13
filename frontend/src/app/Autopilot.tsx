@@ -87,6 +87,14 @@ export function AutopilotPage() {
       completeAutopilotStage(campaign!.id, stage.id, stage.version),
     onSuccess: () => refreshMutation.mutate(),
   })
+  // A campaign that has reached an outcome has nothing left to start, cancel or
+  // take over, and the server refuses all three. Offering them anyway would put
+  // a control in front of somebody whose only possible result is a 409 - and
+  // before the chain could reach its own end, two of these had no reason to be
+  // disabled at all, which is why they were not.
+  const settled =
+    campaign !== null &&
+    ['succeeded', 'failed', 'cancelled', 'manual_takeover'].includes(campaign.status)
   const error =
     draftMutation.error ??
     confirmMutation.error ??
@@ -144,14 +152,14 @@ export function AutopilotPage() {
       {campaign ? (
         <AppFrame className="mt-5" heading={language === 'zh' ? '3. 启动与取消' : '3. Start and cancel'} panelClassName="flex flex-wrap items-center gap-3 p-5">
           <span className="text-sm">{campaign.name} · {campaign.status}</span>
-          <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>{language === 'zh' ? '预留预算并启动' : 'Reserve budget and start'}</Button>
-          <Button type="button" variant="outline" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>{language === 'zh' ? '幂等取消' : 'Idempotent cancel'}</Button>
+          <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending || settled}>{language === 'zh' ? '预留预算并启动' : 'Reserve budget and start'}</Button>
+          <Button type="button" variant="outline" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending || settled}>{language === 'zh' ? '幂等取消' : 'Idempotent cancel'}</Button>
           <Button type="button" variant="outline" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>{language === 'zh' ? '刷新阶段' : 'Refresh stages'}</Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => takeoverMutation.mutate()}
-            disabled={takeoverMutation.isPending || campaign.status === 'manual_takeover' || campaign.status === 'cancelled'}
+            disabled={takeoverMutation.isPending || settled}
           >
             {language === 'zh' ? '人工接管' : 'Take over'}
           </Button>

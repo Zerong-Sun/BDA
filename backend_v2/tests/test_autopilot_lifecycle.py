@@ -864,3 +864,134 @@ def test_the_adapter_set_is_pinned_so_a_new_one_revisits_the_walk_above() -> Non
 
     assert set(adapters.ADAPTERS) == {"compute", "design", "research", "plan", "report"}
     assert SELF_SETTLING_RESOURCE_TYPES == frozenset({"copilot_agent_run"})
+
+
+# --- The transitions that predate a campaign having an outcome ----------------
+
+
+class TestATerminalCampaignIsNotOverwritten:
+    """`finish_campaign` introduced two statuses the rest of the state machine
+    had never seen, because until the chain could reach its own end nothing ever
+    produced one. Each existing transition had to be taught, and neither had
+    been: overwriting an outcome erases the answer to "how did this turn out"
+    and leaves the `campaign.finished` ledger entry describing a status the row
+    no longer has.
+    """
+
+    def _finished(self, session: Session, status: str = "succeeded"):
+        campaign, _, user = _campaign(session, stage_keys=["review"])
+        stage = _stages(session, campaign)[0]
+        settle_stage(session, campaign, stage, status="succeeded" if status == "succeeded" else "failed")
+        from backend_v2.app.autopilot.service import finish_campaign
+
+        finish_campaign(session, campaign)
+        assert campaign.status == status
+        return campaign, user
+
+    def test_a_succeeded_campaign_cannot_be_taken_over(self, session: Session) -> None:
+        from backend_v2.app.autopilot.service import take_over_campaign
+
+        campaign, user = self._finished(session)
+
+        with pytest.raises(DomainError, match="nothing left to take over"):
+            take_over_campaign(session, campaign, campaign.version, user)
+        assert campaign.status == "succeeded"
+
+    def test_a_failed_campaign_cannot_be_taken_over(self, session: Session) -> None:
+        from backend_v2.app.autopilot.service import take_over_campaign
+
+        campaign, user = self._finished(session, status="failed")
+
+        with pytest.raises(DomainError, match="nothing left to take over"):
+            take_over_campaign(session, campaign, campaign.version, user)
+        assert campaign.status == "failed"
+
+    def test_a_succeeded_campaign_cannot_be_cancelled(self, session: Session) -> None:
+        """The more dangerous of the two: cancel had no status guard at all."""
+        from backend_v2.app.autopilot.service import cancel_campaign
+
+        campaign, user = self._finished(session)
+
+        with pytest.raises(DomainError, match="nothing left to cancel"):
+            cancel_campaign(session, campaign, user)
+        assert campaign.status == "succeeded"
+
+    def test_a_running_campaign_is_still_cancellable(self, session: Session) -> None:
+        """The guard is a guard, not a wall."""
+        from backend_v2.app.autopilot.service import cancel_campaign
+
+        campaign, _, user = _campaign(session)
+
+        cancel_campaign(session, campaign, user)
+
+        assert campaign.status == "cancelled"
+
+
+class TestFinishIsNotTheSameAsBlocked:
+    def test_a_blocked_advance_does_not_finish_the_campaign(self, session: Session) -> None:
+        """`advance_campaign` returns nothing for four reasons and only one is
+        "the chain is over". Calling `finish_campaign` for all four was safe only
+        because it re-checks every stage itself, which made that guard
+        load-bearing for a question asked somewhere else."""
+        from backend_v2.app.autopilot.service import _advance_and_record
+
+        campaign, _, _ = _campaign(session)
+        first, second = _stages(session, campaign)
+        settle_stage(session, campaign, first, status="succeeded")
+        advance_campaign(session, campaign)
+        assert second.status == "ready"
+
+        _advance_and_record(session, campaign, first)
+
+        assert campaign.status == "running"
+
+    def test_a_campaign_with_no_stages_has_not_succeeded(self, session: Session) -> None:
+        """`all([])` is True, so without a guard this reports an outcome for work
+        that was never declared."""
+        from backend_v2.app.autopilot.service import finish_campaign
+
+        campaign, _, _ = _campaign(session, stage_keys=[])
+
+        finish_campaign(session, campaign)
+
+        assert campaign.status == "running"
+
+
+class TestTheWorkerGuards:
+    """The two branches nothing exercised. Both return rather than raise, which
+    matters: a raise here is a Celery retry, and a retry of a lookup that will
+    never succeed is a task that runs for ever."""
+
+    def _run_task(self, session: Session, run_id) -> dict:
+        import contextlib
+
+        from backend_v2.app.autopilot import tasks
+
+        @contextlib.contextmanager
+        def _scope():
+            yield session
+
+        original = tasks.session_scope
+        tasks.session_scope = _scope  # type: ignore[assignment]
+        try:
+            return tasks.stage_settled.run(str(run_id))
+        finally:
+            tasks.session_scope = original  # type: ignore[assignment]
+
+    # There is no test for the `missing_campaign` branch, and that is a finding
+    # rather than an omission: `autopilot_stages.campaign_id` carries a foreign
+    # key with `ondelete="CASCADE"`, so a stage cannot outlive its campaign and
+    # the state cannot be constructed. The branch is still right to keep - the
+    # worker reads the stage and the campaign in two statements, so a delete
+    # landing between them returns None for the second - but that is a race no
+    # unit test can stage, and writing one that fakes it would test the fake.
+
+    def test_a_stage_pointing_at_a_run_that_is_gone_is_not_retried_for_ever(
+        self, session: Session
+    ) -> None:
+        campaign, _, _ = _campaign(session)
+        stage = _stages(session, campaign)[0]
+        stage.resource_type, stage.resource_id = "copilot_agent_run", uuid.uuid4()
+        session.flush()
+
+        assert self._run_task(session, stage.resource_id)["status"] == "missing_run"

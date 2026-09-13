@@ -84,6 +84,17 @@ def test_a_missing_or_malformed_slot_count_reads_as_one() -> None:
 # --- The queue's own GPU request ---------------------------------------------
 
 
+def test_the_forcing_queue_set_is_not_empty() -> None:
+    """Guards the parametrize below, which is otherwise vacuous.
+
+    An empty parameter set produces no cases, so emptying `GPU_FORCING_QUEUES` -
+    which would make the single most important rule in `declarations.py` dead -
+    would leave that test silently green. Naming the queue this project actually
+    learned the rule from is what makes the removal fail rather than pass.
+    """
+    assert "2v100-32-e5" in GPU_FORCING_QUEUES
+
+
 @pytest.mark.parametrize("queue", sorted(GPU_FORCING_QUEUES))
 def test_a_gpu_forcing_queue_contradicts_a_cpu_only_declaration(queue: str) -> None:
     result = _review(resources={"cpus": 1}, queue=queue)

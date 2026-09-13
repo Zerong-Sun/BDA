@@ -339,6 +339,16 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
         existing = session.get(Operation, campaign.cancel_operation_id)
         if existing is not None:
             return existing
+    if campaign.status in FINISHED_CAMPAIGN_STATUSES:
+        # Same reasoning as takeover, and the more dangerous of the two because
+        # cancel had no status guard at all: cancelling a campaign that already
+        # succeeded would overwrite the outcome with `cancelled` and lose the
+        # only place the result is recorded on the row.
+        raise DomainError(
+            "autopilot_campaign_finished",
+            f"A {campaign.status} campaign has nothing left to cancel",
+            status_code=409,
+        )
     operation = enqueue_operation(
         session,
         topic="autopilot.cancel",
@@ -442,6 +452,17 @@ def take_over_campaign(
         raise DomainError(
             "autopilot_campaign_cancelled",
             "A cancelled campaign has nothing left to take over",
+            status_code=409,
+        )
+    if campaign.status in FINISHED_CAMPAIGN_STATUSES:
+        # Authority over the products is what takeover hands across, and a
+        # finished campaign has already handed it - there is no worker left to
+        # take it from. Accepting this would replace the recorded outcome with
+        # `manual_takeover` and leave the `campaign.finished` ledger entry
+        # describing a status the row no longer has.
+        raise DomainError(
+            "autopilot_campaign_finished",
+            f"A {campaign.status} campaign has nothing left to take over",
             status_code=409,
         )
     campaign.status = "manual_takeover"
@@ -608,6 +629,14 @@ UNSTARTED_STAGE_STATUSES = ("pending", "awaiting_release")
 #: `advance_campaign` steps over them looking for the next thing to do.
 SETTLED_STAGE_STATUSES = ("succeeded", "failed", "cancelled")
 
+#: A campaign that has reached an outcome. `finish_campaign` writes the first
+#: two and they did not exist until the chain could reach the end of itself -
+#: which is why the transitions below had no reason to know about them, and why
+#: each one had to be taught. Overwriting one of these is erasing the answer to
+#: "how did this campaign turn out", and the ledger entry that recorded it stops
+#: matching the row.
+FINISHED_CAMPAIGN_STATUSES = ("succeeded", "failed")
+
 #: Stage products that end their own stage, so a person must not also end it.
 #:
 #: Only the agent run does. A `workflow_run` is the opposite case and the
@@ -757,7 +786,13 @@ def _advance_and_record(
     principal = None if user is not None else _worker_principal_id(session)
     reached, resource = advance_campaign(session, campaign)
     if reached is None:
-        finish_campaign(session, campaign, user=user)
+        # `advance_campaign` returns nothing for four different reasons, and only
+        # one of them is "the chain is over". Calling `finish_campaign` for all
+        # four was safe only because it re-checks every stage itself - which made
+        # the guard there load-bearing for a question asked here, and would have
+        # marked a taken-over campaign succeeded the day somebody relaxed it.
+        if next_stage(session, campaign) is None:
+            finish_campaign(session, campaign, user=user)
         return None
     session.add(
         AutopilotLedgerEntry(
@@ -812,6 +847,13 @@ def finish_campaign(
     stages = list(
         session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id))
     )
+    if not stages:
+        # `all([])` is True, so without this a campaign with no stages reports
+        # `succeeded` - an outcome for work that was never declared, let alone
+        # done. Not reachable through `confirm_draft`, which always writes at
+        # least `DEFAULT_STAGE_KEYS`, and guarded anyway because the vacuous
+        # truth is the kind that survives a refactor.
+        return campaign
     if any(stage.status not in SETTLED_STAGE_STATUSES for stage in stages):
         return campaign
     outcome = "failed" if any(stage.status == "failed" for stage in stages) else "succeeded"
