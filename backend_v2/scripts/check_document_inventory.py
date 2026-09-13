@@ -22,7 +22,6 @@ KNOWN_MISSING = DOCS_ROOT / "data/KNOWN_MISSING_2026-09-01.json"
 
 HISTORICAL_FILES = {
     "docs/NEXT_EXPERIMENTS_2026-08-29.md",
-    "docs/V2_LOCAL_ACCEPTANCE.md",
     "docs/refactor/CURRENT_STATE_2026-08-22.md",
     "docs/refactor/CURRENT_STATE_2026-08-27.md",
     "docs/refactor/DEFECTS_FOUND.md",
@@ -43,7 +42,7 @@ def category(path: Path) -> str:
     name = relative(path)
     if name.startswith("docs/archive/") or name in HISTORICAL_FILES:
         return "history"
-    if name.startswith("docs/superpowers/"):
+    if name.startswith(("docs/superpowers/", "docs/plans/")):
         return "draft"
     return "active"
 

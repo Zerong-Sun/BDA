@@ -120,6 +120,15 @@ _ACTION_REQUEST_TERMS = {
     },
 }
 
+
+_ACTION_REQUEST_TERMS.update({
+    "promote_candidate_to_bench": {"domains": {"candidate", "construct", "候选", "构建体"}, "verbs": {"promote", "register", "纳入", "登记", "注册", "转入"}},
+    "analyse_bli_run": {"domains": {"bli"}, "verbs": {"analyse", "analyze", "fit", "分析", "拟合"}},
+    "analyse_akta_run": {"domains": {"akta"}, "verbs": {"analyse", "analyze", "分析"}},
+    "analyse_enzyme_plate": {"domains": {"enzyme", "tecan", "酶", "板"}, "verbs": {"analyse", "analyze", "fit", "分析", "拟合"}},
+    "attach_to_research_goal": {"domains": {"goal", "目标"}, "verbs": {"attach", "link", "关联", "链接"}},
+})
+
 _NEGATION_SUFFIXES = (
     "do not",
     "don't",
@@ -226,11 +235,13 @@ class CopilotActionService:
         *,
         request_text: str,
         source_message_id: uuid.UUID,
+        authorized_writes: set[str] | None = None,
     ):
         self.session = session
         self.project = require_project(session, project.id, user)
         self.user = user
         self.request_text = request_text
+        self.authorized_writes = authorized_writes
         self.source_message_id = source_message_id
         self._completed: dict[str, dict[str, Any]] = {}
         self._research = ResearchActionService(session, self.project, user)
@@ -424,6 +435,8 @@ class CopilotActionService:
         not run, and the caller drops it from the turn rather than offering a
         tool that would always refuse.
         """
+        if self.authorized_writes is not None:
+            return action_name in self.authorized_writes
         terms = _ACTION_REQUEST_TERMS.get(action_name)
         if terms is None:
             return False

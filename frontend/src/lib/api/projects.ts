@@ -101,6 +101,9 @@ export async function createProject(payload: CreateProjectPayload): Promise<Proj
 }
 
 export interface CreateProjectPromptDraftPayload {
+  project_id?: string
+  organization_id?: string
+  language?: 'en' | 'zh'
   name: string
   project_type: string
   summary?: string
@@ -114,11 +117,11 @@ export interface ProjectPromptDraft {
 }
 
 export async function createProjectPromptDraft(payload: CreateProjectPromptDraftPayload): Promise<{ draft_id: string }> {
-  const organizations = (await listOrganizationsApiV2OrganizationsGet<true>({ throwOnError: true })).data
-  if (!organizations[0]) throw new ApiError('No organization membership is available', 409)
+  const organizationId = payload.organization_id ?? (await listOrganizationsApiV2OrganizationsGet<true>({ throwOnError: true })).data[0]?.id
+  if (!organizationId) throw new ApiError('No organization membership is available', 409)
   const accepted = await postProjectPromptDraftApiV2ProjectsPromptDraftsPost<true>({
-    body: { organization_id: organizations[0].id, name: payload.name,
-      project_type: payload.project_type, summary: payload.summary },
+    body: { organization_id: organizationId, name: payload.name,
+      project_type: payload.project_type, summary: payload.summary, project_id: payload.project_id, language: payload.language },
     throwOnError: true,
   })
   return accepted.data
@@ -131,12 +134,13 @@ export function getProjectPromptDraft(draftId: string): Promise<ProjectPromptDra
 }
 
 export async function waitForProjectPromptDraft(draftId: string): Promise<ProjectPromptDraft> {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
     const draft = await getProjectPromptDraft(draftId)
-    if (draft.status !== 'pending') return draft
+    if (draft.status === 'failed') throw new ApiError(draft.error || 'Prompt generation failed. Check the model configuration and retry.', 422)
+    if (draft.status === 'ready' && draft.prompt?.trim()) return draft
     await new Promise((resolve) => window.setTimeout(resolve, 1000))
   }
-  throw new ApiError('Prompt generation did not finish within two minutes.', 408)
+  throw new ApiError(`The draft is still pending after ten minutes (draft ${draftId}). Check worker and model status before starting another draft.`, 408)
 }
 
 /**

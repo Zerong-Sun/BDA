@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -27,6 +28,7 @@ class WorkflowInputBinding(BaseModel):
 
 
 class WorkflowNodeInput(BaseModel):
+    execution_mode: Literal["dispatch", "manual"] = "dispatch"
     key: str = Field(min_length=1, max_length=120)
     node_type: str = Field(min_length=1, max_length=80)
     model_plugin: str = Field(min_length=1, max_length=160)
@@ -134,7 +136,7 @@ class WorkflowNodeResponse(BaseModel):
     command: str | None
     queue: str | None
     status: WorkflowNodeStatus
-    execution_mode: str = "dispatch"
+    execution_mode: Literal["dispatch", "manual"] = "dispatch"
     parameters: dict
     input_bindings: list = Field(default_factory=list)
     error_message: str | None
@@ -175,6 +177,7 @@ class ScriptPreviewCreate(BaseModel):
 
 
 class ScriptPreviewResponse(BaseModel):
+    review_fingerprint: str
     workflow_node_id: uuid.UUID
     plugin_id: uuid.UUID | None
     script: str

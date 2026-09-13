@@ -26,5 +26,5 @@ manifest path/checksum validation, timeout/cancel races, worker recovery,
 two-stage upload failures and the complete domain API contract. Production
 cutover still requires the same tests against the supplied Kubernetes,
 remote-Docker and LSF environments. Local performance, SSE, Redis/MinIO outage
-and migration evidence is recorded in `docs/V2_LOCAL_ACCEPTANCE.md`; it is not a
+and migration evidence is recorded in `docs/archive/2026-09-07/validation/V2_LOCAL_ACCEPTANCE.md`; it is not a
 substitute for signed production-environment evidence.

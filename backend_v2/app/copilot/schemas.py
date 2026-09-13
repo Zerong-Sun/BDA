@@ -10,9 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class CopilotTurnContext(BaseModel):
     route: str | None = Field(default=None, max_length=500)
     research_tab: str | None = Field(default=None, max_length=80)
-    selected_entity_ids: list[
-        Annotated[str, Field(min_length=1, max_length=100)]
-    ] = Field(default_factory=list, max_length=50)
+    selected_entity_ids: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        default_factory=lambda: ["research"], max_length=50
+    )
     language: Literal["en", "zh"] = "en"
 
 
@@ -79,9 +79,9 @@ class ChatAccepted(BaseModel):
 class CopilotConfigUpdate(BaseModel):
     llm_provider_id: uuid.UUID | None = None
     settings: dict = Field(default_factory=dict)
-    enabled_skills: list[
-        Annotated[str, Field(min_length=1, max_length=80)]
-    ] = Field(default_factory=list, max_length=50)
+    enabled_skills: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=lambda: ["research"], max_length=50
+    )
 
 
 class CopilotConfigResponse(CopilotConfigUpdate):
@@ -162,6 +162,7 @@ class HandoffPage(BaseModel):
 
 
 class RoutePlanCreate(BaseModel):
+    use_model: bool = False
     project_id: uuid.UUID
     goal: str = Field(min_length=1, max_length=5000)
 
@@ -240,6 +241,9 @@ class AgentRunCreate(BaseModel):
     #: A roster bot id. Mutually exclusive with `skills`, and narrowing only:
     #: the run gets `bot.capabilities & project.enabled_skills`.
     bot: str | None = Field(default=None, min_length=1, max_length=80)
+    service_kind: Literal["brief", "literature", "planning", "execution", "interpretation", "custom"] = "custom"
+    # Exact tool ids are an explicit scope request, intersected with project permissions.
+    authorized_writes: list[Annotated[str, Field(min_length=1, max_length=80)]] | None = Field(default=None, max_length=20)
     max_turns: int = Field(default=24, ge=1, le=200)
     max_cost_usd_cents: int | None = Field(default=None, ge=0, le=1_000_000)
 
@@ -258,6 +262,8 @@ class AgentRunResponse(BaseModel):
     bot: str | None = None
     parent_run_id: uuid.UUID | None
     allowed_tools: list
+    task_contract: dict = Field(default_factory=dict)
+    outcome: dict = Field(default_factory=dict)
     max_turns: int
     turn_count: int
     cost_usd_cents: int
@@ -374,3 +380,27 @@ class McpSessionIssued(BaseModel):
 class McpSessionPage(BaseModel):
     items: list[McpSessionResponse]
     next_cursor: str | None = None
+
+
+class AgentRunContinuation(BaseModel):
+    message: str = Field(min_length=1, max_length=10000)
+    authorized_writes: list[str] | None = Field(default=None, max_length=20)
+
+
+class TaskServiceResponse(BaseModel):
+    id: str
+    title: str
+    title_zh: str
+    deliverable: str
+    deliverable_zh: str
+    capabilities: list[str]
+    write_tools: list[str]
+    steps: list[dict]
+
+
+class TaskReadinessResponse(BaseModel):
+    model: str
+    checked_at: str | None = None
+    checks: dict[str, bool] = Field(default_factory=dict)
+    eligible_services: list[str] = Field(default_factory=list)
+    reason: str | None = None

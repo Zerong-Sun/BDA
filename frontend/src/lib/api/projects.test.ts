@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   deleteProject,
+  createProjectPromptDraft,
+  waitForProjectPromptDraft,
   getCurrentWorkflowRun,
   hasWorkflowNodes,
   listProjectWorkflowRuns,
@@ -11,6 +13,28 @@ import { WorkflowRunSchema } from '../schemas/workflow'
 import { server } from '../../test/mocks/handlers'
 
 describe('project api', () => {
+  it('uses the supplied project organization without an extra organization lookup', async () => {
+    let organizationReads = 0
+    let body: unknown
+    server.use(
+      http.get('/api/v2/organizations', () => { organizationReads++; return HttpResponse.json([]) }),
+      http.post('/api/v2/projects/prompt-drafts', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json({ draft_id: 'project-draft' })
+      }),
+    )
+    await createProjectPromptDraft({ organization_id: 'org-project', project_id: 'project', name: 'Project', project_type: 'enzyme_design', summary: 'Improve stability', language: 'zh' })
+    expect(organizationReads).toBe(0)
+    expect(body).toMatchObject({ organization_id: 'org-project', project_id: 'project', language: 'zh' })
+  })
+
+  it('reports a failed prompt draft immediately instead of treating it as usable', async () => {
+    server.use(http.get('/api/v2/projects/prompt-drafts/draft-failed', () => HttpResponse.json({
+      id: 'draft-failed', status: 'failed', prompt: null, error: 'No configured model',
+    })))
+    await expect(waitForProjectPromptDraft('draft-failed')).rejects.toThrow('No configured model')
+  })
+
   it('soft deletes a project with the configured retention period', async () => {
     const result = await deleteProject('proj_delete_test')
 

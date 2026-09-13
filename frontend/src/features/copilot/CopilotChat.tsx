@@ -20,6 +20,7 @@ import { isResearchPageContext } from '../research/reviewIntent'
 import { useAppStore } from '../../lib/store/appStore'
 import { looksLikeCopilotResearchResult } from '../../lib/api/copilotResearch'
 import { projectText } from '../../lib/i18n/projectText'
+import { isQuestion } from './taskPresentation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
@@ -41,7 +42,7 @@ import {
 //: value of its own.
 const AUTO_BOT = '__auto__'
 
-export function CopilotChat({ pageContext }: { pageContext?: string }) {
+export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void }) {
   const { t, format, language } = useI18n()
   const { projectId, activeProject, setProjectId } = useProjectContext()
   const queryClient = useQueryClient()
@@ -59,6 +60,12 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
     setBot,
   } = useCopilotChat(projectId, pageContext, language)
   const [input, setInput] = useState('')
+  const initialSent = useRef(false)
+  useEffect(() => {
+    if (!initialQuestion || initialSent.current) return
+    initialSent.current = true
+    void send(initialQuestion)
+  }, [initialQuestion, send])
   const copilotDraft = useAppStore((state) => state.copilotDraft)
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -99,6 +106,7 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
     const trimmed = input.trim()
     if (!trimmed) return
     setInput('')
+    if (onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
     await send(trimmed)
   }
 

@@ -232,6 +232,7 @@ def complete_research_turn(
             allowed_tools=allowed_tools,
             has_operator=bot is not None,
         )
+        offered = {tool["function"]["name"] for tool in tools}
         message = completion_message(
             provider,
             conversation,
@@ -269,6 +270,8 @@ def complete_research_turn(
             function = request.get("function") or {}
             name = str(function.get("name") or "")
             try:
+                if name not in offered:
+                    raise ValueError("tool_not_allowed_for_this_turn")
                 arguments = json.loads(function.get("arguments") or "{}")
                 if not isinstance(arguments, dict):
                     raise ValueError("tool_arguments_not_object")
@@ -466,7 +469,7 @@ def _execute(
         raise ValueError("unknown_research_tool")
     tool_context = ToolContext(
         project_id=getattr(context, "project_id", None),
-        user_id=getattr(context, "user_id", None),
+        user_id=getattr(getattr(actions, "user", None), "id", None) or getattr(context, "user_id", None),
         session=getattr(context, "session", None),
         research=context,
         project=project_context,

@@ -17,6 +17,8 @@ export interface ParameterFieldDefinition {
   options?: Array<string | { label: string; value: string }>
   help?: string
   advanced?: boolean
+  jsonType?: 'object' | 'array'
+  nullable?: boolean
   required?: boolean
 }
 
@@ -106,6 +108,8 @@ function fieldFromJsonSchemaProperty(
     options: enumValues.length > 0 ? enumValues : undefined,
     help: typeof property.description === 'string' ? property.description : undefined,
     advanced: property['x-bda-advanced'] === true,
+    nullable: Array.isArray(property.type) && property.type.includes('null'),
+    jsonType: declaredType === 'object' || declaredType === 'array' ? declaredType : undefined,
     required,
   }
 }
@@ -239,6 +243,9 @@ function fallbackFields(modelName?: string): ParameterFieldDefinition[] {
 
 export function fieldsFromParameterSchema(schema: unknown, modelName?: string): ParameterFieldDefinition[] {
   const fields = parseParameterSchema(schema)
+  const parsed = typeof schema === 'string' ? safeJson(schema) : schema
+  // An explicitly empty schema is authoritative too (additionalProperties may be false).
+  if (parsed && typeof parsed === 'object' && ('properties' in parsed || 'fields' in parsed)) return fields
   return fields.length > 0 ? fields : fallbackFields(modelName)
 }
 
@@ -247,4 +254,40 @@ export function defaultsFromFields(fields: ParameterFieldDefinition[]): Record<s
     if (field.default !== undefined) acc[field.key] = field.default
     return acc
   }, {})
+}
+
+/** Prepare the editable drafts for the API; full JSON Schema validation stays in preflight. */
+export function prepareParameterValues(
+  fields: ParameterFieldDefinition[],
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...values }
+  for (const field of fields) {
+    let value = result[field.key]
+    const label = field.label ?? field.key
+    if (value === undefined || value === '') {
+      if (field.required && (value === undefined || field.type === 'number' || field.type === 'integer' || field.type === 'json')) {
+        throw new Error(`${label}: a value is required`)
+      }
+      if (field.type === 'number' || field.type === 'integer' || field.type === 'json') delete result[field.key]
+      continue
+    }
+    if (field.type === 'json' && typeof value === 'string') {
+      try { value = JSON.parse(value) } catch { throw new Error(`${label}: invalid JSON`) }
+    }
+    if (value === null && field.nullable) { result[field.key] = null; continue }
+    if (field.jsonType === 'array' && !Array.isArray(value)) throw new Error(`${label}: expected a JSON array`)
+    if (field.jsonType === 'object' && (!value || typeof value !== 'object' || Array.isArray(value))) {
+      throw new Error(`${label}: expected a JSON object`)
+    }
+    if (field.type === 'integer' || field.type === 'number') {
+      if (typeof value !== 'number' || !Number.isFinite(value) || (field.type === 'integer' && !Number.isInteger(value))) {
+        throw new Error(`${label}: expected a finite ${field.type}`)
+      }
+      if (field.min !== undefined && value < field.min) throw new Error(`${label}: minimum ${field.min}`)
+      if (field.max !== undefined && value > field.max) throw new Error(`${label}: maximum ${field.max}`)
+    }
+    result[field.key] = value
+  }
+  return result
 }

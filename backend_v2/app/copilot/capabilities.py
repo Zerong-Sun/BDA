@@ -119,7 +119,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Plan routes and inspect workflows; applying a route remains a user-confirmed action",
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["get_workflow_status"],
+        "chat_tools": ["get_workflow_status", "plan_workflow_route"],
         "requires_confirmation": True,
     },
     {
@@ -269,7 +269,7 @@ CAPABILITY_ALIASES = {
 
 
 def normalize_capabilities(enabled: list[str] | None) -> set[str]:
-    if not enabled:
+    if enabled is None:
         return set(CAPABILITY_ALIASES["research"])
     known = {item["id"] for item in COPILOT_CAPABILITIES}
     result: set[str] = set()

@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { listModelPlugins } from '../../lib/api/registry'
 import { useI18n } from '../../lib/i18n'
+import { Alert, AlertDescription } from '../../components/reui/alert'
+import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FrameHeader, FramePanel, FrameTitle } from '../../components/reui/frame'
 
 export function PluginRegistryPanel() {
   const { t, format } = useI18n()
-  const { data: plugins = [], isLoading } = useQuery({
+  const { data: plugins = [], isLoading, error, refetch } = useQuery({
     queryKey: ['model-plugins'],
     queryFn: listModelPlugins,
   })
@@ -20,6 +22,13 @@ export function PluginRegistryPanel() {
       <FramePanel>
       {isLoading ? (
         <p className="mt-2 text-sm text-text-secondary">{t.workflowExt.pluginRegistry.loading}</p>
+      ) : error ? (
+        <Alert variant="destructive" role="alert">
+          <AlertDescription>{error.message}</AlertDescription>
+          <Button type="button" variant="outline" onClick={() => void refetch()}>{t.common.retry}</Button>
+        </Alert>
+      ) : plugins.length === 0 ? (
+        <p>{t.nodeBuilder.noModels}</p>
       ) : (
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {plugins.map((plugin) => (

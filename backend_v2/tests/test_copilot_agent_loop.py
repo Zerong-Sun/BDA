@@ -497,6 +497,9 @@ def test_a_queued_tool_suspends_the_run_instead_of_reporting_it_and_stopping(
 
 
 class _FakeActions:
+    def request_allows(self, name: str) -> bool:
+        return name == "start_literature_search"
+
     """Just enough of the action service for the queue tool's single call."""
 
     def __init__(self, operation_id: uuid.UUID) -> None:

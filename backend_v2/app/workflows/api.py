@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..compute.binding import BindingError, resolve_artifact_bindings
-from ..compute.scripts import preview_context, render_script
+from ..compute.review import render_review
 from ..core.database import get_session
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
@@ -324,11 +324,11 @@ def preview_node_script(
         "inputs": resolved_inputs,
         "pending_inputs": pending_inputs,
     }
+    script, fingerprint = render_review(node, plugin, payload.compute_backend, manifest)
     return ScriptPreviewResponse(
         workflow_node_id=node.id,
         plugin_id=plugin.id if plugin else None,
-        script=render_script(
-            preview_context(node, plugin, payload.compute_backend, command, effective_parameters)
-        ),
+        script=script,
+        review_fingerprint=fingerprint,
         input_manifest=manifest,
     )

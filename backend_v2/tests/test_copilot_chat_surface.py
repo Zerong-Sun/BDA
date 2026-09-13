@@ -156,7 +156,7 @@ def test_no_read_tool_is_in_the_write_gate() -> None:
 
 def _allows(text: str, action: str) -> bool:
     """`request_allows` reads only `request_text`, so this is the whole of it."""
-    return CopilotActionService.request_allows(SimpleNamespace(request_text=text), action)
+    return CopilotActionService.request_allows(SimpleNamespace(request_text=text, authorized_writes=None), action)
 
 
 @pytest.mark.parametrize("write", sorted(REGISTRY.write_ids()))

@@ -1,4 +1,7 @@
+import { Disclosure } from '../components/ui/Disclosure'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog'
+import { previewWorkflowNodeScript } from '../lib/api/workflow'
 import { TargetIdentityFix } from '../features/workflow/TargetIdentityFix'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkle, SpinnerGap } from '@phosphor-icons/react'
@@ -26,7 +29,6 @@ import {
   preflightBlockersFrom,
   submitWorkflowRun,
 } from '../lib/api/workflow'
-import { isTerminalWorkflowRun } from '../lib/schemas/workflow'
 import { applyRoutePlan, planRoute, type RoutePlan } from '../lib/api/copilot'
 import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listModelPlugins, validateModelPlugin } from '../lib/api/registry'
@@ -233,6 +235,7 @@ export function WorkflowPage() {
   const [goal, setGoal] = useState(() =>
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
   )
+  const [confirmRun, setConfirmRun] = useState(false)
   const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<string | null>(null)
@@ -368,7 +371,7 @@ export function WorkflowPage() {
 
   const workflowRun = workflowGraph?.workflow ?? currentWorkflowRun
   const targetReady = targetReadiness.data?.ready_for_workflow === true
-  const readOnly = isDemoMode || !targetReady || isTerminalWorkflowRun(workflowRun?.status)
+  const readOnly = isDemoMode || !targetReady || Boolean(workflowRun && workflowRun.status !== 'draft')
   const showRoutePlanner =
     !isDemoMode &&
     targetReady &&
@@ -399,7 +402,7 @@ export function WorkflowPage() {
       }),
     onSuccess: (plan) => {
       const recommended =
-        plan.route_options.find((route) => route.recommended) ?? plan.route_options[0]
+        plan.route_options.find((route) => route.recommended)
       setRoutePlan(plan)
       setSelectedRouteId(recommended?.route_id ?? '')
       setSelectedModuleIds(
@@ -424,6 +427,7 @@ export function WorkflowPage() {
       return applyRoutePlan({
         project_id: projectId,
         route_id: selectedRoute.route_id,
+        workflow_spec: selectedRoute.workflow_spec,
         objective: routeObjective,
         target: routePlan?.target ?? routeTargetLabel,
         selected_module_ids: selectedModuleIds,
@@ -446,27 +450,47 @@ export function WorkflowPage() {
     onError: () => showToast(t.workflowExt.toasts.routeCreateFailed, 'error'),
   })
 
+  const submissionPreview = useQuery({
+    queryKey: ['submission-preview', workflowRunId, workflowGraph?.workflow.version, workflowPreflight.data?.checks],
+    enabled: confirmRun && Boolean(workflowRunId),
+    retry: false,
+    queryFn: () => {
+      const backend = workflowPreflight.data?.checks.compute_backend ?? 'lsf'
+      if (backend !== 'lsf' && backend !== 'docker') throw new Error('Unsupported compute backend')
+      return Promise.all(workflowNodes.filter((node) => node.execution_mode !== 'manual').map(async (node) => ({
+        name: node.model_plugin, ...(await previewWorkflowNodeScript(node.id, { compute_backend: backend })),
+      })))
+    },
+  })
   const startWorkflow = useMutation({
     mutationFn: () => {
       if (!workflowRunId) {
         throw new Error(t.workflowExt.toasts.noWorkflowRun)
       }
-      return submitWorkflowRun(workflowRunId)
+      if (!submissionPreview.isSuccess || submissionPreview.isFetching || !workflowGraph) throw new Error(language === 'zh' ? '请等待提交预览完成' : 'Wait for the submission preview')
+      return submitWorkflowRun(workflowRunId, workflowGraph.workflow.version, {
+        backend: String(workflowPreflight.data?.checks.compute_backend ?? 'lsf'),
+        fingerprints: Object.fromEntries(submissionPreview.data.map((item) => [item.workflow_node_id, item.review_fingerprint])),
+      })
     },
     onSuccess: () => {
+      setConfirmRun(false)
       showToast(t.workflowExt.toasts.submitted, 'success')
       queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-jobs', workflowRunId] })
     },
     onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: ['submission-preview', workflowRunId] })
       const blockers = preflightBlockersFrom(error)
       if (blockers.length > 0) {
         showToast(`${t.workflowExt.toasts.computeBlocked} ${blockers.join('; ')}`, 'info')
         queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
         return
       }
-      showToast(t.workflowExt.toasts.startFailed, 'error')
+      void queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
+      void queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
+      showToast(error instanceof Error ? error.message : t.workflowExt.toasts.startFailed, 'error')
     },
   })
 
@@ -567,8 +591,21 @@ export function WorkflowPage() {
         onCreateRun={() => createWorkflow.mutate()}
         onNewRoute={() => createWorkflow.mutate()}
         onAddNode={() => setBuilderOpen((v) => !v)}
-        onStart={() => startWorkflow.mutate()}
+        onStart={() => setConfirmRun(true)}
       />
+
+      <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader><DialogTitle>{language === 'zh' ? '确认提交计算任务' : 'Review compute submission'}</DialogTitle>
+            <DialogDescription>{language === 'zh' ? '确认后将创建作业并交给后台执行。脚本中的预览标识会在提交时替换为真实任务标识。' : 'Confirmation creates jobs for the worker to execute. Preview identifiers are replaced by real job identifiers at submission.'}</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm">{language === 'zh' ? '执行后端' : 'Backend'}: {String(workflowPreflight.data?.checks.compute_backend ?? '—')} · {language === 'zh' ? '默认队列' : 'Default queue'}: {String(workflowPreflight.data?.checks.queue ?? '—')}</p>
+          {submissionPreview.isPending ? <p role="status">{language === 'zh' ? '正在准备提交预览…' : 'Preparing submission preview…'}</p> : null}
+          {submissionPreview.isError ? <div role="alert"><p>{submissionPreview.error.message}</p><Button type="button" variant="outline" onClick={() => void submissionPreview.refetch()}>{language === 'zh' ? '重新生成预览' : 'Retry preview'}</Button></div> : null}
+          {submissionPreview.data?.map((preview) => <Disclosure key={preview.workflow_node_id} className="rounded border p-3" title={preview.name}><pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs">{preview.script}</pre></Disclosure>)}
+          <Button type="button" disabled={startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
+        </DialogContent>
+      </Dialog>
 
       {!isDemoMode && workflowRun?.derived_from_id ? (
         <Frame variant="inverse" spacing="sm" className="mb-4">
@@ -768,7 +805,7 @@ export function WorkflowPage() {
                       <Button type="button"
                         className="w-fit"
                         disabled={
-                          readOnly || applyPlannedRoute.isPending || selectedModuleIds.length === 0
+                          readOnly || applyPlannedRoute.isPending || selectedModuleIds.length !== selectedRoute.modules.length || Boolean((selectedRoute.constraints.missing_plugins as unknown[] | undefined)?.length)
                         }
                         onClick={() => applyPlannedRoute.mutate()}
                       >
@@ -874,7 +911,8 @@ export function WorkflowPage() {
                   onClose={() => setBuilderOpen(false)}
                   onAdd={async (template, nodeName, methods, parameters) => {
                     try {
-                      await canvasRef.current?.addNodeFromTemplate(
+                      if (!canvasRef.current) throw new Error(t.workflowExt.toasts.addNodeFailed)
+                      await canvasRef.current.addNodeFromTemplate(
                         template,
                         nodeName,
                         methods,

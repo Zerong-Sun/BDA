@@ -146,7 +146,7 @@ def granted_capabilities(session: Session, grant: CopilotMcpSession) -> set[str]
     if not grant.granted_capabilities:
         return set()
     config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == grant.project_id))
-    enabled = normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
+    enabled = normalize_capabilities(list(config.enabled_skills) if config else None)
     return normalize_capabilities(list(grant.granted_capabilities)) & enabled
 
 
@@ -171,7 +171,9 @@ def available_tools(session: Session, grant: CopilotMcpSession) -> list[ToolSpec
         writes = REGISTRY.write_ids()
         names = {name for name in names if name not in writes}
     else:
-        names &= set(run.allowed_tools or [])
+        from .agent_runs import transcript
+        from .task_contracts import available_step_tools
+        names &= available_step_tools(run, transcript(session, run))
         names = _intent_filtered(session, grant, run, names)
 
     # Selected by tool id over the whole registry, the way `agent_loop._schemas`
@@ -184,6 +186,7 @@ def available_tools(session: Session, grant: CopilotMcpSession) -> list[ToolSpec
         spec
         for spec in REGISTRY.all()
         if spec.id in names and spec.requires not in UNSUPPORTED_REQUIRES
+        and (not spec.needs_operator or (run is not None and run.bot))
     ]
 
 
@@ -203,10 +206,12 @@ def _intent_filtered(
     if not gated:
         return names
     from .actions import CopilotActionService
+    from .agent_loop import authorising_text
 
     project, user = _actors(session, grant)
     service = CopilotActionService(
-        session, project, user, request_text=run.goal, source_message_id=run.id
+        session, project, user, request_text=authorising_text(session, run), source_message_id=run.id,
+                authorized_writes=set(run.task_contract.get("authorized_writes", [])) if (run.task_contract or {}).get("version") else None
     )
     return {name for name in names if name not in WRITE_TOOL_NAMES or service.request_allows(name)}
 
@@ -219,6 +224,7 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
     - never from the client's arguments.
     """
     from .actions import CopilotActionService
+    from .agent_loop import authorising_text
     from .project_context import ProjectContextService
     from .research_context import ResearchContextService
 
@@ -232,13 +238,15 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
         project=ProjectContextService(session, project),
         actions=(
             CopilotActionService(
-                session, project, user, request_text=run.goal, source_message_id=run.id
+                session, project, user, request_text=authorising_text(session, run), source_message_id=run.id,
+                authorized_writes=set(run.task_contract.get("authorized_writes", [])) if (run.task_contract or {}).get("version") else None
             )
             if run is not None
             else None
         ),
         allowed_kinds=research_kinds_for_capabilities(granted_capabilities(session, grant)),
         agent_run=None,
+        bot=run.bot if run is not None else None,
     )
 
 

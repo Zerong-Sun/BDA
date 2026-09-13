@@ -125,7 +125,14 @@ def literature_search(search_run_id: str) -> dict:
         run.status = "running"
         run.version += 1
         project_id = run.project_id
-        query = run.query
+        from ..research.search_query import search_topic
+
+        try:
+            query = search_topic(session, run.project_id, run.query)
+        except Exception as exc:
+            run.status = "failed"
+            run.error = str(exc)[:1000]
+            return {"search_run_id": search_run_id, "status": "failed", "error": str(exc)[:1000]}
         requested_limit = run.requested_limit
         fetch_full_text = run.fetch_full_text
         extract_claims = run.extract_claims

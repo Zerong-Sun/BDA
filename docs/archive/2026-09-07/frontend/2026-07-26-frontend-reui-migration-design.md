@@ -1,3 +1,10 @@
+> **已归档 · 2026-09-07**
+> 原位置：`docs/superpowers/specs/2026-07-26-frontend-reui-migration-design.md`。
+> 原因：阶段性迁移设计，不代表当前页面入口清单。
+> 当前依据：[替代文档](../../../FRONTEND_V2.md)。以下正文按原样保存；其中原日期、状态、操作命令和行号属于历史，不作为当前使用说明。
+
+---
+
 # Frontend REUI Migration Design
 
 **Date:** 2026-07-26

@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -9,13 +10,13 @@ import remarkGfm from 'remark-gfm'
  * table scrolls inside the card instead of widening the page.
  */
 const PROSE = [
-  'max-w-none text-sm leading-6 text-text-secondary',
+  'min-w-0 max-w-full text-sm leading-6 text-text-secondary [overflow-wrap:anywhere]',
   '[&>*:first-child]:mt-0',
   '[&_a]:text-accent [&_a]:underline',
   '[&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3',
   '[&_code]:rounded [&_code]:bg-surface-2 [&_code]:px-1',
   '[&_h1]:mt-6 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-text-primary',
-  '[&_h2]:mt-6 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-text-primary',
+  '[&_h2]:scroll-mt-32 [&_h2]:mt-6 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-text-primary',
   '[&_h3]:mt-4 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-text-primary',
   '[&_h4]:mt-4 [&_h4]:text-sm [&_h4]:font-semibold [&_h4]:text-text-primary',
   '[&_hr]:my-4 [&_hr]:border-border-soft',
@@ -59,8 +60,9 @@ function headingText(node: React.ReactNode): string {
 }
 
 export function ReviewMarkdown({ children }: { children: string }) {
+  const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const headings = sectionHeadings(children)
-  const idByHeading = new Map(headings.map((heading, index) => [heading, `section-${index + 1}`]))
+  const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
   const showToc = headings.length >= TOC_THRESHOLD
 
   return (
@@ -70,7 +72,11 @@ export function ReviewMarkdown({ children }: { children: string }) {
           <ol className="!ml-4 grid gap-0.5 text-xs sm:grid-cols-2">
             {headings.map((heading) => (
               <li key={heading}>
-                <a className="text-accent hover:underline" href={`#${idByHeading.get(heading)}`}>
+                <a className="text-accent hover:underline" href={`#${idByHeading.get(heading)}`}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    document.getElementById(idByHeading.get(heading)!)?.scrollIntoView({ block: 'start' })
+                  }}>
                   {heading}
                 </a>
               </li>

@@ -411,7 +411,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.1}
+          fitViewOptions={{ padding: 0.2, minZoom: 0.1 }}
           proOptions={proOptions}
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
@@ -426,7 +427,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             maskColor={maskColor}
             className="!bg-surface-1 !border-border-soft"
           />
-          <Controls className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
+          <Controls fitViewOptions={{ padding: 0.2, minZoom: 0.1 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
         </ReactFlow>
         </FramePanel>
       </Frame>

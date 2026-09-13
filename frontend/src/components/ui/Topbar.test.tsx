@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { server } from '../../test/mocks/handlers'
@@ -17,6 +17,7 @@ describe('Topbar logout', () => {
       copilotOpen: false,
     })
     server.use(
+      http.get('/api/v2/operations', () => HttpResponse.json({ items: [], next_cursor: null })),
       http.get('/api/v2/projects', () =>
         HttpResponse.json({
             items: [
@@ -48,6 +49,11 @@ describe('Topbar logout', () => {
   })
 
   afterEach(cleanup)
+
+  it('shows the project name in the closed selector instead of its ID', async () => {
+    renderWithProviders(<Topbar />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '选择项目' })).toHaveTextContent('Live Project'))
+  })
 
   it('clears authentication and project-scoped browser state while preserving preferences', () => {
     sessionStorage.setItem('bda_token', 'token')

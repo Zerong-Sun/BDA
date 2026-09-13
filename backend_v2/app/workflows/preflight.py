@@ -16,6 +16,7 @@ from jsonschema.exceptions import _Error as _JsonSchemaError
 from sqlalchemy.orm import Session
 
 from ..compute.binding import binding_blockers, edge_port_blockers
+from ..core.config import get_settings
 from ..registry.models import ModelPlugin
 from ..registry.runtime_validation import runtime_validation_is_current
 from .models import WorkflowRun
@@ -71,6 +72,12 @@ def order_pair_blockers(node: Any, plugin: Any) -> list[dict]:
     pairs = plugin.parameter_schema.get("x-bda-order-pairs") or []
     parameters = node.parameters or {}
     blockers = []
+    if not isinstance(pairs, list) or any(
+        not isinstance(pair, list) or len(pair) != 2 or any(not isinstance(key, str) for key in pair)
+        for pair in pairs
+    ):
+        return [{"code": "plugin_order_pairs_invalid", "node_key": node.node_key,
+                 "message": "Plugin ordering rules must contain pairs of parameter names"}]
     for low_key, high_key in pairs:
         low, high = parameters.get(low_key), parameters.get(high_key)
         if isinstance(low, int | float) and isinstance(high, int | float) and low > high:
@@ -85,8 +92,13 @@ def order_pair_blockers(node: Any, plugin: Any) -> list[dict]:
     return blockers
 
 
-def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[dict], list[dict], dict]:
+def evaluate_preflight(
+    session: Session, workflow: WorkflowRun, *, compute_backend: str | None = None
+) -> tuple[list[dict], list[dict], dict]:
     """Returns (blockers, warnings, checks)."""
+    settings = get_settings()
+    backend = compute_backend or settings.compute_backend
+    strict = settings.is_production or settings.compute_require_runtime_proof
     nodes = WorkflowRepository(session).nodes(workflow.id)
     blockers: list[dict] = []
     warnings: list[dict] = []
@@ -158,6 +170,14 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
                     "node_id": str(node.id),
                 }
             )
+        if strict and node.container_image and node.container_image != plugin.container_image:
+            blockers.append(
+                {
+                    "code": "plugin_runtime_override",
+                    "node_key": node.node_key,
+                    "message": "Node image differs from the validated plugin; update the node before submitting",
+                }
+            )
         if plugin.validation_status != "valid":
             plugin_warnings[("plugin_unvalidated", str(plugin.id))] = {
                 "code": "plugin_unvalidated",
@@ -191,12 +211,30 @@ def evaluate_preflight(session: Session, workflow: WorkflowRun) -> tuple[list[di
     upstream_blockers, checked_edges = _upstream_binding_blockers(nodes_by_key, plugins)
     blockers.extend(upstream_blockers)
     blockers.extend(_edge_blockers(workflow, nodes_by_key, plugins, skip=checked_edges))
-    warnings.extend(plugin_warnings[key] for key in sorted(plugin_warnings))
+    for key in sorted(plugin_warnings):
+        warning = plugin_warnings[key]
+        plugin = next((item for item in plugins.values() if item and str(item.id) == warning["plugin_id"]), None)
+        invalid = (
+            warning["code"] == "plugin_unvalidated" and plugin is not None and plugin.validation_status == "invalid"
+        )
+        (blockers if strict or invalid else warnings).append(warning)
+    if backend == "lsf" and not (settings.lsf_ssh_host.strip() and settings.lsf_remote_root.strip()):
+        blockers.append(
+            {
+                "code": "lsf_not_configured",
+                "message": "Configure the cluster SSH host and remote working directory before submitting",
+            }
+        )
 
     return (
         blockers,
         warnings,
         {
+            "compute_backend": backend,
+            "queue": settings.lsf_queue if backend == "lsf" else None,
+            "staging_mode": settings.lsf_staging_mode if backend == "lsf" else None,
+            "runtime_proof_required": strict,
+            "connectivity_checked": False,
             "node_count": len(nodes),
             "status": workflow.status,
             "blocker_count": len(blockers),

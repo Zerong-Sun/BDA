@@ -62,7 +62,9 @@ Lab 工作台提供蛋白构建体管理、浓度与稀释计算，以及 BLI、
 
 ## 3. Copilot 与 Autopilot
 
-Copilot 是受项目上下文和工具白名单限制的研究协作层。它可以读取项目、研究证据、候选、工作流和实验结果，也可以在用户明确请求时创建待确认操作。长时任务使用持久化 agent run：对话轮次、工具调用、预算和等待中的计算均保存在服务器，浏览器不是会话真源。
+服务种类、页面入口、模型配置和完整 HTTP 接口表见 [Copilot 服务指南](docs/COPILOT_SERVICE_GUIDE.md)。
+
+Copilot 是围绕研究目标推进工作的项目助手，以统一任务计划、明确授权、可追溯交付物和失败恢复连接研究与实验页面。它受项目上下文和工具白名单限制。它可以读取项目、研究证据、候选、工作流和实验结果，也可以在用户明确请求时创建待确认操作。长时任务使用持久化 agent run：对话轮次、工具调用、预算和等待中的计算均保存在服务器，浏览器不是会话真源。
 
 Autopilot 用于冻结协议后的自动执行交接，其当前交互顺序为：
 
@@ -147,7 +149,7 @@ npm --prefix frontend run test:browser
 python scripts/check_public_data.py
 ```
 
-迁移验收包括空库 upgrade、全量 downgrade/upgrade round trip，以及从公开 demo 基线克隆升级；恢复策略使用迁移前备份和应用回滚，不依赖危险的线上 downgrade。更完整的命令、依赖和预期结果见 [本地验收](docs/V2_LOCAL_ACCEPTANCE.md)与[发布及恢复说明](docs/STAGING_RELEASE_AND_RECOVERY.md)。
+迁移验收包括空库 upgrade、全量 downgrade/upgrade round trip，以及从公开 demo 基线克隆升级；恢复策略使用迁移前备份和应用回滚，不依赖危险的线上 downgrade。当前要求见[发布及恢复说明](docs/STAGING_RELEASE_AND_RECOVERY.md)；已归档批次的结果仅供[历史本地验收追溯](docs/archive/2026-09-07/validation/V2_LOCAL_ACCEPTANCE.md)。
 
 ## 9. 文档、贡献与引用
 

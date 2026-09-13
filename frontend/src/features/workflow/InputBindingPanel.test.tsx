@@ -45,6 +45,7 @@ const node = (key: string, pluginId: string): WorkflowNode =>
     id: `node-${key}`,
     workflow_run_id: 'wf',
     node_key: key,
+    execution_mode: 'dispatch',
     node_type: 'model',
     model_plugin: 'ProteinMPNN',
     model_plugin_id: pluginId,

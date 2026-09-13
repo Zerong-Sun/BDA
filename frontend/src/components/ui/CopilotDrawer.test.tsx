@@ -8,17 +8,15 @@ import { useAppStore } from '../../lib/store/appStore'
 import { Button } from './Button'
 import { CopilotDrawer } from './CopilotDrawer'
 
-vi.mock('../../features/copilot/CopilotChat', () => ({
-  CopilotChat: () => <div data-slot="scroll-area">Conversation</div>,
-}))
-vi.mock('../../features/copilot/CopilotActions', () => ({
-  CopilotActions: () => <div>Actions</div>,
+vi.mock('../../features/copilot/CopilotChat', () => ({ CopilotChat: () => <div>Conversation</div> }))
+vi.mock('../../features/copilot/CopilotActions', () => ({ CopilotActions: () => <div>Actions</div> }))
+vi.mock('../../features/copilot/CopilotAgentRuns', () => ({ CopilotAgentRuns: () => <div>Agent run list</div> }))
+
+vi.mock('../../features/copilot/CopilotWorkspace', () => ({
+  CopilotWorkspace: () => <div data-slot="scroll-area">Task workspace</div>,
 }))
 vi.mock('../../features/copilot/CopilotSettings', () => ({
-  CopilotSettings: () => <div>Settings</div>,
-}))
-vi.mock('../../features/copilot/CopilotAgentRuns', () => ({
-  CopilotAgentRuns: () => <div>Agent run list</div>,
+  CopilotSettings: () => <div>Model configuration panel</div>,
 }))
 vi.mock('../../features/copilot/CopilotChain', () => ({
   CopilotChain: ({ onSelectOperator }: { onSelectOperator?: (id: string) => void }) => (
@@ -62,19 +60,15 @@ describe('CopilotDrawer', () => {
     await waitFor(() => expect(trigger).toHaveFocus())
   })
 
-  it('swaps chat for agent runs rather than stacking them', async () => {
-    // A transcript and a conversation each want the whole drawer; showing both
-    // at once leaves neither readable.
+  it('opens a unified task workspace and keeps model settings secondary', async () => {
     renderWithProviders(<DrawerHarness />)
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
-    expect(screen.getByText('Conversation')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Agent runs' }))
-
-    expect(await screen.findByText('Agent run list')).toBeInTheDocument()
-    expect(screen.queryByText('Conversation')).not.toBeInTheDocument()
-    expect(screen.queryByText('Actions')).not.toBeInTheDocument()
+    expect(screen.getByText('Task workspace')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Agent runs' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByText('Model configuration panel')).toBeInTheDocument()
+    expect(screen.getByText('Task workspace')).toBeInTheDocument()
   })
 
   it('offers the surfaces as tabs rather than as toggle buttons', async () => {
@@ -87,8 +81,8 @@ describe('CopilotDrawer', () => {
 
     const tabs = screen.getAllByRole('tab')
 
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Chat', 'Chain', 'Agent runs', 'MCP'])
-    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Tasks', 'Chat', 'Chain', 'Agent runs', 'MCP'])
+    expect(screen.getByRole('tab', { name: 'Tasks' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('hands the reader from a handover to the operator it names', async () => {

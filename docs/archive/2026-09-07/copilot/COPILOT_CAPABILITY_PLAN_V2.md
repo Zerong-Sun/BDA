@@ -1,3 +1,10 @@
+> **已归档 · 2026-09-07**
+> 原位置：`docs/COPILOT_CAPABILITY_PLAN_V2.md`。
+> 原因：能力规划缺少完整入口/API映射及新增实验服务。
+> 当前依据：[替代文档](../../../COPILOT_SERVICE_GUIDE.md)。以下正文按原样保存；其中原日期、状态、操作命令和行号属于历史，不作为当前使用说明。
+
+---
+
 # BDA Copilot Capability Plan V2
 
 状态：活跃

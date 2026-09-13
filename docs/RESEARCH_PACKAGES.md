@@ -1,14 +1,14 @@
-# BDA 研究包、结构数据与 BYOK 使用指南
+# BDA 研究包与结构数据指南
 
 状态：活跃
 
-最后核验：2026-08-31（Asia/Shanghai）
+最后核验：2026-09-07（Asia/Shanghai；拆分模型配置职责）
 
-权威范围：公开研究包目录、导入流程、结构展示和用户自有模型密钥（BYOK）。平台总览与成熟度以仓库根目录 `README.md` 为准。
+权威范围：公开研究包目录、导入流程和结构展示。平台总览与成熟度以仓库根目录 `README.md` 为准。
 
 数据来源：当前研究包目录、导入服务、PD1 manifest、结构界面和 provider 配置实现。
 
-替代关系：取代曾引用私有四项目 deliverables 路径的旧版说明。
+替代关系：取代旧《研究包、结构数据与 BYOK 使用指南》的研究包部分；模型配置统一见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)。
 
 ## 1. 问题与边界
 
@@ -47,23 +47,13 @@ Content-Type: application/json
 
 ## 3. Research workspace 与结构展示
 
-Research 页面只从 `GET /api/v2/projects/{project_id}/research-workspace` 读取展示数据。后端数据库是工作区内容的真源；静态 JSON 只是可重复导入的发布输入，不直接驱动页面。
+Research 的证据资料视图通过 `GET /api/v2/projects/{project_id}/research-workspace` 读取聚合数据；目标树、时间线和后台任务使用各自领域接口。后端数据库是工作区内容的真源；静态 JSON 只是可重复导入的发布输入，不直接驱动页面。
 
 PD1 包登记 3BIK、3BP5、5IUS 和 6JBT 四个 RCSB 结构引用。Mol* 通过后端返回的授权下载地址加载结构，并支持链筛选、表示方式、着色、相机重置和全屏。演示 fixture 的文件名含 `DEMO` 语义，页面必须持续显示“预计算、合成演示、非真实模型运行或实验结论”的说明。
 
-## 4. 配置 BYOK
+## 4. 模型与页面使用
 
-开发或单用户环境可以按以下顺序配置 OpenAI-compatible provider：
-
-1. 选择项目；
-2. 打开 **设置 → Copilot API**；
-3. 填写 API base、模型名和 API key；
-4. 保存并执行连接测试；
-5. 返回 Research 或 Copilot，在当前项目边界内创建请求。
-
-开发环境不把原始密钥写入普通业务表。服务端将密钥保存在 `BDA_V2_LLM_LOCAL_SECRET_DIR` 指定的受限文件中，数据库只保存 `file:` credential reference，响应只显示末四位预览。
-
-生产环境禁止浏览器提交长期原始密钥。管理员应通过 secret manager 配置 provider，并在 registry 中使用 `env:` 或 `file:` reference。Provider 可用性不改变用户的组织/项目权限，也不能绕过工具白名单、写操作确认或预算限制。
+研究包导入不要求先配置模型。任务书、文献调研、模型配置和权限见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)；四个 Research 分区和工具箱见 [平台使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 ## 5. 验证
 

@@ -16,7 +16,8 @@ describe('Lab stage in the design loop', () => {
       funnel: { generated: 4, ordered: 4 },
       experiment_result_count: 0,
     } as never)
-    expect(withCandidates.stages[3].state).not.toBe('locked')
+    expect(withCandidates.currentIndex).toBe(3)
+    expect(withCandidates.stages[3].state).toBe('current')
 
     const withResults = derivePipeline(true, {
       target_readiness: { ready_for_workflow: true },
