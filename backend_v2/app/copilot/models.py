@@ -242,3 +242,58 @@ class CopilotMcpSession(UUIDVersionMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     call_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CopilotHandoff(UUIDVersionMixin, Base):
+    """One operator's statement of what it did, addressed to the next operator.
+
+    This is the channel the roster did not have. Before it, `BotSpec.handoff`
+    named a successor in prose and nothing carried across the boundary: bot A
+    could not leave bot B anything, so nothing A produced could be checked by
+    anyone either. A row here is what makes both possible, and append-only is
+    what makes it worth reading - an edited handover is not a record of the
+    chain, it is the last operator's opinion of it.
+
+    `claims` is the load-bearing column and the reason this is a table rather
+    than a text field. A prose summary can only be read; a list of
+
+        {"statement": ..., "evidence_ref": ..., "confidence": ...}
+
+    can be checked. `auditor` says "claim 3 cites nothing" by looking, not by
+    interpreting, which is what gives the review stance a defined output.
+    """
+
+    __tablename__ = "copilot_handoffs"
+    __table_args__ = (
+        CheckConstraint("length(from_bot) > 0", name="ck_copilot_handoff_from_bot"),
+        CheckConstraint("length(to_bot) > 0", name="ck_copilot_handoff_to_bot"),
+        # The recipient's read is "notes addressed to me in this project, newest
+        # first", so that is the index. Reading by sender is the auditor's path
+        # and is narrow enough to ride the same one.
+        Index("ix_copilot_handoffs_inbox", "project_id", "to_bot", "created_at"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    #: Roster bot ids, both validated against `bots.require` before insert. Not
+    #: a foreign key: the roster is code, and a retired bot must not take its
+    #: history with it.
+    from_bot: Mapped[str] = mapped_column(String(80), index=True)
+    to_bot: Mapped[str] = mapped_column(String(80))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    #: `[{statement, evidence_ref, confidence}]`. See the class docstring.
+    claims: Mapped[list] = mapped_column(JSON, default=list)
+    #: What this operator could not settle. Separate from `claims` because an
+    #: open question with an evidence ref attached would read as a finding.
+    open_questions: Mapped[list] = mapped_column(JSON, default=list)
+    #: Artifact, job, goal or reference ids the next operator needs to start.
+    refs: Mapped[list] = mapped_column(JSON, default=list)
+    #: The durable run that wrote this, when there was one. A chat turn leaves
+    #: it NULL, which is not an error - it means the note has no transcript
+    #: behind it for `auditor` to read, and the auditor says so rather than
+    #: treating an absent transcript as a clean one.
+    produced_by_run: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("copilot_agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)

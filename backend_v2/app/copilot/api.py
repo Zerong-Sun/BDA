@@ -17,7 +17,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, mcp
+from . import agent_runs, handoffs, mcp
 from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
@@ -44,6 +44,8 @@ from .schemas import (
     CopilotConfigResponse,
     CopilotConfigTestResponse,
     CopilotConfigUpdate,
+    HandoffPage,
+    HandoffResponse,
     InterpretationCreate,
     InterpretationResponse,
     McpSessionCreate,
@@ -88,10 +90,14 @@ BOTS = [
         title=bot.title,
         title_zh=bot.title_zh,
         phase=bot.phase,
+        stance=bot.stance,
         summary=bot.summary,
         charter=bot.charter,
         capabilities=list(bot.capabilities),
         handoff=list(bot.handoff),
+        reviews=list(bot.reviews),
+        directs=list(bot.directs),
+        reviewed_by=[other.id for other in bot_roster.reviewers_of(bot.id)],
         triggers=list(bot.triggers),
     )
     for bot in bot_roster.all_bots()
@@ -201,6 +207,33 @@ def list_conversations(
         items=[ConversationResponse.model_validate(item) for item in page],
         next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
     )
+
+
+@router.get("/projects/{project_id}/handoffs", response_model=HandoffPage)
+def list_handoffs(
+    project_id: uuid.UUID,
+    to_bot: str | None = Query(default=None, max_length=80),
+    from_bot: str | None = Query(default=None, max_length=80),
+    limit: int = Query(default=handoffs.DEFAULT_LIMIT, ge=1, le=handoffs.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> HandoffPage:
+    """The chain's handovers, newest first.
+
+    Readable by a person and not only by the next operator. A record only the
+    bots can see would make the channel's whole justification - that what one
+    operator claimed is auditable afterwards - true for the auditor and false
+    for the reader it is ultimately for.
+
+    No cursor. A handover is a summary between phases, not an event stream; the
+    project-scoped limit is the whole of the paging this needs, and an opaque
+    cursor here would imply a volume the table does not have.
+    """
+    require_project(session, project_id, user)
+    rows = handoffs.inbox(
+        session, project_id=project_id, to_bot=to_bot, from_bot=from_bot, limit=limit
+    )
+    return HandoffPage(items=[HandoffResponse(**handoffs.to_json_model(row)) for row in rows])
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)

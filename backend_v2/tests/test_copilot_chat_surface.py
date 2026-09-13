@@ -35,7 +35,7 @@ FULL_TURN = {
 
 
 def _names(**overrides) -> set[str]:
-    kwargs = {**FULL_TURN, "allowed_tools": None, **overrides}
+    kwargs = {**FULL_TURN, "allowed_tools": None, "has_operator": True, **overrides}
     return {schema["function"]["name"] for schema in research_agent.chat_schemas(**kwargs)}
 
 
@@ -118,10 +118,34 @@ def test_the_write_gate_covers_every_write_the_registry_has() -> None:
     filters exactly this set through the user's own words, so a write missing
     from it is a write the model could call on a turn nobody asked for one.
     """
-    assert research_agent.WRITE_TOOL_NAMES == REGISTRY.write_ids()
+    assert research_agent.WRITE_TOOL_NAMES == REGISTRY.user_intent_write_ids()
     assert "analyse_bli_run" in research_agent.WRITE_TOOL_NAMES
     assert "promote_candidate_to_bench" in research_agent.WRITE_TOOL_NAMES
     assert "attach_to_research_goal" in research_agent.WRITE_TOOL_NAMES
+
+
+def test_the_only_writes_outside_the_intent_gate_are_copilot_bookkeeping() -> None:
+    """The exemption is an argument about one table, not a category to grow.
+
+    `intent="internal"` means the tool changes no research record, so the gate
+    that reads the user's words has nothing to protect. Pinning the membership
+    here makes adding a second exemption a deliberate edit with this test in
+    front of it, rather than a default a new spec falls into.
+    """
+    exempt = REGISTRY.write_ids() - REGISTRY.user_intent_write_ids()
+
+    assert exempt == {"post_handoff"}
+
+
+def test_the_conservative_write_set_is_what_a_read_only_surface_gets() -> None:
+    """`mcp.available_tools` degrades an unbound grant with `write_ids`.
+
+    Written down because the two sets differ by exactly the tool a read-only
+    surface would most easily be given by accident: a draft-mode write whose
+    intent gate does not apply.
+    """
+    assert REGISTRY.user_intent_write_ids() < REGISTRY.write_ids()
+    assert "post_handoff" in REGISTRY.write_ids()
 
 
 def test_no_read_tool_is_in_the_write_gate() -> None:
@@ -175,3 +199,41 @@ def test_capability_chat_tools_are_all_real_registry_tools() -> None:
     declared = tools_for_capabilities(normalize_capabilities(["research"]))
 
     assert declared <= REGISTRY.ids(), sorted(declared - REGISTRY.ids())
+
+
+# --- Tools that need an operator ---------------------------------------------
+
+
+def test_a_turn_with_no_operator_is_not_offered_the_tools_that_need_one() -> None:
+    """The same rule as `requires`, one axis over.
+
+    A handover whose sender is "the assistant" names nobody accountable, so an
+    unhinted turn cannot post one. Offering it anyway would put a guaranteed
+    failure in front of the model - the exact state this module's other tests
+    exist to prevent.
+    """
+    needs = {spec.id for spec in REGISTRY.all() if spec.needs_operator}
+
+    assert needs, "if this is empty the assertion below proves nothing"
+    assert needs & _names(), "an owned turn still gets them"
+    assert not (needs & _names(has_operator=False))
+
+
+def test_reading_the_roster_never_needs_an_operator() -> None:
+    """A turn that has not chosen one is the likeliest to be asking who they are."""
+    unowned = _names(has_operator=False)
+
+    assert "list_operators" in unowned
+    assert "read_handoffs" in unowned
+
+
+def test_withdrawing_the_operator_withdraws_nothing_else() -> None:
+    """Bounded, so a future `needs_operator` cannot quietly take a tool with it.
+
+    Compared against the tools chat offers at all: `delegate_to_operator` also
+    needs an operator and is already absent, because it needs a run to own the
+    child it opens.
+    """
+    withdrawn = _names() - _names(has_operator=False)
+
+    assert withdrawn == {spec.id for spec in REGISTRY.all() if spec.needs_operator} & _names()

@@ -117,11 +117,48 @@ class BotResponse(BaseModel):
     title: str
     title_zh: str
     phase: int
+    #: "produce" | "review" | "direct". What the operator is for, as opposed to
+    #: what it may touch - see `bots.STANCES`. Sent to the client so a picker can
+    #: group operators by what they do rather than by phase number alone.
+    stance: str
     summary: str
     charter: str
     capabilities: list[str] = Field(default_factory=list)
     handoff: list[str] = Field(default_factory=list)
+    #: For a reviewer, whose output it judges; for a director, whom it may
+    #: delegate to. Both empty for a producer.
+    reviews: list[str] = Field(default_factory=list)
+    directs: list[str] = Field(default_factory=list)
+    #: Who reviews this operator. Derived from the reviewers' own declarations,
+    #: because a producer does not choose who checks it.
+    reviewed_by: list[str] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)
+
+
+class HandoffClaim(BaseModel):
+    statement: str
+    #: Empty when the operator cited nothing, which is recorded rather than
+    #: rejected - see `handoffs.normalise_claims`.
+    evidence_ref: str = ""
+    confidence: Literal["stated", "consistent", "unsupported"] = "unsupported"
+
+
+class HandoffResponse(BaseModel):
+    id: uuid.UUID
+    from_bot: str
+    to_bot: str
+    summary: str
+    claims: list[HandoffClaim] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    refs: list[str] = Field(default_factory=list)
+    #: Null for a note written in chat. The auditor reads this as "no transcript
+    #: behind the claim" rather than as a clean review.
+    produced_by_run: uuid.UUID | None = None
+    created_at: datetime
+
+
+class HandoffPage(BaseModel):
+    items: list[HandoffResponse]
 
 
 class RoutePlanCreate(BaseModel):

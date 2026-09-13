@@ -45,8 +45,16 @@ def chat_schemas(
     has_actions: bool,
     has_session: bool,
     allowed_tools: set[str] | None,
+    has_operator: bool = True,
 ) -> list[dict[str, Any]]:
-    """Schemas for the tools this turn can both offer and run."""
+    """Schemas for the tools this turn can both offer and run.
+
+    `has_operator` is the same kind of condition as the four above it: a turn
+    that named no bot cannot hand over, because a handover whose sender is "the
+    assistant" names nobody accountable. Offering the tool anyway would put a
+    guaranteed failure in front of the model - the state this function was
+    rewritten to end, one axis over.
+    """
     present = {
         "research": has_research,
         "project": has_project,
@@ -58,6 +66,7 @@ def chat_schemas(
         for spec in REGISTRY.all()
         if spec.requires not in CHAT_UNSUPPORTED_REQUIRES
         and present.get(spec.requires, False)
+        and (has_operator or not spec.needs_operator)
         and (allowed_tools is None or spec.id in allowed_tools)
     ]
 
@@ -67,7 +76,11 @@ def chat_schemas(
 #: as the other five were unreachable anyway. `tasks.py` filters exactly this set
 #: through the user's own words, so a write missing from it is a write the model
 #: could call on a turn nobody asked for one.
-WRITE_TOOL_NAMES = REGISTRY.write_ids()
+#: The writes `tasks.py` filters through the user's own words. Narrower than
+#: `REGISTRY.write_ids()` by the copilot's own bookkeeping - a handover note
+#: changes no research record, and gating it on the user saying "handoff" would
+#: stop operators handing over rather than stop a write nobody asked for.
+WRITE_TOOL_NAMES = REGISTRY.user_intent_write_ids()
 
 SCIENTIFIC_REVIEW_PROMPT = """\
 BDA_SCIENTIFIC_REVIEW_V1. Act as a strict scientific and techno-economic reviewer.
@@ -204,6 +217,8 @@ def complete_research_turn(
     project_context: ProjectContextService | None = None,
     allowed_tools: set[str] | None = None,
     max_tool_calls: int = 12,
+    bot: str | None = None,
+    enabled_capabilities: set[str] | None = None,
 ) -> ResearchAgentResult:
     citations = list(initial_citations)
     call_log = list(initial_tool_calls)
@@ -215,6 +230,7 @@ def complete_research_turn(
             has_actions=actions is not None,
             has_session=getattr(context, "session", None) is not None,
             allowed_tools=allowed_tools,
+            has_operator=bot is not None,
         )
         message = completion_message(
             provider,
@@ -263,6 +279,8 @@ def complete_research_turn(
                     allowed_kinds,
                     actions,
                     project_context,
+                    bot=bot,
+                    enabled_capabilities=enabled_capabilities,
                 )
                 citations.extend(result_citations)
                 logged_call = {
@@ -432,6 +450,9 @@ def _execute(
     allowed_kinds: set[str] | None,
     actions: CopilotActionService | None,
     project_context: ProjectContextService | None,
+    *,
+    bot: str | None = None,
+    enabled_capabilities: set[str] | None = None,
 ) -> tuple[Any, list[dict[str, Any]]]:
     """Run one tool.
 
@@ -451,6 +472,11 @@ def _execute(
         project=project_context,
         actions=actions,
         allowed_kinds=allowed_kinds,
+        # A chat turn carries its operator here; a run carries it on the row.
+        # Both reach `tools._bot_of`, which refuses when neither is set - an
+        # unowned turn has no accountable sender to put on a handover.
+        bot=bot,
+        allowed_capabilities=frozenset(enabled_capabilities) if enabled_capabilities else None,
     )
     try:
         result = REGISTRY.execute(name, tool_context, arguments)

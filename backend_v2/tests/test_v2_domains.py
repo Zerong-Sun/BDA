@@ -481,6 +481,9 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "agent-orchestration",
         "structure-analysis",
         "failure-diagnosis",
+        "chain-messaging",
+        "chain-orchestration",
+        "review-audit",
     }
     assert {
         item["execution_mode"]
@@ -1203,11 +1206,24 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
     assert [bot["phase"] for bot in bots] == sorted(bot["phase"] for bot in bots)
     by_id = {bot["id"]: bot for bot in bots}
     assert {"briefing", "librarian", "structuralist", "medic", "archivist"} <= set(by_id)
-    assert by_id["structuralist"]["capabilities"] == ["project-read", "structure-analysis"]
+    assert by_id["structuralist"]["capabilities"] == [
+        "project-read",
+        "structure-analysis",
+        "chain-messaging",
+    ]
     # Every handoff resolves, so the model is never told to call for an operator
     # a client cannot then select.
     for bot in bots:
         assert set(bot["handoff"]) <= set(by_id)
+
+    # The responsibility axis reaches the client, so a picker can group by what
+    # an operator is for rather than only by its position in the chain.
+    assert by_id["conductor"]["stance"] == "direct"
+    assert by_id["auditor"]["stance"] == "review"
+    assert by_id["planner"]["stance"] == "produce"
+    assert "auditor" in by_id["planner"]["reviewed_by"]
+    assert by_id["planner"]["reviews"] == []
+    assert "planner" in by_id["conductor"]["directs"]
 
     assert client.put(
         f"/api/v2/copilot/projects/{project_id}/config",

@@ -57,3 +57,46 @@ export function successorsOf(bot: CopilotBot, bots: readonly CopilotBot[]): Copi
     return next ? [next] : []
   })
 }
+
+/** Operators grouped by what they are for, in the order a picker should show them. */
+export const STANCE_ORDER = ['direct', 'produce', 'review'] as const
+
+export type Stance = (typeof STANCE_ORDER)[number]
+
+export const STANCE_LABELS: Record<Stance, string> = {
+  direct: 'Coordination',
+  produce: 'The chain',
+  review: 'Review',
+}
+
+/**
+ * The roster split by stance, so the picker groups by responsibility rather
+ * than by phase number.
+ *
+ * Grouping by phase put the director at the top and the reviewer at the bottom
+ * of one flat list, which reads as "step -1" and "step 9" - positions in a
+ * sequence that neither of them occupies. A director is not the step before
+ * briefing and a reviewer is not the step after archiving; they sit beside the
+ * chain, and the picker should say so.
+ */
+export function byStance(bots: readonly CopilotBot[]): { stance: Stance; bots: CopilotBot[] }[] {
+  return STANCE_ORDER.map((stance) => ({
+    stance,
+    bots: bots.filter((bot) => bot.stance === stance),
+  })).filter((group) => group.bots.length > 0)
+}
+
+/**
+ * Who checks this operator, resolved against the roster.
+ *
+ * Read from `reviewed_by`, which the server derives from the reviewers' own
+ * declarations - a producer does not choose who reviews it, so this is not
+ * something the client could assemble from the producer's own row.
+ */
+export function reviewersOf(bot: CopilotBot, bots: readonly CopilotBot[]): CopilotBot[] {
+  const byId = new Map(bots.map((entry) => [entry.id, entry]))
+  return (bot.reviewed_by ?? []).flatMap((id) => {
+    const next = byId.get(id)
+    return next ? [next] : []
+  })
+}

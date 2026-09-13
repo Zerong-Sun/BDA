@@ -828,6 +828,10 @@ export type BotResponse = {
      */
     charter: string;
     /**
+     * Directs
+     */
+    directs?: Array<string>;
+    /**
      * Handoff
      */
     handoff?: Array<string>;
@@ -839,6 +843,18 @@ export type BotResponse = {
      * Phase
      */
     phase: number;
+    /**
+     * Reviewed By
+     */
+    reviewed_by?: Array<string>;
+    /**
+     * Reviews
+     */
+    reviews?: Array<string>;
+    /**
+     * Stance
+     */
+    stance: string;
     /**
      * Summary
      */
@@ -3287,6 +3303,76 @@ export type FindingUpdate = {
      * Title
      */
     title?: string | null;
+};
+
+/**
+ * HandoffClaim
+ */
+export type HandoffClaim = {
+    /**
+     * Confidence
+     */
+    confidence?: 'stated' | 'consistent' | 'unsupported';
+    /**
+     * Evidence Ref
+     */
+    evidence_ref?: string;
+    /**
+     * Statement
+     */
+    statement: string;
+};
+
+/**
+ * HandoffPage
+ */
+export type HandoffPage = {
+    /**
+     * Items
+     */
+    items: Array<HandoffResponse>;
+};
+
+/**
+ * HandoffResponse
+ */
+export type HandoffResponse = {
+    /**
+     * Claims
+     */
+    claims?: Array<HandoffClaim>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * From Bot
+     */
+    from_bot: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Open Questions
+     */
+    open_questions?: Array<string>;
+    /**
+     * Produced By Run
+     */
+    produced_by_run?: string | null;
+    /**
+     * Refs
+     */
+    refs?: Array<string>;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * To Bot
+     */
+    to_bot: string;
 };
 
 /**
@@ -27875,6 +27961,332 @@ export type ListConversationsApiV2CopilotProjectsProjectIdConversationsGetRespon
 };
 
 export type ListConversationsApiV2CopilotProjectsProjectIdConversationsGetResponse = ListConversationsApiV2CopilotProjectsProjectIdConversationsGetResponses[keyof ListConversationsApiV2CopilotProjectsProjectIdConversationsGetResponses];
+
+export type ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * To Bot
+         */
+        to_bot?: string | null;
+        /**
+         * From Bot
+         */
+        from_bot?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v2/copilot/projects/{project_id}/handoffs';
+};
+
+export type ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetError = ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetErrors[keyof ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetErrors];
+
+export type ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: HandoffPage;
+};
+
+export type ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetResponse = ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetResponses[keyof ListHandoffsApiV2CopilotProjectsProjectIdHandoffsGetResponses];
 
 export type ListMcpSessionsApiV2CopilotProjectsProjectIdMcpSessionsGetData = {
     body?: never;

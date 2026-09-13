@@ -16,6 +16,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.copilot import agent_loop, agent_runs, bots
 from backend_v2.app.copilot.capabilities import (
+    COPILOT_CAPABILITIES,
     capability_ids,
     normalize_capabilities,
     tools_for_capabilities,
@@ -108,7 +109,7 @@ def test_a_bot_cannot_reach_a_capability_the_project_disabled() -> None:
 def test_a_project_with_everything_enabled_still_only_gets_what_the_bot_declares() -> None:
     resolved = bots.capabilities_for_bot("structuralist", ALL_CAPABILITIES)
 
-    assert resolved == {"project-read", "structure-analysis"}
+    assert resolved == {"project-read", "structure-analysis", "chain-messaging"}
     granted = tools_for_capabilities(resolved)
     assert "start_literature_search" not in granted
     assert "create_compute_draft" not in granted
@@ -196,6 +197,99 @@ def test_write_capabilities_are_not_spread_across_the_whole_roster() -> None:
         assert len(holders) == 1, (capability, holders)
 
 
+# --- Stance: the axis that separates responsibilities from tool sets ---------
+# Capabilities say what an operator may touch. Stance says what it is *for*, and
+# is the reason the roster is no longer nine names for one responsibility
+# structure. These assert the relationships rather than any operator's contents.
+
+
+def test_every_bot_declares_a_known_stance() -> None:
+    for bot in bots.all_bots():
+        assert bot.stance in bots.STANCES, bot.id
+
+
+def test_the_chain_has_all_three_stances() -> None:
+    """A roster of producers only is the state this axis was added to fix.
+
+    Nine operators that all produce have nobody checking any of them and nobody
+    deciding who works next, which is a split of functions however the charters
+    are worded.
+    """
+    present = {bot.stance for bot in bots.all_bots()}
+
+    assert present == set(bots.STANCES)
+
+
+def test_every_producer_is_reviewed_by_someone() -> None:
+    """Accountability is the fourth thing a capability list cannot say.
+
+    An operator nobody reviews can make any claim it likes, and the charter it
+    is breaking is the only thing standing in the way.
+    """
+    for bot in bots.producers():
+        assert bots.reviewers_of(bot.id), bot.id
+
+
+def test_a_producer_does_not_choose_its_own_reviewer() -> None:
+    """`reviews` is declared on the reviewer, which is what makes that true."""
+    for bot in bots.producers():
+        assert bot.reviews == ()
+
+
+def test_review_and_delegation_terminate_on_producers() -> None:
+    """Otherwise there is no bottom: a reviewer reviewing a reviewer, or a
+    director directing a director, never reaches the work."""
+    for bot in bots.all_bots():
+        for target in bot.reviews + bot.directs:
+            assert bots.require(target).stance == "produce", (bot.id, target)
+
+
+def test_no_reviewer_can_repair_what_it_finds() -> None:
+    """The stance rule as a statement about capabilities rather than about the
+    validator: a reviewer holding a write is a second producer, and nobody
+    checks the second producer."""
+    granting = {
+        item["id"]
+        for item in COPILOT_CAPABILITIES
+        if item.get("execution_mode", "read") != "read"
+    }
+    for bot in bots.all_bots():
+        if bot.stance not in {"review", "direct"}:
+            continue
+        writes = set(bot.capabilities) & granting
+        # The handover channel is copilot bookkeeping, not a research write -
+        # see `bots._INTERNAL_WRITE_CAPABILITIES`.
+        assert writes <= {"chain-messaging"}, (bot.id, sorted(writes))
+
+
+def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
+    """A handover with no channel is the defect the channel was added to fix.
+
+    An operator whose charter says "hand this to medic" while holding no way to
+    record what it is handing over describes a step the platform cannot take.
+    """
+    for bot in bots.all_bots():
+        if not bot.handoff:
+            continue
+        assert "chain-messaging" in bot.capabilities, bot.id
+
+
+def test_a_director_may_direct_only_what_it_declares() -> None:
+    assert bots.may_direct("conductor", "planner") is True
+    # Review is asked for, not ordered: a director able to open a review run
+    # would be selecting its own reviewer.
+    assert bots.may_direct("conductor", "auditor") is False
+    assert bots.may_direct("planner", "runner") is False
+    assert bots.may_direct("ghost", "planner") is False
+
+
+def test_orchestration_and_review_powers_belong_to_one_stance_each() -> None:
+    for capability, stance in bots._STANCE_ONLY.items():
+        holders = [bot for bot in bots.all_bots() if capability in bot.capabilities]
+        assert holders, capability
+        assert all(bot.stance == stance for bot in holders), capability
+
+
 # --- Through the service: a run created for a bot ----------------------------
 
 
@@ -250,7 +344,7 @@ def test_a_run_created_for_a_bot_gets_exactly_that_bots_tools(session: Session) 
     run = _run(session, project, user, bot="structuralist")
 
     assert set(run.allowed_tools) == tools_for_capabilities(
-        {"project-read", "structure-analysis"}
+        {"project-read", "structure-analysis", "chain-messaging"}
     )
     assert "analyse_structure" in run.allowed_tools
     assert "create_compute_draft" not in run.allowed_tools
@@ -331,6 +425,7 @@ def _spec(**overrides) -> bots.BotSpec:
         "title": "Probe",
         "title_zh": "探针",
         "phase": 0,
+        "stance": "produce",
         "summary": "s",
         "charter": "c",
         "capabilities": ("project-read",),
@@ -346,13 +441,56 @@ def _spec(**overrides) -> bots.BotSpec:
         (_spec(capabilities=("not-a-capability",)), "unknown capabilities"),
         (_spec(capabilities=()), "no capabilities"),
         (_spec(handoff=("ghost",)), "unknown bots"),
+        (_spec(stance="supervisor"), "unknown stance"),
+        # The stance rules, each stated as the roster error it produces. These
+        # are the whole of what makes stance more than a label: without them a
+        # reviewer holding a write is a reviewer that repairs its own findings,
+        # and a director holding one is an operator that does the work it was
+        # meant to route.
+        (
+            _spec(
+                stance="review",
+                capabilities=("project-read", "knowledge-authoring"),
+                reviews=("planner",),
+            ),
+            "second producer",
+        ),
+        (
+            _spec(
+                stance="direct",
+                capabilities=("chain-orchestration", "compute-drafting"),
+                directs=("planner",),
+            ),
+            "will do the work",
+        ),
+        (
+            _spec(stance="produce", capabilities=("project-read", "review-audit")),
+            "belongs to the review stance",
+        ),
+        (
+            _spec(stance="produce", capabilities=("project-read", "chain-orchestration")),
+            "belongs to the direct stance",
+        ),
+        (_spec(stance="review", capabilities=("review-audit",)), "names nobody to review"),
+        (
+            _spec(stance="direct", capabilities=("chain-orchestration",)),
+            "names nobody to direct",
+        ),
+        (_spec(reviews=("planner",)), "cannot review other operators"),
+        (_spec(directs=("planner",)), "cannot direct other operators"),
+        (
+            _spec(stance="review", capabilities=("review-audit",), reviews=("ghost",)),
+            "unknown operator",
+        ),
     ],
 )
 def test_a_broken_roster_fails_at_import_rather_than_at_use(
     broken: bots.BotSpec, message: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # The real roster stays reachable by id so that a `reviews`/`directs` target
+    # naming a live operator resolves; only the bot under test is broken.
     monkeypatch.setattr(bots, "BOTS", (broken,))
-    monkeypatch.setattr(bots, "_BY_ID", {broken.id: broken})
+    monkeypatch.setattr(bots, "_BY_ID", {**bots._BY_ID, broken.id: broken})
 
     with pytest.raises(ValueError, match=message):
         bots._validate_roster()

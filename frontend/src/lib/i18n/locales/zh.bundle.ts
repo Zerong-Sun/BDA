@@ -214,6 +214,11 @@ export const bundleZh = {
       citationSourceFallback: '来源 {index}',
       botLabel: 'Copilot 机器人',
       botAuto: '自动',
+      botStances: {
+        direct: '统筹',
+        produce: '主链',
+        review: '复核',
+      },
     },
     loading: {
       connecting: '正在连接 Copilot…',

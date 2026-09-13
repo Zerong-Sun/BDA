@@ -1313,31 +1313,55 @@ function createStrictRoutes({ scenario, routeId }) {
   }))
   // The bot roster is a server-side declaration, not project data, so it is the
   // same in every scenario - including `empty`, where a project with no data
-  // still has the same nine operators available to it. Two entries rather than
-  // all nine: the harness asserts that the picker renders, and a full copy here
-  // would be a second roster to keep in step with `copilot/bots.py`.
+  // still has the same operators available to it. Three entries rather than all
+  // twelve, one per stance: the picker groups by stance, so a stub carrying only
+  // producers would render one group and pass a test the real roster fails. A
+  // full copy would be a second roster to keep in step with `copilot/bots.py`.
   add('GET', '/api/v2/copilot/bots', {}, () => ok([
+    {
+      id: 'conductor',
+      title: 'Conductor',
+      title_zh: '总调度',
+      phase: -1,
+      stance: 'direct',
+      summary: 'Decide which operator works next, delegate to it, and say when the chain stops.',
+      charter: 'You route work; you do not do it.',
+      capabilities: ['project-read', 'chain-orchestration', 'chain-messaging'],
+      handoff: ['auditor'],
+      reviews: [],
+      directs: ['structuralist', 'planner'],
+      reviewed_by: [],
+      triggers: ['delegate', '调度'],
+    },
     {
       id: 'structuralist',
       title: 'Structuralist',
       title_zh: '结构与残基',
       phase: 3,
+      stance: 'produce',
       summary: 'Read structures at residue level: chains, gaps, contacts, sites and confidence.',
       charter: 'You report geometry as measurement. Never infer function from geometry.',
-      capabilities: ['project-read', 'structure-analysis'],
+      capabilities: ['project-read', 'structure-analysis', 'chain-messaging'],
       handoff: ['planner'],
+      reviews: [],
+      directs: [],
+      reviewed_by: ['auditor'],
       triggers: ['structure', 'residue'],
     },
     {
-      id: 'planner',
-      title: 'Planner',
-      title_zh: '路线规划',
-      phase: 4,
-      summary: 'Choose the route and draft the compute that implements it.',
-      charter: 'You choose the route and draft the compute, and you stop there.',
-      capabilities: ['project-read', 'workflow-planning', 'compute-drafting'],
-      handoff: [],
-      triggers: ['route', 'workflow'],
+      id: 'auditor',
+      title: 'Auditor',
+      title_zh: '复核',
+      phase: 9,
+      stance: 'review',
+      summary: 'Judge an operator\'s claims against the evidence it produced.',
+      charter: 'You judge claims; you never repair them.',
+      capabilities: ['project-read', 'review-audit', 'chain-messaging'],
+      handoff: ['conductor'],
+      reviews: ['structuralist'],
+      directs: [],
+      reviewed_by: [],
+      triggers: ['review', '复核'],
     },
   ]))
   add('GET', '/api/v2/compute-drafts', { limit: '200', project_id: PROJECT_ID }, () => ok({

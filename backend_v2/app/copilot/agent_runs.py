@@ -67,14 +67,27 @@ def create_run(
                 f"Subagents may nest {MAX_SUBAGENT_DEPTH} level deep.",
                 status_code=422,
             )
-        # A child cannot reach further than its parent. Enforced by intersecting
-        # rather than trusting the caller's list.
-        allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
         # A child inherits its parent's charter unless it was given one. A
         # subagent spawned by the medic is still doing the medic's work, and a
         # child that silently lost the refusals its parent was operating under
         # would be the one place the roster stopped applying.
+        delegated = bot is not None and bot != parent.bot
         bot = bot or parent.bot
+        if not delegated:
+            # Splitting work, not routing it: the child is the same operator, so
+            # it cannot reach further than the parent. Enforced by intersecting
+            # rather than trusting the caller's list.
+            allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
+        # Otherwise the child is a *different* operator, and intersecting would
+        # be wrong rather than merely strict: a librarian delegated to by a
+        # director holds none of the director's tools, so the intersection is
+        # exactly the librarian's own work minus the part that makes it a
+        # librarian - `start_literature_search` is dropped and the child looks
+        # like an operator that failed. The bound that matters is the project's,
+        # and the caller has already applied it: `delegate_to_operator` passes
+        # `target.capabilities ∩ project.enabled`, so the pair still cannot
+        # exceed what the project authorised. The director never executes any of
+        # it, which is what keeps routing from being escalation.
 
     run = CopilotAgentRun(
         project_id=project_id,
@@ -137,6 +150,27 @@ def transcript(session: Session, run: CopilotAgentRun) -> list[CopilotAgentTurn]
             .order_by(CopilotAgentTurn.sequence)
         )
     )
+
+
+def turns_for(
+    session: Session, run: CopilotAgentRun, *, limit: int = 40
+) -> list[CopilotAgentTurn]:
+    """The run's most recent turns, oldest first within the window.
+
+    `transcript` loads everything because resuming needs everything. A reviewer
+    does not: it is reading what an operator called, and an unbounded read of
+    another run's transcript is how one review turn exhausts a budget.
+    """
+    window = max(1, min(int(limit), 200))
+    rows = list(
+        session.scalars(
+            select(CopilotAgentTurn)
+            .where(CopilotAgentTurn.run_id == run.id)
+            .order_by(CopilotAgentTurn.sequence.desc())
+            .limit(window)
+        )
+    )
+    return sorted(rows, key=lambda turn: turn.sequence)
 
 
 def budget_root(session: Session, run: CopilotAgentRun) -> CopilotAgentRun:

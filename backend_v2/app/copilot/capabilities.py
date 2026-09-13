@@ -172,6 +172,43 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "chat_tools": ["await_compute_job", "spawn_subagent"],
     },
     {
+        "id": "chain-messaging",
+        "title": "Chain handover",
+        "description": (
+            "Leave a structured handover for the next operator and read the ones "
+            "addressed to you. Copilot bookkeeping: it changes no research record, "
+            "which is why its write does not need the user to ask for it by name."
+        ),
+        "async_execution": False,
+        "execution_mode": "draft",
+        "chat_tools": ["post_handoff", "read_handoffs"],
+    },
+    {
+        "id": "chain-orchestration",
+        "title": "Chain orchestration",
+        "description": (
+            "Read the roster and delegate one part of a goal to a different "
+            "operator. Grants no domain tool of its own: the delegated run "
+            "resolves the target bot's capabilities against the project, and the "
+            "director never executes them."
+        ),
+        "async_execution": True,
+        "execution_mode": "read",
+        "chat_tools": ["list_operators", "delegate_to_operator"],
+    },
+    {
+        "id": "review-audit",
+        "title": "Operator review",
+        "description": (
+            "Read what another operator actually called and what came back, and "
+            "the charter it was working under. Read-only by construction: a "
+            "reviewer that can repair what it found is a second producer."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": ["list_operator_charters", "read_operator_work"],
+    },
+    {
         "id": "compute-drafting",
         "title": "Compute drafting",
         "description": "Create a reviewable compute draft without confirming or submitting it",
@@ -201,6 +238,9 @@ CAPABILITY_ALIASES = {
         "agent-orchestration",
         "structure-analysis",
         "failure-diagnosis",
+        "chain-messaging",
+        "chain-orchestration",
+        "review-audit",
     },
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
@@ -213,6 +253,13 @@ CAPABILITY_ALIASES = {
     "structure": {"project-read", "structure-analysis"},
     "diagnosis": {"project-read", "failure-diagnosis"},
     "route-planning": {"project-read", "workflow-planning"},
+    "orchestration": {
+        "project-read",
+        "research-read",
+        "chain-orchestration",
+        "chain-messaging",
+    },
+    "review": {"project-read", "research-read", "review-audit", "chain-messaging"},
     "interpretation": {"project-read", "result-interpretation"},
 }
 

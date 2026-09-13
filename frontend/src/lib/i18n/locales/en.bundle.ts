@@ -219,6 +219,11 @@ export const bundleEn = {
       citationSourceFallback: 'Source {index}',
       botLabel: 'Copilot bot',
       botAuto: 'Auto',
+      botStances: {
+        direct: 'Coordination',
+        produce: 'The chain',
+        review: 'Review',
+      },
     },
     loading: {
       connecting: 'Connecting to Copilot…',

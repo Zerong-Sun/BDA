@@ -254,6 +254,8 @@ def copilot_respond(message_id: str) -> dict:
                         project_context=project_context,
                         allowed_tools=allowed_tools,
                         max_tool_calls=max_tool_calls,
+                        bot=active_bot.id if active_bot else None,
+                        enabled_capabilities=enabled_capabilities,
                     )
                     answer = agent_result.content
                     citations = agent_result.citations

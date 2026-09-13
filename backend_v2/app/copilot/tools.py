@@ -1117,3 +1117,375 @@ _register(
         handler=_diagnose_compute_failure,
     )
 )
+
+
+# --- Chain: how operators talk, and how one directs another ------------------
+# The roster's `handoff` tuple named a successor and carried nothing across the
+# boundary. These tools are the channel. `post_handoff` writes the copilot's own
+# transcript and changes no research record, which is why it declares
+# `intent="internal"` - see `registry.ToolSpec.intent`; it is still audited, and
+# it is still a write in every other sense.
+
+
+def _bot_of(ctx: ToolContext) -> str:
+    """The operator making this call.
+
+    An unowned turn cannot hand over: a note whose sender is "the assistant"
+    names nobody accountable, and the reviewer would have no charter to check it
+    against. Refused rather than defaulted for that reason.
+    """
+    run = getattr(ctx, "agent_run", None)
+    bot = getattr(run, "bot", None) or getattr(ctx, "bot", None)
+    if not bot:
+        raise ValueError("copilot_bot_context_required")
+    return str(bot)
+
+
+def _post_handoff(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import handoffs
+
+    run = getattr(ctx, "agent_run", None)
+    row = handoffs.record(
+        ctx.session,
+        project_id=_project_of(ctx),
+        user_id=_user_of(ctx),
+        from_bot=_bot_of(ctx),
+        to_bot=_arg_str(args, "to_bot"),
+        summary=_arg_str(args, "summary"),
+        claims=args.get("claims"),
+        open_questions=args.get("open_questions"),
+        refs=args.get("refs"),
+        produced_by_run=getattr(run, "id", None),
+    )
+    result = handoffs.to_json(row)
+    # Reported back rather than rejected: `normalise_claims` downgrades a claim
+    # with no reference to "unsupported", and an operator that believes it cited
+    # something should be told it did not while it can still fix the note.
+    result["unsupported_claims"] = sum(
+        1 for claim in result["claims"] if claim.get("confidence") == "unsupported"
+    )
+    result["off_chain"] = handoffs.is_off_chain(row.from_bot, row.to_bot)
+    return result
+
+
+def _read_handoffs(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import handoffs
+
+    rows = handoffs.inbox(
+        ctx.session,
+        project_id=_project_of(ctx),
+        to_bot=_arg_str(args, "to_bot") or None,
+        from_bot=_arg_str(args, "from_bot") or None,
+        limit=_arg_int(args, "limit", handoffs.DEFAULT_LIMIT),
+    )
+    return [handoffs.to_json(row) for row in rows]
+
+
+_CLAIM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "statement": {"type": "string"},
+        "evidence_ref": {
+            "type": "string",
+            "description": (
+                "The artifact, job, result, reference or goal id this rests on. "
+                "A claim with none is recorded as unsupported."
+            ),
+        },
+        "confidence": {"type": "string", "enum": ["stated", "consistent", "unsupported"]},
+    },
+    "required": ["statement"],
+    "additionalProperties": False,
+}
+
+_register(
+    ToolSpec(
+        id="post_handoff",
+        description=(
+            "Leave a structured handover for the next operator: what you did, the "
+            "claims you are making with the evidence behind each one, what you "
+            "could not settle, and the ids the next operator needs. Append-only."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "to_bot": {"type": "string"},
+                "summary": {"type": "string"},
+                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": 20},
+                "open_questions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 20,
+                },
+                "refs": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+            },
+            "required": ["to_bot", "summary"],
+            "additionalProperties": False,
+        },
+        capability="chain-messaging",
+        execution_mode="draft",
+        requires="session",
+        intent="internal",
+        needs_operator=True,
+        audit=True,
+        handler=_post_handoff,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="read_handoffs",
+        description=(
+            "Read handovers recorded in this project, newest first. Filter by "
+            "`to_bot` for your own inbox or by `from_bot` to read what one "
+            "operator has been claiming."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "to_bot": {"type": "string"},
+                "from_bot": {"type": "string"},
+                "limit": _limit(100, 20),
+            },
+            "additionalProperties": False,
+        },
+        capability="chain-messaging",
+        execution_mode="read",
+        requires="session",
+        handler=_read_handoffs,
+    )
+)
+
+
+def _list_operator_charters(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """The charters a reviewer rules against.
+
+    Returned as data rather than assumed known, because `outside_charter` is a
+    verdict about a specific sentence and a reviewer quoting a charter from
+    memory is inventing the standard it is applying.
+    """
+    from . import bots as roster
+
+    wanted = _arg_str(args, "bot")
+    specs = [roster.require(wanted)] if wanted else roster.producers()
+    return [
+        {
+            "id": bot.id,
+            "title": bot.title,
+            "stance": bot.stance,
+            "summary": bot.summary,
+            "charter": bot.charter,
+            "reviewed_by": [other.id for other in roster.reviewers_of(bot.id)],
+        }
+        for bot in specs
+    ]
+
+
+def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """What an operator actually called, not what it said it did.
+
+    The gap between the two is the whole subject of review, so this returns the
+    recorded tool calls rather than the assistant text around them.
+    """
+    from . import agent_runs
+
+    run = agent_runs.require_run(ctx.session, uuid.UUID(_arg_str(args, "run_id")))
+    if run.project_id != _project_of(ctx):
+        # Same shape as a missing run: whether a run exists in another project
+        # is not this project's to learn.
+        raise ValueError("copilot_agent_run_not_found")
+
+    turns = agent_runs.turns_for(ctx.session, run, limit=_arg_int(args, "limit", 40))
+    calls: list[dict[str, Any]] = []
+    for turn in turns:
+        for call in turn.tool_calls or []:
+            calls.append({"sequence": turn.sequence, "role": turn.role, **dict(call)})
+    return {
+        "run_id": str(run.id),
+        "bot": run.bot,
+        "goal": run.goal,
+        "status": run.status,
+        "turn_count": run.turn_count,
+        "allowed_tools": list(run.allowed_tools or []),
+        "tool_calls": calls,
+    }
+
+
+_register(
+    ToolSpec(
+        id="list_operator_charters",
+        description=(
+            "The charter each operator works under, and who reviews it. This is "
+            "the standard an `outside_charter` verdict is measured against."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"bot": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        capability="review-audit",
+        execution_mode="read",
+        requires="session",
+        handler=_list_operator_charters,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="read_operator_work",
+        description=(
+            "What an operator's run actually called and what came back, turn by "
+            "turn. Use this rather than its summary: the summary is the thing "
+            "under review."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"run_id": {"type": "string"}, "limit": _limit(100, 40)},
+            "required": ["run_id"],
+            "additionalProperties": False,
+        },
+        capability="review-audit",
+        execution_mode="read",
+        requires="session",
+        handler=_read_operator_work,
+    )
+)
+
+
+def _list_operators(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """The roster as a director sees it: who exists and who is reachable now.
+
+    `reachable` is the project's enabled skills intersected with each bot's
+    capabilities. A director that delegates to an operator with nothing enabled
+    produces a child run with no tools, which looks like the operator failing
+    rather than the project not granting it anything.
+    """
+    from . import bots as roster
+
+    enabled = set(getattr(ctx, "allowed_capabilities", None) or ())
+    # Not `_bot_of`: reading the roster is the same for everyone, and a turn that
+    # has not chosen an operator is exactly the one most likely to be asking who
+    # the operators are. Without a director, nothing is delegable.
+    me = str(getattr(getattr(ctx, "agent_run", None), "bot", None) or getattr(ctx, "bot", None) or "")
+    return [
+        {
+            "id": bot.id,
+            "title": bot.title,
+            "title_zh": bot.title_zh,
+            "stance": bot.stance,
+            "summary": bot.summary,
+            "capabilities": list(bot.capabilities),
+            "resolved_capabilities": sorted(set(bot.capabilities) & enabled) if enabled else None,
+            "may_delegate_to": roster.may_direct(me, bot.id),
+            "handoff": list(bot.handoff),
+        }
+        for bot in roster.all_bots()
+    ]
+
+
+def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """Open a child run owned by a different operator, and wait for it.
+
+    Two properties make this routing rather than an escalation, and both are
+    enforced here because a charter asking for them would be a request:
+
+    * the child resolves the *target* bot's capabilities against the project and
+      is then intersected with this run's tools by `create_run`, so delegating
+      can only ever narrow;
+    * the child inherits the originating user's request text, never the
+      director's instruction. The write-intent gate reads the user's own words,
+      so a director able to supply them could write "please submit this job" and
+      unlock every write in the project. The instruction steers the work; it
+      cannot authorise it.
+    """
+    from . import agent_runs
+    from . import bots as roster
+    from .capabilities import tools_for_capabilities
+
+    parent = ctx.agent_run
+    # Read leniently so an undifferentiated run fails the *delegation* check
+    # rather than a missing-context one: "this run is not a director" is the
+    # accurate reason, and `may_direct` says exactly that for an empty id.
+    director = str(getattr(parent, "bot", None) or getattr(ctx, "bot", None) or "")
+    target = _arg_str(args, "bot")
+    if not roster.may_direct(director, target):
+        raise ValueError("copilot_delegation_not_allowed")
+
+    enabled = getattr(ctx, "allowed_capabilities", None)
+    if enabled is None:
+        # Refused rather than defaulted to the target's full declaration. This
+        # is the one value that bounds the child, so a missing one has to stop
+        # the call: falling back would hand a delegated operator every
+        # capability it declares regardless of what the project enabled.
+        raise ValueError("copilot_project_capabilities_required")
+    resolved = roster.capabilities_for_bot(target, set(enabled))
+    if not resolved:
+        raise ValueError("copilot_delegate_no_capabilities")
+
+    child = agent_runs.create_run(
+        ctx.session,
+        project_id=parent.project_id,
+        user_id=parent.created_by,
+        goal=_arg_str(args, "instruction"),
+        allowed_tools=sorted(tools_for_capabilities(resolved)),
+        conversation_id=parent.conversation_id,
+        parent_run_id=parent.id,
+        max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
+        bot=target,
+    )
+    return {
+        "resource_id": str(child.id),
+        "run_id": str(child.id),
+        "bot": child.bot,
+        "goal": child.goal,
+        "allowed_tools": list(child.allowed_tools),
+        "waiting": True,
+    }
+
+
+_register(
+    ToolSpec(
+        id="list_operators",
+        description=(
+            "The roster: every operator, what it is for, and whether this "
+            "project has enabled what it needs. Read this before delegating."
+        ),
+        parameters=_EMPTY_OBJECT,
+        capability="chain-orchestration",
+        execution_mode="read",
+        requires="session",
+        handler=_list_operators,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="delegate_to_operator",
+        description=(
+            "Hand one step to a different operator and wait for it. The child "
+            "runs under that operator's charter and resolves that operator's "
+            "capabilities, never yours, and it cannot perform a write the user "
+            "did not ask for - your instruction steers the work and does not "
+            "authorise it."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "bot": {"type": "string"},
+                "instruction": {
+                    "type": "string",
+                    "description": "What to produce, and what would make the step finished.",
+                },
+                "max_turns": {"type": "integer", "minimum": 1, "maximum": 24},
+            },
+            "required": ["bot", "instruction"],
+            "additionalProperties": False,
+        },
+        capability="chain-orchestration",
+        execution_mode="read",
+        requires="agent_run",
+        needs_operator=True,
+        awaits="subagent",
+        handler=_delegate_to_operator,
+    )
+)

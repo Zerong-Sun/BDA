@@ -2,13 +2,13 @@
 
 状态：活跃
 
-最后核验：2026-09-13（Asia/Shanghai；本轮新增 bot 名册、结构分析与故障诊断能力）
+最后核验：2026-09-13（Asia/Shanghai；本轮新增 bot 名册、结构分析与故障诊断能力，并加入 stance 轴、交接通道与 conductor/steward/auditor）
 
 权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
-替代关系：不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威），也不取代 [MCP capability surface](MCP_CAPABILITY_SURFACE.md)（外部调用契约）。本文在两者之上定义“谁负责链条的哪一段”。
+替代关系：不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威），也不取代 [MCP capability surface](MCP_CAPABILITY_SURFACE.md)（外部调用契约）。本文在两者之上定义“谁负责链条的哪一段”；职责轴（stance）、交接协议与委派规则在 [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md)。
 
 ## Why a roster rather than one assistant
 
@@ -40,22 +40,36 @@ hint, generalised from one to a set. It is what stops “select the planner bot�
 from becoming a privilege-escalation path, and it is the property the adversarial
 tests exist to attack.
 
-## The chain and its nine bots
+## The chain and its twelve operators
 
 The phases run in order, but the chain is a loop, not a line: `medic` sends work
 back to `planner`, and `archivist` sends the next question back to `briefing`.
 
-| # | Bot | 中文 | Owns | Capabilities | Hands off to |
-| --- | --- | --- | --- | --- | --- |
-| 0 | `briefing` | 选题起草 | Turning an intent into a stated, falsifiable research question with success criteria | `project-read`, `research-read`, `knowledge-authoring` | `librarian`, `scout` |
-| 1 | `librarian` | 文献整理 | Finding, ingesting and organising literature with retrievable provenance | `research-read`, `literature-search` | `briefing`, `scout` |
-| 2 | `scout` | 靶点情报 | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair` | `structuralist`, `planner` |
-| 3 | `structuralist` | 结构与残基 | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis` | `planner`, `analyst` |
-| 4 | `planner` | 路线规划 | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting` | `runner` |
-| 5 | `runner` | 步骤推进 | Carrying a confirmed run across its waits and reporting what settled | `project-read`, `workflow-planning`, `agent-orchestration` | `medic`, `analyst` |
-| 6 | `medic` | 故障诊断 | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis` | `planner`, `runner` |
-| 7 | `analyst` | 结果解读 | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring` | `archivist`, `structuralist` |
-| 8 | `archivist` | 记录归档 | Attaching evidence to research goals and drafting the record of what was decided | `research-read`, `research-trace-authoring`, `knowledge-authoring` | `briefing` |
+Nine of the twelve *produce*: they own a phase. The other three do not do the
+work at all — `conductor` decides who works next, and `steward` and `auditor`
+judge what a producer claimed. That is the `stance` axis, and it is enforced at
+import rather than stated in a charter; the argument for it, and the rules it
+imposes, are in [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
+
+Every operator that hands off also holds `chain-messaging`. Before that, a
+charter could say "hand this to medic" while the platform had no way to carry
+anything across the boundary, which made the handoff a sentence rather than a
+step.
+
+| # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to |
+| --- | --- | --- | --- | --- | --- | --- |
+| — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` |
+| 0 | `briefing` | 选题起草 | produce | Turning an intent into a stated, falsifiable research question with success criteria | `project-read`, `research-read`, `knowledge-authoring`, `chain-messaging` | `librarian`, `scout` |
+| 1 | `librarian` | 文献整理 | produce | Finding, ingesting and organising literature with retrievable provenance | `research-read`, `literature-search`, `chain-messaging` | `briefing`, `scout` |
+| 2 | `scout` | 靶点情报 | produce | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `structuralist`, `planner` |
+| 3 | `structuralist` | 结构与残基 | produce | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis`, `chain-messaging` | `planner`, `analyst` |
+| 4 | `planner` | 路线规划 | produce | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner` |
+| 4 | `steward` | 资源守门 | review | Checking a draft's declared resources against what the job can actually use | `project-read`, `review-audit`, `chain-messaging` | `planner` |
+| 5 | `runner` | 步骤推进 | produce | Carrying a confirmed run across its waits and reporting what settled | `project-read`, `workflow-planning`, `agent-orchestration`, `chain-messaging` | `medic`, `analyst` |
+| 6 | `medic` | 故障诊断 | produce | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis`, `chain-messaging` | `planner`, `runner` |
+| 7 | `analyst` | 结果解读 | produce | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `chain-messaging` | `archivist`, `structuralist` |
+| 8 | `archivist` | 记录归档 | produce | Attaching evidence to research goals and drafting the record of what was decided | `research-read`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `briefing` |
+| — | `auditor` | 复核 | review | Ruling on an operator's claims against the evidence it produced and the charter it works under | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor` |
 
 ### What each bot must refuse
 
@@ -95,22 +109,57 @@ model verbatim.
   originally instructed it to mark goals answered, which was an instruction to do
   something no tool exposes — the failure mode being a model that reports having
   done it.
+- `conductor` — must not do the work, and must not authorise it. It holds no
+  capability that changes the research record, and delegating is not a way to
+  reach one: the delegated operator runs under its own charter and its own
+  capabilities. It also cannot supply the user's words — a delegated run's write
+  gate reads the *originating* request, so an instruction the director wrote can
+  steer work but never unlock a write.
+- `steward` — must not edit the draft it reviews and must not confirm it. It
+  reports the two numbers that disagree and hands the finding to `planner`. It
+  must also approve when the declaration is sound, because a review that only
+  ever objects stops being read.
+- `auditor` — must not repair what it finds. Its output is a verdict per claim
+  (`supported` / `unsupported` / `contradicted` / `outside_charter`), ruled on
+  what the operator actually called rather than on what it said it did. A claim
+  citing nothing is `unsupported`, and a handover with no run behind it is
+  *unreviewable* rather than clean.
 
 ### Handoff protocol
 
-A handoff is a statement in the answer, not a transfer of control: the bot names
-which operator should take the next step and what that operator needs. The
-platform does not switch bots by itself, because a bot that could re-select
-itself with wider capabilities would defeat the narrowing law. The client — chat
-UI, agent-run creation, or an MCP caller — selects the next bot explicitly.
+A handoff is still not a transfer of control: the bot names which operator should
+take the next step, and the client — chat UI, agent-run creation, or an MCP
+caller — selects it. The platform does not switch bots by itself, because a bot
+that could re-select itself with wider capabilities would defeat the narrowing
+law. `handoff` remains advisory and is validated only for referential integrity.
 
-`handoff` is therefore advisory, and validated only for referential integrity:
-every named bot must exist. It is surfaced to the model so it can name the right
-next operator, and to the UI so it can offer that operator as one click.
+What changed is that a handoff now **leaves something behind**. `post_handoff`
+appends a row to `copilot_handoffs` carrying the summary, the ids the next
+operator needs, the questions this one could not settle, and — the load-bearing
+part — a list of claims, each with the evidence reference behind it. A prose
+summary can only be read; a claim with its reference can be checked, which is
+what gives `auditor` a defined output rather than a second opinion. A claim
+submitted without a reference is recorded as `unsupported` rather than rejected,
+because rejecting it would keep the operator's own mistake out of the record and
+leave the handover looking clean.
+
+The one exception to "the client selects" is `conductor`, whose
+`delegate_to_operator` opens a child run owned by a *different* operator. The
+child's tools are `target.capabilities ∩ project.enabled_skills` — the project's
+bound, not the director's. Intersecting against the parent, the way
+`spawn_subagent` does, would be wrong here rather than merely strict: a director
+holds none of a librarian's literature tools, so the intersection removes
+`start_literature_search` and hands back a child that reads like an operator
+that failed. The invariant that matters is that both runs stay inside what the
+project authorised, and that the director executes none of the child's tools.
+Delegation requires a durable run, so chat can only ever recommend an operator.
 
 ## New capabilities this roster adds
 
-Two phases had no capability to stand on, so the roster adds two, both read-only.
+Two phases had no capability to stand on, so the roster adds two read-only ones;
+the responsibility axis adds three more (`chain-messaging`, `chain-orchestration`
+and `review-audit`), described in
+[Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
 
 ### `structure-analysis` — 结构与残基分析
 
@@ -234,36 +283,56 @@ grants tools. After this change the full list is:
 
 | Capability (skill) | Mode | Tools | Bots that hold it |
 | --- | --- | --- | --- |
-| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | briefing, scout, structuralist, planner, runner, medic, analyst |
-| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | briefing, librarian, scout, planner, archivist |
-| `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
-| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | structuralist |
-| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | medic |
-| `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
-| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | briefing, archivist |
-| `workflow-planning` | draft | `get_workflow_status` | planner, runner |
-| `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
-| `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
-| `research-trace-authoring` | draft | `attach_to_research_goal` | archivist |
-| `literature-search` | queue | `start_literature_search` | librarian |
-| `target-intelligence` | queue | `start_target_intelligence` | scout |
-| `research-gap-repair` | queue | `resolve_research_gaps` | scout |
 | `agent-orchestration` | read (async) | `await_compute_job`, `spawn_subagent` | runner |
+| `chain-orchestration` | read (async) | `list_operators`, `delegate_to_operator` | conductor |
+| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | medic |
+| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, briefing, scout, structuralist, planner, steward, runner, medic, analyst, auditor |
+| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, briefing, librarian, scout, planner, archivist, auditor |
+| `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
+| `review-audit` | read | `list_operator_charters`, `read_operator_work` | steward, auditor |
+| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | structuralist |
+| `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
+| `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, briefing, librarian, scout, structuralist, planner, steward, runner, medic, analyst, archivist, auditor |
+| `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
+| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | briefing, archivist |
+| `research-trace-authoring` | draft | `attach_to_research_goal` | archivist |
+| `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
+| `workflow-planning` | draft | `get_workflow_status` | planner, runner |
+| `literature-search` | queue | `start_literature_search` | librarian |
+| `research-gap-repair` | queue | `resolve_research_gaps` | scout |
+| `target-intelligence` | queue | `start_target_intelligence` | scout |
 
-Everything in that table is reachable over MCP except `agent-orchestration`,
-which is excluded by construction: its tools declare `requires="agent_run"`, an
-MCP client has no run to suspend, and `mcp.py` refuses to list them. `runner` is
-therefore the one bot whose full capability set exists only inside a durable
-agent run.
+Everything in that table is reachable over MCP except the two async ones.
+`agent-orchestration` and `chain-orchestration` are excluded by construction:
+`await_compute_job`, `spawn_subagent` and `delegate_to_operator` declare
+`requires="agent_run"`, an MCP client has no run to suspend, and `mcp.py`
+refuses to list them. `runner` and `conductor` are therefore the two operators
+whose full capability set exists only inside a durable agent run — `conductor`
+can read the roster and the handover record from chat, and can only recommend an
+operator there rather than delegate to one.
+
+`chain-messaging` is a `draft` capability that an unbound MCP grant still does
+not get: `mcp.available_tools` degrades such a grant with `REGISTRY.write_ids()`,
+which is the conservative set and includes `post_handoff`. The narrower
+`user_intent_write_ids()` — the set the chat intent gate filters — is the one
+that excludes it, and it has to be asked for by name.
 
 ## Surfaces
 
 One declaration, three surfaces, no duplication:
 
-- `GET /copilot/bots` lists the roster with its capabilities, charter, phase and
-  handoffs. The frontend reads that response rather than restating it — the
-  hand-written skill registry it sits beside kept its own copy of the backend's
-  capability list, and a copy is what drifts.
+- `GET /copilot/bots` lists the roster with its capabilities, charter, phase,
+  stance, handoffs and — for each producer — who reviews it. The frontend reads
+  that response rather than restating it: the hand-written skill registry it sits
+  beside kept its own copy of the backend's capability list, and a copy is what
+  drifts. The picker groups by stance rather than by phase, because a director is
+  not the step before `briefing` and a reviewer is not the step after
+  `archivist`, which is what one ordered list would say.
+- `GET /copilot/projects/{id}/handoffs` returns the chain's handovers, newest
+  first, with each claim's evidence reference and confidence. A record only the
+  operators could read would make the channel's justification — that what one
+  operator claimed is auditable afterwards — true for `auditor` and false for the
+  person it is ultimately for.
 - `POST /copilot/agent-runs` accepts `bot`. The server resolves the bot to its
   capability set, intersects it with the project configuration, and derives
   `allowed_tools` from the result — the client never names a tool.
@@ -287,6 +356,15 @@ nothing, which leaves an undifferentiated run rather than a broken one.
 A subagent inherits its parent's bot unless given one. A child doing part of the
 medic's work is still doing the medic's work, and a child that silently lost its
 parent's refusals would be the one place the roster stopped applying.
+`delegate_to_operator` is the exception that gives one, and it is why a director
+needs a tool of its own rather than a flag on `spawn_subagent`.
+
+What a child must **not** inherit is the authority to write. The write-intent
+gate reads the user's own request, and a child's goal is written by the parent
+model — so `agent_loop.authorising_text` walks to the root run and reads its
+goal. Without that, a director emitting "search the literature and save it"
+would be authoring the user's half of the conversation. The same hole existed in
+`spawn_subagent` before delegation did, and the walk closes both.
 
 ## What this does not change
 
@@ -295,7 +373,11 @@ parent's refusals would be the one place the roster stopped applying.
   evidence, or deletes project data. Those remain user actions, as recorded in
   the capability plan.
 - Write tools still require the user's own words to authorise them in the same
-  turn. Selecting a bot is not a request; `actions.request_allows` is unchanged.
+  turn. Selecting a bot is not a request, and neither is delegating to one:
+  `actions.request_allows` still reads what the person asked for, now resolved
+  through the root run rather than the run that happens to be executing.
+- A reviewer cannot repair what it finds and a director cannot do the work, and
+  neither is a matter of charter wording: both are import-time roster errors.
 - Budgets, depth limits, audit attribution and citation policy are unchanged. A
   bot is a narrower mandate inside the existing envelope, never a wider one.
 
@@ -320,6 +402,20 @@ Each of these holds, and has a test that fails when it stops holding.
 | 13 | `diagnose_compute_failure` refuses a job id from another project | `test_compute_diagnosis.py` |
 | 14 | The new capabilities reach an external MCP client with no transport code of their own | `test_copilot_mcp.py` |
 | 15 | The chat sends a selected bot instead of a matched skill and never both; a roster that failed to load leaves the chat working, unhinted | `CopilotChat.test.tsx`, `bots/registry.test.ts` |
+| 16 | A `review` bot declaring a write capability, a `direct` bot declaring one, a stance-only capability on the wrong stance, and review or delegation aimed at a non-producer all fail at import | `test_copilot_bots.py` |
+| 17 | Every producer is reviewed by somebody, and no producer names its own reviewer | `test_copilot_bots.py` |
+| 18 | Every operator that hands off holds `chain-messaging`, so no charter names a step the platform cannot take | `test_copilot_bots.py` |
+| 19 | A delegated run is owned by the target operator and keeps the tools that define it; a subagent of the *same* operator is still bounded by its parent | `test_copilot_chain.py` |
+| 20 | A director may delegate only to the operators it declares, and an operator with nothing enabled is refused rather than delegated to | `test_copilot_chain.py` |
+| 21 | A delegated run's write gate reads the originating user request, not the director's instruction — and the same holds for a subagent | `test_copilot_chain.py` |
+| 22 | A reviewer reads what an operator called rather than what it said, cannot read across projects, and resolves to no write it could repair with | `test_copilot_chain.py` |
+| 23 | A handover names two real operators, never itself, and cannot be edited | `test_copilot_handoffs.py` |
+| 24 | A claim citing nothing is recorded as `unsupported` rather than dropped, and an operator cannot assert its way past a missing reference | `test_copilot_handoffs.py` |
+| 25 | An unowned turn cannot hand over; a person can read the chain over REST | `test_copilot_handoffs.py` |
+| 26 | `post_handoff` is the only write outside the user-intent gate, and an unbound MCP grant still does not get it | `test_copilot_chat_surface.py` |
+| 27 | The picker groups operators by stance, drops a stance it cannot label, and renders nothing for an empty roster | `bots/registry.test.ts` |
+| 28 | A turn that named no operator is not offered the tools that need one; reading the roster and the handover record never needs one | `test_copilot_chat_surface.py` |
+| 29 | A settled delegation and a settled subagent fold back under the tool that opened them | `test_copilot_chain.py` |
 
 Gates run for this change, on `bda-public/main`:
 

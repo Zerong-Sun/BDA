@@ -1,17 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { matchBot, successorsOf, type CopilotBot } from './registry'
+import {
+  byStance,
+  matchBot,
+  reviewersOf,
+  successorsOf,
+  type CopilotBot,
+  type Stance,
+} from './registry'
 
-function bot(id: string, triggers: string[], handoff: string[] = []): CopilotBot {
+function bot(
+  id: string,
+  triggers: string[],
+  handoff: string[] = [],
+  overrides: Partial<CopilotBot> = {},
+): CopilotBot {
   return {
     id,
     title: id,
     title_zh: id,
     phase: 0,
+    stance: 'produce',
     summary: `${id} summary`,
     charter: `${id} charter`,
     capabilities: ['project-read'],
     handoff,
+    reviews: [],
+    directs: [],
+    reviewed_by: [],
     triggers,
+    ...overrides,
   }
 }
 
@@ -61,5 +78,53 @@ describe('successorsOf', () => {
 
   it('drops a handoff the roster does not contain instead of rendering a dead option', () => {
     expect(successorsOf({ ...ROSTER[0], handoff: ['ghost'] }, ROSTER)).toEqual([])
+  })
+})
+
+describe('byStance', () => {
+  const MIXED: CopilotBot[] = [
+    bot('planner', ['route'], [], { reviewed_by: ['auditor'] }),
+    bot('auditor', ['review'], [], { stance: 'review', reviews: ['planner'] }),
+    bot('conductor', ['delegate'], [], { stance: 'direct', directs: ['planner'] }),
+  ]
+
+  it('groups operators by what they are for, coordination first', () => {
+    // Not by phase: a director is not the step before the chain and a reviewer
+    // is not the step after it, which is exactly what one ordered list says.
+    expect(byStance(MIXED).map((group) => group.stance)).toEqual(['direct', 'produce', 'review'])
+    expect(byStance(MIXED)[1].bots.map((b) => b.id)).toEqual(['planner'])
+  })
+
+  it('omits a stance no operator holds rather than rendering an empty group', () => {
+    expect(byStance([MIXED[0]]).map((group) => group.stance)).toEqual(['produce'])
+  })
+
+  it('returns nothing for an empty roster', () => {
+    expect(byStance([])).toEqual([])
+  })
+
+  it('drops an operator whose stance the client does not know', () => {
+    // A roster served by a newer backend must not crash an older client, and a
+    // stance this build cannot label has no group to render into.
+    const future = bot('future', [], [], { stance: 'arbitrate' as unknown as Stance })
+    expect(byStance([...MIXED, future]).flatMap((group) => group.bots.map((b) => b.id)))
+      .not.toContain('future')
+  })
+})
+
+describe('reviewersOf', () => {
+  const ROSTER_WITH_REVIEW: CopilotBot[] = [
+    bot('planner', [], [], { reviewed_by: ['auditor', 'steward'] }),
+    bot('auditor', [], [], { stance: 'review', reviews: ['planner'] }),
+  ]
+
+  it('resolves who checks an operator against the roster', () => {
+    expect(reviewersOf(ROSTER_WITH_REVIEW[0], ROSTER_WITH_REVIEW).map((b) => b.id)).toEqual([
+      'auditor',
+    ])
+  })
+
+  it('is empty for an operator nobody reviews', () => {
+    expect(reviewersOf(ROSTER_WITH_REVIEW[1], ROSTER_WITH_REVIEW)).toEqual([])
   })
 })

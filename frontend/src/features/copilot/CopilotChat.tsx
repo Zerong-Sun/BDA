@@ -10,6 +10,7 @@ import {
 import { Link } from 'react-router'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { useCopilotChat } from './useCopilotChat'
+import { byStance } from './bots/registry'
 import { getCopilotConfig } from '../../lib/api/copilot'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
@@ -28,7 +29,9 @@ import { Frame, FramePanel } from '../../components/reui/frame'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -136,10 +139,19 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={AUTO_BOT}>{t.copilot.chat.botAuto}</SelectItem>
-                {bots.map((entry) => (
-                  <SelectItem key={entry.id} value={entry.id} title={entry.summary}>
-                    {language === 'zh' ? entry.title_zh : entry.title}
-                  </SelectItem>
+                {/* Grouped by stance, not by phase. A director is not the step
+                    before briefing and a reviewer is not the step after
+                    archiving; a single ordered list says they are, which is the
+                    reading this roster exists to correct. */}
+                {byStance(bots).map((group) => (
+                  <SelectGroup key={group.stance}>
+                    <SelectLabel>{t.copilot.chat.botStances[group.stance]}</SelectLabel>
+                    {group.bots.map((entry) => (
+                      <SelectItem key={entry.id} value={entry.id} title={entry.summary}>
+                        {language === 'zh' ? entry.title_zh : entry.title}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

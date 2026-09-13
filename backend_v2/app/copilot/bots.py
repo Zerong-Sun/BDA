@@ -15,9 +15,21 @@ check. Every other property here - charter, phase, handoffs, triggers - is
 description that reaches the model or the UI; only `capabilities` is load
 bearing, and it is intersected, never unioned.
 
-Handoffs are advisory by design. The platform does not switch bots on its own,
-because a bot that could re-select itself with a wider set would defeat the
-narrowing law. A bot names its successor in prose; the client selects it.
+A bot also declares a `stance`, which is the axis the first version of this
+roster was missing. Capabilities say what an operator may touch; stance says
+what it is *for*, and therefore what it may never do with the tools it holds.
+`_validate_roster` makes that mechanical rather than a line in a charter,
+because a refusal nothing checks is decoration.
+
+Handoffs are still advisory in the sense that matters: the platform does not
+switch bots on its own, because a bot that could re-select itself with a wider
+set would defeat the narrowing law. What changed is that a handover now leaves
+something behind - see `handoffs.py` - so the next operator reads what the last
+one claimed rather than being told about it in prose, and a reviewer reads the
+same rows. The one exception to "the client selects" is a `direct` bot, which
+may open a child run owned by a different operator; that widens nothing,
+because the child resolves the *target* bot's capabilities against the project,
+never the director's.
 
 `docs/COPILOT_BOT_ROSTER.md` is the prose half of this file - the chain, the
 charters and the skill/MCP inventory. Adding or retiring a bot here means
@@ -31,7 +43,40 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..core.problem import DomainError
-from .capabilities import capabilities_for_turn, capability_ids
+from .capabilities import COPILOT_CAPABILITIES, capabilities_for_turn, capability_ids
+
+#: What an operator is *for*, orthogonal to what it may touch.
+#:
+#: Capabilities answer "which tools"; stance answers "what are you forbidden to
+#: do with the tools you hold". The roster shipped without this axis and was
+#: therefore a split of functions in the vocabulary of a split of
+#: responsibilities: nine operators, no relationship between any two of them.
+#:
+#:   produce - does the work of one phase and hands it on
+#:   review  - judges another operator's output and may not repair it
+#:   direct  - decides who works next and may not do the work
+#:
+#: `_validate_roster` makes each of these mechanical. A reviewer that can fix
+#: what it found is not a reviewer - it is a second producer, and nobody checks
+#: the repair; a director that can do the work will do the work, and the chain
+#: quietly collapses back to one operator.
+STANCES = ("produce", "review", "direct")
+
+#: Powers that belong to exactly one stance. Declared as a mapping rather than
+#: checked inline so that adding a capability to the wrong kind of operator
+#: fails with the reason rather than with a boolean.
+_STANCE_ONLY = {
+    "chain-orchestration": "direct",
+    "review-audit": "review",
+}
+
+#: Write capabilities that change no research record, so holding one does not
+#: make an operator a producer. Only the handover channel qualifies: it writes
+#: the copilot's own transcript, which is the same thing a chat message already
+#: does every turn. Anything else added here would be a hole in the stance rule,
+#: so the list is short on purpose and each member's tools declare
+#: `intent="internal"` in the registry to say the same thing from the other side.
+_INTERNAL_WRITE_CAPABILITIES = frozenset({"chain-messaging"})
 
 
 @dataclass(frozen=True)
@@ -45,6 +90,10 @@ class BotSpec:
     #: Where this bot sits in the chain. Ordering only - it grants nothing and
     #: does not constrain which bot a client may select.
     phase: int
+    #: One of `STANCES`. Grants nothing either: it only makes certain capability
+    #: combinations illegal to declare, so it can subtract from the roster and
+    #: never add to a turn.
+    stance: str
     summary: str
     #: The bot's mandate and, mostly, its refusals. Reaches the model verbatim,
     #: so it is written as instructions to the operator and not as documentation
@@ -55,6 +104,15 @@ class BotSpec:
     capabilities: tuple[str, ...]
     #: Bot ids this one should hand to. Validated for existence only.
     handoff: tuple[str, ...] = ()
+    #: For a `review` bot: whose output it judges. This is the "who checks me"
+    #: half of a responsibility, and it is declared on the reviewer rather than
+    #: on the producer so that adding a reviewer cannot silently change what a
+    #: producer is allowed to do. Empty for every other stance.
+    reviews: tuple[str, ...] = ()
+    #: For a `direct` bot: the operators it may delegate to. Bounded by
+    #: declaration rather than by "any bot in the roster", so the reach of a
+    #: director is reviewable in the same place its charter is.
+    directs: tuple[str, ...] = ()
     #: Bilingual routing hints for a client that wants to suggest a bot. Never
     #: consulted server-side when resolving capabilities.
     triggers: tuple[str, ...] = field(default_factory=tuple)
@@ -64,10 +122,58 @@ class BotSpec:
 #: `archivist` returns to `briefing`.
 BOTS: tuple[BotSpec, ...] = (
     BotSpec(
+        id="conductor",
+        title="Conductor",
+        title_zh="总调度",
+        phase=-1,
+        stance="direct",
+        summary="Decide which operator works next, delegate to it, and say when the chain stops.",
+        charter=(
+            "You route work; you do not do it. Read the chain's handovers and the "
+            "project's state, name the operator whose accountability the next step "
+            "falls under, and delegate to it with an instruction that says what to "
+            "produce and what would make the step finished. You hold no tool that "
+            "changes the research record, and delegating is not a way to reach one: "
+            "a delegated operator runs under its own charter and its own "
+            "capabilities, and refuses what it would refuse from a person. You "
+            "cannot authorise a write. If a step needs one, say which operator owns "
+            "it and what the user would have to ask for, and stop - an instruction "
+            "you wrote is not the user asking. Delegate one step at a time and read "
+            "what came back before choosing the next: a plan made for five steps at "
+            "once is a plan that ignores the first result. When the operators "
+            "disagree, send the claim to auditor rather than picking the answer you "
+            "prefer. Say explicitly when the chain is finished or blocked; a "
+            "director that never stops is a loop."
+        ),
+        capabilities=(
+            "project-read",
+            "research-read",
+            "chain-orchestration",
+            "chain-messaging",
+        ),
+        handoff=("auditor",),
+        directs=(
+            "briefing",
+            "librarian",
+            "scout",
+            "structuralist",
+            "planner",
+            "runner",
+            "medic",
+            "analyst",
+            "archivist",
+        ),
+        triggers=(
+            "orchestrate", "coordinate", "who should", "next operator", "delegate",
+            "调度", "统筹", "安排", "该谁", "全链条",
+        ),
+    ),
+    BotSpec(
         id="briefing",
         title="Briefing",
         title_zh="选题起草",
         phase=0,
+        stance="produce",
         summary="Turn an intent into a stated, falsifiable research question with success criteria.",
         charter=(
             "You draft the question, not the answer. Read the project's existing "
@@ -81,7 +187,7 @@ BOTS: tuple[BotSpec, ...] = (
             "librarian when the unknowns are literature, scout when they are "
             "target identity."
         ),
-        capabilities=("project-read", "research-read", "knowledge-authoring"),
+        capabilities=("project-read", "research-read", "knowledge-authoring", "chain-messaging"),
         handoff=("librarian", "scout"),
         triggers=("brief", "research question", "proposal", "选题", "立项", "研究问题", "写提案"),
     ),
@@ -90,6 +196,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Librarian",
         title_zh="文献整理",
         phase=1,
+        stance="produce",
         summary="Find, ingest and organise literature with retrievable provenance.",
         charter=(
             "You handle literature and its provenance. Search only when the user "
@@ -101,7 +208,7 @@ BOTS: tuple[BotSpec, ...] = (
             "did not fit it. Hand to scout when the literature settles a target "
             "question, back to briefing when it changes the question itself."
         ),
-        capabilities=("research-read", "literature-search"),
+        capabilities=("research-read", "literature-search", "chain-messaging"),
         handoff=("briefing", "scout"),
         triggers=(
             "paper", "literature", "citation", "PubMed", "Europe PMC", "review",
@@ -113,6 +220,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Scout",
         title_zh="靶点情报",
         phase=2,
+        stance="produce",
         summary="Establish target identity, run target intelligence, and close retrievable Research gaps.",
         charter=(
             "You establish what the target actually is before anyone designs "
@@ -131,6 +239,7 @@ BOTS: tuple[BotSpec, ...] = (
             "research-read",
             "target-intelligence",
             "research-gap-repair",
+            "chain-messaging",
         ),
         handoff=("structuralist", "planner"),
         triggers=(
@@ -143,6 +252,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Structuralist",
         title_zh="结构与残基",
         phase=3,
+        stance="produce",
         summary="Read structures at residue level: chains, gaps, contacts, sites and confidence.",
         charter=(
             "You report geometry as measurement. Chains, residue numbering and "
@@ -157,7 +267,7 @@ BOTS: tuple[BotSpec, ...] = (
             "say, 'this is the active site' needs evidence from literature or a "
             "recorded experiment, so hand that to librarian or analyst."
         ),
-        capabilities=("project-read", "structure-analysis"),
+        capabilities=("project-read", "structure-analysis", "chain-messaging"),
         handoff=("planner", "analyst"),
         triggers=(
             "structure", "PDB", "mmCIF", "residue", "interface", "contact",
@@ -170,6 +280,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Planner",
         title_zh="路线规划",
         phase=4,
+        stance="produce",
         summary="Choose the route and draft the compute that implements it.",
         charter=(
             "You choose the route and draft the compute, and you stop there. "
@@ -187,6 +298,7 @@ BOTS: tuple[BotSpec, ...] = (
             "research-read",
             "workflow-planning",
             "compute-drafting",
+            "chain-messaging",
         ),
         handoff=("runner",),
         triggers=(
@@ -199,6 +311,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Runner",
         title_zh="步骤推进",
         phase=5,
+        stance="produce",
         summary="Carry a confirmed run across its waits and report each step's outcome.",
         charter=(
             "You carry a confirmed run across its waits. You do not submit, "
@@ -213,7 +326,12 @@ BOTS: tuple[BotSpec, ...] = (
             "genuinely separable and say what you delegated. Report what has "
             "finished and what is still pending as two different things."
         ),
-        capabilities=("project-read", "workflow-planning", "agent-orchestration"),
+        capabilities=(
+            "project-read",
+            "workflow-planning",
+            "agent-orchestration",
+            "chain-messaging",
+        ),
         handoff=("medic", "analyst"),
         triggers=(
             "advance", "next step", "wait", "monitor", "run",
@@ -225,6 +343,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Medic",
         title_zh="故障诊断",
         phase=6,
+        stance="produce",
         summary="Explain why a job failed, in terms of what it declared versus what it was given.",
         charter=(
             "You explain failures from recorded evidence. Read the job's error, "
@@ -238,7 +357,7 @@ BOTS: tuple[BotSpec, ...] = (
             "anything else. Propose the fix as a change to the draft and hand it "
             "to planner; you do not resubmit."
         ),
-        capabilities=("project-read", "failure-diagnosis"),
+        capabilities=("project-read", "failure-diagnosis", "chain-messaging"),
         handoff=("planner", "runner"),
         triggers=(
             "failed", "failure", "error", "crash", "exit code", "diagnose",
@@ -250,6 +369,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Analyst",
         title_zh="结果解读",
         phase=7,
+        stance="produce",
         summary="Interpret recorded computational and bench results without inventing any.",
         charter=(
             "You interpret what was recorded. Every number you quote carries its "
@@ -267,6 +387,7 @@ BOTS: tuple[BotSpec, ...] = (
             "result-interpretation",
             "wetlab-read",
             "wetlab-authoring",
+            "chain-messaging",
         ),
         handoff=("archivist", "structuralist"),
         triggers=(
@@ -279,6 +400,7 @@ BOTS: tuple[BotSpec, ...] = (
         title="Archivist",
         title_zh="记录归档",
         phase=8,
+        stance="produce",
         summary="Attach evidence to research goals and draft the record of what was decided.",
         charter=(
             "You record decisions; you do not make them. Write down what was "
@@ -296,11 +418,82 @@ BOTS: tuple[BotSpec, ...] = (
             "research-read",
             "research-trace-authoring",
             "knowledge-authoring",
+            "chain-messaging",
         ),
         handoff=("briefing",),
         triggers=(
             "record", "archive", "decision", "goal", "attach", "note",
             "记录", "归档", "决策", "目标", "笔记",
+        ),
+    ),
+    BotSpec(
+        id="steward",
+        title="Steward",
+        title_zh="资源守门",
+        phase=4,
+        stance="review",
+        summary="Check a compute draft's declared resources against what the job can actually use.",
+        charter=(
+            "You review resource declarations before a human confirms a draft. "
+            "Read the draft and compare four things that must agree: the slot "
+            "count, the per-host span, the thread or worker count the tool will "
+            "actually start, and the GPU declaration. A job holding cores it "
+            "cannot use is a violation here, not a rounding error, and the queue "
+            "can merge its own GPU request into a job whose directives ask for "
+            "none - so a script that says it needs no GPU has to prove it at run "
+            "time rather than by saying so. Report each disagreement with the two "
+            "numbers that disagree. You do not edit the draft and you do not "
+            "confirm it: state the finding and hand it back to planner, whose "
+            "decision the route is. When the declaration is sound, say so plainly "
+            "- an approval that is never given makes the review a formality."
+        ),
+        capabilities=("project-read", "review-audit", "chain-messaging"),
+        handoff=("planner",),
+        reviews=("planner",),
+        triggers=(
+            "cores", "cpus", "ptile", "slots", "gpu", "resources", "utilisation",
+            "核数", "资源", "利用率", "占用",
+        ),
+    ),
+    BotSpec(
+        id="auditor",
+        title="Auditor",
+        title_zh="复核",
+        phase=9,
+        stance="review",
+        summary="Judge an operator's claims against the evidence it produced and the charter it works under.",
+        charter=(
+            "You judge claims; you never repair them. Take the handover, read "
+            "what the operator actually called and what came back, and rule on "
+            "each claim separately: supported when the evidence states it, "
+            "unsupported when nothing backs it, contradicted when the evidence "
+            "says otherwise, and outside_charter when the operator did something "
+            "its own charter forbids. Rule on what was run, not on what the "
+            "operator said it ran - the summary is the thing under review. A "
+            "claim with no evidence reference is unsupported, and saying so is "
+            "the finding rather than a gap in your reading. When a note has no "
+            "run behind it there is no transcript to check, so report it as "
+            "unreviewable rather than as clean. You hold no write and no fix: "
+            "hand every finding back to the operator that made the claim, and "
+            "say what would settle it. Say when you find nothing wrong - a "
+            "reviewer whose verdicts are always adverse stops being read."
+        ),
+        capabilities=("project-read", "research-read", "review-audit", "chain-messaging"),
+        handoff=("conductor",),
+        reviews=(
+            "briefing",
+            "librarian",
+            "scout",
+            "structuralist",
+            "planner",
+            "runner",
+            "medic",
+            "analyst",
+            "archivist",
+        ),
+        triggers=(
+            "review", "verify", "check", "audit", "verdict", "evidence",
+            "复核", "审查", "核对", "证据", "验证",
         ),
     ),
 )
@@ -309,13 +502,30 @@ BOTS: tuple[BotSpec, ...] = (
 _BY_ID: dict[str, BotSpec] = {bot.id: bot for bot in BOTS}
 
 
-def _validate_roster() -> None:
-    """Fail at import if the roster contradicts the capability registry.
+def _writes_of(capabilities: tuple[str, ...]) -> set[str]:
+    """Capabilities among these that grant at least one write tool.
 
-    A bot naming a capability that does not exist would silently resolve to a
-    smaller set, which looks like a working bot with a missing tool. A handoff
-    naming a bot that does not exist would tell the model to call for an
-    operator nobody can select.
+    Derived from the capability rows rather than listed here, so a capability
+    that gains a write tool later immediately makes any reviewer holding it a
+    roster error, instead of quietly turning a reviewer into a producer.
+    """
+    granting = {
+        str(item["id"])
+        for item in COPILOT_CAPABILITIES
+        if str(item.get("execution_mode", "read")) != "read"
+    }
+    return set(capabilities) & granting
+
+
+def _validate_roster() -> None:
+    """Fail at import if the roster contradicts itself or the capability rows.
+
+    Two kinds of error, and both are silent at run time if they are not caught
+    here. A bot naming a capability that does not exist resolves to a smaller
+    set, which looks like a working bot with a missing tool. A bot whose stance
+    and capabilities disagree looks like a working bot that is doing someone
+    else's job: a reviewer able to repair what it found leaves the repair
+    unchecked, and a director able to do the work does the work.
     """
     known = capability_ids()
     for bot in BOTS:
@@ -327,6 +537,49 @@ def _validate_roster() -> None:
         missing = sorted(set(bot.handoff) - set(_BY_ID))
         if missing:
             raise ValueError(f"bot {bot.id} hands off to unknown bots: {missing}")
+        if bot.stance not in STANCES:
+            raise ValueError(f"bot {bot.id} declares unknown stance: {bot.stance!r}")
+
+        writes = _writes_of(bot.capabilities) - _INTERNAL_WRITE_CAPABILITIES
+        if bot.stance == "review" and writes:
+            raise ValueError(
+                f"review bot {bot.id} declares write capabilities {sorted(writes)}; "
+                "a reviewer that can repair what it found is a second producer "
+                "and nobody checks the repair"
+            )
+        if bot.stance == "direct" and writes:
+            raise ValueError(
+                f"direct bot {bot.id} declares write capabilities {sorted(writes)}; "
+                "a director that can do the work will do the work instead of routing"
+            )
+
+        for capability, stance in _STANCE_ONLY.items():
+            if capability in bot.capabilities and bot.stance != stance:
+                raise ValueError(
+                    f"bot {bot.id} is {bot.stance} and declares {capability}, "
+                    f"which belongs to the {stance} stance"
+                )
+
+        if bot.reviews and bot.stance != "review":
+            raise ValueError(f"bot {bot.id} is {bot.stance} and cannot review other operators")
+        if bot.stance == "review" and not bot.reviews:
+            raise ValueError(f"review bot {bot.id} names nobody to review")
+        if bot.directs and bot.stance != "direct":
+            raise ValueError(f"bot {bot.id} is {bot.stance} and cannot direct other operators")
+        if bot.stance == "direct" and not bot.directs:
+            raise ValueError(f"direct bot {bot.id} names nobody to direct")
+
+        for target in sorted(set(bot.reviews) | set(bot.directs)):
+            other = _BY_ID.get(target)
+            if other is None:
+                raise ValueError(f"bot {bot.id} names unknown operator {target}")
+            if other.stance != "produce":
+                # Reviewing a reviewer, or directing a director, has no bottom.
+                # Accountability has to terminate on someone who produces.
+                raise ValueError(
+                    f"bot {bot.id} names {target}, which is {other.stance}; "
+                    "review and delegation must terminate on a producer"
+                )
 
 
 _validate_roster()
@@ -353,6 +606,31 @@ def require(bot_id: str) -> BotSpec:
             status_code=404,
         )
     return bot
+
+
+def producers() -> list[BotSpec]:
+    """Operators that do the work, as opposed to judging or routing it."""
+    return [bot for bot in all_bots() if bot.stance == "produce"]
+
+
+def reviewers_of(bot_id: str) -> list[BotSpec]:
+    """Who judges this operator's output.
+
+    The fourth thing a capability list cannot say, and the reason `reviews` is
+    declared on the reviewer: a producer cannot know, and must not be able to
+    choose, who checks it.
+    """
+    return [bot for bot in all_bots() if bot_id in bot.reviews]
+
+
+def may_direct(director_id: str, target_id: str) -> bool:
+    """Whether this director may delegate to this operator.
+
+    Bounded by the roster rather than by "any bot", so a director's reach is
+    reviewable in the same place its charter is.
+    """
+    director = _BY_ID.get(director_id)
+    return bool(director and director.stance == "direct" and target_id in director.directs)
 
 
 def capabilities_for_bot(bot_id: str, enabled_capabilities: set[str]) -> set[str]:
