@@ -79,16 +79,16 @@ export function successorsOf(bot: CopilotBot, bots: readonly CopilotBot[]): Copi
   })
 }
 
-/** Operators grouped by what they are for, in the order a picker should show them. */
+/** Operators grouped by what they are for, in the order a picker should show them.
+ *
+ * The labels live in the i18n bundles, not here. A `STANCE_LABELS` map sat in
+ * this file for one commit, in English only, read by nothing - the same
+ * declared-and-never-read shape as the `systemPrompt` field on the capability
+ * list this module replaced.
+ */
 export const STANCE_ORDER = ['direct', 'produce', 'review'] as const
 
 export type Stance = (typeof STANCE_ORDER)[number]
-
-export const STANCE_LABELS: Record<Stance, string> = {
-  direct: 'Coordination',
-  produce: 'The chain',
-  review: 'Review',
-}
 
 /**
  * The roster split by stance, so the picker groups by responsibility rather

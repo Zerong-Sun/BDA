@@ -335,10 +335,14 @@ One declaration, three surfaces, no duplication:
   not the step before `briefing` and a reviewer is not the step after
   `archivist`, which is what one ordered list would say.
 - `GET /copilot/projects/{id}/handoffs` returns the chain's handovers, newest
-  first, with each claim's evidence reference and confidence. A record only the
-  operators could read would make the channel's justification — that what one
-  operator claimed is auditable afterwards — true for `auditor` and false for the
-  person it is ultimately for.
+  first, with each claim's evidence reference and confidence, and the Copilot
+  drawer's **Chain** tab renders them. A record only the operators could read
+  would make the channel's justification — that what one operator claimed is
+  auditable afterwards — true for `auditor` and false for the person it is
+  ultimately for. The view is built around the unsupported claim: it is not an
+  error and is not hidden, because the operator made it and the server recorded
+  it rather than dropping it, so the reader looking for what to check finds it
+  first.
 - `POST /copilot/agent-runs` accepts `bot`. The server resolves the bot to its
   capability set, intersects it with the project configuration, and derives
   `allowed_tools` from the result — the client never names a tool.

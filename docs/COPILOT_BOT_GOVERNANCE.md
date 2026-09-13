@@ -121,6 +121,13 @@ without interpreting anything. This is what turns review from a vibes exercise
 into work with a defined output, and it is why the channel is worth a table
 rather than a string field.
 
+And why it is worth a screen. The record shipped with no UI, reachable only by
+asking the Copilot to read its own inbox in chat — which is the last operator's
+account of itself, not a record. The drawer's **Chain** tab renders it, and
+renders the unsupported claim loudest: the operator made it, the server wrote it
+down as unsupported rather than dropping it, and a reader looking for what to
+check should not have to hunt for it.
+
 ### Posting a note is not a research write
 
 The write-intent gate exists to stop a model changing **the research record**

@@ -17,6 +17,9 @@ vi.mock('../../features/copilot/CopilotSettings', () => ({
 vi.mock('../../features/copilot/CopilotAgentRuns', () => ({
   CopilotAgentRuns: () => <div>Agent run list</div>,
 }))
+vi.mock('../../features/copilot/CopilotChain', () => ({
+  CopilotChain: () => <div>Chain record</div>,
+}))
 
 afterEach(cleanup)
 
@@ -57,10 +60,37 @@ describe('CopilotDrawer', () => {
     await screen.findByRole('dialog', { name: 'Copilot' })
     expect(screen.getByText('Conversation')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent runs' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Agent runs' }))
 
     expect(await screen.findByText('Agent run list')).toBeInTheDocument()
     expect(screen.queryByText('Conversation')).not.toBeInTheDocument()
     expect(screen.queryByText('Actions')).not.toBeInTheDocument()
+  })
+
+  it('offers the surfaces as tabs rather than as toggle buttons', async () => {
+    // They were always mutually exclusive and already announced `aria-pressed`,
+    // which is a tab group wearing buttons: the roles were wrong for what it
+    // does and arrow keys did not move between them.
+    renderWithProviders(<DrawerHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
+    await screen.findByRole('dialog', { name: 'Copilot' })
+
+    const tabs = screen.getAllByRole('tab')
+
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Chat', 'Chain', 'Agent runs', 'MCP'])
+    expect(screen.getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('opens the chain record, which nothing else in the app shows', async () => {
+    // The handover table is what makes the roster auditable, and until this tab
+    // the only way to read it was to ask the Copilot about its own inbox.
+    renderWithProviders(<DrawerHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
+    await screen.findByRole('dialog', { name: 'Copilot' })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Chain' }))
+
+    expect(await screen.findByText('Chain record')).toBeInTheDocument()
+    expect(screen.queryByText('Conversation')).not.toBeInTheDocument()
   })
 })
