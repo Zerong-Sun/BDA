@@ -1,7 +1,8 @@
-> **已归档 · 2026-09-07**
+> **已归档 · 2026-09-13**
 > 原位置：`docs/COPILOT_CAPABILITY_PLAN_V2.md`。
-> 原因：能力规划缺少完整入口/API映射及新增实验服务。
-> 当前依据：[替代文档](../../../COPILOT_SERVICE_GUIDE.md)。以下正文按原样保存；其中原日期、状态、操作命令和行号属于历史，不作为当前使用说明。
+> 原因：合并任务服务指南时保留最新主线的 bot 能力与权限原文。
+> 当前依据：[服务与权限指南](../../COPILOT_SERVICE_GUIDE.md)、[Bot 名册](../../COPILOT_BOT_ROSTER.md)。
+> 以下正文来自主线提交 `06837cea2f4c3fe3b1d0d7ed0c03f6af1bee9c00`，原字节保留；历史链接可能已失效。
 
 ---
 
@@ -9,7 +10,7 @@
 
 状态：活跃
 
-最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
+最后核验：2026-09-13（Asia/Shanghai；本轮新增两个只读能力，并把职责划分移交 bot 名册）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -31,6 +32,8 @@ database access.
 | Project data | Read targets, candidates, experiments, workflows, jobs, drafts | Read | Project membership |
 | Research evidence | Read workspace entities, datasets, references, saved excerpts | Read | Project membership and citations |
 | Result interpretation | Explain recorded results and limitations | Read | No invented measurements |
+| Structure analysis | Read an uploaded structure artifact at residue level: chains, sequences, numbering gaps, ligands, disulfides, interface contacts, per-site neighbourhoods | Read | Project membership; measurements only, never a functional claim |
+| Failure diagnosis | Explain a failed compute job from its recorded error, attempts, events and declared runtime spec | Read | Project membership; each finding names its evidence and its confidence, and no evidence means no finding |
 | Knowledge authoring | Search notes; create `copilot_draft` notes | Draft | Explicit request; pending human review |
 | Literature search | Queue Europe PMC search and ingestion | Queue | Explicit request; auditable query and traces |
 | Target intelligence | Queue analysis for an exact operational Target UUID | Queue | Explicit request; exact project target |
@@ -38,6 +41,12 @@ database access.
 | Workflow planning | Inspect and recommend routes | Draft | Applying a route remains a user action |
 | Compute drafting | Create Docker/LSF draft | Draft | Explicit request; confirmation and submission remain user actions |
 | Durable agent run | Persist a bounded multi-turn task; suspend on a job or one child run and resume | Queue | Explicit run creation, project scope, tool allow-list, cost and depth limits |
+
+Which of these capabilities a given phase of work needs, who is accountable for that
+phase, and what that operator must refuse are one level up, in
+[Copilot bot roster](COPILOT_BOT_ROSTER.md). A bot narrows this matrix and never
+extends it: the capabilities in force are always the bot's declaration intersected
+with the project's enabled set.
 
 The durable runner stores its transcript, tool calls, pending tasks and accumulated cost
 on the server. A run may wait for a submitted compute job or spawn one level of child

@@ -1,0 +1,14 @@
+{
+  "archived_on": "2026-09-13",
+  "source_commit": "06837cea2f4c3fe3b1d0d7ed0c03f6af1bee9c00",
+  "preservation": "Original bytes are preserved after an archive notice.",
+  "documents": [
+    {
+      "old_path": "docs/COPILOT_CAPABILITY_PLAN_V2.md",
+      "archive_path": "docs/archive/2026-09-13/COPILOT_CAPABILITY_PLAN_V2.md",
+      "reason": "Preserve the current main document separately from the earlier archive.",
+      "replacement": "docs/COPILOT_SERVICE_GUIDE.md",
+      "original_sha256": "97bc957d1df01710da8f6ca258a17a9b80fe250e54f023fc8051d6d4323f255e"
+    }
+  ]
+}
