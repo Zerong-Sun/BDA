@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-12（Asia/Shanghai；补入工作区结构说明与归档索引）
+最后核验：2026-09-13（Asia/Shanghai；统一任务、bots、工作流与两批归档入口）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -12,43 +12,21 @@
 
 ## 开始使用
 
-按下面顺序阅读即可了解从建项目到运行的完整路径；只想使用计算器或仪器预览，可直接看第一份指南的“独立实验工具”。
-
-- [Workflow connections and gates](WORKFLOW_GATES.md)
-- [Workflow gate validation and repairs](WORKFLOW_GATES_REVIEW.md)
-
-- [Workflow connections and gates](WORKFLOW_GATES.md)
-- [Workflow gate validation and repairs](WORKFLOW_GATES_REVIEW.md)
-- [System operability review](SYSTEM_OPERABILITY_REVIEW.md)
-
-- [Workspace map / 工作区结构说明](WORKSPACE_MAP.md)
-- [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
-- [Backend v2](BACKEND_V2.md)
-- [Frontend v2](FRONTEND_V2.md)
-- [Research workspace and BYOK](BDA_RESEARCH_WORKSPACE_AND_BYOK.md)
-- [Compute targets](COMPUTE_TARGETS.md)
-- [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md)
-- [Copilot bot roster](COPILOT_BOT_ROSTER.md)
-- [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)
-- [Copilot DeepSeek configuration](COPILOT_DEEPSEEK_配置指南.md)
-- [Copilot validation report](COPILOT_VALIDATION_REPORT.md)
-- [Data catalog](DATA_CATALOG.md)
-- [Decision transparency](DECISION_TRANSPARENCY.md)
-- [Dual-mode operation plan (automated / manual)](DUAL_MODE_OPERATION_PLAN.md)
-- [MCP capability surface](MCP_CAPABILITY_SURFACE.md)
-- [Plugin interface](PLUGIN_INTERFACE.md)
-- [QM cluster operating rules](QM_CLUSTER_OPERATION_RULES.md)
-- [Research interface usage](RESEARCH_INTERFACE_USAGE_GUIDE.md)
-- [Research record structure](RESEARCH_RECORD_STRUCTURE.md)
-- [Research review writing standard](RESEARCH_REVIEW_WRITING_STANDARD.md)
-- [RFdiffusion workflow submission](RFDIFFUSION_WORKFLOW_SUBMISSION.md)
-- [Staging release and recovery evidence](STAGING_RELEASE_AND_RECOVERY.md)
-- [Local staging acceptance](V2_LOCAL_ACCEPTANCE.md)
-- [PD1 demo data card](../examples/migration-fixtures/pd1/DATA_CARD.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
-- [Copilot 服务指南：能力、页面入口、模型配置、工具权限与 HTTP 接口](COPILOT_SERVICE_GUIDE.md)
+- [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)
 - [公开 PD1 演示数据说明](../examples/migration-fixtures/pd1/DATA_CARD.md)
+- [工作区结构说明](WORKSPACE_MAP.md)
+
+## Copilot、bots 与工作流
+
+- [Bot 名册](COPILOT_BOT_ROSTER.md)
+- [Bot 职责与委派规则](COPILOT_BOT_GOVERNANCE.md)
+- [MCP 能力与调用契约](MCP_CAPABILITY_SURFACE.md)
+- [决策归属与人工放行](DECISION_TRANSPARENCY.md)
+- [工作流连接与门控](WORKFLOW_GATES.md)
+- [工作流门控验证与修复](WORKFLOW_GATES_REVIEW.md)
+- [系统可操作性复核](SYSTEM_OPERABILITY_REVIEW.md)
 
 ## 研究记录与审核
 

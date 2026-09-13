@@ -473,3 +473,30 @@ def test_a_known_project_kind_points_at_its_real_route(session: Session) -> None
     grant, _ = _grant(session, project, user)
     found = mcp.read_resource(session, grant, "bda://project/candidate/abc-123")
     assert found["payload"]["authoritative_path"] == "/api/v2/candidates/abc-123"
+
+
+def test_project_can_revoke_all_tools_from_an_existing_mcp_grant(session: Session):
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user)
+    assert mcp.available_tools(session, grant)
+    session.add(CopilotConfig(project_id=project.id, enabled_skills=[]))
+    session.flush()
+    assert mcp.available_tools(session, grant) == []
+
+
+def test_mcp_respects_task_steps_and_explicit_scope_over_goal_words(session: Session):
+    from backend_v2.app.copilot.task_contracts import build_contract
+
+    project, user = _project(session)
+    run = _run(session, project, user, goal="Search and save a draft note")
+    run.task_contract = build_contract("literature", ["create_knowledge_draft"])
+    session.flush()
+    grant, _ = _grant(session, project, user, run_id=run.id)
+    names = {spec.id for spec in mcp.available_tools(session, grant)}
+    assert "search_research" in names
+    assert "create_knowledge_draft" not in names  # Evidence step is still pending.
+    run.task_contract = build_contract("custom", [])
+    session.flush()
+    names = {spec.id for spec in mcp.available_tools(session, grant)}
+    assert not (names & REGISTRY.user_intent_write_ids())
+    assert not mcp.tool_context(session, grant).actions.request_allows("create_knowledge_draft")

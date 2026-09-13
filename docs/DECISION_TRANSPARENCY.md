@@ -4,7 +4,7 @@
 
 最后核验：2026-09-12（Asia/Shanghai；本轮七条规则全部落地，并经一次对抗性复查修掉六个缺陷）
 
-权威范围：本文只规定「一个判断如何被归属、证据如何被引用、哪些步骤必须由人放行、一次批准可以承载多少」。MCP 能力面见 [MCP 能力面](MCP_CAPABILITY_SURFACE.md)；Autopilot 的执行与预算模型见 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md)；Copilot 自身的能力边界见 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)。
+权威范围：本文只规定「一个判断如何被归属、证据如何被引用、哪些步骤必须由人放行、一次批准可以承载多少」。MCP 能力面见 [MCP 能力面](MCP_CAPABILITY_SURFACE.md)；Autopilot 的执行与预算模型见 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md)；Copilot 自身的能力边界见 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md)。
 
 数据来源：`backend_v2/app/{timeline,autopilot,core}/`、`frontend/src/features/{timeline,plugins,jobs,results}/`、`backend_v2/tests/test_{project_timeline,review_budget,autopilot_stage_gates,autopilot_formalization}.py`。
 

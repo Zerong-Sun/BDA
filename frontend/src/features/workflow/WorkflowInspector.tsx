@@ -19,7 +19,6 @@ import {
   type ScriptPreviewResponse,
 } from '../../lib/api/workflow'
 import { ParameterSchemaForm } from '../plugins'
-import { NodeAssistance } from './NodeAssistance'
 import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
 import { parseParameterSchema } from '../../lib/forms/parameterSchema'
 import { NodeAssistance } from './NodeAssistance'

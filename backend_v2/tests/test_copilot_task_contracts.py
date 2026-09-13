@@ -214,3 +214,48 @@ def test_scientific_review_covers_all_sections_and_rejects_invented_refs(session
     assert 'evidence_comparison' in seen[1][1]['content']
     assert run.outcome['status'] == 'review_required'
     assert run.outcome['scientific_review'] == 'unavailable'
+
+
+def test_legacy_bot_and_explicit_read_only_task_have_distinct_mandates(session: Session):
+    project, user = _project(session)
+    legacy, _ = start_agent_run(
+        session, project, user,
+        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="librarian"),
+    )
+    scoped, _ = start_agent_run(
+        session, project, user,
+        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="librarian", authorized_writes=[]),
+    )
+    assert legacy.task_contract == {}
+    assert "start_literature_search" in legacy.allowed_tools
+    assert scoped.task_contract["authorized_writes"] == []
+    assert not (set(scoped.allowed_tools) & REGISTRY.user_intent_write_ids())
+    # Handoffs are accountable internal records, not domain write permissions.
+    assert "post_handoff" in scoped.allowed_tools
+
+
+def test_delegation_keeps_explicit_scope_even_when_operator_changes(session: Session):
+    project, user = _project(session)
+    parent = _run(
+        session, project, user, bot="conductor", task_contract=build_contract("custom", []),
+        allowed_tools=["delegate_to_operator", "post_handoff"],
+    )
+    child = _run(
+        session, project, user, parent_run_id=parent.id, bot="librarian",
+        goal="Search and save a note",
+        allowed_tools=["search_research", "start_literature_search", "post_handoff"],
+    )
+    assert child.task_contract["authorized_writes"] == []
+    assert set(child.allowed_tools) == {"search_research", "post_handoff"}
+
+
+def test_task_step_keeps_handoffs_without_unlocking_future_writes():
+    from backend_v2.app.copilot.task_contracts import available_step_tools
+
+    run = SimpleNamespace(
+        task_contract=build_contract("literature", ["create_knowledge_draft"]),
+        allowed_tools=["search_research", "get_reference_content", "create_knowledge_draft", "post_handoff"],
+    )
+    offered = available_step_tools(run, [])
+    assert "post_handoff" in offered
+    assert "create_knowledge_draft" not in offered

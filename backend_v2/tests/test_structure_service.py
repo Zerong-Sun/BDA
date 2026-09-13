@@ -265,7 +265,7 @@ def test_a_malformed_argument_raises_rather_than_reaching_storage(session: Sessi
 
     with pytest.raises(ValueError):
         REGISTRY.execute("analyse_structure", ctx, {"artifact_id": "not-a-uuid"}, granted={"structure-analysis"})
-    with pytest.raises(ValueError):
+    with pytest.raises(DomainError, match="declared schema"):
         REGISTRY.execute(
             "list_structure_contacts",
             ctx,

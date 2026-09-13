@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-07（Asia/Shanghai；对照当前工作树代码与 OpenAPI）
+最后核验：2026-09-13（Asia/Shanghai；合并任务服务、bot 名册与 MCP 契约）
 
 权威范围：BDA v2 的 Copilot 服务种类、前端入口、工具权限、HTTP 接口、模型配置与实现边界。平台整体成熟度见 [README](../README.md)。
 
@@ -14,13 +14,19 @@
 
 Copilot 是围绕研究目标推进工作的项目助手。默认入口是同一工作区中的目标输入、任务计划、进度和交付物；简单问题进入对话，连续工作先展示可修改的服务类型及授权范围。Research 的调研入口复用同一工作区。系统的文本分类只是可修改的建议，不决定权限。
 
-用户侧提供五类服务：**明确研究目标、调研与比较证据、制定实验方案、跟进执行与处理异常、解读结果与设计下一轮**。13 类能力是开发者的权限分组，29 个工具是执行接口，不要求用户理解这些内部分类。
+用户侧提供五类服务：**明确研究目标、调研与比较证据、制定实验方案、跟进执行与处理异常、解读结果与设计下一轮**。18 类能力是开发者的权限分组，40 个工具是执行接口，不要求用户理解这些内部分类。
 
 启动前检查任务计划；外部检索和保存笔记分别勾选授权，未勾选只读取现有资料。运行时按步骤收窄工具范围。任务卡持续展示实际步骤、来源、交付内容、缺口和下一步，原始轮次默认折叠。项目首页可进入助手或直接继续专业页面。
 
 任务书交付物可以编辑后应用为项目 prompt，保存时携带项目版本和修改原因。停止的任务可以保存为 `pending_review` 标签的计划记录，再进入项目决策树关联目标和编辑；该动作不批准科学结论。补充信息可继续原任务，可保留或缩小写入授权，费用额度不变，最多增加 12 轮，总上限 200。
 
 Autopilot 保留高级“按批准方案运行”入口和独立的方案确认、计算预算协议。Copilot 任务与 campaign 尚未共用完整执行状态机，当前不开放完整无人值守闭环。
+
+### Bots 与其他入口
+
+抽屉默认打开任务页，同时保留聊天、协作链、后台运行记录和 MCP 页签。12 个 bots 按产出、审核、调度划分职责；选择 bot 会把其能力与项目授权求交集。完整名册与交接关系见 [Bot 名册](COPILOT_BOT_ROSTER.md)，委派和审核约束见 [Bot 治理](COPILOT_BOT_GOVERNANCE.md)。
+
+显式任务范围与旧客户端兼容：请求省略服务类型和 `authorized_writes` 时，继续按原始用户请求判断写入意图；提供服务类型或写入清单（包括空列表）则保存明确任务契约。子任务、切换 bot 和 MCP 均不能扩大已保存的写入范围；内部交接记录仍按 bot 章程保留。MCP 还受当前任务步骤限制，项目撤回全部能力后，已有会话也不再提供工具。
 
 ### 按任务查找专业入口
 
@@ -62,6 +68,8 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 - `draft` 不能一概理解为“不写数据库”：知识草案会落库，`wetlab-authoring` 的分析会记录结果，`research-trace-authoring` 会建立关联。具体副作用见能力表。
 - 普通聊天的 `skill` 只接受规范能力 ID；配置和 agent run 的 `skills` 支持兼容别名。`research` 是较宽的历史能力集合，包含计算草案及实验写入；它不等于专用文献调研入口的四项权限。
 - `enabled_skills=[]` 现在明确表示禁用全部工具；未提供配置时才继承默认能力。迁移 `0056` 将旧空列表转换成显式 `research`，保留原部署语义。保存模型设置不会把已禁用的权限重新打开。后台每轮都会收窄已被项目撤回的权限。完整项目权限矩阵仍主要通过配置 API 管理。
+
+上述边界同样约束 [MCP](MCP_CAPABILITY_SURFACE.md)。普通聊天还禁止取消作业、删除项目数据、报告排队工作已经完成，以及暴露凭据、对象密钥或访问令牌。内部交接不是批准研究证据。
 
 ### 可直接使用的请求示例
 
@@ -144,7 +152,7 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 ## 7. 开发者：能力与模型工具清单
 
-下表按 `capabilities.py` 的授权分组列出 13 类服务、29 个不同工具。部分读工具在多个能力中共享；实际参数、执行上下文及权限以工具注册和领域服务为准。`GET /api/v2/copilot/skills` 返回能力元数据，不是完整工具参数 schema。
+下表按 `capabilities.py` 的授权分组列出 18 类能力、40 个不同工具。部分读工具在多个能力中共享；实际参数、执行上下文及权限以工具注册和领域服务为准。`GET /api/v2/copilot/skills` 返回能力元数据，不是完整工具参数 schema。
 
 | 能力 ID | 模型工具名 | 服务及副作用 |
 | --- | --- | --- |
@@ -160,6 +168,11 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | `wetlab-authoring` | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | 明确请求后提升候选为实验构建体，或分析已上传 artifact 并记录实验结果。 |
 | `research-trace-authoring` | `attach_to_research_goal` | 明确请求后将已有结果、候选、构建体等关联研究目标。 |
 | `agent-orchestration` | `await_compute_job`, `spawn_subagent` | 仅后台 agent run：等待已存在作业、创建受父任务权限和深度限制的子任务。不是提交计算工具。 |
+| `structure-analysis` | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | 读取同项目已上传结构；只报告记录与测量，不批准功能结论。 |
+| `failure-diagnosis` | `get_compute_status`, `diagnose_compute_failure` | 读取作业错误和执行记录；诊断不等于重提作业。 |
+| `chain-messaging` | `post_handoff`, `read_handoffs` | 具名 bot 的内部交接记录，不修改领域数据。 |
+| `chain-orchestration` | `list_operators`, `delegate_to_operator` | 依章程委派；权限仍受项目及原始用户授权约束。 |
+| `review-audit` | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | 读取章程和执行记录供审核；不代替人工批准。 |
 | `compute-drafting` | `get_compute_status`, `create_compute_draft` | 读计算状态，创建待确认计算草案；不确认、不提交。 |
 
 ## 8. 开发者：HTTP 接口地图
@@ -170,6 +183,12 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 | 方法与接口 | 提供的服务 | 返回/执行位置 |
 | --- | --- | --- |
+| `GET /api/v2/copilot/bots` | Bot 名册、章程与职责 | 200，同步，只读 |
+| `GET /api/v2/copilot/projects/{project_id}/handoffs` | 项目内交接收件箱 | 200，只读 |
+| `POST /api/v2/copilot/mcp-sessions` | 签发受限 MCP 会话 | 201，令牌仅创建时返回 |
+| `GET /api/v2/copilot/projects/{project_id}/mcp-sessions` | 列出项目 MCP 会话 | 200 |
+| `GET /api/v2/copilot/mcp-sessions/{session_id}` | 读取会话范围与状态 | 200 |
+| `POST /api/v2/copilot/mcp-sessions/{session_id}/revocations` | 撤销会话 | 200 |
 | `GET /api/v2/copilot/task-services` | 五类服务、能力上限、写工具及步骤目录 | 200，同步，只读 |
 | `GET /api/v2/copilot/projects/{project_id}/task-readiness` | 当前模型的有效检查记录和可用服务 | 200，同步，只读 |
 | `POST /api/v2/copilot/projects/{project_id}/config/assessments` | 两次模型调用，运行四项协议检查 | 200，服务端保存与模型指纹绑定的检查结果 |
@@ -192,9 +211,9 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | `GET /api/v2/copilot/agent-runs/{run_id}/turns` | 读取模型/工具轮次 | 200，cursor 分页 |
 | `POST /api/v2/copilot/agent-runs/{run_id}/cancellations` | 用户取消后台任务 | 200，须 If-Match；返回取消结果，不是普通聊天工具 |
 
-聊天请求主要字段：`project_id`、`message`、可选 `conversation_id`、`skill`、`context`。`context` 支持 `route`、`research_tab`、`selected_entity_ids`、`language`；顶层 `intent=review_section` 用于章节辅助。
+聊天请求主要字段：`project_id`、`message`、可选 `conversation_id`、`skill` 或 `bot`、`context`。`context` 支持 `route`、`research_tab`、`selected_entity_ids`、`language`；顶层 `intent=review_section` 用于章节辅助。
 
-后台任务主要字段：`project_id`、`goal`、`service_kind`、`authorized_writes`，可选 `skills`、`max_turns`、`max_cost_usd_cents`。默认配方 UI 和 API 为 24 轮，旧专家面板为 12 轮；金额单位为美分。服务端生成并保存 `task_contract`，客户端不能提交完成判据。响应 `outcome` 包含步骤、交付内容、缺口、来源操作和产物入口；`status` 保留执行状态兼容。
+后台任务主要字段：`project_id`、`goal`、`service_kind`、`authorized_writes`，可选 `skills` 或 `bot`、`max_turns`、`max_cost_usd_cents`。默认配方 UI 和 API 为 24 轮，旧专家面板为 12 轮；金额单位为美分。服务端生成并保存 `task_contract`，客户端不能提交完成判据。响应 `outcome` 包含步骤、交付内容、缺口、来源操作和产物入口；`status` 保留执行状态兼容。
 
 ### 8.2 嵌在页面中的 AI 和研究交接
 

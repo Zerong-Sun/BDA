@@ -342,3 +342,21 @@ def test_enzyme_project_does_not_receive_binder_template(compute_session, monkey
     assert plan.route_options == []
     assert plan.recommended_route == ''
     assert any('project type' in item for item in plan.rationale)
+
+
+def test_script_review_uses_saved_configuration_and_detects_a_changed_script():
+    from backend_v2.app.compute.review import render_review
+    from backend_v2.app.workflows.assistance import parse_script
+    from backend_v2.app.workflows.gate_schemas import ScriptImport
+
+    node = SimpleNamespace(
+        id=uuid.uuid4(), parameters={}, queue=None, container_image=None, command="echo original",
+        configuration={"script": parse_script(ScriptImport(filename="review.sh", language="shell", source="echo reviewed"))},
+    )
+    manifest = {"parameters": {}, "inputs": [], "pending_inputs": []}
+    script, fingerprint = render_review(node, None, "docker", manifest)
+    assert "echo reviewed" in script and "echo original" not in script
+    node.configuration = {"script": parse_script(ScriptImport(filename="review.sh", language="shell", source="echo changed"))}
+    changed, next_fingerprint = render_review(node, None, "docker", manifest)
+    assert "echo changed" in changed
+    assert next_fingerprint != fingerprint

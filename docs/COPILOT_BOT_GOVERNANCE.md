@@ -8,7 +8,7 @@
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
-替代关系：不取代 [Copilot bot roster](COPILOT_BOT_ROSTER.md)（名册与各 bot 的章程），也不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威）。本文定义名册之上的一层：谁可以判谁、谁可以调度谁、以及它们如何交谈。
+替代关系：不取代 [Copilot bot roster](COPILOT_BOT_ROSTER.md)（名册与各 bot 的章程），也不取代 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md)（能力与权限的权威）。本文定义名册之上的一层：谁可以判谁、谁可以调度谁、以及它们如何交谈。
 
 ## The defect this exists to fix
 

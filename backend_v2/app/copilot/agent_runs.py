@@ -92,9 +92,11 @@ def create_run(
 
     contract = dict(task_contract or {})
     if parent_run_id is not None and (parent.task_contract or {}).get("version"):
+        from .registry import REGISTRY
         from .task_contracts import build_contract
         parent_writes = set((parent.task_contract or {}).get("authorized_writes", []))
         contract = build_contract("custom", sorted(parent_writes & set(allowed_tools)))
+        allowed_tools = sorted(set(allowed_tools) - (REGISTRY.user_intent_write_ids() - parent_writes))
 
     run = CopilotAgentRun(
         project_id=project_id,

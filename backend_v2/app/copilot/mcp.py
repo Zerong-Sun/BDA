@@ -138,10 +138,8 @@ def granted_capabilities(session: Session, grant: CopilotMcpSession) -> set[str]
     Intersected on every call rather than frozen at issue time, so turning a
     capability off for the project immediately narrows the grants already out.
 
-    An empty `granted_capabilities` means *none*. `normalize_capabilities([])`
-    returns the full research alias set - correct for a project config, where
-    empty means "unconfigured, use the default", and wrong here, where empty
-    means the issuer granted nothing.
+    An empty grant or explicit empty project configuration means no tools.
+    Only a missing project configuration inherits the default capabilities.
     """
     if not grant.granted_capabilities:
         return set()
@@ -193,12 +191,10 @@ def available_tools(session: Session, grant: CopilotMcpSession) -> list[ToolSpec
 def _intent_filtered(
     session: Session, grant: CopilotMcpSession, run: CopilotAgentRun, names: set[str]
 ) -> set[str]:
-    """Drop writes the run's goal did not ask for.
+    """Filter domain writes by the saved task scope or original user's request.
 
-    Only the five action-service tools can be checked this way: `request_allows`
-    is defined over `actions._ACTION_REQUEST_TERMS` and knows no others. The rest
-    of the write tools are gated by the run binding alone, which is why a grant
-    without a run exposes none of them.
+    Delegated goals and MCP arguments cannot extend that mandate. Internal
+    handoff records are governed separately by the bound operator's charter.
     """
     from .research_agent import WRITE_TOOL_NAMES
 
@@ -220,8 +216,8 @@ def tool_context(session: Session, grant: CopilotMcpSession) -> ToolContext:
     """The services an MCP call may use.
 
     Mirrors `agent_loop._tool_context`, with two differences that are the point:
-    `agent_run` is left unset, and `request_text` comes from the bound run's goal
-    - never from the client's arguments.
+    `agent_run` is left unset, and authorization comes from the saved task
+    scope or originating user's request, never from the client's arguments.
     """
     from .actions import CopilotActionService
     from .agent_loop import authorising_text

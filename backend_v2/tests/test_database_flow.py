@@ -62,7 +62,7 @@ def test_dag_dispatches_only_dependency_ready_jobs() -> None:
                         key="child", node_type="model", model_plugin="demo", model_plugin_id=plugin.id
                     ),
                 ],
-                edges=[WorkflowEdgeInput(source="root", target="child")],
+                edges=[WorkflowEdgeInput(id="root-child", source="root", target="child", gate={"mode": "dependency", "configured": True})],
             ),
             user,
         )

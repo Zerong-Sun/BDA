@@ -8,7 +8,7 @@
 
 数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
 
-替代关系：不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威），也不取代 [MCP capability surface](MCP_CAPABILITY_SURFACE.md)（外部调用契约）。本文在两者之上定义“谁负责链条的哪一段”；职责轴（stance）、交接协议与委派规则在 [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md)。
+替代关系：不取代 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md)（能力与权限的权威），也不取代 [MCP capability surface](MCP_CAPABILITY_SURFACE.md)（外部调用契约）。本文在两者之上定义“谁负责链条的哪一段”；职责轴（stance）、交接协议与委派规则在 [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md)。
 
 ## Why a roster rather than one assistant
 
