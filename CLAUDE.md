@@ -23,7 +23,15 @@ backend_v2/.venv/bin/mypy --config-file backend_v2/pyproject.toml backend_v2/app
 backend_v2/.venv/bin/pytest backend_v2/tests
 npm --prefix frontend test
 npm --prefix frontend run build
+npm --prefix frontend run lint
 ```
+
+`npm run lint` is a separate CI step and neither `test` nor `build` runs it, so a
+change can be green locally on both and still turn the `frontend` job red. Two
+rules bite most often: a component file may export only components
+(`react-refresh/only-export-components` — put hooks and constants in their own
+module), and `features/lab` carries three standing TanStack Table warnings that
+are not yours.
 
 Single backend test / single frontend test:
 

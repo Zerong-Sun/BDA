@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
 import { ArrowRightIcon, WarningCircleIcon } from '@phosphor-icons/react'
-import { listHandoffsApiV2CopilotProjectsProjectIdHandoffsGet } from '../../lib/api/generated'
 import type { HandoffResponse } from '../../lib/api/generated'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
@@ -9,6 +7,7 @@ import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import { Button } from '../../components/ui/Button'
 import { useCopilotBots, type CopilotBot } from './bots/registry'
+import { useCopilotHandoffs } from './handoffs'
 
 /**
  * The record of what one operator handed the next, and what it claimed.
@@ -45,25 +44,6 @@ function confidenceLabel(
 ): string {
   if (!confidence) return ''
   return labels[confidence] ?? confidence
-}
-
-export const copilotHandoffsQueryKey = (projectId: string | null) =>
-  ['copilot', 'handoffs', projectId] as const
-
-export function useCopilotHandoffs(projectId: string | null) {
-  return useQuery({
-    // The project id is in the key because a handover belongs to one project and
-    // nothing else; a shared key would show one project's chain inside another.
-    queryKey: copilotHandoffsQueryKey(projectId),
-    enabled: Boolean(projectId),
-    queryFn: async () => {
-      const { data } = await listHandoffsApiV2CopilotProjectsProjectIdHandoffsGet<true>({
-        throwOnError: true,
-        path: { project_id: projectId as string },
-      })
-      return data.items
-    },
-  })
 }
 
 function operatorName(id: string, bots: readonly CopilotBot[], zh: boolean): string {
