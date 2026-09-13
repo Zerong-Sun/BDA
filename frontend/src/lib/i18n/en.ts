@@ -286,7 +286,7 @@ export const en: TranslationDict = {
     subtitle: 'Browse, search, and switch between all research projects.',
     searchPlaceholder: 'Search by name, ID, or summary…',
     sortBy: 'Sort projects',
-    sortRecent: 'Recently created',
+    sortRecent: 'Recently updated',
     sortStatus: 'Status priority',
     sortName: 'Name (A–Z)',
     filterStatus: 'Filter by status',

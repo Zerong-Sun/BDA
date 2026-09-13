@@ -83,7 +83,7 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
   return page
 }
 
-async function screenshot(page, name) { await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); await page.screenshot({ path: `${output}/${name}.png`, fullPage: true }) }
+async function screenshot(page, name) { await page.evaluate(() => window.scrollTo(0, 0)); await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); await page.screenshot({ path: `${output}/${name}.png`, fullPage: true }) }
 async function noOverflow(page, label) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const dimensions = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }))
@@ -108,8 +108,13 @@ try {
   await page.goto(`${origin}/#/projects?project=proj_browser`)
   await page.getByRole('link', { name: bundle.projects[0].name.en, exact: true }).waitFor()
   assert.equal(await page.locator('.project-row canvas, .project-row img').count(), 0)
+  assert.equal(await page.getByRole('combobox', { name: 'Filter by status' }).innerText(), 'All statuses')
+  assert.equal(await page.getByRole('combobox', { name: 'Sort projects' }).innerText(), 'Recently updated')
+  await page.getByRole('combobox', { name: 'Sort projects' }).click()
+  await page.getByRole('option', { name: 'Name (A–Z)', exact: true }).click()
+  assert.equal(await page.getByRole('combobox', { name: 'Sort projects' }).innerText(), 'Name (A–Z)')
   await screenshot(page, 'projects-en-light')
-  for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 1000 }); await noOverflow(page, `Projects ${width}`) }
+  for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 1000 }); await noOverflow(page, `Projects ${width}`); if (width === 390) await screenshot(page, 'projects-mobile') }
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('link', { name: 'Open', exact: true }).click()
   await page.getByRole('region', { name: 'Project brief' }).waitFor()
@@ -169,8 +174,8 @@ try {
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
   await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
   checks.push('Structure A/B selection survives Bot round trips and full page reloads')
-  await page.getByRole('button', { name: 'Structuralist structuralist', exact: true }).click()
-  assert.equal(await page.getByRole('button', { name: 'Structuralist structuralist', exact: true }).getAttribute('aria-pressed'), 'true')
+  await page.getByRole('button', { name: 'Structuralist', exact: true }).click()
+  assert.equal(await page.getByRole('button', { name: 'Structuralist', exact: true }).getAttribute('aria-pressed'), 'true')
   await page.getByRole('tab', { name: 'Bot handoffs', exact: true }).click()
   await screenshot(page, 'bots-handoffs-en-light')
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
@@ -181,6 +186,26 @@ try {
     checks.push(`Actual FastAPI catalog renders all ${catalog.bots.length} Bots and ${catalog.services.length} services`)
   }
   await screenshot(page, 'bots-en-light')
+  await page.setViewportSize({ width: 390, height: 1000 })
+  await noOverflow(page, 'Mobile Bot composer')
+  await screenshot(page, 'bots-mobile')
+  await page.getByRole('button', { name: 'More workspace actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Application settings', exact: true }).waitFor()
+  await page.getByRole('menuitem', { name: 'Toolbox', exact: true }).waitFor()
+  await page.getByRole('menuitem', { name: 'Interface tour', exact: true }).waitFor()
+  await screenshot(page, 'mobile-utilities')
+  await page.keyboard.press('Escape')
+  await page.getByRole('menu').waitFor({ state: 'hidden' })
+  const lastBot = page.locator('.bot-roster-item').last()
+  await lastBot.focus()
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('.bot-roster-item')).at(-1)?.getAttribute('aria-pressed') === 'true')
+  assert.equal(await lastBot.getAttribute('aria-pressed'), 'true')
+  await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
+  await page.getByLabel('Task goal', { exact: true }).focus()
+  await page.screenshot({ path: `${output}/bots-mobile-focus.png` })
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  checks.push('Localized filters display labels after selection; last mobile Bot remains keyboard-accessible')
   await page.getByLabel('Task goal', { exact: true }).fill('Research the existing project sources')
   await page.getByRole('button', { name: 'Research the evidence', exact: true }).click()
   await page.getByRole('checkbox', { name: 'Allow saving research notes for review' }).check()
@@ -222,6 +247,9 @@ try {
   const zh = await newPage('zh', 'dark', 'read-only')
   await zh.goto(`${origin}/#/projects?project=proj_browser`)
   await zh.locator('.project-row').waitFor()
+  assert.equal(await zh.getByRole('combobox', { name: '按状态筛选' }).innerText(), '全部状态')
+  assert.equal(await zh.getByRole('combobox', { name: '排序方式' }).innerText(), '最近更新')
+  assert.ok((await zh.locator('.science-preview-footer').innerText()).includes(bundle.projects[0].name.zh))
   await screenshot(zh, 'projects-zh-dark')
   await zh.getByRole('link', { name: 'Open', exact: true }).count().then(async (count) => {
     if (count) await zh.getByRole('link', { name: 'Open', exact: true }).click()
@@ -235,6 +263,13 @@ try {
     await noOverflow(zh, `Chinese brief ${width}`)
   }
   checks.push('Responsive Bot and Chinese brief layouts; demo/viewer goal edits disabled')
+  await zh.goto(`${origin}/#/bots?project=proj_browser&view=tasks`)
+  await zh.getByRole('heading', { name: '你希望完成什么？' }).waitFor()
+  await screenshot(zh, 'bots-zh-dark')
+  await zh.setViewportSize({ width: 390, height: 1000 })
+  await noOverflow(zh, 'Chinese mobile Bots')
+  await screenshot(zh, 'bots-zh-mobile')
+  await zh.setViewportSize({ width: 1440, height: 1000 })
   await zh.goto(`${origin}/#/bots?project=proj_browser&view=tasks&run=task-browser`)
   await zh.getByText(task.outcome.summary, { exact: true }).waitFor()
   assert.ok(await zh.getByRole('button', { name: '继续此任务', exact: true }).isDisabled())
@@ -268,7 +303,7 @@ try {
   await errorPage.getByText('Roster unavailable for this test').waitFor()
   failRoster = false
   await errorPage.getByRole('button', { name: 'Retry', exact: true }).click()
-  await errorPage.getByRole('button', { name: 'Conductor conductor', exact: true }).waitFor()
+  await errorPage.getByRole('button', { name: 'Conductor', exact: true }).waitFor()
   checks.push('Roster failure is recoverable through Retry')
   failTask = true
   const taskError = await newPage()

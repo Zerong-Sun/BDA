@@ -60,14 +60,16 @@ function BotProjectWorkspace() {
           <aside className="bot-roster" aria-label={zh ? '研究 Bot 名录' : 'Research Bot roster'}>
             <h2>{zh ? '研究伙伴' : 'Research team'}</h2>
             <p className="mb-4 text-xs text-text-muted">{zh ? '选择职责，开始对话。' : 'Choose a responsibility to start a conversation.'}</p>
+            <div className="bot-roster-scroll">
             <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={view === 'chat' && !selectedId} onClick={() => selectBot(null)}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '自动匹配' : 'Auto-match'}</strong><small>{zh ? '根据问题选择 Bot' : 'Match the question to a Bot'}</small></span></Button>
             <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>
-              {byStance(bots.data ?? []).map((group) => <div key={group.stance}>
+              {byStance(bots.data ?? []).map((group) => <div className="bot-roster-group" key={group.stance}>
                 <p className="bot-stance">{({ direct: zh ? '协调' : 'Coordinate', produce: zh ? '研究与产出' : 'Research & produce', review: zh ? '审阅' : 'Review' })[group.stance]}</p>
-                {group.bots.map((bot) => <Button variant="ghost" type="button" className="bot-roster-item" key={bot.id} aria-pressed={view === 'chat' && selectedId === bot.id} onClick={() => selectBot(bot.id)}><BotAvatar id={bot.id} stance={bot.stance} /><span><strong>{name(bot)}</strong><small>{bot.id}</small></span></Button>)}
+                {group.bots.map((bot) => <Button variant="ghost" type="button" className="bot-roster-item" key={bot.id} aria-label={name(bot)} title={bot.summary} aria-pressed={view === 'chat' && selectedId === bot.id} onClick={() => selectBot(bot.id)}><BotAvatar id={bot.id} stance={bot.stance} /><span><strong>{name(bot)}</strong></span></Button>)}
               </div>)}
               {bots.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '暂无可用 Bot。可在模型设置中检查配置。' : 'No Bots available. Check model settings.'}</p> : null}
             </ApiState>
+            </div>
           </aside>
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
@@ -87,6 +89,7 @@ function BotProjectWorkspace() {
             </Tabs>
           </div>
           <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />
+            <p className="science-eyebrow bot-materials-label">{zh ? '项目资料' : 'PROJECT MATERIALS'}</p>
             <nav aria-label={zh ? '项目资料' : 'Project materials'}>{[
               ['evidence', zh ? '文献与证据' : 'Literature & evidence'], ['structures', zh ? '结构对照' : 'Structure comparison'], ['methods', zh ? '实验方案' : 'Experiment plan'], ['timeline', zh ? '决策记录' : 'Decision record'],
             ].map(([tab, label]) => <Link key={tab} to={`/research?project=${encodeURIComponent(projectId)}&tab=${tab}`}>{label}<ArrowRightIcon /></Link>)}</nav>

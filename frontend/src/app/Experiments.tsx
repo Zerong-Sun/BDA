@@ -68,8 +68,8 @@ export function ExperimentsPage() {
   const query = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
 
   return (
-    <section>
-      <ScienceWelcome onCreate={openCreate} />
+    <section className="projects-page">
+      <ScienceWelcome />
 
       {appMode === 'demo' ? (
         <Alert className="mb-5" variant="warning">
@@ -88,7 +88,6 @@ export function ExperimentsPage() {
         </Alert>
       ) : null}
 
-      <div className="mb-4 flex justify-end"><Button type="button" variant="ghost" size="sm" onClick={() => setShowIntro(!showIntro)} aria-expanded={showIntro}>{t.experimentsExt.gettingStarted}</Button></div>
       {showIntro ? (
         <AppFrame className="mb-6" panelClassName="p-4">
           <div className="flex items-start justify-between gap-3">
@@ -129,6 +128,8 @@ export function ExperimentsPage() {
 
       <div data-tour-id="project-library">
       <ProjectLibrary
+        onToggleIntro={() => setShowIntro(!showIntro)}
+        introOpen={showIntro}
         onCreate={openCreate}
         onManage={(project) => {
           setProjectId(project.id)

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { ArrowRightIcon, BooksIcon, ChartLineUpIcon, CompassIcon, FlaskIcon, ListChecksIcon, SparkleIcon } from '@phosphor-icons/react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,6 +15,8 @@ import { assessTaskReadiness, getTaskReadiness, isLive, listAgentRuns, listTaskS
 import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
 import { deliveryLabel, isQuestion, suggestService, type ServiceKind } from './taskPresentation'
+
+const serviceIcons = { brief: CompassIcon, literature: BooksIcon, planning: FlaskIcon, execution: ListChecksIcon, interpretation: ChartLineUpIcon }
 
 interface WorkspaceProps {
   pageContext?: string
@@ -84,16 +87,20 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     <Button type="button" variant="outline" render={<Link to="/tools" />}>{zh ? '直接使用实验工具' : 'Open experiment tools'}</Button></div>
   if (runId) return <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setRunId(null)} />
   if (chat || draft) return <div className="flex min-h-0 flex-1 flex-col"><Button type="button" variant="ghost" onClick={() => { useAppStore.getState().setCopilotDraft(''); setChat(false); setQuestion(null) }}>{zh ? '返回当前任务' : 'Back to tasks'}</Button><CopilotChat pageContext={pageContext} initialQuestion={question ?? undefined} onTaskRequested={requestTask} /></div>
-  return <div className="space-y-4 overflow-y-auto p-4">
+  return <div className="task-workspace space-y-4 overflow-y-auto p-4">
     {readOnly ? <p role="status" className="text-sm text-text-secondary">{zh ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
-    <div><h3 className="font-semibold">{zh ? '你希望完成什么？' : 'What would you like to accomplish?'}</h3>
+    <div className="task-introduction"><span className="task-introduction-icon" aria-hidden="true"><SparkleIcon weight="duotone" /></span><h3 className="font-semibold">{zh ? '你希望完成什么？' : 'What would you like to accomplish?'}</h3>
       <p className="mt-1 text-sm text-text-secondary">{zh ? '说明目标，助手会准备步骤、跟进结果，并在需要你判断时停下来。' : 'Describe your goal. The assistant prepares steps, tracks results and pauses for your input.'}</p></div>
-    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (!selected && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
-      <Textarea aria-label={zh ? '希望完成的工作' : 'Task goal'} value={goal} onChange={(e) => { updateDraft({ goal: e.target.value, preview: false, writes: [] }) }} placeholder={zh ? '例如：调研这个靶点的证据，比较方法并准备下一步方案' : 'For example: research this target and compare the available methods'} />
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2" aria-label={zh ? '服务类型' : 'Service type'}>
-        {services.data?.map((s) => <Button type="button" variant={selected === s.id ? 'secondary' : 'outline'} key={s.id} className="h-auto justify-start whitespace-normal text-left" aria-pressed={selected === s.id} onClick={() => { updateDraft({ selected: s.id as ServiceKind, writes: [], preview: true }) }}>{zh ? s.title_zh : s.title}</Button>)}
+    <form className="task-composer space-y-3" onSubmit={(e) => { e.preventDefault(); if (!selected && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
+      <div className="task-input-surface"><Textarea aria-label={zh ? '希望完成的工作' : 'Task goal'} value={goal} onChange={(e) => { updateDraft({ goal: e.target.value, preview: false, writes: [] }) }} placeholder={zh ? '例如：调研这个靶点的证据，比较方法并准备下一步方案' : 'For example: research this target and compare the available methods'} />
+      <div className="task-input-footer"><span>{zh ? '先查看计划，再决定开始。' : 'Review the plan before starting.'}</span>{!preview ? <Button type="submit" disabled={!goal.trim()}>{zh ? '继续' : 'Continue'}<ArrowRightIcon aria-hidden="true" /></Button> : null}</div></div>
+      <p className="task-services-label">{zh ? '选择一个研究方向' : 'Choose a starting point'}</p>
+      <div className="task-services" aria-label={zh ? '服务类型' : 'Service type'}>
+        {services.data?.map((s) => {
+          const ServiceIcon = serviceIcons[s.id as keyof typeof serviceIcons] ?? SparkleIcon
+          return <Button type="button" variant={selected === s.id ? 'secondary' : 'outline'} key={s.id} className="task-service h-auto justify-start whitespace-normal text-left" aria-pressed={selected === s.id} onClick={() => { updateDraft({ selected: s.id as ServiceKind, writes: [], preview: true }) }}><span className="task-service-icon" aria-hidden="true"><ServiceIcon /></span><span>{zh ? s.title_zh : s.title}</span><ArrowRightIcon className="task-service-arrow" aria-hidden="true" /></Button>
+        })}
       </div>
-      {!preview ? <Button type="submit" disabled={!goal.trim()}>{zh ? '继续' : 'Continue'}</Button> : null}
     </form>
     {preview && service ? <section aria-label={zh ? '任务计划' : 'Task plan'} className="space-y-3 rounded-lg border border-border p-3">
       <h4 className="font-semibold">{zh ? service.title_zh : service.title}</h4>
@@ -120,9 +127,9 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     {services.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p> : null}
     <Button type="button" variant="ghost" onClick={() => setChat(true)}>{zh ? '询问或解释一个问题' : 'Ask or explain a question'}</Button>
-    <section className="space-y-2"><h4 className="font-semibold">{zh ? '我的任务与交付物' : 'Tasks and deliverables'}</h4>
+    <section className="task-deliveries space-y-2"><h4 className="font-semibold">{zh ? '我的任务与交付物' : 'Tasks and deliverables'}</h4>
       {runs.isLoading ? <p role="status">{zh ? '加载任务…' : 'Loading tasks…'}</p> : null}
-      {runs.data?.filter((r) => !r.parent_run_id).map((run) => <Button key={run.id} type="button" variant="outline" className="h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="text-xs">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
+      {runs.data?.filter((r) => !r.parent_run_id).map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
       {runs.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '启动后，进度和产物会保存在这里。' : 'Task progress and deliverables will stay here.'}</p> : null}
     </section>
   </div>

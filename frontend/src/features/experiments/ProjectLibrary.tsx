@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { CircleNotch, MagnifyingGlass, Trash } from '@phosphor-icons/react'
+import { ArrowUpRight, Books, Cube, Quotes, Plus, CircleNotch, MagnifyingGlass, Trash } from '@phosphor-icons/react'
 import { Alert, AlertAction, AlertDescription } from '@/components/reui/alert'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { AppFrame } from '@/components/ui/AppFrame'
@@ -31,6 +31,8 @@ type SortKey = 'status' | 'name' | 'recent'
 
 interface ProjectLibraryProps {
   onCreate: () => void
+  onToggleIntro: () => void
+  introOpen: boolean
   onManage: (project: Project) => void
   projectDelete: ReturnType<typeof useDeleteProjectLifecycle>
 }
@@ -61,7 +63,7 @@ function ProjectLibrarySkeleton() {
   )
 }
 
-export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLibraryProps) {
+export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, projectDelete }: ProjectLibraryProps) {
   const { t, language, format } = useI18n()
   const client = useQueryClient()
   const {
@@ -156,18 +158,19 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
   }, [visibleProjects])
 
   return (
-    <section className="mb-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="project-library mb-6">
+      <div className="project-library-heading">
         <div>
-          <h2 className="text-card-title font-semibold">{t.projectLibrary.title}</h2>
+          <h2>{t.projectLibrary.title}<span className="project-library-count">{visibleProjects.length}</span></h2>
           <p className="mt-1 text-sm text-text-secondary">{t.projectLibrary.subtitle}</p>
         </div>
-        <Button type="button" onClick={onCreate}>
-          {t.common.newExperiment}
-        </Button>
+        <div className="project-library-actions"><Button type="button" variant="ghost" onClick={onToggleIntro} aria-expanded={introOpen}>{t.experimentsExt.gettingStarted}</Button>
+        <Button type="button" className="science-primary" onClick={onCreate}>
+          <Plus aria-hidden="true" />{t.common.newExperiment}
+        </Button></div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="project-library-filters">
         <label className="relative min-w-[12rem] flex-1">
           <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <Input
@@ -179,7 +182,7 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
             className="w-full pl-8"
           />
         </label>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
+        <Select items={statusOptions.map((status) => ({ value: status, label: status === 'all' ? t.projectLibrary.filterAll : status }))} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
           <SelectTrigger aria-label={t.projectLibrary.filterStatus}>
             <SelectValue />
           </SelectTrigger>
@@ -191,7 +194,7 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
             ))}
           </SelectContent>
         </Select>
-        <Select value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
+        <Select items={[{ value: 'recent', label: t.projectLibrary.sortRecent }, { value: 'status', label: t.projectLibrary.sortStatus }, { value: 'name', label: t.projectLibrary.sortName }]} value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
           <SelectTrigger aria-label={t.projectLibrary.sortBy}>
             <SelectValue />
           </SelectTrigger>
@@ -263,15 +266,15 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
                   <p className="project-row-objective">{brief.objective || (language === 'zh' ? '尚未定义目标，打开项目补充。' : 'Define the objective in the project brief.')}</p>
                   <div className="project-facts">
                     {summary ? <>
-                      <Link to={`/research${query}&tab=references`}>{format(t.projectLibrary.referencesCount, { count: summary.reference_count })}</Link>
-                      <Link to={`/research${query}&tab=structures`}>{format(t.projectLibrary.pdbCount, { count: summary.structure_count })}</Link>
-                      <Link to={`/research${query}&tab=evidence`}>{format(t.projectLibrary.claimsCount, { count: summary.finding_count })}</Link>
+                      <Link to={`/research${query}&tab=references`}><Books aria-hidden="true" />{format(t.projectLibrary.referencesCount, { count: summary.reference_count })}</Link>
+                      <Link to={`/research${query}&tab=structures`}><Cube aria-hidden="true" />{format(t.projectLibrary.pdbCount, { count: summary.structure_count })}</Link>
+                      <Link to={`/research${query}&tab=evidence`}><Quotes aria-hidden="true" />{format(t.projectLibrary.claimsCount, { count: summary.finding_count })}</Link>
                     </> : <span>{language === 'zh' ? '资料统计待加载' : 'Material counts unavailable'}</span>}
                     <span>{language === 'zh' ? '更新于 ' : 'Updated '}{new Date(project.updated_at || project.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
                   </div>
                 </div>
                 <div className="project-row-actions">
-                  <Button type="button" render={<Link to={`/research${query}&tab=goals`} />}>{t.projectLibrary.open}</Button>
+                  <Button type="button" render={<Link to={`/research${query}&tab=goals`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
                   <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '与 Bot 协作' : 'Work with Bots'}</Button>
                   <Disclosure className="project-row-menu" title={language === 'zh' ? '更多操作' : 'More actions'}><div>
                     <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>{t.projectLibrary.manage}</Button>
