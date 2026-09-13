@@ -40,13 +40,34 @@ export function useCopilotBots() {
  * and a paper has not chosen an operator, and picking the first match would
  * silently drop half of what was asked. The undifferentiated Copilot handles
  * those, which is what it is for.
+ *
+ * One case is not that kind of tie: a token that is a strict substring of
+ * another token the same message matched. "literature review" hits
+ * `librarian`'s phrase and `auditor`'s bare "review" at once - one phrase
+ * matched twice, not two operators named - and calling it ambiguous would make
+ * both unroutable by the word that names them. So a match is discarded when
+ * some other match contains it, and whatever survives decides.
+ *
+ * Containment, not length. Length would rank "residue" over "paper", which are
+ * equally specific and merely different sizes, and that tie has to survive.
+ *
+ * This replaces the hand-written skill registry's fixed preference for anything
+ * over `project-read` and `research-read`: stated as containment it needs no
+ * list, and so no list to keep in step with the roster.
  */
 export function matchBot(input: string, bots: readonly CopilotBot[]): CopilotBot | undefined {
   const lower = input.toLowerCase()
-  const matches = bots.filter((bot) =>
-    (bot.triggers ?? []).some((token) => token.length > 0 && lower.includes(token.toLowerCase())),
+  const hits = bots.flatMap((bot) =>
+    (bot.triggers ?? [])
+      .map((token) => token.toLowerCase())
+      .filter((token) => token.length > 0 && lower.includes(token))
+      .map((token) => ({ bot, token })),
   )
-  return matches.length === 1 ? matches[0] : undefined
+  const surviving = hits.filter(
+    (hit) => !hits.some((other) => other.token.length > hit.token.length && other.token.includes(hit.token)),
+  )
+  const named = new Set(surviving.map((hit) => hit.bot.id))
+  return named.size === 1 ? surviving[0].bot : undefined
 }
 
 /** The bots a given bot hands work to, resolved against the roster. */

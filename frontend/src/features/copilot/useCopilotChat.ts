@@ -1,5 +1,4 @@
 import { getTranslations } from '../../lib/i18n'
-import { matchSkill } from './skills/registry'
 import { matchBot, useCopilotBots } from './bots/registry'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
@@ -82,10 +81,14 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const trimmed = input.trim()
     if (!trimmed || loading) return
 
-    // A bot and a skill are both narrowing hints and the API rejects both at
-    // once, so the bot wins and the skill is only consulted when no bot applies.
+    // One narrowing hint, derived from the served roster. There used to be a
+    // second - a hand-written capability list in `skills/registry.ts` with its
+    // own bilingual triggers, consulted when no bot matched. It was a copy of
+    // the backend's capability ids maintained beside the roster that already
+    // describes the same routing, and a copy is what drifts: its `systemPrompt`
+    // field was populated for all nine entries and read by nothing. Its
+    // vocabulary now lives on the operators that own it.
     const activeBot = bot ?? matchBot(trimmed, bots ?? [])?.id
-    const skill = activeBot ? undefined : matchSkill(trimmed)?.name
     const reviewIntent = detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
@@ -107,7 +110,10 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const payload = {
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
-      skill,
+      // `skill` stays on the request contract - an agent run, an MCP grant or
+      // another client may still narrow to one capability - and this UI simply
+      // no longer guesses one. Sending neither means the project's configured
+      // set, which is the documented undifferentiated case.
       bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,

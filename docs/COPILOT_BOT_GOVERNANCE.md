@@ -227,6 +227,29 @@ named no bot. Reading the roster and reading the handover record deliberately do
 *not* need one: a turn that has not chosen an operator is the likeliest to be
 asking who the operators are.
 
+## Where the roster reaches the rest of the platform
+
+One surface used to describe operators without using the roster.
+
+**The client's own capability list is gone.** `features/copilot/skills/registry.ts`
+held nine capability ids with their own bilingual triggers, consulted whenever no
+bot matched. It was a copy of the backend's vocabulary maintained beside the
+roster that already describes the same routing — and it had the tell: a
+`systemPrompt` field populated for all nine entries and read by nothing, the same
+shape as `ToolSpec.request_terms` before it. Its trigger vocabulary moved onto
+the operators that own it, and its one behavioural rule — specific beats broad —
+became a property of matching rather than a hardcoded preference for
+`project-read` and `research-read`: a matched token is discarded when another
+matched token contains it. Containment, not length, because "residue" is not more
+specific than "paper".
+
+Folding the vocabulary in surfaced two collisions worth recording, because both
+made an operator unroutable by the word that names it: `librarian` and `auditor`
+both claimed "review", and `runner` claimed "run" — the verb in nearly every
+imperative a user types, which tied it against whichever operator the sentence
+actually named. A trigger has to name an operator's *subject*, and a test now
+refuses the common verbs.
+
 ## What is deliberately not added
 
 More bots along the capability axis. The roster does not need a "reporter", a
@@ -254,3 +277,6 @@ nothing.
 | 10 | A slot count above one with no evidence, and a CPU-only stage on a GPU-forcing queue, are violations; the queue rules stay silent on a backend that ignores the queue | `test_compute_declarations.py` |
 | 11 | A sound declaration is reported as sound, not as an empty finding list | `test_compute_declarations.py` |
 | 12 | Every child run - delegated or spawned - is dispatched when it is created, and the dispatch names the child | `test_copilot_chain.py` |
+| 13 | No two operators claim one trigger, and no trigger is a bare common verb | `test_copilot_bots.py` |
+| 14 | Every case the retired client-side skill registry routed still resolves to exactly one operator | `test_copilot_bots.py` |
+| 15 | A contained token loses to the phrase containing it; an unrelated longer token does not outrank a shorter one | `bots/registry.test.ts` |

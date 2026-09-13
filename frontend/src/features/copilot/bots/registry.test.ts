@@ -54,6 +54,54 @@ describe('matchBot', () => {
     expect(matchBot('Find a paper about this residue', ROSTER)).toBeUndefined()
   })
 
+  it('lets the more specific phrase win over a shorter token inside it', () => {
+    // One phrase matched twice is not two operators named. Before this, both
+    // `librarian` and `auditor` became unroutable by the word that names them:
+    // "literature review" hit the long phrase and the bare "review" at once.
+    const SPECIFICITY: CopilotBot[] = [
+      bot('librarian', ['literature review', 'paper']),
+      bot('auditor', ['review'], [], { stance: 'review', reviews: ['planner'] }),
+    ]
+
+    expect(matchBot('write me a literature review', SPECIFICITY)?.id).toBe('librarian')
+    expect(matchBot('please review the plan', SPECIFICITY)?.id).toBe('auditor')
+  })
+
+  it('still ties when two equally specific tokens are hit', () => {
+    const SPECIFICITY: CopilotBot[] = [
+      bot('librarian', ['paper']),
+      bot('structuralist', ['residue']),
+    ]
+
+    expect(matchBot('a paper about a residue', SPECIFICITY)).toBeUndefined()
+  })
+
+  it('does not let a longer unrelated token outrank a shorter one', () => {
+    // Containment, not length. A message naming both a route and an interface
+    // contact really has named two operators, and ranking "interface contact"
+    // above "plan" on size alone would silently drop half the request - the
+    // exact failure the tie rule exists to prevent.
+    const SPECIFICITY: CopilotBot[] = [
+      bot('planner', ['plan', 'route', 'draft']),
+      bot('structuralist', ['interface contact']),
+    ]
+
+    expect(matchBot('plan a route for the draft interface contact', SPECIFICITY)).toBeUndefined()
+  })
+
+  it('resolves a contained token even when the container is matched once', () => {
+    // The discard is per matched token, not per bot: `librarian` keeps the
+    // phrase, `auditor` loses only the occurrence inside it.
+    const SPECIFICITY: CopilotBot[] = [
+      bot('librarian', ['literature review']),
+      bot('auditor', ['review', 'verdict'], [], { stance: 'review', reviews: ['planner'] }),
+    ]
+
+    expect(matchBot('literature review', SPECIFICITY)?.id).toBe('librarian')
+    // ...but a second, independent reason to call the auditor restores the tie.
+    expect(matchBot('literature review and a verdict', SPECIFICITY)).toBeUndefined()
+  })
+
   it('returns nothing when no bot is named', () => {
     expect(matchBot('hello', ROSTER)).toBeUndefined()
   })

@@ -211,8 +211,12 @@ BOTS: tuple[BotSpec, ...] = (
         capabilities=("research-read", "literature-search", "chain-messaging"),
         handoff=("briefing", "scout"),
         triggers=(
-            "paper", "literature", "citation", "PubMed", "Europe PMC", "review",
-            "论文", "文献", "引用", "综述",
+            # "review" alone belongs to `auditor`: two bots claiming one token
+            # is a tie, and a tie routes to nobody - so the word that names this
+            # operator's artefact has to be the artefact, not the act.
+            "paper", "literature", "citation", "PubMed", "Europe PMC",
+            "review article", "literature review", "reference",
+            "论文", "文献", "引用", "综述", "参考文献",
         ),
     ),
     BotSpec(
@@ -243,8 +247,9 @@ BOTS: tuple[BotSpec, ...] = (
         ),
         handoff=("structuralist", "planner"),
         triggers=(
-            "target", "UniProt", "gap", "intelligence", "ortholog",
-            "靶点", "情报", "缺口", "补齐",
+            "target", "UniProt", "gap", "gaps", "intelligence", "ortholog",
+            "target intelligence", "target profile",
+            "靶点", "情报", "缺口", "补齐", "修复", "靶点情报", "靶点档案",
         ),
     ),
     BotSpec(
@@ -303,7 +308,13 @@ BOTS: tuple[BotSpec, ...] = (
         handoff=("runner",),
         triggers=(
             "route", "workflow", "plan", "draft", "pipeline", "LSF", "cluster",
-            "路线", "工作流", "规划", "草稿", "集群",
+            "compute draft", "cluster job", "threshold",
+            # Named tools route here rather than to `structuralist`: a message
+            # naming one is almost always about running it, and reading what it
+            # produced names a structure instead.
+            "AlphaFold", "Rosetta", "RFdiffusion",
+            "路线", "工作流", "规划", "草稿", "集群", "阈值",
+            "计算草稿", "集群作业", "任务草稿",
         ),
     ),
     BotSpec(
@@ -334,7 +345,13 @@ BOTS: tuple[BotSpec, ...] = (
         ),
         handoff=("medic", "analyst"),
         triggers=(
-            "advance", "next step", "wait", "monitor", "run",
+            # Not bare "run": it is the verb in nearly every imperative a user
+            # types ("run the search", "run the analysis"), so it ties with
+            # whichever operator the sentence actually named and routes to
+            # neither. A trigger has to name this operator's subject - a run
+            # already in flight - rather than the act of starting one.
+            "advance", "next step", "wait", "monitor",
+            "run status", "still running", "is it done",
             "推进", "下一步", "等待", "执行",
         ),
     ),
@@ -392,6 +409,7 @@ BOTS: tuple[BotSpec, ...] = (
         handoff=("archivist", "structuralist"),
         triggers=(
             "result", "interpret", "BLI", "SEC", "assay", "KD", "candidate",
+            "experiment",
             "结果", "解读", "实验", "测定", "候选",
         ),
     ),
@@ -423,7 +441,8 @@ BOTS: tuple[BotSpec, ...] = (
         handoff=("briefing",),
         triggers=(
             "record", "archive", "decision", "goal", "attach", "note",
-            "记录", "归档", "决策", "目标", "笔记",
+            "knowledge", "save this",
+            "记录", "归档", "决策", "目标", "笔记", "知识", "保存",
         ),
     ),
     BotSpec(

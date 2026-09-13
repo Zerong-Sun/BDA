@@ -372,6 +372,16 @@ goal. Without that, a director emitting "search the literature and save it"
 would be authoring the user's half of the conversation. The same hole existed in
 `spawn_subagent` before delegation did, and the walk closes both.
 
+## Where the roster reaches the rest of the platform
+
+- **The chat client no longer keeps its own capability list.** The hand-written
+  `features/copilot/skills/registry.ts` — nine capability ids with their own
+  bilingual triggers, plus a `systemPrompt` field nothing ever read — is retired.
+  Its vocabulary now sits on the operators that own it, and matching resolves
+  specificity by containment: a matched token loses to another matched token that
+  contains it, which is what lets "literature review" reach `librarian` without
+  `auditor`'s bare "review" turning it into a tie. See
+  [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
 ## What this does not change
 
 - No bot executes shell commands, reads arbitrary paths, or reaches credentials.
@@ -426,6 +436,7 @@ Each of these holds, and has a test that fails when it stops holding.
 | 31 | The queue rules do not fire on a backend that ignores the queue | `test_compute_declarations.py` |
 | 32 | `steward` can reach a declaration from a plugin id or a workflow node, and reviewing one changes nothing | `test_copilot_chain.py` |
 | 33 | A delegated or spawned child run is dispatched through the outbox when it is created, so the pair cannot deadlock | `test_copilot_chain.py` |
+| 34 | No two operators claim one trigger; no trigger is a bare common verb; every case the retired client-side skill registry routed still resolves | `test_copilot_bots.py` |
 
 Gates run for this change, on `bda-public/main`:
 

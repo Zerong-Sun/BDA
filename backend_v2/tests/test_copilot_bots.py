@@ -290,6 +290,111 @@ def test_orchestration_and_review_powers_belong_to_one_stance_each() -> None:
         assert all(bot.stance == stance for bot in holders), capability
 
 
+# --- Triggers: the routing vocabulary the frontend used to keep its own copy of
+# The client had a second, hand-written capability list with its own bilingual
+# triggers. Retiring it moved that vocabulary here, where the roster it describes
+# already lives. These guard the two ways that move could go wrong.
+
+
+def test_no_two_operators_claim_the_same_trigger() -> None:
+    """A tie routes to nobody, so a shared token makes both unroutable.
+
+    `librarian` and `auditor` both claimed "review" for one commit - one meaning
+    a review article, the other the act - and the word that names each of them
+    stopped naming either.
+    """
+    owners: dict[str, list[str]] = {}
+    for bot in bots.all_bots():
+        for token in bot.triggers:
+            owners.setdefault(token.lower(), []).append(bot.id)
+
+    shared = {token: ids for token, ids in owners.items() if len(ids) > 1}
+    assert not shared, shared
+
+
+def test_a_trigger_containing_another_operators_trigger_is_deliberate() -> None:
+    """Substring matching means the long phrase always drags the short one in.
+
+    The client resolves this by discarding a matched token that another matched
+    token contains, so these pairs route to the longer one. Listed rather than
+    forbidden, because "literature review" has to be able to outrank "review" -
+    but a new pair should be a decision, not a surprise.
+    """
+    tokens = [(token.lower(), bot.id) for bot in bots.all_bots() for token in bot.triggers]
+    nested = {
+        (long, long_bot, short, short_bot)
+        for long, long_bot in tokens
+        for short, short_bot in tokens
+        if long_bot != short_bot and short != long and short in long
+    }
+
+    assert nested == {
+        ("review article", "librarian", "review", "auditor"),
+        ("literature review", "librarian", "review", "auditor"),
+        # 链 is one character and sits inside 全链条; the director wins, which is
+        # right - "全链条" is a request to run the chain, not to read a chain of
+        # a structure.
+        ("全链条", "conductor", "链", "structuralist"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        # Each of these was a case the retired skill registry routed. They are
+        # here so the merge is provably not a loss of routing.
+        ("Adjust the workflow threshold", "planner"),
+        ("调整工作流阈值", "planner"),
+        ("请补齐 Research target 的 gaps", "scout"),
+        ("run the target intelligence", "scout"),
+        ("跑一下靶点情报", "scout"),
+        ("create a compute draft", "planner"),
+        ("生成计算草稿", "planner"),
+        ("How should RFdiffusion connect to a protein workflow?", "planner"),
+        ("Interpret the BLI experiment", "analyst"),
+        ("save this to knowledge", "archivist"),
+        ("保存到知识库", "archivist"),
+        ("整理一下这些文献", "librarian"),
+        ("find the reference", "librarian"),
+    ],
+)
+def test_the_retired_skill_registrys_routing_still_resolves(message: str, expected: str) -> None:
+    """Server-side mirror of the client matcher, applied to the roster.
+
+    The client is where routing happens; this asserts the *vocabulary* is
+    present and unambiguous, which is the half that lives here.
+    """
+    lowered = message.lower()
+    hits = [
+        (token.lower(), bot.id)
+        for bot in bots.all_bots()
+        for token in bot.triggers
+        if token.lower() in lowered
+    ]
+    surviving = {
+        bot_id
+        for token, bot_id in hits
+        if not any(other != token and token in other for other, _ in hits)
+    }
+
+    assert surviving == {expected}, sorted(hits)
+
+
+def test_no_trigger_is_a_bare_common_verb() -> None:
+    """A token that matches most sentences names nobody.
+
+    `runner` claimed "run" for one commit, which is the verb in nearly every
+    imperative a user types - so "run the target intelligence" tied `runner`
+    against `scout` and routed to neither. The vocabulary has to name each
+    operator's subject, not the act of asking.
+    """
+    swamping = {"run", "do", "get", "make", "show", "find", "use", "set", "add", "go"}
+
+    for bot in bots.all_bots():
+        offending = {token.lower() for token in bot.triggers} & swamping
+        assert not offending, (bot.id, sorted(offending))
+
+
 # --- Through the service: a run created for a bot ----------------------------
 
 

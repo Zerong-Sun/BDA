@@ -295,9 +295,18 @@ describe('CopilotChat', () => {
     expect(payload?.skill).toBeUndefined()
   })
 
-  it('falls back to the skill hint when the roster is unavailable', async () => {
+  it('sends unhinted when the roster is unavailable', async () => {
     // The picker is absent and the chat still works. A roster that failed to
     // load must not take the copilot down with it.
+    //
+    // It used to fall back to a client-side skill guess here. That is gone with
+    // the hand-written skill registry, and the change is a widening in this one
+    // failure mode: the turn now carries no hint and gets the project's
+    // configured set - the documented undifferentiated case, and the same thing
+    // a message matching no trigger has always got. It is not a permission
+    // change, because the server intersects whatever arrives with that set
+    // either way; it is the loss of an incidental narrowing that only ever
+    // applied when the roster request had failed.
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
     fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
@@ -308,7 +317,7 @@ describe('CopilotChat', () => {
     await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
     const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
     expect(payload?.bot).toBeUndefined()
-    expect(payload?.skill).toBe('workflow-planning')
+    expect(payload?.skill).toBeUndefined()
     expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
   })
   it('keeps the selected bot when the drawer is closed and reopened', async () => {
