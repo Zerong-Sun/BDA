@@ -310,4 +310,48 @@ describe('CopilotChat', () => {
     expect(payload?.skill).toBe('workflow-planning')
     expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
   })
+  it('keeps the selected bot when the drawer is closed and reopened', async () => {
+    // Component state sent the operator back to Auto every time the drawer
+    // unmounted, with nothing on screen saying it had changed. conversationId
+    // and messages already live in the project session; the bot belongs there
+    // for the same reason.
+    server.use(
+      http.get('/api/v2/copilot/bots', () =>
+        HttpResponse.json([
+          {
+            id: 'medic',
+            title: 'Medic',
+            title_zh: '故障诊断',
+            phase: 6,
+            summary: 'Explain why a job failed.',
+            charter: 'You explain failures from recorded evidence.',
+            capabilities: ['project-read', 'failure-diagnosis'],
+            handoff: [],
+            triggers: ['failed'],
+          },
+        ]),
+      ),
+    )
+    const first = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Copilot bot' }))
+    const medic = await screen.findByRole('option', { name: 'Medic' })
+    fireEvent.pointerDown(medic, { button: 0 })
+    fireEvent.pointerUp(medic, { button: 0 })
+    fireEvent.click(medic)
+    await waitFor(() =>
+      expect(useAppStore.getState().copilotSessions.proj_test?.bot).toBe('medic'),
+    )
+
+    first.unmount()
+    renderWithProviders(<CopilotChat pageContext="route=/results; project_id=proj_test" />)
+
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Why did it die?' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    expect(vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]?.bot).toBe('medic')
+  })
 })

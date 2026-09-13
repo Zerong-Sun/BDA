@@ -470,3 +470,17 @@ def test_a_truncated_interface_says_so_and_still_reports_the_full_residue_set() 
     assert capped["pairs"][0]["distance_angstrom"] == min(
         pair["distance_angstrom"] for pair in full["pairs"]
     )
+
+
+def test_solvent_is_not_folded_into_a_single_hetero_count() -> None:
+    """One number covering both reads as ligands.
+
+    A crystal structure carries hundreds of ordered waters, and a chain
+    reporting `hetero_count: 300` beside an empty ligand list is a number that
+    will be quoted as a ligand count.
+    """
+    chain_b = next(entry for entry in kernels.analyse(PDB_TEXT)["chains"] if entry["chain"] == "B")
+
+    assert chain_b["ligand_count"] == 1
+    assert chain_b["solvent_count"] == 1
+    assert "hetero_count" not in chain_b

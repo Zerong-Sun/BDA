@@ -64,10 +64,15 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastMode, setLastMode] = useState<string | null>(() => getLatestCopilotMode())
-  // null means "let the message decide". A bot the user picked stays picked
-  // across turns, because a phase of work is several messages long and having
-  // to re-select the operator every turn is how a picker stops being used.
-  const [bot, setBot] = useState<string | null>(null)
+  // null means "let the message decide". Kept in the project's session rather
+  // than in component state: the drawer unmounts every time it closes, and a
+  // phase of work is several messages long, so component state quietly sent the
+  // operator back to Auto whenever the user looked at a page.
+  const bot = session?.bot ?? null
+  const setSessionBot = useAppStore((state) => state.setCopilotSessionBot)
+  const setBot = (next: string | null) => {
+    if (projectId) setSessionBot(projectId, next)
+  }
   const { data: bots } = useCopilotBots()
   const usableMessages = messages.filter(
     (message) => message.content.trim().length > 0 && message.content !== legacyCopilotIntro,

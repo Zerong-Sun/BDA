@@ -414,7 +414,19 @@ class CopilotActionService:
         )
 
     def request_allows(self, action_name: str) -> bool:
-        terms = _ACTION_REQUEST_TERMS[action_name]
+        """Did the user's own words ask for this action, in this turn?
+
+        A write with no declared vocabulary answers **no**, not KeyError. The
+        set of write tools is now derived from the registry rather than listed
+        by hand, so this is reached for every write there is, including ones
+        whose bilingual request terms nobody has written yet. Denying is the
+        only safe direction: a write nobody can authorise by asking for it must
+        not run, and the caller drops it from the turn rather than offering a
+        tool that would always refuse.
+        """
+        terms = _ACTION_REQUEST_TERMS.get(action_name)
+        if terms is None:
+            return False
         normalized = self.request_text.lower()
         if not any(_contains_term(normalized, term) for term in terms["domains"]):
             return False

@@ -25,6 +25,16 @@ export interface CopilotChatMessage {
 export interface CopilotProjectSession {
   conversationId: string | null
   messages: CopilotChatMessage[]
+  /**
+   * The roster bot this project's chat is scoped to, or null for auto-match.
+   *
+   * Here rather than in component state for the same reason `conversationId`
+   * is: the drawer unmounts every time it closes, and a phase of work is
+   * several messages long. Component state sent the operator back to Auto each
+   * time the user looked at a page, with nothing on screen saying it had
+   * changed.
+   */
+  bot: string | null
 }
 
 export interface WorkflowSeed {
@@ -90,6 +100,7 @@ interface AppState {
     messages: CopilotChatMessage[] | ((messages: CopilotChatMessage[]) => CopilotChatMessage[]),
   ) => void
   setCopilotConversationId: (projectId: string, conversationId: string | null) => void
+  setCopilotSessionBot: (projectId: string, bot: string | null) => void
   resetCopilotSession: (projectId: string) => void
   setCopilotDraft: (draft: string) => void
   setCopilotSelectedEntityIds: (entityIds: string[]) => void
@@ -150,7 +161,7 @@ export const useAppStore = create<AppState>()(
               : messages,
         })),
       setCopilotSessionMessages: (projectId, messages) => set((state) => {
-        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [] }
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
         return {
           copilotSessions: {
             ...state.copilotSessions,
@@ -162,13 +173,17 @@ export const useAppStore = create<AppState>()(
         }
       }),
       setCopilotConversationId: (projectId, conversationId) => set((state) => {
-        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [] }
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
         return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, conversationId } } }
+      }),
+      setCopilotSessionBot: (projectId, bot) => set((state) => {
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
+        return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, bot } } }
       }),
       resetCopilotSession: (projectId) => set((state) => ({
         copilotSessions: {
           ...state.copilotSessions,
-          [projectId]: { conversationId: null, messages: [] },
+          [projectId]: { conversationId: null, messages: [], bot: null },
         },
       })),
       setCopilotDraft: (copilotDraft) => set({ copilotDraft }),

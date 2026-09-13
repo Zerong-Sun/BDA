@@ -52,7 +52,7 @@ back to `planner`, and `archivist` sends the next question back to `briefing`.
 | 2 | `scout` | 靶点情报 | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair` | `structuralist`, `planner` |
 | 3 | `structuralist` | 结构与残基 | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis` | `planner`, `analyst` |
 | 4 | `planner` | 路线规划 | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting` | `runner` |
-| 5 | `runner` | 步骤推进 | Advancing a confirmed run step by step and waiting for jobs to settle | `project-read`, `workflow-planning`, `agent-orchestration` | `medic`, `analyst` |
+| 5 | `runner` | 步骤推进 | Carrying a confirmed run across its waits and reporting what settled | `project-read`, `workflow-planning`, `agent-orchestration` | `medic`, `analyst` |
 | 6 | `medic` | 故障诊断 | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis` | `planner`, `runner` |
 | 7 | `analyst` | 结果解读 | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring` | `archivist`, `structuralist` |
 | 8 | `archivist` | 记录归档 | Attaching evidence to research goals and drafting the record of what was decided | `research-read`, `research-trace-authoring`, `knowledge-authoring` | `briefing` |
@@ -80,17 +80,21 @@ model verbatim.
   low-confidence loop is arithmetic on noise.
 - `planner` — must not confirm or submit. It produces a draft and the reasons for
   it, including the reasons against the routes it did not pick.
-- `runner` — must not poll and must not assume an outcome. It calls the waiting
-  tool and is resumed with the result. A failed job is a result to report, not an
-  error to retry silently.
+- `runner` — must not poll, must not assume an outcome, and does not advance
+  anything itself: the run moves because the platform moves it, and the bot's job
+  is to wait correctly and report what settled. A failed job is a result to
+  report, not an error to retry silently.
 - `medic` — must not guess. Every diagnosis names the evidence it rests on and
   says plainly when that evidence does not determine the cause.
 - `analyst` — must not invent measurements, and must not rank by a score whose
   mechanism it has not checked. It reports what was recorded, with units and the
   analysis version that produced it.
-- `archivist` — must not decide. It records the decision that was made, who made
-  it and what it rested on, and marks a goal answered only when a linked result
-  answers it.
+- `archivist` — must not decide, and cannot close a goal. Marking a goal answered
+  is a scientific judgement and stays with a person; the bot says which linked
+  result it thinks answers a goal and leaves the call to the reader. The charter
+  originally instructed it to mark goals answered, which was an instruction to do
+  something no tool exposes — the failure mode being a model that reports having
+  done it.
 
 ### Handoff protocol
 
@@ -132,7 +136,7 @@ Three tools:
 
 | Tool | Answers |
 | --- | --- |
-| `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, heteroatoms and ligands, disulfides, and a pLDDT or B-factor summary |
+| `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, ligands and solvent counted separately, disulfides, and a pLDDT or B-factor summary |
 | `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
@@ -165,8 +169,19 @@ job declared and what it was actually given:
   file.
 
 `diagnose_compute_failure` gathers the recorded evidence for one job — status,
-error code and message, attempt history, recent job events, and the declared
-`runtime_spec` — and runs an explicit rule set over it. Each rule produces a
+error code and message, the status-event timeline, the retry chain, and the
+declared `runtime_spec` — and runs an explicit rule set over it.
+
+Which records those are took a correction. The first version read `JobAttempt`,
+which has `status`, `error` and `finished_at` columns and looks like the history
+of a job's attempts. It is not: exactly one row is written per job, at dispatch,
+with `status="dispatching"`, and it is never updated, so those columns are
+permanently `"dispatching"` and `NULL`. Three rules read them and could not fire
+on any real job. The records that do exist are the `JobEvent` rows — one per
+status transition, each timestamped — and the retry chain, which is a linked list
+of *separate* `Job` rows joined by the `retry_of` payload on each `job.pending`
+event. Runtime is measured from acceptance rather than row creation, so a long
+queue wait cannot hide a fast failure. Each rule produces a
 finding with a confidence of `confirmed` (the evidence states it) or `possible`
 (the evidence is consistent with it), the evidence it used, and a remedy. A job
 whose evidence matches no rule returns no findings and says so: an invented cause
@@ -174,6 +189,43 @@ is worse than no cause, because it ends the investigation.
 
 The rules are data, not prose, so they can be tested one at a time and extended
 without touching the tool.
+
+## Chat, agent runs and MCP now offer the same tools
+
+The roster's first version shipped with `structuralist` and `medic` inert in
+chat, and the cause was older than either of them.
+
+`registry.py` exists because a tool used to be declared in three places and
+nothing failed when one was missed — the tool simply became unreachable. The
+agent loop and the MCP surface were moved onto it; **chat was not**. It kept
+three hand-written schema lists covering the tools that need the research
+context, the project context or the action service, and no list was ever written
+for the ones needing only a session. Thirteen registry tools — every bench tool,
+the research-goal tools, and the whole structure and diagnosis surface — were
+declared in `capabilities.py` as chat tools, returned by
+`tools_for_capabilities`, dispatchable through `REGISTRY.execute`, and silently
+dropped before the model ever saw them.
+
+So `structuralist` resolved its capabilities, passed the narrowing law, appeared
+in the picker, and had none of its tools; `medic` kept `get_compute_status` and
+lost the tool that says *why* a job failed — the exact state it exists to fix.
+
+Chat now derives its schemas from the registry, using the same `requires` rule
+`REGISTRY.execute` enforces, so what is offered and what will run cannot
+disagree. A second list drifted the same way: `WRITE_TOOL_NAMES`, which
+`tasks.py` filters through the user's own words before allowing a write, named
+five of the registry's ten writes. That was harmless only while the other five
+were unreachable; deriving the schemas without also deriving this set would have
+exposed five writes with no intent check. It now derives from
+`REGISTRY.write_ids()`, and `actions.request_allows` answers **no** for a write
+whose bilingual vocabulary nobody has written rather than raising.
+
+One consequence is worth stating plainly: the five bench and trace writes
+(`analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate`,
+`promote_candidate_to_bench`, `attach_to_research_goal`) have no entry in
+`actions._ACTION_REQUEST_TERMS`, so in chat they are denied and therefore not
+offered. They remain available inside a durable agent run. Giving one of them a
+vocabulary is what turns it on in chat, deliberately and one at a time.
 
 ## Skill and MCP inventory
 

@@ -14,13 +14,20 @@ is what makes the capability check and the audit record impossible to skip.
 
 This is what turns the copilot from an assistant that answers into an agent
 that acts: adding a capability is adding a row, and the guardrails come with it.
+
+That promise held for the agent loop and for MCP, both of which derive their
+tool listing from `all()`. Chat did not: it kept the old hand-written schema
+lists alongside, so thirteen tools were dispatchable through `execute` and never
+offered, and the write set the intent check consulted named half the writes that
+existed. `research_agent.chat_schemas` and `WRITE_TOOL_NAMES` now derive from
+here too, which is what makes the sentence above true on all three surfaces.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..core.problem import DomainError
@@ -77,9 +84,14 @@ class ToolSpec:
     #: a result without one means the work was already finished and there is
     #: nothing to wait for.
     awaits: str = ""
-    #: Bilingual verbs that must appear in the user's own message before a write
-    #: runs, so the model cannot talk itself into one.
-    request_terms: tuple[str, ...] = field(default_factory=tuple)
+    #: NOTE: a `request_terms` field used to sit here, describing the bilingual
+    #: vocabulary a write needs in the user's own message. No spec ever set it
+    #: and no code ever read it, so a contributor who populated it would have
+    #: believed their write was gated when it was not. The vocabulary lives in
+    #: `actions._ACTION_REQUEST_TERMS`, which is richer than a flat tuple - it
+    #: separates domain words from verbs and handles negation - and
+    #: `actions.request_allows` denies any write it has no entry for.
+
     #: How a result turns into citations, declared with the tool rather than
     #: decided by the caller. An answer that cites nothing is not auditable, so
     #: "none" is a statement about the tool (a write, an overview) and not a

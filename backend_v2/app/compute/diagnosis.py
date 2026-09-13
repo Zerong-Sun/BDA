@@ -42,7 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.problem import DomainError
-from .models import Job, JobAttempt, JobEvent
+from .models import Job, JobEvent
 
 #: Queues that merge their own GPU requirement into every job, whatever the
 #: submitted directives say. A stage that declares no GPU and lands here holds
@@ -113,13 +113,16 @@ class Rule:
 
 
 def _errors(evidence: dict[str, Any]) -> str:
-    """Every recorded error string for this job, joined for pattern matching.
+    """Every recorded error string in this job's retry chain, for matching.
 
-    The job's own message, and each attempt's. A retry that failed differently
-    is the interesting case, and matching only the latest would miss it.
+    This job's message and code, plus the messages of the attempts it replaced.
+    A retry that failed differently from its predecessor is the interesting
+    case, and matching only the latest would miss it.
     """
     parts = [str(evidence.get("error_message") or ""), str(evidence.get("error_code") or "")]
-    parts.extend(str(attempt.get("error") or "") for attempt in evidence.get("attempts", []))
+    parts.extend(
+        str(item.get("error_message") or "") for item in evidence.get("previous_attempts", [])
+    )
     return "\n".join(part for part in parts if part)
 
 
@@ -220,31 +223,63 @@ def _rule_cpu_evidence(evidence: dict[str, Any]) -> Finding | None:
 
 
 def _rule_immediate_exit(evidence: dict[str, Any]) -> Finding | None:
-    attempts = evidence.get("attempts") or []
-    quick = [
-        attempt
-        for attempt in attempts
-        if attempt.get("duration_seconds") is not None
-        and attempt["duration_seconds"] <= IMMEDIATE_EXIT_SECONDS
-        and attempt.get("status") in {"failed", "error"}
-    ]
-    if not quick:
+    """Read from the event log, not from a JobAttempt row.
+
+    The first version of this rule asked `JobAttempt` for a status and a
+    finished_at. Neither is ever written: an attempt row is inserted once at
+    dispatch with status "dispatching" and never updated again, so the rule
+    could not fire on a real job however fast it died. The event log is the
+    record that actually exists - one row per status transition, each with its
+    timestamp - so the elapsed time is the gap between the job starting and the
+    event that ended it.
+    """
+    runtime = evidence.get("runtime_seconds")
+    if evidence.get("status") != "failed" or runtime is None:
+        return None
+    if runtime > IMMEDIATE_EXIT_SECONDS:
         return None
     return Finding(
         id="immediate_exit",
         title="The job died before the model could have started",
         confidence="possible",
         detail=(
-            f"Attempt(s) {', '.join(str(a.get('attempt_number')) for a in quick)} failed "
-            f"within {IMMEDIATE_EXIT_SECONDS}s. That is too fast for the model to have "
-            "run, so the cause is almost always the plugin declaration - image, command, "
-            "entrypoint or runtime setup - rather than the input or the science."
+            f"It reached {evidence.get('phase_reached')!r} and failed {runtime}s later, "
+            f"which is under the {IMMEDIATE_EXIT_SECONDS}s floor for the model having run "
+            "at all. The cause is then almost always the plugin declaration - image, "
+            "command, entrypoint or runtime setup - rather than the input or the science."
         ),
         remedy=(
             "Preview the rendered script for this node, then check the plugin's image, "
             "command and runtime_setup against what the container actually provides."
         ),
-        evidence=("attempts[].started_at", "attempts[].finished_at", "attempts[].status"),
+        evidence=("recent_events[].event_type", "recent_events[].at", "status"),
+    )
+
+
+def _rule_never_started(evidence: dict[str, Any]) -> Finding | None:
+    """Failed without the scheduler ever reporting it running.
+
+    Distinct from `immediate_exit`, and the distinction is the useful part: a
+    job that ran for three seconds got as far as the container; one that never
+    ran did not, so the input manifest, the queue and the submission are where
+    to look and the command is not.
+    """
+    if evidence.get("status") != "failed" or evidence.get("reached_running"):
+        return None
+    return Finding(
+        id="never_started",
+        title="The job failed without ever being reported as running",
+        confidence="confirmed",
+        detail=(
+            f"The event log stops at {evidence.get('phase_reached')!r}; there is no "
+            "`job.running`. Whatever went wrong happened before the model was given "
+            "control, so the container's command is not the first place to look."
+        ),
+        remedy=(
+            "Check the submission itself: input manifest resolution, the queue the job "
+            "was sent to, and the backend's own rejection message."
+        ),
+        evidence=("recent_events[].event_type", "status"),
     )
 
 
@@ -272,22 +307,34 @@ def _pattern_rule(
 
 
 def _rule_repeated_failure(evidence: dict[str, Any]) -> Finding | None:
-    attempts = [attempt for attempt in evidence.get("attempts") or [] if attempt.get("error")]
-    if len(attempts) < 2:
+    """Walk the retry chain, not a list of attempts on one job.
+
+    A retry here is a *new* `Job` row carrying the next `attempt_number` and a
+    `job.pending` event whose payload names the job it replaces. The first
+    version of this rule compared `JobAttempt.error` strings, a column nothing
+    writes, so it could not fire. Comparing the predecessors' recorded errors is
+    the same question asked of the records that exist.
+    """
+    previous = [item for item in evidence.get("previous_attempts") or [] if item.get("error_message")]
+    if not previous:
         return None
-    messages = {str(attempt["error"]).strip() for attempt in attempts}
+    messages = {str(item["error_message"]).strip() for item in previous}
+    current = str(evidence.get("error_message") or "").strip()
+    if current:
+        messages.add(current)
     if len(messages) > 1:
         return None
     return Finding(
         id="repeated_identical_failure",
-        title="Every attempt failed the same way",
+        title="This attempt and the ones it replaced all failed the same way",
         confidence="confirmed",
         detail=(
-            f"{len(attempts)} attempts recorded an identical error. The failure is "
-            "deterministic, so resubmitting the same specification reproduces it."
+            f"{len(previous) + 1} attempts in the retry chain recorded an identical "
+            "error. The failure is deterministic, so resubmitting the same "
+            "specification reproduces it."
         ),
         remedy="Change the specification before the next submission; a retry alone will not help.",
-        evidence=("attempts[].error",),
+        evidence=("previous_attempts[].error_message", "error_message"),
     )
 
 
@@ -384,6 +431,7 @@ RULES: tuple[Rule, ...] = (
         ),
     ),
     Rule("immediate_exit", _rule_immediate_exit),
+    Rule("never_started", _rule_never_started),
     Rule("gpu_forced_by_queue", _rule_gpu_queue),
     Rule("cpu_declaration_unsupported", _rule_cpu_evidence),
     Rule("repeated_identical_failure", _rule_repeated_failure),
@@ -391,43 +439,133 @@ RULES: tuple[Rule, ...] = (
 )
 
 
-def _duration(started: datetime | None, finished: datetime | None) -> float | None:
-    if started is None or finished is None:
-        return None
-    left = started if started.tzinfo else started.replace(tzinfo=UTC)
-    right = finished if finished.tzinfo else finished.replace(tzinfo=UTC)
-    return round((right - left).total_seconds(), 1)
+#: Status transitions in the order the job makes them. Used to say how far a job
+#: got, which is the difference between "the container ran and died" and "the
+#: container never started" - two failures with disjoint causes.
+PHASE_ORDER = ("pending", "dispatching", "queued", "running", "collecting")
+
+#: How far back the retry chain is walked. A chain longer than this is itself the
+#: finding, and following it forever would let a cycle in the recorded payloads
+#: hang the request.
+MAX_RETRY_DEPTH = 10
+
+
+def _aware(value: datetime) -> datetime:
+    """SQLite hands back naive datetimes for timezone-aware columns."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _timeline(events: list[JobEvent]) -> dict[str, Any]:
+    """How far the job got and how long it ran, from the status events.
+
+    The event log is the only record of this. `JobAttempt` looks like it should
+    hold it - it has `status`, `error` and `finished_at` columns - but exactly
+    one row is written per job, at dispatch, and never updated, so every one of
+    those columns is either "dispatching" or NULL forever. A rule reading them
+    cannot fire, which is what the first version of this module did.
+    """
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    reached = "pending"
+    for event in events:
+        if not event.event_type.startswith("job."):
+            continue
+        phase = event.event_type.removeprefix("job.")
+        moment = _aware(event.created_at)
+        if phase in PHASE_ORDER:
+            if PHASE_ORDER.index(phase) > PHASE_ORDER.index(reached):
+                reached = phase
+            # The clock starts when the backend accepts the job, not when the
+            # row was created: time spent PEND in a queue is the scheduler's,
+            # not the stage's, and counting it would hide every fast failure
+            # behind a long wait.
+            if phase == "running" or (phase == "queued" and started_at is None):
+                started_at = moment
+        elif phase in {"failed", "succeeded", "cancelled"}:
+            ended_at = moment
+    runtime = (
+        round((ended_at - started_at).total_seconds(), 1)
+        if started_at is not None and ended_at is not None and ended_at >= started_at
+        else None
+    )
+    return {
+        "phase_reached": reached,
+        "reached_running": reached == "running" or reached == "collecting",
+        "runtime_seconds": runtime,
+    }
+
+
+def _retry_chain(session: Session, job: Job) -> list[dict[str, Any]]:
+    """The jobs this one replaced, newest first.
+
+    A retry is a new `Job` row, not another attempt on this one: `service.retry`
+    copies the runtime spec onto a fresh row with the next `attempt_number` and
+    records the predecessor in the `job.pending` event payload. So the history a
+    diagnosis wants is a linked list through those payloads, and nothing on the
+    job row itself points backwards.
+    """
+    chain: list[dict[str, Any]] = []
+    seen: set[uuid.UUID] = {job.id}
+    current = job
+    for _ in range(MAX_RETRY_DEPTH):
+        payload = session.scalar(
+            select(JobEvent.payload)
+            .where(JobEvent.job_id == current.id, JobEvent.event_type == "job.pending")
+            .order_by(JobEvent.created_at.asc())
+            .limit(1)
+        )
+        raw = (payload or {}).get("retry_of") if isinstance(payload, dict) else None
+        if not raw:
+            break
+        try:
+            previous_id = uuid.UUID(str(raw))
+        except ValueError:
+            break
+        if previous_id in seen:
+            break
+        seen.add(previous_id)
+        previous = session.get(Job, previous_id)
+        if previous is None or previous.project_id != job.project_id:
+            break
+        chain.append(
+            {
+                "job_id": str(previous.id),
+                "attempt_number": previous.attempt_number,
+                "status": previous.status,
+                "error_code": previous.error_code,
+                "error_message": previous.error_message,
+            }
+        )
+        current = previous
+    return chain
 
 
 def collect_evidence(session: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> dict[str, Any]:
-    """The recorded facts about one job, and nothing derived from them.
+    """The recorded facts about one job, and nothing derived beyond the timeline.
 
     Separated from `diagnose` so the rules can be exercised against a literal
     bundle in a test without a database, which is the only way to prove that a
     rule stays silent on evidence it does not read.
+
+    Only the fields the rules read are copied out of `runtime_spec`. The spec
+    also holds presigned manifest keys, and this bundle is handed to a language
+    model.
     """
     job = session.scalar(select(Job).where(Job.id == job_id))
     if job is None or job.project_id != project_id:
         raise DomainError("job_not_found", "No such job in this project.", status_code=404)
 
-    attempts = list(
-        session.scalars(
-            select(JobAttempt)
-            .where(JobAttempt.job_id == job.id)
-            .order_by(JobAttempt.attempt_number.asc())
-        )
-    )
     events = list(
         session.scalars(
             select(JobEvent)
             .where(JobEvent.job_id == job.id)
-            .order_by(JobEvent.created_at.desc())
-            .limit(EVENT_LIMIT)
+            .order_by(JobEvent.created_at.asc())
         )
     )
     spec = job.runtime_spec or {}
     manifest = spec.get("input_manifest") or {}
     snapshot = spec.get("plugin_snapshot") or {}
+    previous = _retry_chain(session, job)
     return {
         "job_id": str(job.id),
         "status": job.status,
@@ -448,19 +586,14 @@ def collect_evidence(session: Session, project_id: uuid.UUID, job_id: uuid.UUID)
         },
         "resolved_input_count": len(manifest.get("inputs") or []),
         "pending_inputs": list(manifest.get("pending_inputs") or []),
-        "attempts": [
-            {
-                "attempt_number": attempt.attempt_number,
-                "status": attempt.status,
-                "error": attempt.error,
-                "external_id": attempt.external_id,
-                "duration_seconds": _duration(attempt.started_at, attempt.finished_at),
-            }
-            for attempt in attempts
-        ],
+        **_timeline(events),
+        "previous_attempts": previous,
+        "retry_of": previous[0]["job_id"] if previous else None,
+        # Newest last, matching the order they happened, and capped so a job
+        # that flapped does not turn the bundle into a log file.
         "recent_events": [
-            {"event_type": event.event_type, "at": event.created_at.isoformat()}
-            for event in events
+            {"event_type": event.event_type, "at": _aware(event.created_at).isoformat()}
+            for event in events[-EVENT_LIMIT:]
         ],
     }
 

@@ -220,7 +220,12 @@ def analyse(text: str) -> dict[str, Any]:
                 "last_seq": int(polymer[-1].get_id()[1]),
                 "sequence": "".join(_one_letter(residue) for residue in polymer),
                 "numbering_gaps": _numbering_gaps(polymer),
-                "hetero_count": len(hetero),
+                # Split, because one number covering both is read as ligands and
+                # a crystal structure carries hundreds of ordered waters. The
+                # sibling fields `ligands` and `solvent_residue_count` already
+                # draw this line; this one used to cross it.
+                "ligand_count": len([r for r in hetero if r.get_resname().strip().upper() not in SOLVENT_COMPONENTS]),
+                "solvent_count": len([r for r in hetero if r.get_resname().strip().upper() in SOLVENT_COMPONENTS]),
             }
         )
 
