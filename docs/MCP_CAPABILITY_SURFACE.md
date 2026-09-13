@@ -2,7 +2,7 @@
 
 状态：活跃 / §6 四步全部已实现
 
-最后核验：2026-09-12（Asia/Shanghai；本轮补齐 citation 过协议边界并实跑全部门禁）
+最后核验：2026-09-13（Asia/Shanghai；本轮随 bot 名册新增 structure-analysis 与 failure-diagnosis 两个只读 capability，更新工具与能力计数）
 
 权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
@@ -20,7 +20,7 @@
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
 - **控制面丢失**：251 个 operation 中只有 121 个带 `x-permission`。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
-同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **28 个工具 / 11 个 capability**，按执行模式分为 read 18 / draft 7 / queue 3。
+同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **32 个工具 / 15 个 capability**，按执行模式分为 read 22 / draft 7 / queue 3。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
 ## 2. 结论
 

@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
-from . import agent_runs
+from . import agent_runs, bots
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .provider import completion_message
@@ -65,10 +65,26 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     This is the whole of "restoring" a run. There is no in-memory object graph to
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
-    conversation: list[dict[str, Any]] = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "user", "content": run.goal},
-    ]
+    conversation: list[dict[str, Any]] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    # The run's bot, read from the roster rather than from the row. The row
+    # holds the id; the charter is source, so a run resumed after a deploy
+    # operates under the current wording instead of a snapshot of what the
+    # charter said when it started. An id no longer in the roster contributes
+    # nothing, which leaves an undifferentiated run rather than a broken one.
+    charter = bots.get(run.bot) if run.bot else None
+    if charter is not None:
+        conversation.append(
+            {
+                "role": "system",
+                "content": (
+                    f"You are acting as the {charter.id} bot ({charter.title_zh}). "
+                    f"{charter.charter} This charter narrows BDA_AGENT_LOOP_V1 and "
+                    "cannot weaken it. When the goal needs an operator you are not, "
+                    "say which one and stop: " + (", ".join(charter.handoff) or "none") + "."
+                ),
+            }
+        )
+    conversation.append({"role": "user", "content": run.goal})
     for turn in turns:
         if turn.role == "tool":
             meta = (turn.tool_calls or [{}])[0]
@@ -134,21 +150,32 @@ def fold_settled_tasks(session: Session, run: CopilotAgentRun) -> int:
             run,
             role="tool",
             content=json.dumps(payload, ensure_ascii=False, default=str),
-            tool_calls=[{"tool_call_id": task.tool_call_id, "name": names.get(task.tool_call_id, _default_name(task))}],
+            tool_calls=[{"tool_call_id": task.tool_call_id, "name": names.get(task.tool_call_id) or _default_name(session, run, task)}],
         )
         recorded.add(task.tool_call_id)
         folded += 1
     return folded
 
 
-def _default_name(task: CopilotAgentTask) -> str:
+def _default_name(session: Session, run: CopilotAgentRun, task: CopilotAgentTask) -> str:
     """The tool a wait must have come from, when the call is no longer in view.
 
     The provider rejects a tool message whose name does not match the call it
     answers, so the name is read off the assistant turn where possible and only
-    falls back to the task kind.
+    falls back to here.
+
+    The kind alone stopped being enough once `delegate_to_operator` joined
+    `spawn_subagent` in awaiting a subagent: `kind == "subagent"` no longer
+    names one tool. The child itself settles it, using the same signal
+    `create_run` used to decide how to bound it - a delegated child is owned by
+    a *different* operator, a spawned one inherits the parent's.
     """
-    return "await_compute_job" if task.kind == "gpu_job" else "spawn_subagent"
+    if task.kind == "gpu_job":
+        return "await_compute_job"
+    child = session.get(CopilotAgentRun, task.resource_id)
+    if child is not None and child.bot and child.bot != run.bot:
+        return "delegate_to_operator"
+    return "spawn_subagent"
 
 
 def _tool_context(session: Session, run: CopilotAgentRun) -> ToolContext:
@@ -173,18 +200,77 @@ def _tool_context(session: Session, run: CopilotAgentRun) -> ToolContext:
         session=session,
         research=ResearchContextService(session, project),
         project=ProjectContextService(session, project),
-        # The goal is the human's own words, so the same request check that stops
-        # a chat turn talking itself into a write applies unchanged here.
+        # The same request check that stops a chat turn talking itself into a
+        # write, against the human's own words - see `authorising_text`, which is
+        # where "the human's own words" stops being the same thing as this run's
+        # goal.
         actions=CopilotActionService(
-            session, project, user, request_text=run.goal, source_message_id=run.id
+            session,
+            project,
+            user,
+            request_text=authorising_text(session, run),
+            source_message_id=run.id,
         ),
         agent_run=run,
+        bot=run.bot,
+        allowed_capabilities=frozenset(enabled_capabilities(session, run)),
     )
 
 
+def authorising_text(session: Session, run: CopilotAgentRun) -> str:
+    """The user's own words for this run, which is not always its goal.
+
+    A root run's goal came from the API and is the person's request. A child
+    run's goal is whatever the parent model wrote when it delegated - so reading
+    `run.goal` here would let an agent author the user's half of the
+    conversation and unlock every write by asking itself for one. That is the
+    single way a director could turn routing into escalation, and it applies
+    just as much to `spawn_subagent`, which has always set a child's goal from
+    the parent's text.
+
+    So the authorising words come from the root. Subagents nest one level
+    (`agent_runs.MAX_SUBAGENT_DEPTH`), so the parent is the root; the loop is
+    written as a walk anyway, because the depth limit is a constant somebody may
+    raise and this must not quietly become wrong when they do.
+    """
+    seen: set[uuid.UUID] = set()
+    current = run
+    while current.parent_run_id is not None and current.parent_run_id not in seen:
+        seen.add(current.id)
+        parent = session.get(CopilotAgentRun, current.parent_run_id)
+        if parent is None:
+            break
+        current = parent
+    return current.goal
+
+
+def enabled_capabilities(session: Session, run: CopilotAgentRun) -> set[str]:
+    """What the project has enabled, which is wider than what this run may call.
+
+    Read here rather than stored on the row so that revoking a capability from
+    the project narrows a run already in flight, the same way it narrows an
+    outstanding MCP session.
+    """
+    from .capabilities import normalize_capabilities
+    from .models import CopilotConfig
+
+    config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == run.project_id))
+    return normalize_capabilities(list(config.enabled_skills) if config and config.enabled_skills else None)
+
+
 def _schemas(run: CopilotAgentRun) -> list[dict[str, Any]]:
+    """What this run may call.
+
+    `needs_operator` is applied here as well as in chat: an undifferentiated run
+    has no accountable sender for a handover and no declared reach to delegate
+    within, so offering it either tool would be offering a guaranteed failure.
+    """
     allowed = set(run.allowed_tools or [])
-    return [spec.schema() for spec in REGISTRY.all() if spec.id in allowed]
+    return [
+        spec.schema()
+        for spec in REGISTRY.all()
+        if spec.id in allowed and (run.bot or not spec.needs_operator)
+    ]
 
 
 def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:

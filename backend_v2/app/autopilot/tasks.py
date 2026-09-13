@@ -4,6 +4,7 @@ import uuid
 
 from sqlalchemy import select
 
+from ..copilot.models import CopilotAgentRun
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
 from .models import (
@@ -14,21 +15,22 @@ from .models import (
     BudgetReservation,
     CampaignBudget,
 )
-from .service import UNSTARTED_STAGE_STATUSES, activate_stage
+from .service import (
+    UNSTARTED_STAGE_STATUSES,
+    _advance_and_record,
+    _worker_principal_id,
+    activate_stage,
+    settle_stage,
+)
 
 
 def _worker_principal(session) -> AutopilotServicePrincipal:
-    principal = session.scalar(
-        select(AutopilotServicePrincipal).where(AutopilotServicePrincipal.name == "autopilot-worker")
-    )
-    if principal is None:
-        principal = AutopilotServicePrincipal(
-            name="autopilot-worker",
-            allowed_actions=["campaign.execute", "campaign.cancel.reconcile"],
-        )
-        session.add(principal)
-        session.flush()
-    return principal
+    """The principal a worker-written ledger row is signed by.
+
+    Resolved through the service's own lookup so the two cannot create two rows
+    named "autopilot-worker" and sign different entries with different ids.
+    """
+    return session.get(AutopilotServicePrincipal, _worker_principal_id(session))
 
 
 def _ledger_exists(session, campaign_id: uuid.UUID, event_type: str, operation_id: str) -> bool:
@@ -266,3 +268,61 @@ def settle_reservation(self, campaign_id: str, reservation_id: str, actual_gpu_s
         "committed_gpu_seconds": charged,
         "unbilled_overrun_gpu_seconds": overrun,
     }
+
+
+@celery_app.task(name="bda_v2.autopilot_stage_settled", bind=True)
+def stage_settled(self, run_id: str) -> dict:
+    """A copilot agent run finished; settle the stage it belonged to and move on.
+
+    This is the half of the loop that was missing. A stage opened a run, the run
+    finished, and nothing connected the two - so the stage read `ready` for ever
+    and the campaign stopped after its first step. The mechanism existed on both
+    sides and the signal between them did not.
+
+    Subscribed to `copilot.agent_run.settled`, which the copilot emits on every
+    terminal state including cancelled. A run this campaign did not open is not
+    an error: the topic fans out to whoever cares, and most runs are somebody
+    typing in the drawer.
+
+    Idempotent under redelivery on both halves - `settle_stage` refuses to
+    re-settle, and `advance_campaign` finds the next stage already started.
+    """
+    parsed = uuid.UUID(run_id)
+    with session_scope() as session:
+        stage = session.scalar(
+            select(AutopilotStage).where(
+                AutopilotStage.resource_type == "copilot_agent_run",
+                AutopilotStage.resource_id == parsed,
+            )
+        )
+        if stage is None:
+            return {"run_id": run_id, "status": "not_a_stage"}
+        # Locked for the whole of this stay: two workers settling and advancing
+        # one campaign would each read "the next unstarted stage" before either
+        # wrote, and both would activate it.
+        campaign = session.scalar(
+            select(AutopilotCampaign)
+            .where(AutopilotCampaign.id == stage.campaign_id)
+            .with_for_update()
+        )
+        if campaign is None:
+            return {"run_id": run_id, "status": "missing_campaign"}
+
+        run = session.get(CopilotAgentRun, parsed)
+        if run is None:
+            return {"run_id": run_id, "status": "missing_run"}
+        # The stage ends the way its product ended. A cancelled run is not a
+        # failed step - somebody stopped it - and calling it failed would put a
+        # fault in the record where a decision belongs.
+        settle_stage(session, campaign, stage, status=run.status)
+
+        reached = _advance_and_record(session, campaign, stage)
+        if reached is None:
+            return {"run_id": run_id, "status": "settled", "advanced": False}
+        return {
+            "run_id": run_id,
+            "status": "settled",
+            "advanced": True,
+            "next_stage": str(reached.id),
+            "held": bool(reached.held),
+        }

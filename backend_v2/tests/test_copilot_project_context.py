@@ -69,6 +69,10 @@ def test_project_context_reads_each_operational_data_family() -> None:
         node_key="design",
         node_type="model",
         model_plugin="demo",
+        # The name is a display string; the id is what reaches the registry, and
+        # `review_compute_declaration` needs it. A stand-in missing the column
+        # would let this read as covered while the real node carried nothing.
+        model_plugin_id=uuid.uuid4(),
         status="draft",
         error_message=None,
     )

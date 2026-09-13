@@ -23,7 +23,15 @@ backend_v2/.venv/bin/mypy --config-file backend_v2/pyproject.toml backend_v2/app
 backend_v2/.venv/bin/pytest backend_v2/tests
 npm --prefix frontend test
 npm --prefix frontend run build
+npm --prefix frontend run lint
 ```
+
+`npm run lint` is a separate CI step and neither `test` nor `build` runs it, so a
+change can be green locally on both and still turn the `frontend` job red. Two
+rules bite most often: a component file may export only components
+(`react-refresh/only-export-components` — put hooks and constants in their own
+module), and `features/lab` carries three standing TanStack Table warnings that
+are not yours.
 
 Single backend test / single frontend test:
 
@@ -79,6 +87,7 @@ Other gates, each with a script you can run locally:
 - **Cluster claims** — a job script that says it needs no GPU must prove it at run time. The queue is chosen on the `bsub` command line and can merge its own `GPU_REQ` into the job, so `#BSUB` carrying no `-gpu` does not mean no GPU: `2v100-32-e5` forces `num=1:mode=exclusive_process` onto everything, and three jackhmmer stages held a V100 for about seven GPU-hours while their comments said they had not asked for one. Every no-GPU stage must exit when `CUDA_VISIBLE_DEVICES` is set; `-n`, `span[ptile=]` and the tool's thread count must agree; and a loop over staged inputs must compare a count, because `sha256sum -c` cannot see files its manifest never listed. Check with `PYTHONPATH=. backend_v2/.venv/bin/python backend_v2/scripts/check_cluster_claims.py`, and `--live <job-id>` to ask the scheduler what a running job was actually given.
 - **Migration reversibility** — CI runs `alembic check` (model/migration drift) then `alembic downgrade base`. Every migration needs a working downgrade.
 - **Retired-runtime grep** — CI greps the tree and fails on `/api/v1`, `submit-to-compute`, `/jobs/.*/sync`, `experiment-results/upload`, `copilot/literature`, `docker.sock`, and `sqlite:///`. These paths are deliberately dead.
+- **Browser vertical slice** — CI runs `npm --prefix frontend run test:browser`, a 148-case matrix over route x viewport x theme x scenario. Every API request the app makes must have a stub in `frontend/scripts/browser-harness-core.mjs`; an unhandled one is a failure, so a new endpoint the app calls on mount needs a handler there in the same change. `npm test` and `npm run build` both pass without it, which is why this is the frontend gate most likely to be the thing that turns the job red. Rerun one case with `BDA_BROWSER_CASES=<id> TMPDIR=/tmp node scripts/browser-vertical-slice.mjs` from `frontend/`; failures land in `.superpowers/.../browser-artifacts/<run>/cases/<id>/failure.json`.
 - **Frontend transport boundary** — see below.
 
 ## Version scope

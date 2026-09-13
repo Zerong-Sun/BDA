@@ -14,13 +14,20 @@ is what makes the capability check and the audit record impossible to skip.
 
 This is what turns the copilot from an assistant that answers into an agent
 that acts: adding a capability is adding a row, and the guardrails come with it.
+
+That promise held for the agent loop and for MCP, both of which derive their
+tool listing from `all()`. Chat did not: it kept the old hand-written schema
+lists alongside, so thirteen tools were dispatchable through `execute` and never
+offered, and the write set the intent check consulted named half the writes that
+existed. `research_agent.chat_schemas` and `WRITE_TOOL_NAMES` now derive from
+here too, which is what makes the sentence above true on all three surfaces.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..core.problem import DomainError
@@ -50,6 +57,17 @@ class ToolContext:
     #: leave it unset, which is what makes the suspending tools unreachable from
     #: chat: they declare `requires="agent_run"` and there is nothing to suspend.
     agent_run: Any = None
+    #: The operator this turn belongs to, for a chat turn that named one. A run
+    #: carries it on the row instead; `tools._bot_of` reads whichever is present
+    #: and refuses when neither is, because an unowned turn cannot hand over -
+    #: a note whose sender is "the assistant" names nobody accountable.
+    bot: str | None = None
+    #: The project's enabled capability ids, as opposed to this turn's tools.
+    #: A director needs the project's set to say whether an operator it is about
+    #: to delegate to has anything enabled at all; delegating into an empty
+    #: capability set produces a child with no tools, which reads as the
+    #: operator failing rather than the project not granting it anything.
+    allowed_capabilities: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +87,29 @@ class ToolSpec:
     #: Write tools record what they did. Reads do not: an audit row per read
     #: would bury the writes that matter.
     audit: bool = False
+    #: Whose request has to authorise this tool.
+    #:   "user"     - the user's own words must ask for it, through
+    #:                `actions.request_allows`. Every tool that changes the
+    #:                research record is this, and it is the default so that
+    #:                forgetting the field cannot open a hole.
+    #:   "internal" - copilot bookkeeping that changes no domain table: a
+    #:                handover note between operators, which sits in the same
+    #:                category as the chat message already written every turn
+    #:                without an intent check. Still audited.
+    #: Declared per tool rather than inferred from the table a handler happens
+    #: to touch, so the exemption is visible in the catalogue instead of being
+    #: implicit somewhere inside a handler.
+    intent: str = "user"
+    #: Whether this tool needs the turn to belong to a named operator.
+    #:
+    #: Declared rather than discovered inside the handler, for the same reason
+    #: `requires` is: a tool that is offered and then always fails teaches the
+    #: model to retry, and an undifferentiated turn has no accountable sender to
+    #: put on a handover and no declared reach to delegate within. `mcp.py`
+    #: already states the rule this upholds - a tool that is not callable is not
+    #: listed - and chat and the agent loop now apply it to the operator the same
+    #: way they apply it to the services.
+    needs_operator: bool = False
     #: What this tool leaves running after it returns: "gpu_job", "subagent", or
     #: "" for a tool that answers within the call. A tool that names a kind is
     #: how a run comes to suspend at all - the agent loop reads this rather than
@@ -77,9 +118,14 @@ class ToolSpec:
     #: a result without one means the work was already finished and there is
     #: nothing to wait for.
     awaits: str = ""
-    #: Bilingual verbs that must appear in the user's own message before a write
-    #: runs, so the model cannot talk itself into one.
-    request_terms: tuple[str, ...] = field(default_factory=tuple)
+    #: NOTE: a `request_terms` field used to sit here, describing the bilingual
+    #: vocabulary a write needs in the user's own message. No spec ever set it
+    #: and no code ever read it, so a contributor who populated it would have
+    #: believed their write was gated when it was not. The vocabulary lives in
+    #: `actions._ACTION_REQUEST_TERMS`, which is richer than a flat tuple - it
+    #: separates domain words from verbs and handles negation - and
+    #: `actions.request_allows` denies any write it has no entry for.
+
     #: How a result turns into citations, declared with the tool rather than
     #: decided by the caller. An answer that cites nothing is not auditable, so
     #: "none" is a statement about the tool (a write, an overview) and not a
@@ -131,7 +177,27 @@ class ToolRegistry:
         return [spec.schema() for spec in self.for_capabilities(capabilities)]
 
     def write_ids(self) -> set[str]:
+        """Every tool that is not a read.
+
+        The conservative set, and the default one to reach for: a caller that
+        means "do not let this surface change anything" wants all of them,
+        including the copilot's own bookkeeping. `user_intent_write_ids` is the
+        narrower set and has to be asked for by name.
+        """
         return {spec.id for spec in self.all() if spec.execution_mode != "read"}
+
+    def user_intent_write_ids(self) -> set[str]:
+        """Writes the user's own words have to ask for.
+
+        Narrower than `write_ids` by exactly the `intent="internal"` tools. The
+        intent gate drops from `allowed_tools` every member of this set the
+        request does not authorise, so a handover note listed here would leave
+        an operator unable to hand over unless the user happened to say the word
+        "handoff" - while the note changes no research record, which is what the
+        gate is protecting. Nothing else may be added without that argument
+        holding for it too.
+        """
+        return {spec.id for spec in self.all() if spec.execution_mode != "read" and spec.intent == "user"}
 
     def capability_manifest(self) -> dict[str, dict[str, Any]]:
         """Capability -> the tools it grants, derived rather than maintained.

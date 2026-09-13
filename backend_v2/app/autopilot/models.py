@@ -150,6 +150,12 @@ class AutopilotStage(UUIDVersionMixin, Base):
     #: what was approved: reclassifying a stage key later must not silently re-open a
     #: campaign someone confirmed under the old classification.
     risk_tier: Mapped[str] = mapped_column(String(32), default="reversible_draft")
+    #: The roster operator accountable for this stage, copied from
+    #: `operators.STAGE_OPERATORS` at confirmation for the same reason `risk_tier` is: it
+    #: is part of what was approved. Re-staffing a stage key later must not change who
+    #: carried a campaign somebody already confirmed. NULL is a real state - some stages
+    #: deliberately have no operator, and `operators.UNSTAFFED` says which and why.
+    operator: Mapped[str | None] = mapped_column(String(80), nullable=True)
     #: When a held stage was let through, and by whom. Both NULL on a stage that was never
     #: held - and a held stage with these NULL is precisely the state the worker refuses
     #: to advance past.
@@ -177,6 +183,29 @@ class AutopilotStage(UUIDVersionMixin, Base):
         from . import gates
 
         return gates.explain(self.stage_key) if self.held else None
+
+    @property
+    def operator_reason(self) -> str | None:
+        """Who carries this stage and what for, or why nobody does.
+
+        Derived from the *stored* operator where there is one, not from the current
+        mapping: a campaign confirmed under an older staffing must keep reading as the
+        campaign that was approved. Falls back to explaining the stage key only when the
+        row has no operator, which is where "by design" and "not classified" differ.
+        """
+        from . import operators
+
+        if not self.operator:
+            return operators.explain(self.stage_key)
+        from ..copilot import bots
+
+        spec = bots.get(self.operator)
+        if spec is None:
+            return (
+                f"stage {self.stage_key!r} was confirmed for operator {self.operator!r}, "
+                "which the roster no longer has"
+            )
+        return f"stage {self.stage_key!r} is carried by {spec.id} ({spec.title_zh}): {spec.summary}"
 
 
 class AutopilotLedgerEntry(Base):

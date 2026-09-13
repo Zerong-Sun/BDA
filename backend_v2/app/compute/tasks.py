@@ -248,6 +248,7 @@ def publish_outbox(batch_size: int = 100) -> dict:
             "job.succeeded": "bda_v2.campaign_advance",
             "job.settled": ("bda_v2.campaign_advance", "bda_v2.copilot_agent_task_settled"),
             "operation.settled": "bda_v2.copilot_agent_operation_settled",
+            "copilot.agent_run.settled": "bda_v2.autopilot_stage_settled",
             "campaign.evaluate": "bda_v2.campaign_evaluate",
             "literature.relations.detect": "bda_v2.literature_relations_detect",
             "registry.model_plugin.validate": "bda_v2.registry_model_plugin_validate",

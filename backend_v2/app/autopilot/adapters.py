@@ -106,11 +106,113 @@ class WorkflowRunAdapter:
         return ("workflow_run", run.id)
 
 
+class AgentRunAdapter:
+    """A stage becomes a durable agent run owned by the operator accountable for it.
+
+    This is what connects the roster to the campaign. A stage used to have a risk tier and
+    a resource and nobody carrying it, so the one place the platform runs the research
+    phases in order was the one place none of the charters applied.
+
+    Three properties make that safe rather than merely automatic, and each is a rule the
+    roster or the gates already established:
+
+    * **The operator comes from the stage, not from this call.** It was frozen at
+      confirmation (`operators.STAGE_OPERATORS`), so the run is carried by whoever the
+      approved protocol said - not by whatever the mapping says today.
+    * **The goal is the person's own words.** The run's authorising text is the campaign
+      brief a human wrote and confirmed, never a sentence this code composed. Writes
+      inside the run are gated on it by `actions.request_allows` exactly as in chat, so an
+      automatic stage cannot perform a write the brief did not ask for. That is the same
+      rule that stops a director manufacturing consent, applied one level up.
+    * **A held stage never gets here.** `service.activate_stage` returns before the
+      adapter when `stage.held`, so an operator is never already working on a step a
+      person has not released.
+
+    The run's tools are `bot.capabilities ∩ project.enabled_skills`, resolved the way
+    `start_agent_run` resolves them. A stage whose operator has nothing enabled produces
+    no run and says so, rather than a run with no tools that reads as a failed operator.
+    """
+
+    def ensure_stage_resource(
+        self, session: Session, campaign: AutopilotCampaign, stage: AutopilotStage
+    ) -> StageResource | None:
+        from ..copilot import agent_runs, bots
+        from ..copilot.capabilities import normalize_capabilities, tools_for_capabilities
+        from ..copilot.models import CopilotAgentRun, CopilotConfig
+
+        if not stage.operator or bots.get(stage.operator) is None:
+            # An unstaffed stage, or one confirmed before the column existed, or one whose
+            # operator has since left the roster. None of those is an error: the stage
+            # simply has no trunk object of its own, which is what `None` means here.
+            return None
+
+        key = idempotency_key(stage)
+        existing = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.legacy_id == key))
+        if existing is not None:
+            return ("copilot_agent_run", existing.id)
+
+        project = session.get(Project, campaign.project_id)
+        user = session.get(User, campaign.created_by)
+        if project is None or user is None:
+            return None
+
+        config = session.scalar(
+            select(CopilotConfig).where(CopilotConfig.project_id == campaign.project_id)
+        )
+        enabled = normalize_capabilities(
+            list(config.enabled_skills) if config and config.enabled_skills else None
+        )
+        capabilities = bots.capabilities_for_bot(stage.operator, enabled)
+        allowed_tools = sorted(tools_for_capabilities(capabilities))
+        if not allowed_tools:
+            return None
+
+        run = agent_runs.create_run(
+            session,
+            project_id=project.id,
+            user_id=user.id,
+            # The brief, verbatim. Composing a goal here would put words in the
+            # person's mouth that the write-intent gate then reads as authorisation.
+            goal=_brief_of(campaign, stage),
+            allowed_tools=allowed_tools,
+            bot=stage.operator,
+        )
+        run.legacy_id = key
+        session.flush()
+        # Dispatched here rather than left for a sweep, for the reason a delegated child
+        # is: nothing else looks at a `running` run that no worker was told about.
+        agent_runs.enqueue_first_step(session, run)
+        return ("copilot_agent_run", run.id)
+
+
+def _brief_of(campaign: AutopilotCampaign, stage: AutopilotStage) -> str:
+    """The confirmed brief, with the stage named so the operator knows which step it is.
+
+    The brief is the authorising half and is reproduced unchanged; the stage key is a
+    label on it, not an instruction, because a sentence this module wrote would be a
+    sentence the intent gate could mistake for the person's.
+    """
+    spec = campaign.frozen_spec if isinstance(campaign.frozen_spec, dict) else {}
+    brief = spec.get("brief")
+    if isinstance(brief, dict):
+        brief = brief.get("text") or brief.get("goal") or ""
+    text = str(brief or campaign.name or "").strip()
+    return f"[{stage.stage_key}] {text}"[:50_000]
+
+
 #: Which stage keys have a trunk object today. A key that is absent is not a failure: it
 #: means the stage is still a human step, and the campaign says so rather than pretending.
+#:
+#: `compute` and `design` keep the workflow run - that is the object a person opens in the
+#: Workflow page, and replacing it with an agent run would move the step off the trunk the
+#: module docstring is about. The stages that gain an operator-owned run are the ones whose
+#: product is reasoning rather than a graph.
 ADAPTERS: dict[str, StageAdapter] = {
     "compute": WorkflowRunAdapter(),
     "design": WorkflowRunAdapter(),
+    "research": AgentRunAdapter(),
+    "plan": AgentRunAdapter(),
+    "report": AgentRunAdapter(),
 }
 
 

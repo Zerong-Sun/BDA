@@ -1,0 +1,621 @@
+"""Why one job failed, from the evidence the platform already recorded.
+
+`get_compute_status` reports that a job failed and what its error string was.
+That is where every investigation here has started and it is never where one
+ends, because the failures this cluster produces are rarely exceptions in the
+platform. They are disagreements between what a job *declared* and what it was
+actually given: a stage that says it needs no GPU submitted to a queue that
+merges one in, `-n` disagreeing with the thread count the tool was told to use,
+a registry row whose image or command makes the job exit in seconds with an
+empty log, a staged-input loop that verified a manifest which never listed the
+file that was missing.
+
+So the shape here is: gather the recorded evidence for one job, run an explicit
+rule set over it, and return findings that each name the evidence they rest on.
+
+Three properties are deliberate.
+
+**Rules are data.** Each is a `Rule` with a predicate, so one rule can be tested
+against one piece of evidence, and adding the next lesson this cluster teaches
+is adding a row rather than extending a branch.
+
+**Confidence is stated, not implied.** `confirmed` means the evidence says it;
+`possible` means the evidence is consistent with it and with other things. A
+reader who cannot tell the two apart will act on the second as if it were the
+first.
+
+**No match is an answer.** A job whose evidence fits no rule yields no findings
+and says so. An invented cause ends an investigation, which is strictly worse
+than admitting the evidence does not determine one.
+"""
+
+from __future__ import annotations
+
+import re
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..core.problem import DomainError
+from .models import Job, JobEvent
+
+#: Queues that merge their own GPU requirement into every job, whatever the
+#: submitted directives say. A stage that declares no GPU and lands here holds
+#: one exclusively for its whole run, and the low-utilisation mail that follows
+#: is treated as a violation in this project, not as a notice.
+GPU_FORCING_QUEUES = frozenset({"2v100-32-e5", "2v100-32", "gpu-v100"})
+
+#: A dispatch that failed this fast did not run the model. Something rejected it
+#: before the work began - a missing image, an entrypoint that is not there, a
+#: command that exits immediately - and all of those live in the plugin
+#: declaration rather than in the science.
+IMMEDIATE_EXIT_SECONDS = 45
+
+#: How many of a job's most recent events the bundle carries. Enough to see the
+#: transition that ended it without turning the result into a log file.
+EVENT_LIMIT = 20
+
+_PATTERNS: dict[str, re.Pattern[str]] = {
+    "oom": re.compile(
+        r"TERM_MEMLIMIT|out of memory|OutOfMemory|CUDA out of memory|Killed\b|exit code 137",
+        re.IGNORECASE,
+    ),
+    "timeout": re.compile(r"TERM_RUNLIMIT|run limit|walltime|timed? ?out|DeadlineExceeded", re.IGNORECASE),
+    "image": re.compile(
+        r"pull access denied|manifest unknown|no such image|ImagePullBackOff|"
+        r"repository does not exist|not found: manifest",
+        re.IGNORECASE,
+    ),
+    "missing_file": re.compile(
+        r"No such file or directory|FileNotFoundError|cannot open .* for reading|"
+        r"cannot stat|does not exist",
+        re.IGNORECASE,
+    ),
+    "checksum": re.compile(
+        r"sha256sum|checksum|FAILED open or read|computed checksum did not match",
+        re.IGNORECASE,
+    ),
+    "permission": re.compile(r"Permission denied|Operation not permitted|EACCES", re.IGNORECASE),
+}
+
+
+@dataclass(frozen=True)
+class Finding:
+    id: str
+    title: str
+    confidence: str  # "confirmed" | "possible"
+    detail: str
+    remedy: str
+    #: Which fields of the evidence bundle the rule read. Named so a reader can
+    #: check the finding against the same evidence rather than trusting it.
+    evidence: tuple[str, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "confidence": self.confidence,
+            "detail": self.detail,
+            "remedy": self.remedy,
+            "evidence": list(self.evidence),
+        }
+
+
+@dataclass(frozen=True)
+class Rule:
+    id: str
+    check: Callable[[dict[str, Any]], Finding | None]
+
+
+def _errors(evidence: dict[str, Any]) -> str:
+    """Every recorded error string in this job's retry chain, for matching.
+
+    This job's message and code, plus the messages of the attempts it replaced.
+    A retry that failed differently from its predecessor is the interesting
+    case, and matching only the latest would miss it.
+    """
+    parts = [str(evidence.get("error_message") or ""), str(evidence.get("error_code") or "")]
+    parts.extend(
+        str(item.get("error_message") or "") for item in evidence.get("previous_attempts", [])
+    )
+    return "\n".join(part for part in parts if part)
+
+
+def _resources(evidence: dict[str, Any]) -> dict[str, Any]:
+    snapshot = evidence.get("plugin_snapshot") or {}
+    resources = snapshot.get("resources")
+    return resources if isinstance(resources, dict) else {}
+
+
+def _rule_pending_inputs(evidence: dict[str, Any]) -> Finding | None:
+    pending = evidence.get("pending_inputs") or []
+    if not pending:
+        return None
+    return Finding(
+        id="pending_inputs_unresolved",
+        title="The job was dispatched with unresolved input ports",
+        confidence="confirmed",
+        detail=(
+            f"The input manifest still lists {len(pending)} unresolved port(s): "
+            f"{', '.join(str(item) for item in pending[:6])}. The stage ran without "
+            "the artifact it was supposed to read."
+        ),
+        remedy=(
+            "Bind the upstream output port to this node's input port, or wait for the "
+            "producing stage to succeed, before submitting again."
+        ),
+        evidence=("runtime_spec.input_manifest.pending_inputs",),
+    )
+
+
+def _rule_no_command(evidence: dict[str, Any]) -> Finding | None:
+    if evidence.get("command"):
+        return None
+    return Finding(
+        id="no_command_declared",
+        title="Neither the plugin nor the node declared a command",
+        confidence="confirmed",
+        detail=(
+            "The runtime spec carries no command, so the container had nothing to run. "
+            "A job in this state exits immediately and produces an empty log."
+        ),
+        remedy=(
+            "Set the command on the model plugin registry row (preferred, so every node "
+            "using it inherits the fix) or on the workflow node."
+        ),
+        evidence=("runtime_spec.command", "runtime_spec.plugin_snapshot.command"),
+    )
+
+
+def _rule_gpu_queue(evidence: dict[str, Any]) -> Finding | None:
+    queue = str(evidence.get("queue") or "")
+    if queue not in GPU_FORCING_QUEUES:
+        return None
+    resources = _resources(evidence)
+    if resources.get("gpu"):
+        return None
+    return Finding(
+        id="gpu_forced_by_queue",
+        title="A no-GPU stage was submitted to a queue that forces a GPU",
+        confidence="confirmed",
+        detail=(
+            f"The plugin declares no GPU, but queue {queue!r} merges its own GPU "
+            "requirement into every job it accepts. The stage held a GPU exclusively "
+            "for its whole run without using it. This does not by itself fail a job, "
+            "and it is a violation here regardless of whether the job succeeded."
+        ),
+        remedy=(
+            "Submit CPU-only stages to a CPU queue, and have the stage exit when "
+            "CUDA_VISIBLE_DEVICES is set so the mismatch cannot recur silently."
+        ),
+        evidence=("runtime_spec.queue", "runtime_spec.plugin_snapshot.resources.gpu"),
+    )
+
+
+def _rule_cpu_evidence(evidence: dict[str, Any]) -> Finding | None:
+    resources = _resources(evidence)
+    cpus = resources.get("cpus")
+    if not isinstance(cpus, int) or cpus <= 1:
+        return None
+    if str(resources.get("cpus_evidence") or "").strip():
+        return None
+    return Finding(
+        id="cpu_declaration_unsupported",
+        title=f"The plugin asks for {cpus} slots with no evidence that it uses them",
+        confidence="possible",
+        detail=(
+            f"`-n`, `span[ptile=]` and $BDA_CPUS all derive from this one number, so the "
+            f"scheduler reserved {cpus} cores. The registry row names no measurement or "
+            "upstream thread flag supporting that, and a job holding cores it cannot use "
+            "draws low-utilisation inspection."
+        ),
+        remedy=(
+            "Either record the measurement in `cpus_evidence` on the plugin row, or "
+            "reduce `cpus` to what the tool actually saturates."
+        ),
+        evidence=("runtime_spec.plugin_snapshot.resources.cpus",),
+    )
+
+
+def _rule_immediate_exit(evidence: dict[str, Any]) -> Finding | None:
+    """Read from the event log, not from a JobAttempt row.
+
+    The first version of this rule asked `JobAttempt` for a status and a
+    finished_at. Neither is ever written: an attempt row is inserted once at
+    dispatch with status "dispatching" and never updated again, so the rule
+    could not fire on a real job however fast it died. The event log is the
+    record that actually exists - one row per status transition, each with its
+    timestamp - so the elapsed time is the gap between the job starting and the
+    event that ended it.
+    """
+    runtime = evidence.get("runtime_seconds")
+    if evidence.get("status") != "failed" or runtime is None:
+        return None
+    if runtime > IMMEDIATE_EXIT_SECONDS:
+        return None
+    return Finding(
+        id="immediate_exit",
+        title="The job died before the model could have started",
+        confidence="possible",
+        detail=(
+            f"It reached {evidence.get('phase_reached')!r} and failed {runtime}s later, "
+            f"which is under the {IMMEDIATE_EXIT_SECONDS}s floor for the model having run "
+            "at all. The cause is then almost always the plugin declaration - image, "
+            "command, entrypoint or runtime setup - rather than the input or the science."
+        ),
+        remedy=(
+            "Preview the rendered script for this node, then check the plugin's image, "
+            "command and runtime_setup against what the container actually provides."
+        ),
+        evidence=("recent_events[].event_type", "recent_events[].at", "status"),
+    )
+
+
+def _rule_never_started(evidence: dict[str, Any]) -> Finding | None:
+    """Failed without the scheduler ever reporting it running.
+
+    Distinct from `immediate_exit`, and the distinction is the useful part: a
+    job that ran for three seconds got as far as the container; one that never
+    ran did not, so the input manifest, the queue and the submission are where
+    to look and the command is not.
+    """
+    if evidence.get("status") != "failed" or evidence.get("reached_running"):
+        return None
+    return Finding(
+        id="never_started",
+        title="The job failed without ever being reported as running",
+        confidence="confirmed",
+        detail=(
+            f"The event log stops at {evidence.get('phase_reached')!r}; there is no "
+            "`job.running`. Whatever went wrong happened before the model was given "
+            "control, so the container's command is not the first place to look."
+        ),
+        remedy=(
+            "Check the submission itself: input manifest resolution, the queue the job "
+            "was sent to, and the backend's own rejection message."
+        ),
+        evidence=("recent_events[].event_type", "status"),
+    )
+
+
+def _pattern_rule(
+    rule_id: str,
+    pattern_key: str,
+    title: str,
+    detail: str,
+    remedy: str,
+) -> Callable[[dict[str, Any]], Finding | None]:
+    def check(evidence: dict[str, Any]) -> Finding | None:
+        match = _PATTERNS[pattern_key].search(_errors(evidence))
+        if match is None:
+            return None
+        return Finding(
+            id=rule_id,
+            title=title,
+            confidence="confirmed",
+            detail=f"{detail} The recorded error matches {match.group(0)!r}.",
+            remedy=remedy,
+            evidence=("error_message", "attempts[].error"),
+        )
+
+    return check
+
+
+def _rule_repeated_failure(evidence: dict[str, Any]) -> Finding | None:
+    """Walk the retry chain, not a list of attempts on one job.
+
+    A retry here is a *new* `Job` row carrying the next `attempt_number` and a
+    `job.pending` event whose payload names the job it replaces. The first
+    version of this rule compared `JobAttempt.error` strings, a column nothing
+    writes, so it could not fire. Comparing the predecessors' recorded errors is
+    the same question asked of the records that exist.
+    """
+    previous = [item for item in evidence.get("previous_attempts") or [] if item.get("error_message")]
+    if not previous:
+        return None
+    messages = {str(item["error_message"]).strip() for item in previous}
+    current = str(evidence.get("error_message") or "").strip()
+    if current:
+        messages.add(current)
+    if len(messages) > 1:
+        return None
+    return Finding(
+        id="repeated_identical_failure",
+        title="This attempt and the ones it replaced all failed the same way",
+        confidence="confirmed",
+        detail=(
+            f"{len(previous) + 1} attempts in the retry chain recorded an identical "
+            "error. The failure is deterministic, so resubmitting the same "
+            "specification reproduces it."
+        ),
+        remedy="Change the specification before the next submission; a retry alone will not help.",
+        evidence=("previous_attempts[].error_message", "error_message"),
+    )
+
+
+def _rule_never_reached_scheduler(evidence: dict[str, Any]) -> Finding | None:
+    if evidence.get("external_id"):
+        return None
+    if evidence.get("status") not in {"failed", "cancelled"}:
+        return None
+    return Finding(
+        id="never_reached_backend",
+        title="The job never received an external id",
+        confidence="possible",
+        detail=(
+            "The compute backend never returned an identifier for this job, so it "
+            "probably failed on submission rather than during execution. The transport "
+            "(SSH to the cluster, or the Docker endpoint) is the first place to look."
+        ),
+        remedy=(
+            "Check backend connectivity and credentials, then resubmit; recovery queries "
+            "external state before resubmitting, so a job that did start will not be "
+            "duplicated."
+        ),
+        evidence=("external_id", "status"),
+    )
+
+
+RULES: tuple[Rule, ...] = (
+    Rule("pending_inputs_unresolved", _rule_pending_inputs),
+    Rule("no_command_declared", _rule_no_command),
+    Rule(
+        "out_of_memory",
+        _pattern_rule(
+            "out_of_memory",
+            "oom",
+            "The job was killed for exceeding its memory",
+            "Memory limits are enforced by the scheduler and by the GPU driver separately.",
+            "Raise `memory_gb` on the plugin row, or reduce the batch/crop size the stage uses.",
+        ),
+    ),
+    Rule(
+        "walltime_exceeded",
+        _pattern_rule(
+            "walltime_exceeded",
+            "timeout",
+            "The job hit its run-time limit",
+            "The work was still running when the limit expired; it did not fail on its own.",
+            "Raise the stage's time limit, or split the input so one job does less.",
+        ),
+    ),
+    Rule(
+        "image_unavailable",
+        _pattern_rule(
+            "image_unavailable",
+            "image",
+            "The container image could not be obtained",
+            "The runtime could not pull or find the declared image.",
+            "Correct the image reference on the plugin row, or make the image available "
+            "on the execution host; compute nodes here have no internet.",
+        ),
+    ),
+    Rule(
+        "input_file_missing",
+        _pattern_rule(
+            "input_file_missing",
+            "missing_file",
+            "A file the job expected was not there",
+            "A staged input was absent at run time. A manifest check cannot catch this on "
+            "its own: `sha256sum -c` verifies the files its manifest lists and is silent "
+            "about one it never listed, which is why staged-input loops must also compare "
+            "a count.",
+            "Confirm the staging step wrote every declared input, and have the job compare "
+            "the number of staged files against the number expected.",
+        ),
+    ),
+    Rule(
+        "checksum_mismatch",
+        _pattern_rule(
+            "checksum_mismatch",
+            "checksum",
+            "A staged file failed its checksum",
+            "The bytes on the execution host are not the bytes that were staged.",
+            "Re-stage the input. On macOS-created archives, check for `._*` sidecar files: "
+            "they pass `sha256sum -c` and then trip the job's own file-count guard.",
+        ),
+    ),
+    Rule(
+        "permission_denied",
+        _pattern_rule(
+            "permission_denied",
+            "permission",
+            "The job was denied access to a path or device",
+            "The execution account could not read or write something the stage needs.",
+            "Check the staging directory's ownership and the account the job runs under.",
+        ),
+    ),
+    Rule("immediate_exit", _rule_immediate_exit),
+    Rule("never_started", _rule_never_started),
+    Rule("gpu_forced_by_queue", _rule_gpu_queue),
+    Rule("cpu_declaration_unsupported", _rule_cpu_evidence),
+    Rule("repeated_identical_failure", _rule_repeated_failure),
+    Rule("never_reached_backend", _rule_never_reached_scheduler),
+)
+
+
+#: Status transitions in the order the job makes them. Used to say how far a job
+#: got, which is the difference between "the container ran and died" and "the
+#: container never started" - two failures with disjoint causes.
+PHASE_ORDER = ("pending", "dispatching", "queued", "running", "collecting")
+
+#: How far back the retry chain is walked. A chain longer than this is itself the
+#: finding, and following it forever would let a cycle in the recorded payloads
+#: hang the request.
+MAX_RETRY_DEPTH = 10
+
+
+def _aware(value: datetime) -> datetime:
+    """SQLite hands back naive datetimes for timezone-aware columns."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _timeline(events: list[JobEvent]) -> dict[str, Any]:
+    """How far the job got and how long it ran, from the status events.
+
+    The event log is the only record of this. `JobAttempt` looks like it should
+    hold it - it has `status`, `error` and `finished_at` columns - but exactly
+    one row is written per job, at dispatch, and never updated, so every one of
+    those columns is either "dispatching" or NULL forever. A rule reading them
+    cannot fire, which is what the first version of this module did.
+    """
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    reached = "pending"
+    for event in events:
+        if not event.event_type.startswith("job."):
+            continue
+        phase = event.event_type.removeprefix("job.")
+        moment = _aware(event.created_at)
+        if phase in PHASE_ORDER:
+            if PHASE_ORDER.index(phase) > PHASE_ORDER.index(reached):
+                reached = phase
+            # The clock starts when the backend accepts the job, not when the
+            # row was created: time spent PEND in a queue is the scheduler's,
+            # not the stage's, and counting it would hide every fast failure
+            # behind a long wait.
+            if phase == "running" or (phase == "queued" and started_at is None):
+                started_at = moment
+        elif phase in {"failed", "succeeded", "cancelled"}:
+            ended_at = moment
+    runtime = (
+        round((ended_at - started_at).total_seconds(), 1)
+        if started_at is not None and ended_at is not None and ended_at >= started_at
+        else None
+    )
+    return {
+        "phase_reached": reached,
+        "reached_running": reached == "running" or reached == "collecting",
+        "runtime_seconds": runtime,
+    }
+
+
+def _retry_chain(session: Session, job: Job) -> list[dict[str, Any]]:
+    """The jobs this one replaced, newest first.
+
+    A retry is a new `Job` row, not another attempt on this one: `service.retry`
+    copies the runtime spec onto a fresh row with the next `attempt_number` and
+    records the predecessor in the `job.pending` event payload. So the history a
+    diagnosis wants is a linked list through those payloads, and nothing on the
+    job row itself points backwards.
+    """
+    chain: list[dict[str, Any]] = []
+    seen: set[uuid.UUID] = {job.id}
+    current = job
+    for _ in range(MAX_RETRY_DEPTH):
+        payload = session.scalar(
+            select(JobEvent.payload)
+            .where(JobEvent.job_id == current.id, JobEvent.event_type == "job.pending")
+            .order_by(JobEvent.created_at.asc())
+            .limit(1)
+        )
+        raw = (payload or {}).get("retry_of") if isinstance(payload, dict) else None
+        if not raw:
+            break
+        try:
+            previous_id = uuid.UUID(str(raw))
+        except ValueError:
+            break
+        if previous_id in seen:
+            break
+        seen.add(previous_id)
+        previous = session.get(Job, previous_id)
+        if previous is None or previous.project_id != job.project_id:
+            break
+        chain.append(
+            {
+                "job_id": str(previous.id),
+                "attempt_number": previous.attempt_number,
+                "status": previous.status,
+                "error_code": previous.error_code,
+                "error_message": previous.error_message,
+            }
+        )
+        current = previous
+    return chain
+
+
+def collect_evidence(session: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> dict[str, Any]:
+    """The recorded facts about one job, and nothing derived beyond the timeline.
+
+    Separated from `diagnose` so the rules can be exercised against a literal
+    bundle in a test without a database, which is the only way to prove that a
+    rule stays silent on evidence it does not read.
+
+    Only the fields the rules read are copied out of `runtime_spec`. The spec
+    also holds presigned manifest keys, and this bundle is handed to a language
+    model.
+    """
+    job = session.scalar(select(Job).where(Job.id == job_id))
+    if job is None or job.project_id != project_id:
+        raise DomainError("job_not_found", "No such job in this project.", status_code=404)
+
+    events = list(
+        session.scalars(
+            select(JobEvent)
+            .where(JobEvent.job_id == job.id)
+            .order_by(JobEvent.created_at.asc())
+        )
+    )
+    spec = job.runtime_spec or {}
+    manifest = spec.get("input_manifest") or {}
+    snapshot = spec.get("plugin_snapshot") or {}
+    previous = _retry_chain(session, job)
+    return {
+        "job_id": str(job.id),
+        "status": job.status,
+        "compute_backend": job.compute_backend,
+        "model_plugin": job.model_plugin,
+        "attempt_number": job.attempt_number,
+        "external_id": job.external_id,
+        "error_code": job.error_code,
+        "error_message": job.error_message,
+        "queue": spec.get("queue"),
+        "image": spec.get("image") or snapshot.get("image"),
+        "command": spec.get("command") or snapshot.get("command"),
+        "plugin_snapshot": {
+            "key": snapshot.get("key"),
+            "version": snapshot.get("version"),
+            "resources": snapshot.get("resources") or {},
+            "runtime_mode": snapshot.get("runtime_mode"),
+        },
+        "resolved_input_count": len(manifest.get("inputs") or []),
+        "pending_inputs": list(manifest.get("pending_inputs") or []),
+        **_timeline(events),
+        "previous_attempts": previous,
+        "retry_of": previous[0]["job_id"] if previous else None,
+        # Newest last, matching the order they happened, and capped so a job
+        # that flapped does not turn the bundle into a log file.
+        "recent_events": [
+            {"event_type": event.event_type, "at": _aware(event.created_at).isoformat()}
+            for event in events[-EVENT_LIMIT:]
+        ],
+    }
+
+
+def diagnose(session: Session, project_id: uuid.UUID, job_id: uuid.UUID) -> dict[str, Any]:
+    evidence = collect_evidence(session, project_id, job_id)
+    return {"evidence": evidence, **findings_for(evidence)}
+
+
+def findings_for(evidence: dict[str, Any]) -> dict[str, Any]:
+    findings = [finding for rule in RULES if (finding := rule.check(evidence)) is not None]
+    confirmed = [finding for finding in findings if finding.confidence == "confirmed"]
+    return {
+        "findings": [finding.as_dict() for finding in findings],
+        "summary": (
+            f"{len(confirmed)} confirmed and {len(findings) - len(confirmed)} possible "
+            f"cause(s) identified from the recorded evidence."
+            if findings
+            else (
+                "The recorded evidence matches none of the known failure patterns. "
+                "Do not infer a cause from this result; the job's own log is the next "
+                "place to look."
+            )
+        ),
+    }

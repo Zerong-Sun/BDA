@@ -1,0 +1,370 @@
+# Copilot Bot Governance
+
+状态：活跃
+
+最后核验：2026-09-13（Asia/Shanghai；本轮引入 stance 轴、交接通道与 conductor/auditor/steward）
+
+权威范围：bot 的职责轴（stance）、决定权与拒绝的机械约束、bot 之间的交接协议与委派规则。
+
+数据来源：仓库内版本化代码、配置、测试与本文列明的来源。
+
+替代关系：不取代 [Copilot bot roster](COPILOT_BOT_ROSTER.md)（名册与各 bot 的章程），也不取代 [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)（能力与权限的权威）。本文定义名册之上的一层：谁可以判谁、谁可以调度谁、以及它们如何交谈。
+
+## The defect this exists to fix
+
+The roster shipped nine bots that differ by **which tools they hold**. That is a
+split of functions wearing the vocabulary of a split of responsibilities, and
+three properties of the code say so plainly:
+
+1. **Deleting `BotSpec.charter` would change no behaviour.** The charter is
+   prose handed to the model. `planner`'s charter forbids describing a draft as
+   running; nothing checks whether it did.
+2. **`handoff` is prose.** `bots.py` states it outright — *"Handoffs are
+   advisory by design."* One bot cannot leave anything for another. There is no
+   channel, so there is nothing to check either.
+3. **A subagent inherits its parent's bot.** The only delegation mechanism in
+   the system cannot cross a role boundary. A run has exactly one operator from
+   start to finish.
+
+Nine names, one responsibility structure: *the assistant, holding a smaller
+toolbox this turn*.
+
+## What a capability list cannot say
+
+A responsibility is four things, and the roster expresses only the second — and
+that one only as prose a model may ignore.
+
+| | Question | Before |
+|---|---|---|
+| Decision rights | What may I **decide**, as opposed to propose? | absent |
+| Refusals | What must I refuse although my tools allow it? | prose only |
+| Accountability | Who judges my output, against what? | absent |
+| Obligations | What must I hand over, in what form? | absent |
+
+Adding more bots along the capability axis makes this worse, not better: it
+multiplies operators without creating a single relationship between them.
+
+## 1. Stance: one orthogonal axis, enforced at import
+
+Every bot declares exactly one stance. Capabilities say what it can touch;
+stance says what it is *for*, and what it may therefore never do.
+
+| stance | produces | judges | routes | write capabilities |
+|---|---|---|---|---|
+| `produce` | its own phase | no | no | its phase's writes |
+| `review` | no | yes | no | **none — enforced** |
+| `direct` | no | no | yes | **none — enforced** |
+
+"None" means no capability that changes the research record. Both stances still
+hold `chain-messaging`, which writes a handover row — a reviewer that could not
+report its verdict, or a director that could not say why it routed, would be
+useless. That one exemption is named in `bots._INTERNAL_WRITE_CAPABILITIES`, its
+tools declare `intent="internal"` in the registry so the same claim is made from
+both sides, and the argument for it is below: the note changes no domain table.
+The list is short on purpose; anything else added to it is a hole in this rule.
+
+The enforcement is the entire point, and it lives in `_validate_roster()`
+beside the existing unknown-capability check, so a violation fails at import
+rather than in production:
+
+- A `review` bot declaring any capability that grants a write is a roster error.
+  **A reviewer that can fix what it found is not a reviewer** — it is a second
+  producer, and nobody checks the fix. The whole value of the stance is that the
+  finding has to travel back to the operator who made the mistake.
+- A `direct` bot declaring any domain-write capability is a roster error. A
+  director that can do the work will do the work instead of routing, and the
+  chain silently collapses back to one operator.
+- A `produce` bot declaring `chain-orchestration` or `review-audit` is a roster
+  error — those are the powers of the other two stances.
+
+This is the line between splitting functions and splitting responsibilities:
+functions are *which tools*; responsibilities are *which tools, plus what you
+are forbidden to do with the tools you hold* — and the forbidding has to be
+mechanical, or it is decoration.
+
+### Stance does not widen anything
+
+Stance grants nothing. `resolve(bot, project_enabled) == bot.capabilities ∩
+project_enabled` remains the only law that decides what a turn may call. Stance
+only ever subtracts, by making certain capability combinations illegal to
+declare in the first place.
+
+## 2. The handoff record: how bots talk
+
+Direct bot-to-bot calls would be the wrong primitive here. Nothing would be
+recorded, the narrowing law would have no place to stand, and a reviewer would
+have nothing to read. Instead bots exchange **append-only handoff notes**, and
+the reviewer reads the same rows the recipient does.
+
+`copilot_handoffs` — one row per handoff, never updated:
+
+| column | meaning |
+|---|---|
+| `from_bot` / `to_bot` | operator ids, both validated against the roster |
+| `summary` | what was done, in prose |
+| `claims` | the load-bearing part — see below |
+| `open_questions` | what this operator could not settle |
+| `refs` | artifact / job / goal / reference ids the next operator needs |
+| `produced_by_run` | the agent run that wrote it, when there was one |
+
+### Claims are structured, and that is the whole design
+
+A note is not "I did the thing". `claims` is a list of
+
+```json
+{ "statement": "...", "evidence_ref": "...", "confidence": "stated|consistent|unsupported" }
+```
+
+A prose summary can only be read. A list of claims each carrying the evidence
+that supports it can be **checked** — `auditor` can say "claim 3 cites nothing"
+without interpreting anything. This is what turns review from a vibes exercise
+into work with a defined output, and it is why the channel is worth a table
+rather than a string field.
+
+And why it is worth a screen. The record shipped with no UI, reachable only by
+asking the Copilot to read its own inbox in chat — which is the last operator's
+account of itself, not a record. The drawer's **Chain** tab renders it, and
+renders the unsupported claim loudest: the operator made it, the server wrote it
+down as unsupported rather than dropping it, and a reader looking for what to
+check should not have to hunt for it.
+
+### Posting a note is not a research write
+
+The write-intent gate exists to stop a model changing **the research record**
+without the user asking for it. A handoff note changes no domain table; it is
+part of the copilot's own transcript, the same category as the chat message
+that is already written every turn without an intent check. So `ToolSpec` gains
+a declared `intent` field — `"user"` (default, must pass `request_allows`) or
+`"internal"` (copilot-owned bookkeeping, audited, exempt). Declared per tool,
+never inferred, so the exemption is visible in the catalogue rather than
+implicit in a handler.
+
+## 3. Three new bots
+
+### `conductor` — 总调度 (stance: `direct`)
+
+Capabilities: `project-read`, `research-read`, `chain-orchestration`,
+`chain-messaging`. No domain writes.
+
+- `list_operators()` — the roster, each operator's refusals and current
+  reachability under this project's enabled skills
+- `delegate_to_operator(bot, instruction)` — open a child run owned by a
+  **different** bot and wait for it. The child's tools are
+  `target.capabilities ∩ project.enabled_skills`: the project's bound, not the
+  director's. `spawn_subagent` intersects against the parent because a subagent
+  is the same operator splitting its own work; doing that here would strip each
+  operator's defining tool — a delegated `librarian` would lose
+  `start_literature_search` — and produce a child indistinguishable from one
+  that failed.
+
+**The sharpest constraint in this design: a director may route, but it may not
+manufacture consent.** The write-intent gate reads the user's own words. A
+delegated run therefore carries the *originating user request text* for intent
+purposes, not the conductor's instruction — otherwise the conductor could emit
+"请提交这个作业" and unlock every write in the project by writing the user's
+side of the conversation. The instruction steers the work; it can never
+authorise it.
+
+Delegation requires an agent run (`requires="agent_run"`), so in chat the
+conductor can only recommend an operator. That matches `spawn_subagent` and
+keeps the chat surface incapable of opening runs behind the user's back.
+
+A child run is also **dispatched**, through the outbox, at the moment it is
+created. `start_agent_run` did that for a run a person started and nothing did
+it for a child, which deadlocked the pair with nothing able to break it: the
+parent sits in `awaiting_tasks` holding an outstanding subagent task, the child
+sits in `running`, and `resumable_runs` reads only `awaiting_tasks` — so the
+sweep looks at neither, and the thing that would wake the parent is the child
+that nothing was going to run. The defect was `spawn_subagent`'s first;
+`delegate_to_operator` inherited it, which would have made `conductor` a bot
+that cannot complete a single delegation.
+
+### `auditor` — 复核 (stance: `review`)
+
+Capabilities: `project-read`, `research-read`, `review-audit`,
+`chain-messaging`. Zero writes.
+
+- `read_operator_work(run_id)` — which tools an operator actually called and
+  what came back, not what it said it did
+- `list_operator_charters()` — the refusals it is checking against
+
+Its output is a verdict per claim: `supported`, `unsupported`, `contradicted`,
+or `outside_charter` — the last meaning the operator did something its own
+charter forbids, which is the check nothing performed before. It cannot fix
+what it finds; it posts the verdict back to the operator that made the claim.
+
+### `steward` — 资源守门 (stance: `review`)
+
+Capabilities: `project-read`, `review-audit`, `chain-messaging`. Zero writes.
+
+Reviews a compute declaration before a human confirms the draft that uses it:
+`-n`, `span[ptile]`, the exported CPU count and the GPU against what the queue
+will actually give it. This repository already encodes the rules in
+`check_plugin_cpu_declarations.py` and `check_cluster_claims.py`, and treats a
+low-utilisation inspection mail from the cluster as a violation rather than a
+notice. That makes it the one review in the chain with a mechanical standard to
+check against, and a distinct accountability from `planner`, which chooses the
+route.
+
+- `review_compute_declaration(plugin_id | node_id, queue?)` — the declaration,
+  the directives that would be submitted, and the disagreements
+
+The first version of this bot shipped without that tool, and is worth recording
+as the defect it was: the charter named four numbers, and the only compute tool
+`steward` held returned a draft's *free-form specification*, while the numbers
+that reach LSF live on the plugin registry row and on the queue. That is
+`archivist` being told to close a goal, one bot later — an operator instructed to
+do something no tool exposes. The rule it most earns its place on is the queue's
+own GPU request: `#BSUB` carrying no `-gpu` does not mean no GPU, because
+`2v100-32-e5` merges `num=1:mode=exclusive_process` into everything it runs.
+
+## A tool that needs an operator is not offered without one
+
+`registry.py` already refused to offer a tool whose service the turn lacks, and
+`mcp.py` states the rule it upholds: *a tool that is not callable is not listed*,
+because a refusal the model can retry reads as an obstacle rather than a
+boundary. The operator is a second axis of the same thing, and the first version
+of this change missed it — an undifferentiated turn was offered `post_handoff`,
+which then always failed, because a handover whose sender is "the assistant"
+names nobody accountable.
+
+So `ToolSpec` gains `needs_operator`, declared rather than discovered inside a
+handler, and both chat and the agent loop drop those tools from a turn that
+named no bot. Reading the roster and reading the handover record deliberately do
+*not* need one: a turn that has not chosen an operator is the likeliest to be
+asking who the operators are.
+
+## Where the roster reaches the rest of the platform
+
+Two surfaces used to describe operators without using the roster, and both are
+now derived from it.
+
+**The client's own capability list is gone.** `features/copilot/skills/registry.ts`
+held nine capability ids with their own bilingual triggers, consulted whenever no
+bot matched. It was a copy of the backend's vocabulary maintained beside the
+roster that already describes the same routing — and it had the tell: a
+`systemPrompt` field populated for all nine entries and read by nothing, the same
+shape as `ToolSpec.request_terms` before it. Its trigger vocabulary moved onto
+the operators that own it, and its one behavioural rule — specific beats broad —
+became a property of matching rather than a hardcoded preference for
+`project-read` and `research-read`: a matched token is discarded when another
+matched token contains it. Containment, not length, because "residue" is not more
+specific than "paper".
+
+Folding the vocabulary in surfaced two collisions worth recording, because both
+made an operator unroutable by the word that names it: `librarian` and `auditor`
+both claimed "review", and `runner` claimed "run" — the verb in nearly every
+imperative a user types, which tied it against whichever operator the sentence
+actually named. A trigger has to name an operator's *subject*, and a test now
+refuses the common verbs.
+
+**An Autopilot stage has an operator.** `gates.py` answered whether a step may
+act without a person; nothing answered whose job it was when it did, so a
+campaign — the platform's own name for running these phases in order — was the
+one place the chain ran with none of the charters applying. `autopilot/operators.py`
+maps stage key to bot, frozen onto the stage at confirmation exactly as
+`risk_tier` is, and `AgentRunAdapter` opens a run owned by that operator for the
+stages whose product is reasoning.
+
+That grants nothing, and three existing rules are what make it so: the run's
+tools are `bot.capabilities ∩ project.enabled_skills`; its authorising text is
+the brief a person wrote and confirmed, never a sentence the adapter composed —
+the same rule that stops a director manufacturing consent, one level up; and a
+held stage returns from `activate_stage` before the adapter runs, so no operator
+is already working on a step nobody has released. Every staffed stage is
+`reversible_draft`, and a test asserts it: naming a default operator for a step a
+person must accept the risk of would be the platform answering that question for
+them.
+
+### The stage had no way to end
+
+Wiring an operator into a stage left the other half missing, and it was not the
+one that looks missing. A stage went `pending` → `ready` and stopped there: the
+page reported "ready" after the work was finished, and the campaign had no way to
+know a step was over. The advancing was not what was absent — the *knowing* was.
+
+`agent_runs.finish` and `cancel` now emit `copilot.agent_run.settled` through the
+outbox, on every terminal state rather than on success, which is the mistake
+compute already made and recorded: a consumer left to discover failure by polling
+does not, and the thing waiting sleeps for ever. `autopilot.tasks.stage_settled`
+settles the stage and then asks `advance_campaign` for the next one.
+
+What stops it matters more than what moves it, because advancing is the one thing
+here that acts with no person in the loop:
+
+- a **cancelled** campaign has nothing to advance to;
+- a **taken-over** campaign belongs to a person, and advancing it is the race
+  takeover exists to prevent;
+- a **held** stage stops the chain at the gate — advancing arriving at a
+  signature, not failing;
+- a stage **already in flight** stops it too. Without that, a redelivered
+  settlement advanced twice: the stage the first advance activated is `ready`,
+  which the unstarted query does not match, so the second found the stage *after*
+  it and started that one while the one between had not run.
+
+Takeover also stops the stage's operator now, and leaves compute jobs alone. The
+asymmetry is the point: a running job is GPU hours somebody already paid for, and
+an agent run is not a result sitting there — it is an operator still writing.
+
+Advancing also made a dead end reachable, which is worth recording as the cost of
+the feature rather than as a separate bug. Some stages have no automatic product
+by design — `review` is somebody's judgement — and `release` refuses anything
+that is not held, so a chain arriving at one stopped with no action available
+anywhere. The default campaign ends with `review`, so that was every default
+campaign. `POST …/stages/{id}/complete` is the missing verb, and it is
+deliberately not `release`: a release answers *may this act*, completion answers
+*is this done*. Completion is refused only for a product that ends its own stage
+— today just the agent run. The first version refused every product and so
+reproduced the same dead end one stage later: a `workflow_run` is a draft the
+adapter hands to a person to open and finish, nothing was ever going to settle
+it, and the chain stopped at the first `compute` stage with nothing to click. A campaign whose stages have all settled now reports
+`succeeded` or `failed` too — `running` on a finished campaign is a status that
+means nothing.
+
+None of this makes the unattended loop complete, and
+[Autopilot campaigns](AUTOPILOT_CAMPAIGNS.md) still says so. The chain stops at
+the first `compute` or `design` stage, whose product is a workflow-run draft that
+nothing settles by design, and the end-to-end loop has still not been run on real
+compute. The mechanism existing and the loop being proven are different claims.
+
+## What is deliberately not added
+
+More bots along the capability axis. The roster does not need a "reporter", a
+"summariser" or a "searcher" — those are functions, and `archivist`,
+`analyst` and `librarian` already own them. Every addition here has to answer
+*whose decision does this take away from whom*, and a function split answers
+nothing.
+
+## Acceptance
+
+| # | Statement | Where it is proven |
+|---|---|---|
+| 1 | A `review` bot declaring a write capability fails at import | `test_copilot_bots.py` |
+| 2 | A `direct` bot declaring a domain-write capability fails at import | `test_copilot_bots.py` |
+| 3 | Stance never widens: `resolve` is still the intersection for all 12 bots | `test_copilot_bots.py` |
+| 4 | A delegated run is owned by the target bot, not the conductor | `test_copilot_chain.py` |
+| 5 | A delegated run's write gate reads the user's words, not the conductor's | `test_copilot_chain.py` |
+| 6 | A delegated run's tools are exactly target ∩ project, and a subagent's are still bounded by its parent | `test_copilot_chain.py` |
+| 6b | A turn with no project capability set refuses to delegate rather than defaulting to the target's full declaration | `test_copilot_chain.py` |
+| 7 | A handoff note names two real operators, and cannot be edited | `test_copilot_handoffs.py` |
+| 8 | `internal` intent tools skip `request_allows`; `user` intent tools do not | `test_copilot_chat_surface.py` |
+| 8b | A turn with no operator is not offered the tools that need one, and nothing else is withdrawn with them | `test_copilot_chat_surface.py` |
+| 8c | A settled delegation folds back under `delegate_to_operator` and a settled subagent under `spawn_subagent` | `test_copilot_chain.py` |
+| 9 | Every capability is owned by at least one bot | `test_v2_domains.py` |
+| 10 | A slot count above one with no evidence, and a CPU-only stage on a GPU-forcing queue, are violations; the queue rules stay silent on a backend that ignores the queue | `test_compute_declarations.py` |
+| 11 | A sound declaration is reported as sound, not as an empty finding list | `test_compute_declarations.py` |
+| 12 | Every child run - delegated or spawned - is dispatched when it is created, and the dispatch names the child | `test_copilot_chain.py` |
+| 13 | No two operators claim one trigger, and no trigger is a bare common verb | `test_copilot_bots.py` |
+| 14 | Every case the retired client-side skill registry routed still resolves to exactly one operator | `test_copilot_bots.py` |
+| 15 | A contained token loses to the phrase containing it; an unrelated longer token does not outrank a shorter one | `bots/registry.test.ts` |
+| 16 | Every staffed Autopilot stage names a producer, and every staffed stage is unheld | `test_autopilot_operators.py` |
+| 17 | A stage's run is owned by the operator frozen on the row, authorised by the person's brief, and limited to bot ∩ project | `test_autopilot_operators.py` |
+| 18 | An unstaffed, retired-operator or nothing-enabled stage opens no run rather than a broken one | `test_autopilot_operators.py` |
+| 19 | Cancelling a campaign cancels its stage's agent run and marks the stage, without rewriting a stage that already finished | `test_autopilot_operators.py` |
+| 20 | A run announces itself on every terminal state - succeeded, failed and cancelled - carrying the project the worker fence needs | `test_autopilot_lifecycle.py` |
+| 21 | A settled stage records how it ended, once, signed by the worker principal rather than by the person who confirmed the campaign | `test_autopilot_lifecycle.py` |
+| 22 | A cancelled, taken-over, or already-in-flight campaign does not advance; a held stage stops the chain at the gate rather than being stepped over | `test_autopilot_lifecycle.py` |
+| 23 | Taking over stops the stage's operator and does not thereby advance the campaign | `test_autopilot_lifecycle.py` |
+| 24 | A human step can be completed by a person, signed by them; a stage with a product of its own refuses it | `test_autopilot_lifecycle.py` |
+| 25 | A campaign whose every stage has settled reports `succeeded`, or `failed` if any stage failed | `test_autopilot_lifecycle.py` |
+| 26 | A workflow-draft stage is finished by the person who finished the draft; a stage carrying an agent run is still refused | `test_autopilot_lifecycle.py`, `Autopilot.test.tsx` |

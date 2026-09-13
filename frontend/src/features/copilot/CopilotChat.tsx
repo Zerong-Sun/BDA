@@ -10,6 +10,7 @@ import {
 import { Link } from 'react-router'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { useCopilotChat } from './useCopilotChat'
+import { byStance, reviewersOf, successorsOf } from './bots/registry'
 import { getCopilotConfig } from '../../lib/api/copilot'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
@@ -25,6 +26,20 @@ import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+//: The "no bot" option. Radix Select refuses an empty string as an item value,
+//: and null cannot round-trip through it, so the absence of a choice needs a
+//: value of its own.
+const AUTO_BOT = '__auto__'
 
 export function CopilotChat({ pageContext }: { pageContext?: string }) {
   const { t, format, language } = useI18n()
@@ -39,6 +54,9 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
     send,
     resetMessages,
     lastMode,
+    bots,
+    bot,
+    setBot,
   } = useCopilotChat(projectId, pageContext, language)
   const [input, setInput] = useState('')
   const copilotDraft = useAppStore((state) => state.copilotDraft)
@@ -102,14 +120,59 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
     messageEndRef.current?.scrollIntoView?.({ block: 'end' })
   }, [visibleMessages, loadingStage])
 
+  // Resolved against the served roster rather than stored: a selection that
+  // outlived a deploy which retired its operator shows nothing instead of a
+  // charter the server no longer honours.
+  const activeBotSpec = bot ? (bots.find((entry) => entry.id === bot) ?? null) : null
+  const reviewers = activeBotSpec ? reviewersOf(activeBotSpec, bots) : []
+  const successors = activeBotSpec ? successorsOf(activeBotSpec, bots) : []
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b px-4 py-2">
-        <span className="text-xs text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
+        {/* Which project this conversation is bound to. Kept, and kept first:
+            the drawer stays open while the reader navigates, and every answer
+            here is project-scoped - a chat that does not say whose data it is
+            reading is the one thing in this header worth the width. */}
+        <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
           {projectId
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
+        {bots.length > 0 ? (
+          <Select
+            value={bot ?? AUTO_BOT}
+            onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
+          >
+            <SelectTrigger className="h-7 w-36 shrink-0 text-xs" aria-label={t.copilot.chat.botLabel}>
+              <SelectValue placeholder={t.copilot.chat.botAuto} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUTO_BOT}>{t.copilot.chat.botAuto}</SelectItem>
+              {/* Grouped by stance, not by phase. A director is not the step
+                  before briefing and a reviewer is not the step after
+                  archiving; a single ordered list says they are, which is the
+                  reading this roster exists to correct.
+
+                  One line per option, not two. The summary belongs to the
+                  selected operator's row below: `SelectItem` renders its
+                  children inside `ItemText`, whose own layout classes stack
+                  against a two-line child, and an option whose accessible name
+                  is "Planner Choose the route and draft the compute" is worse
+                  to hear than to read. */}
+              {byStance(bots).map((group) => (
+                <SelectGroup key={group.stance}>
+                  <SelectLabel>{t.copilot.chat.botStances[group.stance]}</SelectLabel>
+                  {group.bots.map((entry) => (
+                    <SelectItem key={entry.id} value={entry.id} title={entry.summary}>
+                      {language === 'zh' ? entry.title_zh : entry.title}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -122,6 +185,40 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
           <ArrowCounterClockwiseIcon aria-hidden="true" />
         </Button>
       </div>
+      {/* What the selected operator refuses, who checks it, and where it hands
+          on. All of it was in the roster response already and none of it reached
+          the screen, which made selecting one a gesture rather than a decision.
+          Only when a bot is chosen: the undifferentiated case has no charter to
+          show and the row would be permanent chrome. */}
+      {activeBotSpec ? (
+        <div className="shrink-0 border-b bg-muted/40 px-4 py-2">
+          <p className="text-xs font-medium text-foreground">{activeBotSpec.summary}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{activeBotSpec.charter}</p>
+          {reviewers.length > 0 ? (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {t.copilot.chat.reviewedBy}{' '}
+              {reviewers.map((entry) => (language === 'zh' ? entry.title_zh : entry.title)).join('、')}
+            </p>
+          ) : null}
+          {successors.length > 0 ? (
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+              {t.copilot.chat.handsTo}
+              {successors.map((entry) => (
+                <Button
+                  key={entry.id}
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-[11px]"
+                  onClick={() => setBot(entry.id)}
+                >
+                  {language === 'zh' ? entry.title_zh : entry.title}
+                </Button>
+              ))}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <ScrollArea className="min-h-0 flex-1" aria-label={t.copilot.chat.conversationLabel}>
         <div className="space-y-3 p-4 pr-6">
           {error ? (

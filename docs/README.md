@@ -21,6 +21,8 @@ reports are maintained only in the private BDA-demo archive.
 - [Frontend v2](FRONTEND_V2.md)
 - [Research workspace and BYOK](BDA_RESEARCH_WORKSPACE_AND_BYOK.md)
 - [Compute targets](COMPUTE_TARGETS.md)
+- [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md)
+- [Copilot bot roster](COPILOT_BOT_ROSTER.md)
 - [Copilot capability plan](COPILOT_CAPABILITY_PLAN_V2.md)
 - [Copilot DeepSeek configuration](COPILOT_DEEPSEEK_配置指南.md)
 - [Copilot validation report](COPILOT_VALIDATION_REPORT.md)

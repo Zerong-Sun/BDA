@@ -21,6 +21,7 @@ from .schemas import (
 )
 from .service import (
     cancel_campaign,
+    complete_stage,
     confirm_draft,
     create_draft,
     release_stage,
@@ -192,3 +193,41 @@ def post_stage_release(
     released = release_stage(session, campaign, stage, user, parse_if_match(if_match))
     response.headers["ETag"] = etag(released.version)
     return AutopilotStageResponse.model_validate(released)
+
+
+@router.post(
+    "/autopilot-campaigns/{campaign_id}/stages/{stage_id}/complete",
+    response_model=AutopilotStageResponse,
+    openapi_extra={"x-permission": "autopilot.stage.complete"},
+)
+def post_stage_complete(
+    campaign_id: uuid.UUID,
+    stage_id: uuid.UUID,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> AutopilotStageResponse:
+    """Mark a human step done, and let the chain continue.
+
+    Some stages have no automatic product by design - `review` is somebody's
+    judgement - and until the chain could advance it did not matter that nothing
+    moved them. Now it does: a campaign that reached such a stage stopped there
+    with no action available anywhere, and the default campaign ends with one.
+
+    Distinct from `release`, which is a different question with a different
+    answer. A release says *may this act*, and only a held stage has that
+    question open. This says *is this done*, and only a stage doing human work
+    has that one: a stage with a product of its own is settled by the product, so
+    completing it is refused rather than accepted as a second answer.
+
+    `If-Match` for the reason every other mutation here carries it - two people
+    completing the same step from two stale tabs must not both believe they did -
+    and idempotent, so a retry is not a second claim.
+    """
+    campaign = require_campaign(session, campaign_id)
+    require_project_permission(session, campaign.project_id, user, "autopilot")
+    stage = require_stage(session, stage_id)
+    completed = complete_stage(session, campaign, stage, parse_if_match(if_match), user)
+    response.headers["ETag"] = etag(completed.version)
+    return AutopilotStageResponse.model_validate(completed)

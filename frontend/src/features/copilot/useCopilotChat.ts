@@ -1,5 +1,5 @@
 import { getTranslations } from '../../lib/i18n'
-import { matchSkill } from './skills/registry'
+import { matchBot, useCopilotBots } from './bots/registry'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
@@ -63,6 +63,16 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastMode, setLastMode] = useState<string | null>(() => getLatestCopilotMode())
+  // null means "let the message decide". Kept in the project's session rather
+  // than in component state: the drawer unmounts every time it closes, and a
+  // phase of work is several messages long, so component state quietly sent the
+  // operator back to Auto whenever the user looked at a page.
+  const bot = session?.bot ?? null
+  const setSessionBot = useAppStore((state) => state.setCopilotSessionBot)
+  const setBot = (next: string | null) => {
+    if (projectId) setSessionBot(projectId, next)
+  }
+  const { data: bots } = useCopilotBots()
   const usableMessages = messages.filter(
     (message) => message.content.trim().length > 0 && message.content !== legacyCopilotIntro,
   )
@@ -71,7 +81,14 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const trimmed = input.trim()
     if (!trimmed || loading) return
 
-    const skill = matchSkill(trimmed)?.name
+    // One narrowing hint, derived from the served roster. There used to be a
+    // second - a hand-written capability list in `skills/registry.ts` with its
+    // own bilingual triggers, consulted when no bot matched. It was a copy of
+    // the backend's capability ids maintained beside the roster that already
+    // describes the same routing, and a copy is what drifts: its `systemPrompt`
+    // field was populated for all nine entries and read by nothing. Its
+    // vocabulary now lives on the operators that own it.
+    const activeBot = bot ?? matchBot(trimmed, bots ?? [])?.id
     const reviewIntent = detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
@@ -93,7 +110,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const payload = {
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
-      skill,
+      // `skill` stays on the request contract - an agent run, an MCP grant or
+      // another client may still narrow to one capability - and this UI simply
+      // no longer guesses one. Sending neither means the project's configured
+      // set, which is the documented undifferentiated case.
+      bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,
       context: {
@@ -162,5 +183,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     }
   }
 
-  return { messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages, lastMode }
+  return {
+    messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages,
+    lastMode, bots: bots ?? [], bot, setBot,
+  }
 }

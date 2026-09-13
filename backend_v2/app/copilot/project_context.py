@@ -239,6 +239,12 @@ class ProjectContextService:
                     "node_key": node.node_key,
                     "node_type": node.node_type,
                     "model_plugin": node.model_plugin,
+                    # The id as well as the name, because the name is not a key:
+                    # `review_compute_declaration` reads the registry row, and a
+                    # reviewer holding only a display string could not reach it.
+                    "model_plugin_id": (
+                        str(node.model_plugin_id) if node.model_plugin_id else None
+                    ),
                     "status": node.status,
                     "error_message": node.error_message,
                 }

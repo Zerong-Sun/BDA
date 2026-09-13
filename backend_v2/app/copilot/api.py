@@ -17,7 +17,8 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, mcp
+from . import agent_runs, handoffs, mcp
+from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
     capability_ids,
@@ -35,6 +36,7 @@ from .schemas import (
     AgentRunResponse,
     AgentTurnPage,
     AgentTurnResponse,
+    BotResponse,
     ChatAccepted,
     ChatCreate,
     ConversationPage,
@@ -42,6 +44,8 @@ from .schemas import (
     CopilotConfigResponse,
     CopilotConfigTestResponse,
     CopilotConfigUpdate,
+    HandoffPage,
+    HandoffResponse,
     InterpretationCreate,
     InterpretationResponse,
     McpSessionCreate,
@@ -78,6 +82,26 @@ from .service import (
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
 SKILLS = [SkillResponse(**item) for item in COPILOT_CAPABILITIES]
+#: Derived from the roster declaration, not restated. A second list here would
+#: be a second source of truth for which capabilities a bot holds.
+BOTS = [
+    BotResponse(
+        id=bot.id,
+        title=bot.title,
+        title_zh=bot.title_zh,
+        phase=bot.phase,
+        stance=bot.stance,
+        summary=bot.summary,
+        charter=bot.charter,
+        capabilities=list(bot.capabilities),
+        handoff=list(bot.handoff),
+        reviews=list(bot.reviews),
+        directs=list(bot.directs),
+        reviewed_by=[other.id for other in bot_roster.reviewers_of(bot.id)],
+        triggers=list(bot.triggers),
+    )
+    for bot in bot_roster.all_bots()
+]
 
 
 def _config_response(session: Session, row: CopilotConfig) -> CopilotConfigResponse:
@@ -96,6 +120,18 @@ def list_skills(user: User = Depends(current_user)) -> list[SkillResponse]:
     return SKILLS
 
 
+@router.get("/bots", response_model=list[BotResponse])
+def list_bots(user: User = Depends(current_user)) -> list[BotResponse]:
+    """The roster, in chain order.
+
+    Static: a bot's capabilities are a declaration, and which of them a given
+    project has enabled is answered by `/copilot/config`, not here. Merging the
+    two would make the roster look project-specific and invite a client to
+    decide what a bot may do.
+    """
+    return BOTS
+
+
 @router.post(
     "/chat",
     response_model=ChatAccepted,
@@ -105,24 +141,35 @@ def list_skills(user: User = Depends(current_user)) -> list[SkillResponse]:
 def post_chat(
     payload: ChatCreate, session: Session = Depends(get_session), user: User = Depends(require_command)
 ) -> ChatAccepted:
+    if payload.skill is not None and payload.bot is not None:
+        raise DomainError(
+            "copilot_hint_conflict",
+            "Pass either a skill or a bot for this turn, not both.",
+            status_code=422,
+        )
     if payload.skill is not None and payload.skill not in capability_ids():
         raise DomainError(
             "copilot_skill_not_found",
             "The requested Copilot capability was not found",
             status_code=422,
         )
+    if payload.bot is not None:
+        # 404 rather than a fallback to the default set: a typo that silently
+        # widened the turn is the one failure mode this hint must not have.
+        bot_roster.require(payload.bot)
     project = require_project(session, payload.project_id, user)
     config = CopilotRepository(session).config(project.id)
-    if (
-        payload.skill is not None
-        and payload.skill
-        not in normalize_capabilities(
-            list(config.enabled_skills) if config else None
-        )
-    ):
+    enabled = normalize_capabilities(list(config.enabled_skills) if config else None)
+    if payload.skill is not None and payload.skill not in enabled:
         raise DomainError(
             "copilot_capability_disabled",
             "The requested Copilot capability is disabled for this project",
+            status_code=422,
+        )
+    if payload.bot is not None and not bot_roster.capabilities_for_bot(payload.bot, enabled):
+        raise DomainError(
+            "copilot_capability_disabled",
+            f"This project has enabled none of the capabilities {payload.bot!r} needs.",
             status_code=422,
         )
     conversation, message, operation = submit_chat(
@@ -134,6 +181,7 @@ def post_chat(
         context={
             **payload.context.model_dump(mode="json"),
             "skill_hint": payload.skill,
+            "bot_hint": payload.bot,
         },
         intent=payload.intent,
     )
@@ -159,6 +207,33 @@ def list_conversations(
         items=[ConversationResponse.model_validate(item) for item in page],
         next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
     )
+
+
+@router.get("/projects/{project_id}/handoffs", response_model=HandoffPage)
+def list_handoffs(
+    project_id: uuid.UUID,
+    to_bot: str | None = Query(default=None, max_length=80),
+    from_bot: str | None = Query(default=None, max_length=80),
+    limit: int = Query(default=handoffs.DEFAULT_LIMIT, ge=1, le=handoffs.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> HandoffPage:
+    """The chain's handovers, newest first.
+
+    Readable by a person and not only by the next operator. A record only the
+    bots can see would make the channel's whole justification - that what one
+    operator claimed is auditable afterwards - true for the auditor and false
+    for the reader it is ultimately for.
+
+    No cursor. A handover is a summary between phases, not an event stream; the
+    project-scoped limit is the whole of the paging this needs, and an opaque
+    cursor here would imply a volume the table does not have.
+    """
+    require_project(session, project_id, user)
+    rows = handoffs.inbox(
+        session, project_id=project_id, to_bot=to_bot, from_bot=from_bot, limit=limit
+    )
+    return HandoffPage(items=[HandoffResponse(**handoffs.to_json_model(row)) for row in rows])
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)

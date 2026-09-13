@@ -1,4 +1,5 @@
 import {
+  postStageCompleteApiV2AutopilotCampaignsCampaignIdStagesStageIdCompletePost,
   postStageReleaseApiV2AutopilotCampaignsCampaignIdStagesStageIdReleasePost,
   getCampaignApiV2AutopilotCampaignsCampaignIdGet,
   postCancelApiV2AutopilotCampaignsCampaignIdCancelPost,
@@ -111,4 +112,20 @@ export async function releaseAutopilotStage(campaignId: string, stageId: string,
     throwOnError: true,
   })
   return released.data
+}
+
+/**
+ * Mark a human step done, so the chain can continue.
+ *
+ * Not the same call as releasing. A release answers *may this act*, which only a held
+ * stage has open; this answers *is this done*, which only a stage doing human work has.
+ * The server refuses a stage with a product of its own, because the product settles it.
+ */
+export async function completeAutopilotStage(campaignId: string, stageId: string, version: number) {
+  const completed = await postStageCompleteApiV2AutopilotCampaignsCampaignIdStagesStageIdCompletePost<true>({
+    path: { campaign_id: campaignId, stage_id: stageId },
+    headers: { 'If-Match': `W/"${version}"` },
+    throwOnError: true,
+  })
+  return completed.data
 }

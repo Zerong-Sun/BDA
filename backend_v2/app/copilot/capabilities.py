@@ -1,3 +1,15 @@
+"""What the platform can grant, as one row per capability.
+
+A capability is what this repository calls a "skill": it is what grants tools,
+and `copilot_configs.enabled_skills` is a set of these ids. Who is accountable
+for using one - and what they must refuse - is a level up, in `bots.py`.
+
+Adding a row here means two other edits in the same change: a bot in `bots.py`
+must own it (a test fails otherwise, because an unowned capability is one no
+charter constrains), and `docs/COPILOT_BOT_ROSTER.md`'s inventory table lists
+it with its tools.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -40,6 +52,33 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "async_execution": False,
         "execution_mode": "read",
         "chat_tools": ["list_project_candidates", "list_experiment_results"],
+    },
+    {
+        "id": "structure-analysis",
+        "title": "Structure analysis",
+        "description": (
+            "Read an uploaded structure artifact at residue level: chains, "
+            "sequences, numbering gaps, ligands, disulfides, interface contacts "
+            "and per-site neighbourhoods. Reports measurements, never function."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": [
+            "analyse_structure",
+            "list_structure_contacts",
+            "describe_structure_site",
+        ],
+    },
+    {
+        "id": "failure-diagnosis",
+        "title": "Failure diagnosis",
+        "description": (
+            "Explain a failed compute job from its recorded evidence: error, "
+            "attempt history, events and the runtime spec it declared."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": ["get_compute_status", "diagnose_compute_failure"],
     },
     {
         "id": "knowledge-authoring",
@@ -133,6 +172,47 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "chat_tools": ["await_compute_job", "spawn_subagent"],
     },
     {
+        "id": "chain-messaging",
+        "title": "Chain handover",
+        "description": (
+            "Leave a structured handover for the next operator and read the ones "
+            "addressed to you. Copilot bookkeeping: it changes no research record, "
+            "which is why its write does not need the user to ask for it by name."
+        ),
+        "async_execution": False,
+        "execution_mode": "draft",
+        "chat_tools": ["post_handoff", "read_handoffs"],
+    },
+    {
+        "id": "chain-orchestration",
+        "title": "Chain orchestration",
+        "description": (
+            "Read the roster and delegate one part of a goal to a different "
+            "operator. Grants no domain tool of its own: the delegated run "
+            "resolves the target bot's capabilities against the project, and the "
+            "director never executes them."
+        ),
+        "async_execution": True,
+        "execution_mode": "read",
+        "chat_tools": ["list_operators", "delegate_to_operator"],
+    },
+    {
+        "id": "review-audit",
+        "title": "Operator review",
+        "description": (
+            "Read what another operator actually called and what came back, and "
+            "the charter it was working under. Read-only by construction: a "
+            "reviewer that can repair what it found is a second producer."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": [
+            "list_operator_charters",
+            "read_operator_work",
+            "review_compute_declaration",
+        ],
+    },
+    {
         "id": "compute-drafting",
         "title": "Compute drafting",
         "description": "Create a reviewable compute draft without confirming or submitting it",
@@ -160,6 +240,11 @@ CAPABILITY_ALIASES = {
         "wetlab-authoring",
         "research-trace-authoring",
         "agent-orchestration",
+        "structure-analysis",
+        "failure-diagnosis",
+        "chain-messaging",
+        "chain-orchestration",
+        "review-audit",
     },
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
@@ -169,7 +254,16 @@ CAPABILITY_ALIASES = {
         "target-intelligence",
         "research-gap-repair",
     },
+    "structure": {"project-read", "structure-analysis"},
+    "diagnosis": {"project-read", "failure-diagnosis"},
     "route-planning": {"project-read", "workflow-planning"},
+    "orchestration": {
+        "project-read",
+        "research-read",
+        "chain-orchestration",
+        "chain-messaging",
+    },
+    "review": {"project-read", "research-read", "review-audit", "chain-messaging"},
     "interpretation": {"project-read", "result-interpretation"},
 }
 

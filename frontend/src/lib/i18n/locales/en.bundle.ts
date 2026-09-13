@@ -99,6 +99,7 @@ export const bundleEn = {
   },
   copilot: {
     drawer: {
+      tabChat: 'Chat',
       eyebrow: 'BDA Copilot',
       subtitle:
         'Ask for project-aware route planning, candidate explanations, validation interpretation, or next steps.',
@@ -144,6 +145,27 @@ export const bundleEn = {
       toolCalls: 'called {names}',
       waitingOn: 'Waiting on work that outlives this request.',
       close: 'Back to runs',
+    },
+    chain: {
+      title: 'Chain',
+      toggle: 'Chain',
+      intro:
+        'What each operator handed the next, and the evidence behind every claim it made. Newest first.',
+      selectProject: 'Select a project to see its chain.',
+      loading: 'Loading the chain…',
+      failed: 'The chain record could not be loaded.',
+      emptyTitle: 'No handovers yet',
+      emptyBody:
+        'An operator records one when it passes work on: what it did, the claims it is making with the evidence behind each, and what it could not settle.',
+      noTranscript: 'no transcript',
+      openQuestions: 'Left unsettled',
+      citesNothing: 'cites nothing',
+      unsupportedCount: '{count} claim(s) here cite no evidence',
+      confidence: {
+        stated: 'stated',
+        consistent: 'consistent',
+        unsupported: 'unsupported',
+      },
     },
     mcp: {
       title: 'MCP sessions',
@@ -217,6 +239,15 @@ export const bundleEn = {
       citationProject: 'Project',
       citationExternal: 'External',
       citationSourceFallback: 'Source {index}',
+      reviewedBy: 'Reviewed by',
+      handsTo: 'Hands to',
+      botLabel: 'Copilot bot',
+      botAuto: 'Auto',
+      botStances: {
+        direct: 'Coordination',
+        produce: 'The chain',
+        review: 'Review',
+      },
     },
     loading: {
       connecting: 'Connecting to Copilot…',

@@ -254,4 +254,115 @@ describe('CopilotChat', () => {
     })
     expect(screen.getByRole('button', { name: 'Save to project review' })).toBeInTheDocument()
   })
+  it('sends the selected bot instead of a matched skill, and only one of them', async () => {
+    // The API rejects a request carrying both hints. This is where the two
+    // could meet: an explicit pick, plus a message the skill matcher also
+    // recognises.
+    server.use(
+      http.get('/api/v2/copilot/bots', () =>
+        HttpResponse.json([
+          {
+            id: 'planner',
+            title: 'Planner',
+            title_zh: '路线规划',
+            phase: 4,
+            stance: 'produce',
+            summary: 'Choose the route and draft the compute.',
+            charter: 'Draft only; never confirm or submit.',
+            capabilities: ['project-read', 'workflow-planning'],
+            handoff: [],
+            triggers: ['route'],
+          },
+        ]),
+      ),
+    )
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Copilot bot' }))
+    const planner = await screen.findByRole('option', { name: 'Planner' })
+    fireEvent.pointerDown(planner, { button: 0 })
+    fireEvent.pointerUp(planner, { button: 0 })
+    fireEvent.click(planner)
+
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Adjust the workflow threshold' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
+    expect(payload?.bot).toBe('planner')
+    expect(payload?.skill).toBeUndefined()
+  })
+
+  it('sends unhinted when the roster is unavailable', async () => {
+    // The picker is absent and the chat still works. A roster that failed to
+    // load must not take the copilot down with it.
+    //
+    // It used to fall back to a client-side skill guess here. That is gone with
+    // the hand-written skill registry, and the change is a widening in this one
+    // failure mode: the turn now carries no hint and gets the project's
+    // configured set - the documented undifferentiated case, and the same thing
+    // a message matching no trigger has always got. It is not a permission
+    // change, because the server intersects whatever arrives with that set
+    // either way; it is the loss of an incidental narrowing that only ever
+    // applied when the roster request had failed.
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Adjust the workflow threshold' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
+    expect(payload?.bot).toBeUndefined()
+    expect(payload?.skill).toBeUndefined()
+    expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
+  })
+  it('keeps the selected bot when the drawer is closed and reopened', async () => {
+    // Component state sent the operator back to Auto every time the drawer
+    // unmounted, with nothing on screen saying it had changed. conversationId
+    // and messages already live in the project session; the bot belongs there
+    // for the same reason.
+    server.use(
+      http.get('/api/v2/copilot/bots', () =>
+        HttpResponse.json([
+          {
+            id: 'medic',
+            title: 'Medic',
+            title_zh: '故障诊断',
+            phase: 6,
+            stance: 'produce',
+            summary: 'Explain why a job failed.',
+            charter: 'You explain failures from recorded evidence.',
+            capabilities: ['project-read', 'failure-diagnosis'],
+            handoff: [],
+            triggers: ['failed'],
+          },
+        ]),
+      ),
+    )
+    const first = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Copilot bot' }))
+    const medic = await screen.findByRole('option', { name: 'Medic' })
+    fireEvent.pointerDown(medic, { button: 0 })
+    fireEvent.pointerUp(medic, { button: 0 })
+    fireEvent.click(medic)
+    await waitFor(() =>
+      expect(useAppStore.getState().copilotSessions.proj_test?.bot).toBe('medic'),
+    )
+
+    first.unmount()
+    renderWithProviders(<CopilotChat pageContext="route=/results; project_id=proj_test" />)
+
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
+      target: { value: 'Why did it die?' },
+    })
+    fireEvent.click(screen.getByLabelText('Send message'))
+
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    expect(vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]?.bot).toBe('medic')
+  })
 })

@@ -57,6 +57,7 @@ def create_run(
     parent_run_id: uuid.UUID | None = None,
     max_turns: int = 24,
     max_cost_usd_cents: int | None = None,
+    bot: str | None = None,
 ) -> CopilotAgentRun:
     if parent_run_id is not None:
         parent = require_run(session, parent_run_id)
@@ -66,9 +67,27 @@ def create_run(
                 f"Subagents may nest {MAX_SUBAGENT_DEPTH} level deep.",
                 status_code=422,
             )
-        # A child cannot reach further than its parent. Enforced by intersecting
-        # rather than trusting the caller's list.
-        allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
+        # A child inherits its parent's charter unless it was given one. A
+        # subagent spawned by the medic is still doing the medic's work, and a
+        # child that silently lost the refusals its parent was operating under
+        # would be the one place the roster stopped applying.
+        delegated = bot is not None and bot != parent.bot
+        bot = bot or parent.bot
+        if not delegated:
+            # Splitting work, not routing it: the child is the same operator, so
+            # it cannot reach further than the parent. Enforced by intersecting
+            # rather than trusting the caller's list.
+            allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
+        # Otherwise the child is a *different* operator, and intersecting would
+        # be wrong rather than merely strict: a librarian delegated to by a
+        # director holds none of the director's tools, so the intersection is
+        # exactly the librarian's own work minus the part that makes it a
+        # librarian - `start_literature_search` is dropped and the child looks
+        # like an operator that failed. The bound that matters is the project's,
+        # and the caller has already applied it: `delegate_to_operator` passes
+        # `target.capabilities ∩ project.enabled`, so the pair still cannot
+        # exceed what the project authorised. The director never executes any of
+        # it, which is what keeps routing from being escalation.
 
     run = CopilotAgentRun(
         project_id=project_id,
@@ -76,6 +95,7 @@ def create_run(
         created_by=user_id,
         goal=goal,
         status="running",
+        bot=bot,
         parent_run_id=parent_run_id,
         allowed_tools=sorted(set(allowed_tools)),
         max_turns=max_turns,
@@ -84,6 +104,44 @@ def create_run(
     session.add(run)
     session.flush()
     return run
+
+
+def enqueue_first_step(session: Session, run: CopilotAgentRun) -> None:
+    """Hand a newly created child run to a worker.
+
+    `start_agent_run` does this for a run a person started; nothing did it for a
+    child. The result was a deadlock neither the sweep nor an event could break:
+    the parent sits in `awaiting_tasks` with an outstanding subagent task, the
+    child sits in `running` - and `resumable_runs` only reads `awaiting_tasks`,
+    so the sweep looks at neither. The child's completion is what would wake the
+    parent, and nothing was ever going to run the child.
+
+    Through the outbox rather than `send_task`, for the reason the compute path
+    uses it: this runs inside the parent's transaction, and a worker that picked
+    the child up before that transaction committed would not find it.
+    """
+    from ..identity.models import User
+    from ..platform.operations import enqueue_operation
+    from ..projects.models import Project
+
+    project = session.get(Project, run.project_id)
+    user = session.get(User, run.created_by)
+    if project is None or user is None:
+        raise DomainError(
+            "agent_run_actor_unavailable",
+            "A child run needs its project and its creator to be dispatchable.",
+            status_code=409,
+        )
+    enqueue_operation(
+        session,
+        topic="copilot.agent_step",
+        resource_type="copilot_agent_run",
+        resource_id=run.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        user=user,
+        payload={"run_id": str(run.id)},
+    )
 
 
 def append_turn(
@@ -130,6 +188,27 @@ def transcript(session: Session, run: CopilotAgentRun) -> list[CopilotAgentTurn]
             .order_by(CopilotAgentTurn.sequence)
         )
     )
+
+
+def turns_for(
+    session: Session, run: CopilotAgentRun, *, limit: int = 40
+) -> list[CopilotAgentTurn]:
+    """The run's most recent turns, oldest first within the window.
+
+    `transcript` loads everything because resuming needs everything. A reviewer
+    does not: it is reading what an operator called, and an unbounded read of
+    another run's transcript is how one review turn exhausts a budget.
+    """
+    window = max(1, min(int(limit), 200))
+    rows = list(
+        session.scalars(
+            select(CopilotAgentTurn)
+            .where(CopilotAgentTurn.run_id == run.id)
+            .order_by(CopilotAgentTurn.sequence.desc())
+            .limit(window)
+        )
+    )
+    return sorted(rows, key=lambda turn: turn.sequence)
 
 
 def budget_root(session: Session, run: CopilotAgentRun) -> CopilotAgentRun:
@@ -287,6 +366,29 @@ def resumable_runs(session: Session, limit: int = 50) -> list[CopilotAgentRun]:
     return [run for run in waiting if not outstanding_tasks(session, run)]
 
 
+def announce_settled(session: Session, run: CopilotAgentRun) -> None:
+    """Tell whoever was waiting on this run from outside the copilot.
+
+    `settle_parent` wakes a parent run; nothing told another *domain*. An
+    Autopilot stage that opened a run had no way to learn it had finished, so the
+    stage sat at `ready` for ever and the campaign never moved - the mechanism
+    was there and the signal was not.
+
+    Through the outbox, as `job.settled` is, and on every terminal state rather
+    than on success. Emitting only on success is the mistake compute already
+    made and recorded: a consumer left to discover failure by polling does not,
+    and the thing waiting sleeps for ever.
+    """
+    from ..compute.repository import ComputeRepository
+
+    ComputeRepository(session).enqueue(
+        "copilot.agent_run.settled",
+        run.id,
+        project_id=run.project_id,
+        payload={"run_id": str(run.id), "status": run.status},
+    )
+
+
 def finish(
     session: Session, run: CopilotAgentRun, *, status: str, error: str | None = None
 ) -> CopilotAgentRun:
@@ -300,6 +402,7 @@ def finish(
     run.error = error
     run.version += 1
     session.flush()
+    announce_settled(session, run)
     return run
 
 
@@ -336,6 +439,10 @@ def cancel(session: Session, run: CopilotAgentRun, *, reason: str = "") -> int:
     run.error = reason or None
     run.version += 1
     session.flush()
+    # Cancelled is terminal too. A stage whose operator was stopped has to learn
+    # that as surely as one whose operator finished, or it waits on a run that
+    # will never report - which is the same shape as emitting on success only.
+    announce_settled(session, run)
     return cancelled
 
 

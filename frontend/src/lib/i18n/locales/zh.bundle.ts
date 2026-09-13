@@ -98,6 +98,7 @@ export const bundleZh = {
   },
   copilot: {
     drawer: {
+      tabChat: '对话',
       eyebrow: 'BDA Copilot',
       subtitle: '可请求项目感知的路线规划、候选物解释、验证结果解读或下一步建议。',
       modelSettings: '配置',
@@ -142,6 +143,26 @@ export const bundleZh = {
       toolCalls: '调用了 {names}',
       waitingOn: '正在等待一件比本次请求更久的工作。',
       close: '返回列表',
+    },
+    chain: {
+      title: '链条',
+      toggle: '链条',
+      intro: '每个 operator 交给下一个的内容，以及每条声明背后的证据。最新在前。',
+      selectProject: '请先选择项目。',
+      loading: '正在加载链条…',
+      failed: '交接记录加载失败。',
+      emptyTitle: '还没有交接记录',
+      emptyBody:
+        'operator 把工作交出去时会记一条：做了什么、提出哪些声明及其证据、以及自己没能定下来的问题。',
+      noTranscript: '无转录',
+      openQuestions: '未定的问题',
+      citesNothing: '没有引用任何证据',
+      unsupportedCount: '这里有 {count} 条声明没有引用证据',
+      confidence: {
+        stated: '有记录支持',
+        consistent: '不矛盾',
+        unsupported: '无支持',
+      },
     },
     mcp: {
       title: 'MCP 会话',
@@ -212,6 +233,15 @@ export const bundleZh = {
       citationProject: '项目内',
       citationExternal: '外部',
       citationSourceFallback: '来源 {index}',
+      reviewedBy: '复核者：',
+      handsTo: '交给：',
+      botLabel: 'Copilot 机器人',
+      botAuto: '自动',
+      botStances: {
+        direct: '统筹',
+        produce: '主链',
+        review: '复核',
+      },
     },
     loading: {
       connecting: '正在连接 Copilot…',

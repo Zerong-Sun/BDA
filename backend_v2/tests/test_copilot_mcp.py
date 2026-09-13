@@ -142,6 +142,33 @@ def test_agent_run_tools_are_never_exposed(session: Session) -> None:
     assert mcp.tool_context(session, grant).agent_run is None
 
 
+def test_the_new_read_capabilities_reach_an_external_client(session: Session) -> None:
+    """Structure analysis and failure diagnosis are on the MCP surface for free.
+
+    Both are read-only tools declared in the registry, so no transport code was
+    written for them. That is the property worth pinning: adding a capability
+    must not require a second registration for MCP, or the drift `registry.py`
+    ended comes back through this door.
+    """
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user, capabilities=["structure", "diagnosis"])
+
+    names = {spec.id for spec in mcp.available_tools(session, grant)}
+
+    assert {
+        "analyse_structure",
+        "list_structure_contacts",
+        "describe_structure_site",
+        "diagnose_compute_failure",
+    } <= names
+    # Read-only, so an unbound grant - one with no run and therefore no mandate -
+    # still exposes them.
+    assert all(
+        REGISTRY.get(name).execution_mode == "read"  # type: ignore[union-attr]
+        for name in names
+    )
+
+
 # --- The mandate rule --------------------------------------------------------
 
 

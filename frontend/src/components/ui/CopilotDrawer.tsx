@@ -2,14 +2,17 @@ import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import { CopilotChat } from '../../features/copilot/CopilotChat'
 import { CopilotActions } from '../../features/copilot/CopilotActions'
+import { CopilotChain } from '../../features/copilot/CopilotChain'
 import { CopilotAgentRuns } from '../../features/copilot/CopilotAgentRuns'
 import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
 import { CopilotSettings } from '../../features/copilot/CopilotSettings'
 import { useI18n } from '../../lib/i18n'
+import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { Button } from './Button'
 import { ScrollArea } from './scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './sheet'
+import { Tabs, TabsList, TabsTrigger } from './Tabs'
 
 interface CopilotDrawerProps {
   open: boolean
@@ -21,13 +24,24 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   const { t } = useI18n()
   const copilotWidth = useAppStore((s) => s.copilotWidth)
   const setCopilotWidth = useAppStore((s) => s.setCopilotWidth)
+  // Written into the per-project session rather than passed down, because that is
+  // where `useCopilotChat` reads the selected operator from - handing it through
+  // props would be a second source for one selection.
+  const { projectId } = useProjectContext()
+  const setCopilotSessionBot = useAppStore((s) => s.setCopilotSessionBot)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Chat, runs and MCP grants are alternatives rather than companions: a
-  // transcript and a conversation both want the whole drawer, and showing them at
-  // once would leave neither readable. MCP sits here rather than in settings
-  // because a grant is scoped to a run and a project, which is what this drawer
-  // is already about - settings is where the model provider lives.
-  const [surface, setSurface] = useState<'chat' | 'runs' | 'mcp'>('chat')
+  // Chat, the chain record, runs and MCP grants are alternatives rather than
+  // companions: a transcript and a conversation both want the whole drawer, and
+  // showing them at once would leave neither readable. MCP sits here rather than
+  // in settings because a grant is scoped to a run and a project, which is what
+  // this drawer is already about - settings is where the model provider lives.
+  //
+  // A tab set rather than four toggle buttons. They were already mutually
+  // exclusive and already announced `aria-pressed`, which is a tab group wearing
+  // buttons: arrow keys did not move between them, and four of them beside a
+  // title and a close button wrapped in a 300px drawer. `Tabs` is already in the
+  // repo and says the right thing to a screen reader without being told.
+  const [surface, setSurface] = useState<'chat' | 'chain' | 'runs' | 'mcp'>('chat')
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -76,31 +90,14 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
         >
           <DotsSixVerticalIcon className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <SheetHeader className="flex-row items-center justify-between border-b">
-          <SheetTitle>{t.copilot.drawer.toggleLabel}</SheetTitle>
-          <div className="flex items-center gap-1">
+        <SheetHeader className="flex-row items-center justify-between gap-2 border-b">
+          <SheetTitle className="truncate text-sm">{t.copilot.drawer.toggleLabel}</SheetTitle>
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               type="button"
-              variant={surface === 'runs' ? 'secondary' : 'outline'}
+              variant={settingsOpen ? 'secondary' : 'ghost'}
               size="sm"
-              aria-pressed={surface === 'runs'}
-              onClick={() => setSurface((value) => (value === 'runs' ? 'chat' : 'runs'))}
-            >
-              {t.copilot.agentRuns.toggle}
-            </Button>
-            <Button
-              type="button"
-              variant={surface === 'mcp' ? 'secondary' : 'outline'}
-              size="sm"
-              aria-pressed={surface === 'mcp'}
-              onClick={() => setSurface((value) => (value === 'mcp' ? 'chat' : 'mcp'))}
-            >
-              {t.copilot.mcp.toggle}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
+              aria-pressed={settingsOpen}
               onClick={() => setSettingsOpen((value) => !value)}
             >
               {t.copilot.drawer.modelSettings}
@@ -116,6 +113,21 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             </Button>
           </div>
         </SheetHeader>
+        {/* On its own row: four labels plus the header's own controls do not fit
+            across a 300px drawer, and wrapping them put the close button under
+            the title. */}
+        <Tabs
+          value={surface}
+          onValueChange={(value) => setSurface(value as typeof surface)}
+          className="shrink-0 border-b px-2 pb-1"
+        >
+          <TabsList variant="line" className="w-full justify-start gap-0.5 overflow-x-auto">
+            <TabsTrigger value="chat">{t.copilot.drawer.tabChat}</TabsTrigger>
+            <TabsTrigger value="chain">{t.copilot.chain.toggle}</TabsTrigger>
+            <TabsTrigger value="runs">{t.copilot.agentRuns.toggle}</TabsTrigger>
+            <TabsTrigger value="mcp">{t.copilot.mcp.toggle}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         {settingsOpen ? (
           <ScrollArea className="h-[40%] shrink-0 border-b">
             <CopilotSettings />
@@ -128,6 +140,18 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
         ) : surface === 'runs' ? (
           <ScrollArea className="min-h-0 flex-1">
             <CopilotAgentRuns />
+          </ScrollArea>
+        ) : surface === 'chain' ? (
+          <ScrollArea className="min-h-0 flex-1">
+            {/* Naming the successor moves the reader to it. Reading what was
+                handed over and then hunting for the recipient in the chat's own
+                dropdown is the handoff protocol working on paper only. */}
+            <CopilotChain
+              onSelectOperator={(botId) => {
+                if (projectId) setCopilotSessionBot(projectId, botId)
+                setSurface('chat')
+              }}
+            />
           </ScrollArea>
         ) : (
           <>
