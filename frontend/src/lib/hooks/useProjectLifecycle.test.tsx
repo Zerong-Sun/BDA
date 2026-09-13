@@ -8,6 +8,7 @@ import type { Project } from '../api/projects'
 import { useAppStore } from '../store/appStore'
 import { useDeleteProjectLifecycle } from './useDeleteProjectLifecycle'
 import { useProjectContext } from './useProjectContext'
+import { Button } from '../../components/ui/Button'
 
 function makeProject(projectId: string): Project {
   return {
@@ -74,6 +75,18 @@ function DeleteProjectRoutes() {
 }
 
 describe('project lifecycle hooks', () => {
+  it('drops the old run and structure selection when selecting another project', async () => {
+    mockProjectList([makeProject('a'), makeProject('b')])
+    window.location.hash = '/bots?project=a&view=tasks&run=old&structureA=old-a&structureB=old-b&compare=1'
+    function SwitchProject() {
+      const { projectId, setProjectId } = useProjectContext()
+      return <Button type="button" disabled={!projectId} onClick={() => setProjectId('b')}>Switch project</Button>
+    }
+    renderWithProviders(<SwitchProject />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Switch project' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Switch project' }))
+    expect(window.location.hash).toBe('#/bots?project=b&view=tasks')
+  })
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

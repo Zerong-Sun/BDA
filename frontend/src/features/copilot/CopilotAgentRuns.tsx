@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftIcon, SpinnerGapIcon } from '@phosphor-icons/react'
 import {
@@ -67,6 +68,7 @@ function toneFor(status: string): StatusTone {
 
 export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: string; skills?: string[] }) {
   const { t, format } = useI18n()
+  const readOnly = useCopilotReadOnly()
   const copy = t.copilot.agentRuns
   const { projectId } = useProjectContext()
   const queryClient = useQueryClient()
@@ -89,6 +91,7 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
 
   const start = useMutation({
     mutationFn: () => {
+      requireCopilotWrite()
       if (!projectId) throw new Error(copy.noProject)
       const cost = Number(maxCost.trim())
       return startAgentRun({
@@ -161,7 +164,7 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
               onChange={(event) => setMaxCost(event.target.value)}
             />
           </label>
-          <Button type="submit" size="sm" disabled={!goal.trim() || start.isPending}>
+          <Button type="submit" size="sm" disabled={readOnly || !goal.trim() || start.isPending}>
             {start.isPending ? copy.starting : copy.start}
           </Button>
         </div>
@@ -226,6 +229,7 @@ export function AgentRunDetail({
   onBack: () => void
 }) {
   const { t, format, language } = useI18n()
+  const readOnly = useCopilotReadOnly()
   const copy = t.copilot.agentRuns
   const queryClient = useQueryClient()
   const showToast = useToastStore((state) => state.show)
@@ -252,6 +256,7 @@ export function AgentRunDetail({
 
   const cancel = useMutation({
     mutationFn: () => {
+      requireCopilotWrite()
       if (!run.data) throw new Error(copy.cancel)
       return cancelAgentRun(runId, run.data.version)
     },
@@ -273,7 +278,7 @@ export function AgentRunDetail({
   })
 
   const continuation = useMutation({
-    mutationFn: () => continueAgentRun(runId, run.data!.version, followup.trim(), retainedWrites ?? undefined),
+    mutationFn: () => { requireCopilotWrite(); return continueAgentRun(runId, run.data!.version, followup.trim(), retainedWrites ?? undefined) },
     onSuccess: () => {
       setFollowup('')
       setRetainedWrites(null)
@@ -296,7 +301,7 @@ export function AgentRunDetail({
             variant="outline"
             size="sm"
             className="ms-auto"
-            disabled={cancel.isPending}
+            disabled={readOnly || cancel.isPending}
             onClick={() => cancel.mutate()}
           >
             {cancel.isPending ? copy.cancelling : copy.cancel}
@@ -330,14 +335,15 @@ export function AgentRunDetail({
         </div>
       ) : null}
 
+      {readOnly ? <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
       {run.data ? <TaskDelivery run={run.data} /> : null}
       {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
       {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
       {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
-        <label className="text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
+        <label className="text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea disabled={readOnly} value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
         {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
         <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用或缩小本任务的写入范围和费用上限，增加最多 12 轮处理。' : 'Keeps the same write scope and cost ceiling, with up to 12 more turns.'}</p>
-        <Button type="submit" disabled={!followup.trim() || continuation.isPending}>{language === 'zh' ? '继续此任务' : 'Continue this task'}</Button>
+        <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{language === 'zh' ? '继续此任务' : 'Continue this task'}</Button>
         {continuation.error ? <p role="alert">{continuation.error instanceof Error ? continuation.error.message : String(continuation.error)}</p> : null}
       </form> : null}
       <Disclosure key={run.data?.task_contract?.version ? "task" : "legacy"} title={copy.transcript} defaultOpen={!run.data?.task_contract?.version}>

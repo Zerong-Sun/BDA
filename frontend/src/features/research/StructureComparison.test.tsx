@@ -17,6 +17,20 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('structure comparison', () => {
+  it('restores a comparison from the URL and repairs invalid or duplicate source choices', () => {
+    window.location.hash = '/research?project=project-one&tab=structures&compare=1&structureA=missing&structureB=artifact-1'
+    renderWithProviders(<StructureComparison projectId="project-one" structures={structures} />)
+    expect(screen.getAllByTestId('comparison-viewer').map((el) => el.textContent)).toEqual(['artifact-1', 'artifact-2'])
+  })
+
+  it('keeps the comparison after a component remount', () => {
+    const page = renderWithProviders(<StructureComparison projectId="project-one" structures={structures} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Compare side by side' }))
+    expect(window.location.hash).toContain('compare=1')
+    page.unmount()
+    renderWithProviders(<StructureComparison projectId="project-one" structures={structures} />)
+    expect(screen.getAllByTestId('comparison-viewer')).toHaveLength(2)
+  })
   it('mounts one viewer by default, adds an independent second view on request and releases it on collapse', () => {
     renderWithProviders(<StructureComparison projectId="project-one" structures={structures} />)
     expect(screen.getAllByTestId('comparison-viewer')).toHaveLength(1)

@@ -6,6 +6,11 @@ import { projectBrief } from './projectBrief'
 const project = { id: 'public-project', name: 'PD1', summary: 'Stored objective', prompt: null, source_package_id: 'pd1-demo-v1', source_project_key: 'PD1' } as Project
 
 describe('source-backed project briefs', () => {
+  it('shows an authored public-project brief instead of masking it with package copy', () => {
+    const edited = { ...project, prompt: 'Review only the sources selected by the customer.' }
+    expect(projectBrief(edited, 'en')).toEqual({ source: 'project', objective: edited.prompt, questions: [], deliverables: [] })
+    expect(projectBrief({ ...project, prompt: project.summary }, 'en').source).toBe('public-package')
+  })
   it('presents public-package questions in both languages without claiming goal completion', () => {
     for (const language of ['en', 'zh'] as const) {
       const brief = projectBrief(project, language)

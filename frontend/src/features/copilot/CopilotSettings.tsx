@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '../../components/reui/frame'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
+import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 
 export interface CopilotSettingsActions {
   save: () => void
@@ -40,6 +41,7 @@ export function CopilotSettings(props: CopilotSettingsProps) {
 
 function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady }: CopilotSettingsProps & { projectId: string }) {
   const { t, format, language } = useI18n()
+  const readOnly = useCopilotReadOnly()
   const queryClient = useQueryClient()
   const { data: config, isLoading, isError } = useQuery({
     queryKey: ['copilot-config', projectId],
@@ -57,13 +59,15 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
   const systemPrompt = promptDraft ?? config?.system_prompt ?? ''
 
   const save = useMutation({
-    mutationFn: () =>
-      updateCopilotConfig(projectId, {
+    mutationFn: () => {
+      requireCopilotWrite()
+      return updateCopilotConfig(projectId, {
         llm_api_base: baseUrl.trim(),
         llm_model: model.trim(),
         system_prompt: systemPrompt.trim(),
         ...(apiKey.trim() ? { llm_api_key: apiKey.trim() } : {}),
-      }),
+      })
+    },
     onSuccess: () => {
       setApiKey('')
       setBaseUrlDraft(null)
@@ -72,10 +76,10 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
       void queryClient.invalidateQueries({ queryKey: ['copilot-config'] })
     },
   })
-  const test = useMutation({ mutationFn: () => testCopilotConfig(projectId) })
+  const test = useMutation({ mutationFn: () => { requireCopilotWrite(); return testCopilotConfig(projectId) } })
   const mutationPending = save.isPending || test.isPending
-  const canSave = Boolean(projectId && (config?.api_key_configured || (config?.browser_api_key_allowed && apiKey.trim() && baseUrl.trim() && model.trim())))
-  const canTest = Boolean(config?.api_key_configured)
+  const canSave = !readOnly && Boolean(projectId && (config?.api_key_configured || (config?.browser_api_key_allowed && apiKey.trim() && baseUrl.trim() && model.trim())))
+  const canTest = !readOnly && Boolean(config?.api_key_configured)
   const saveConfiguration = save.mutate
   const testConfiguration = test.mutate
   const publishSave = useCallback(() => {
@@ -145,7 +149,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
             <div className="grid gap-1">
               <Label htmlFor="copilot-api-base">{t.copilot.settings.apiBaseLabel}</Label>
               <Input
-                disabled={!config?.browser_api_key_allowed}
+                disabled={readOnly || !config?.browser_api_key_allowed}
                 id="copilot-api-base"
                 value={baseUrl}
                 onChange={(event) => setBaseUrlDraft(event.target.value)}
@@ -157,6 +161,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
               </Label>
               <Textarea
                 id="copilot-project-prompt"
+                readOnly={readOnly}
                 className="min-h-24"
                 value={systemPrompt}
                 onChange={(event) => setPromptDraft(event.target.value)}
@@ -165,7 +170,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
             <div className="grid gap-1">
               <Label htmlFor="copilot-model">{t.copilot.settings.modelLabel}</Label>
               <Input
-                disabled={!config?.browser_api_key_allowed}
+                disabled={readOnly || !config?.browser_api_key_allowed}
                 id="copilot-model"
                 value={model}
                 onChange={(event) => setModelDraft(event.target.value)}
@@ -180,6 +185,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
               </Label>
               <Input
                 id="copilot-api-key"
+                disabled={readOnly}
                 type="password"
                 autoComplete="off"
                 placeholder={

@@ -24,6 +24,8 @@ export interface CopilotChatMessage {
 }
 
 export interface CopilotProjectSession {
+  pending?: { id: string; stage: 'connecting' | 'thinking' | 'tool' | 'streaming'; detail: string | null } | null
+  error?: string | null
   /** Unsent text and source selection live only in this signed-in browser session. */
   input?: string
   selectedEntityIds?: string[]
@@ -116,6 +118,7 @@ interface AppState {
   setCopilotConversationId: (projectId: string, conversationId: string | null) => void
   setCopilotSessionBot: (projectId: string, bot: string | null) => void
   setCopilotSessionInput: (projectId: string, input: string) => void
+  setCopilotSessionRequest: (projectId: string, pending: CopilotProjectSession['pending'], error?: string | null) => void
   setCopilotTaskDraft: (projectId: string, draft: CopilotTaskDraft) => void
   resetCopilotSession: (projectId: string) => void
   setCopilotDraft: (draft: string) => void
@@ -208,6 +211,12 @@ export const useAppStore = create<AppState>()(
       setCopilotSessionInput: (projectId, input) => set((state) => {
         const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
         return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, input } } }
+      }),
+      setCopilotSessionRequest: (projectId, pending, error) => set((state) => {
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
+        return { copilotSessions: { ...state.copilotSessions, [projectId]: {
+          ...current, pending, ...(error !== undefined ? { error } : {}),
+        } } }
       }),
       setCopilotTaskDraft: (projectId, draft) => set((state) => ({
         copilotTaskDrafts: { ...state.copilotTaskDrafts, [projectId]: draft },

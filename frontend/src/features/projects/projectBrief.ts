@@ -14,7 +14,12 @@ export interface ProjectBrief {
  */
 export function projectBrief(project: Project, language: 'zh' | 'en'): ProjectBrief {
   const zh = language === 'zh'
-  if (project.source_package_id === 'pd1-demo-v1' && project.source_project_key === 'PD1') {
+  const prompt = project.prompt?.trim() ?? ''
+  // Import initializes the prompt from the source summary. A later authored
+  // prompt takes precedence over the editorial package fallback.
+  const summaries = [project.summary, projectText(project, 'summary', 'en'), projectText(project, 'summary', 'zh')]
+  const authoredPrompt = prompt && !summaries.some((summary) => summary?.trim() === prompt)
+  if (!authoredPrompt && project.source_package_id === 'pd1-demo-v1' && project.source_project_key === 'PD1') {
     return {
       source: 'public-package',
       objective: zh
@@ -35,7 +40,7 @@ export function projectBrief(project: Project, language: 'zh' | 'en'): ProjectBr
   }
   return {
     source: 'project',
-    objective: project.prompt?.trim() || projectText(project, 'summary', language).trim(),
+    objective: prompt || projectText(project, 'summary', language).trim(),
     questions: [],
     deliverables: [],
   }

@@ -160,3 +160,9 @@ Final validation for iteration 2:
   layouts, project-location captions, real Mol* fixture rendering and task retry.
 - Public-data allowlist/checksums and `git diff --check` passed. Public source
   package data and model/backend contracts are unchanged.
+
+## Six-dimension audit
+
+The follow-up [verification and repair checklist](BOT_WORKSPACE_VERIFICATION.md)
+records requirements, logic, boundary cases, code quality, test coverage and
+runtime evidence, including streaming races and the full backend Bot catalog.

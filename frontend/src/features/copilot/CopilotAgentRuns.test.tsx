@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { AgentRunDetail, CopilotAgentRuns } from './CopilotAgentRuns'
+import { useAppStore } from '../../lib/store/appStore'
 
 /**
  * The panel over the durable substrate.
@@ -55,8 +56,17 @@ function runReturns(run: Record<string, unknown>, turns: Record<string, unknown>
 }
 
 afterEach(() => cleanup())
+beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'application', language: 'en' }) })
 
 describe('agent run panel', () => {
+  it.each(['viewer', 'demo'])('keeps live runs inspectable but prevents cancellation in %s mode', async (mode) => {
+    if (mode === 'viewer') sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    else useAppStore.setState({ appMode: 'demo' })
+    runReturns(RUN)
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText(RUN.goal)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+  })
   it('rejects a task from another project before loading its transcript or actions', async () => {
     runReturns({ ...RUN, project_id: 'another-project' })
     let transcriptReads = 0

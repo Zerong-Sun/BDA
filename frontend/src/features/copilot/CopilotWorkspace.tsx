@@ -1,4 +1,5 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui/Button'
@@ -33,9 +34,14 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const { language } = useI18n()
   const zh = language === 'zh'
   const fieldId = useId()
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const queryClient = useQueryClient()
   const draft = useAppStore((s) => ignoreDraft ? '' : s.copilotDraft)
-  const demo = useAppStore((s) => s.appMode === 'demo')
+  const readOnly = useCopilotReadOnly()
   const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, selected: initialService ?? null, preview: Boolean(initialService), writes: [], maxTurns: 24, maxCost: '' })
   const savedDraft = useAppStore((s) => s.copilotTaskDrafts[projectId])
   const { goal, selected, preview, writes, maxTurns, maxCost } = rememberDraft ? savedDraft ?? localDraft : localDraft
@@ -58,13 +64,18 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const qualified = readiness.data?.eligible_services?.includes(kind) ?? false
   const validTurns = Number.isInteger(maxTurns) && maxTurns >= 1 && maxTurns <= 200
   const validCost = maxCost.trim() === '' || (Number.isInteger(Number(maxCost)) && Number(maxCost) >= 0 && Number(maxCost) <= 1000000)
-  const assess = useMutation({ mutationFn: () => assessTaskReadiness(projectId), onSuccess: (data) => {
+  const assess = useMutation({ mutationFn: () => { requireCopilotWrite(); return assessTaskReadiness(projectId) }, onSuccess: (data) => {
     queryClient.setQueryData(['copilot-task-readiness', projectId], data)
     void queryClient.invalidateQueries({ queryKey: ['copilot-config', projectId] })
   } })
-  const start = useMutation({ mutationFn: () => startAgentRun({ project_id: projectId, goal: goal.trim(), service_kind: kind,
-    authorized_writes: writes, max_turns: maxTurns, max_cost_usd_cents: maxCost.trim() === '' ? null : Number(maxCost) }),
-    onSuccess: ({ run }) => { setRunId(run.id); void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] }) },
+  const start = useMutation({ mutationFn: () => { requireCopilotWrite(); return startAgentRun({ project_id: projectId, goal: goal.trim(), service_kind: kind,
+    authorized_writes: writes, max_turns: maxTurns, max_cost_usd_cents: maxCost.trim() === '' ? null : Number(maxCost) }) },
+    onSuccess: ({ run }) => {
+      // A durable task may start after the user has moved to another project
+      // or surface. Refresh its list without navigating them back there.
+      if (mounted.current) setRunId(run.id)
+      void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
+    },
   })
   const error = start.error ?? assess.error ?? services.error ?? readiness.error ?? runs.error
   const requestTask = (text: string) => { updateDraft({ goal: text, selected: suggestService(text), writes: [], preview: true }); setChat(false); setQuestion(null) }
@@ -74,6 +85,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   if (runId) return <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setRunId(null)} />
   if (chat || draft) return <div className="flex min-h-0 flex-1 flex-col"><Button type="button" variant="ghost" onClick={() => { useAppStore.getState().setCopilotDraft(''); setChat(false); setQuestion(null) }}>{zh ? '返回当前任务' : 'Back to tasks'}</Button><CopilotChat pageContext={pageContext} initialQuestion={question ?? undefined} onTaskRequested={requestTask} /></div>
   return <div className="space-y-4 overflow-y-auto p-4">
+    {readOnly ? <p role="status" className="text-sm text-text-secondary">{zh ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
     <div><h3 className="font-semibold">{zh ? '你希望完成什么？' : 'What would you like to accomplish?'}</h3>
       <p className="mt-1 text-sm text-text-secondary">{zh ? '说明目标，助手会准备步骤、跟进结果，并在需要你判断时停下来。' : 'Describe your goal. The assistant prepares steps, tracks results and pauses for your input.'}</p></div>
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (!selected && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
@@ -98,11 +110,11 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
         <p className="mt-2 text-xs text-text-secondary">{zh ? '高级运行保留独立的方案确认和计算预算；完整无人值守闭环尚未开放。' : 'Advanced execution has its own plan confirmation and compute budget. Unattended end-to-end execution is not available.'}</p>
       </Disclosure>
       {!qualified ? <div role="status" className="space-y-2 text-sm"><p>{zh ? '此模型尚未通过本服务的任务检查。检查会调用模型，验证结构、引用和工具协议，不执行实验操作。' : 'This model needs task checks. These call the model to check structure, citations and tool protocol, without experiment actions.'}</p>
-        <Button type="button" variant="outline" disabled={!readiness.data?.model || assess.isPending || demo} onClick={() => assess.mutate()}>{assess.isPending ? (zh ? '检查中…' : 'Checking…') : (zh ? '检查模型任务能力' : 'Check model task capabilities')}</Button>
+        <Button type="button" variant="outline" disabled={!readiness.data?.model || assess.isPending || readOnly} onClick={() => assess.mutate()}>{assess.isPending ? (zh ? '检查中…' : 'Checking…') : (zh ? '检查模型任务能力' : 'Check model task capabilities')}</Button>
         {readiness.data?.checked_at ? <p>{Object.entries(readiness.data.checks ?? {}).map(([name, passed]) => `${name}: ${passed ? '✓' : '×'}`).join(' · ')}</p> : null}</div> : null}
       {!validTurns ? <p id={`${fieldId}-turns-error`} role="alert" className="text-sm text-destructive">{zh ? '轮数必须为 1–200 的整数。' : 'Turn limit must be a whole number from 1 to 200.'}</p> : null}
       {!validCost ? <p id={`${fieldId}-cost-error`} role="alert" className="text-sm text-destructive">{zh ? '费用额度须为 0–1,000,000 美分的整数，或留空。' : 'Budget must be a whole number from 0 to 1,000,000 cents, or left empty.'}</p> : null}
-      <Button type="button" disabled={!qualified || !goal.trim() || start.isPending || demo || !validTurns || !validCost} onClick={() => start.mutate()}>{start.isPending ? (zh ? '启动中…' : 'Starting…') : (zh ? '按以上计划开始' : 'Start this plan')}</Button>
+      <Button type="button" disabled={!qualified || !goal.trim() || start.isPending || readOnly || !validTurns || !validCost} onClick={() => start.mutate()}>{start.isPending ? (zh ? '启动中…' : 'Starting…') : (zh ? '按以上计划开始' : 'Start this plan')}</Button>
     </section> : null}
     {preview && !service && !services.isError ? <p role="status" className="text-sm text-text-secondary">{services.isLoading ? (zh ? '加载可用服务…' : 'Loading available services…') : (zh ? '此服务暂不可用，请选择其他服务或开始对话。' : 'This service is unavailable. Choose another service or start a conversation.')}</p> : null}
     {services.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}

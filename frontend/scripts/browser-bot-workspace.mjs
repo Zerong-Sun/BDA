@@ -12,6 +12,7 @@ await mkdir(output, { recursive: true })
 const bundle = JSON.parse(await readFile(new URL('../public/research-packages/pd1-demo-v1.json', import.meta.url), 'utf8'))
 const pdb = await readFile(new URL('../../examples/migration-fixtures/pd1/complexes/PD1Binder_a0172_complex.pdb', import.meta.url), 'utf8')
 const base = createFixtureRouter({ routeId: 'research' })
+const catalog = process.env.BDA_BOT_TEST_CATALOG ? JSON.parse(await readFile(process.env.BDA_BOT_TEST_CATALOG, 'utf8')) : null
 const project = structuredClone((await base.resolve('GET', '/api/v2/projects?limit=200')).body.items[0])
 Object.assign(project, { name: bundle.projects[0].name.en, summary: bundle.projects[0].summary.en, source_package_id: bundle.package_id, source_project_key: 'PD1', localized_content: { name: bundle.projects[0].name, summary: bundle.projects[0].summary } })
 const workspace = structuredClone((await base.resolve('GET', '/api/v2/projects/proj_browser/research-workspace')).body)
@@ -37,7 +38,7 @@ const browser = await chromium.launch({ headless: true })
 const checks = []
 let server
 
-async function newPage(language = 'en', themePreference = 'light', scenario = 'populated') {
+async function newPage(language = 'en', themePreference = 'light', scenario = 'populated', chatFixture = null) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' })
   const storage = createStorageSeed({ authenticated: true, language, themePreference, scenario })
   storage.session.bda_user = JSON.stringify({ ...JSON.parse(storage.session.bda_user), role: scenario === 'read-only' ? 'viewer' : 'researcher' })
@@ -52,6 +53,17 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     const url = new URL(request.url())
     const path = url.pathname
     const method = request.method()
+    if (chatFixture && method === 'POST' && path === '/api/v2/copilot/chat') {
+      chatFixture.requests.push(request.postDataJSON())
+      await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ conversation_id: 'qa-stream', message: { id: 'qa-request' } }) })
+      return
+    }
+    if (chatFixture && path === '/api/v2/copilot/conversations/qa-stream/stream') {
+      await new Promise((resolve) => { chatFixture.release = resolve; chatFixture.ready() })
+      const message = { id: 'qa-reply', role: 'assistant', content: 'Synthetic streaming reply after navigation.', citations: [], tool_calls: [] }
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `event: message\ndata: ${JSON.stringify(message)}\n\nevent: done\ndata: {}\n\n` })
+      return
+    }
     if (method !== 'GET') writes.push({ method, path })
     let reply
     if (path === '/api/v2/projects') reply = { status: 200, body: { items: emptyProjects ? [] : [project], next_cursor: null } }
@@ -62,6 +74,8 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     else if (path === '/api/v2/copilot/agent-runs/task-browser') reply = failTask ? { status: 422, body: { detail: 'Task unavailable for this test' } } : { status: 200, body: task }
     else if (path === '/api/v2/copilot/agent-runs/task-browser/turns') reply = { status: 200, body: { items: [], next_cursor: null } }
     else if (path === '/api/v2/copilot/bots' && failRoster) reply = { status: 422, body: { status: 422, title: 'Roster unavailable', detail: 'Roster unavailable for this test' } }
+    else if (path === '/api/v2/copilot/bots' && catalog) reply = { status: 200, body: catalog.bots }
+    else if (path === '/api/v2/copilot/task-services' && catalog) reply = { status: 200, body: catalog.services }
     else if (path.includes('/handoffs')) reply = { status: 200, body: { items: [], next_cursor: null } }
     else reply = await base.resolve(method, url.href, { body: request.postDataJSON() })
     await route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.body) })
@@ -146,12 +160,26 @@ try {
   assert.ok(drafted.includes('DEMO-1') && drafted.includes('DEMO-2'))
   assert.equal(writes.length, 0, 'Selecting a structure or Bot must not send or execute anything')
   checks.push('Both synthetic structures render; comparison transfers both source IDs to an unsent Bot draft')
+  await page.goBack()
+  await page.getByRole('button', { name: 'Single structure', exact: true }).waitFor()
+  assert.equal(await page.locator('.structure-comparison-pane').count(), 2)
+  await page.reload()
+  await page.getByRole('button', { name: 'Single structure', exact: true }).waitFor()
+  assert.equal(await page.locator('.structure-comparison-pane').count(), 2)
+  await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
+  await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
+  checks.push('Structure A/B selection survives Bot round trips and full page reloads')
   await page.getByRole('button', { name: 'Structuralist structuralist', exact: true }).click()
   assert.equal(await page.getByRole('button', { name: 'Structuralist structuralist', exact: true }).getAttribute('aria-pressed'), 'true')
   await page.getByRole('tab', { name: 'Bot handoffs', exact: true }).click()
   await screenshot(page, 'bots-handoffs-en-light')
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
   await page.getByRole('heading', { name: 'What would you like to accomplish?' }).waitFor()
+  if (catalog) {
+    assert.equal(await page.locator('.bot-roster-item').count(), catalog.bots.length + 1)
+    assert.equal(await page.getByLabel('Service type', { exact: true }).getByRole('button').count(), catalog.services.length)
+    checks.push(`Actual FastAPI catalog renders all ${catalog.bots.length} Bots and ${catalog.services.length} services`)
+  }
   await screenshot(page, 'bots-en-light')
   await page.getByLabel('Task goal', { exact: true }).fill('Research the existing project sources')
   await page.getByRole('button', { name: 'Research the evidence', exact: true }).click()
@@ -207,6 +235,32 @@ try {
     await noOverflow(zh, `Chinese brief ${width}`)
   }
   checks.push('Responsive Bot and Chinese brief layouts; demo/viewer goal edits disabled')
+  await zh.goto(`${origin}/#/bots?project=proj_browser&view=tasks&run=task-browser`)
+  await zh.getByText(task.outcome.summary, { exact: true }).waitFor()
+  assert.ok(await zh.getByRole('button', { name: '继续此任务', exact: true }).isDisabled())
+  assert.ok(await zh.getByRole('button', { name: '保存为待审核计划记录', exact: true }).isDisabled())
+  await zh.getByRole('tab', { name: '对话', exact: true }).click()
+  assert.ok(await zh.locator('.bot-chat-surface input[placeholder]').isDisabled())
+  checks.push('Viewer can inspect task deliveries and chat history without command controls')
+
+  let streamReady
+  const waitingForStream = new Promise((resolve) => { streamReady = resolve })
+  const chatFixture = { requests: [], ready: streamReady, release: null }
+  const streaming = await newPage('en', 'light', 'populated', chatFixture)
+  await streaming.goto(`${origin}/#/bots?project=proj_browser&view=chat`)
+  await streaming.getByLabel('Ask the Copilot a question', { exact: true }).fill('Check the synthetic source summary?')
+  await streaming.getByRole('button', { name: 'Send message', exact: true }).click()
+  await waitingForStream
+  await streaming.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
+  await streaming.getByRole('tab', { name: 'Conversation', exact: true }).click()
+  assert.ok(await streaming.getByLabel('Ask the Copilot a question', { exact: true }).isDisabled())
+  assert.ok(await streaming.getByRole('button', { name: 'Send message', exact: true }).isDisabled())
+  assert.equal(chatFixture.requests.length, 1)
+  chatFixture.release()
+  await streaming.getByText('Synthetic streaming reply after navigation.', { exact: true }).waitFor()
+  assert.ok(await streaming.getByLabel('Ask the Copilot a question', { exact: true }).isEnabled())
+  assert.equal(chatFixture.requests[0].project_id, 'proj_browser')
+  checks.push('Delayed synthetic SSE reply stays locked across tabs and completes in its original project')
 
   failRoster = true
   const errorPage = await newPage()
@@ -231,7 +285,7 @@ try {
   checks.push('Empty workspace offers project selection without broken task controls')
   assert.deepEqual(failures, [], 'No uncaught browser errors')
   assert.equal(writes.length, 0, 'Read-only navigation never mutates backend state')
-  await writeFile(`${output}/report.json`, JSON.stringify({ checks, failures, writes }, null, 2))
+  await writeFile(`${output}/report.json`, JSON.stringify({ checks, failures, writes, syntheticChatPosts: chatFixture.requests.length, catalog: catalog ? { bots: catalog.bots.length, services: catalog.services.length } : 'lightweight fixtures' }, null, 2))
   console.log(JSON.stringify({ passed: checks.length, output, checks }, null, 2))
 } catch (error) {
   for (const context of browser.contexts()) for (const page of context.pages()) {

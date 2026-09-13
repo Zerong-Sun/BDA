@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui/Button'
 import { Textarea } from '../../components/ui/textarea'
@@ -22,10 +23,11 @@ const Outcome = z.object({
 export function TaskDelivery({ run }: { run: AgentRun }) {
   const { language } = useI18n()
   const zh = language === 'zh'
+  const readOnly = useCopilotReadOnly()
   const client = useQueryClient()
   const [brief, setBrief] = useState<{ text: string; version: number } | null>(null)
   const [reason, setReason] = useState('')
-  const record = useMutation({ mutationFn: () => saveTaskDecisionRecord(run.id, run.version), onSuccess: (data) => {
+  const record = useMutation({ mutationFn: () => { requireCopilotWrite(); return saveTaskDecisionRecord(run.id, run.version) }, onSuccess: (data) => {
     client.setQueryData(['agent-run', run.project_id, run.id], data)
     void client.invalidateQueries({ queryKey: ['timeline', run.project_id] })
   }, onError: () => { void client.invalidateQueries({ queryKey: ['agent-run', run.project_id, run.id] }) } })
@@ -33,7 +35,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
     const sections = run.outcome?.sections as Record<string, string> | undefined
     setBrief({ text: [String(run.outcome?.summary ?? ''), ...Object.entries(sections ?? {}).map(([key, value]) => `${key}\n${value}`)].join('\n\n'), version: data.project.version })
   } })
-  const applyBrief = useMutation({ mutationFn: () => updateProjectPrompt(run.project_id, brief!.text.trim(), brief!.version, reason.trim()), onSuccess: () => {
+  const applyBrief = useMutation({ mutationFn: () => { requireCopilotWrite(); return updateProjectPrompt(run.project_id, brief!.text.trim(), brief!.version, reason.trim()) }, onSuccess: () => {
     setBrief(null); setReason('')
     void client.invalidateQueries({ queryKey: ['project-overview', run.project_id] })
     void client.invalidateQueries({ queryKey: ['projects'] })
@@ -56,13 +58,13 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
     {outcome.deliverables?.map((item) => <Link className="block text-sm text-primary" key={`${item.kind}-${item.id}`} to={`${base}&tab=${item.kind === 'literature' ? 'references' : 'data'}`}>{item.kind === 'literature' ? (zh ? '打开检索与文献' : 'Open literature') : (zh ? '打开待审核研究笔记' : 'Open research notes')} · {item.id.slice(0, 8)}</Link>)}
     {outcome.evidence?.length ? <Disclosure title={zh ? '查看来源与操作记录' : 'Sources and actions'}><ul className="space-y-1 text-xs">{outcome.evidence.map((item) => <li key={item.call_id}>{item.successful ? '✓' : '×'} {item.tool} · {item.call_id}</li>)}</ul></Disclosure> : null}
     <p className="text-xs text-text-secondary">{zh ? '步骤核对说明交付记录存在；科研结论和计算提交仍需对应审核。' : 'Step checks confirm delivery records. Scientific conclusions and compute submission still need their respective review.'}</p>
-    {terminal && outcome.summary && !outcome.decision_record_id ? <Button type="button" variant="outline" disabled={record.isPending} onClick={() => record.mutate()}>{zh ? '保存为待审核计划记录' : 'Save as a plan for review'}</Button> : null}
+    {terminal && outcome.summary && !outcome.decision_record_id ? <Button type="button" variant="outline" disabled={readOnly || record.isPending} onClick={() => record.mutate()}>{zh ? '保存为待审核计划记录' : 'Save as a plan for review'}</Button> : null}
     {outcome.decision_record_id ? <p className="text-sm" role="status">{zh ? '已保存到项目决策记录，可关联目标并继续编辑。' : 'Saved to the project decision record. You can attach a goal and edit it there.'}</p> : null}
-    {terminal && outcome.summary && run.task_contract?.service_kind === 'brief' ? <Button type="button" variant="outline" disabled={prepareBrief.isPending} onClick={() => prepareBrief.mutate()}>{zh ? '编辑并应用为项目任务书' : 'Edit and apply as project brief'}</Button> : null}
+    {terminal && outcome.summary && run.task_contract?.service_kind === 'brief' ? <Button type="button" variant="outline" disabled={readOnly || prepareBrief.isPending} onClick={() => prepareBrief.mutate()}>{zh ? '编辑并应用为项目任务书' : 'Edit and apply as project brief'}</Button> : null}
     {brief ? <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); applyBrief.mutate() }}>
       <label>{zh ? '任务书草案' : 'Brief draft'}<Textarea value={brief.text} onChange={(e) => setBrief({ ...brief, text: e.target.value })} /></label>
       <label>{zh ? '修改原因' : 'Reason for the change'}<Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-      <Button type="submit" disabled={!brief.text.trim() || !reason.trim() || applyBrief.isPending}>{zh ? '保存任务书' : 'Save project brief'}</Button>
+      <Button type="submit" disabled={readOnly || !brief.text.trim() || !reason.trim() || applyBrief.isPending}>{zh ? '保存任务书' : 'Save project brief'}</Button>
       <Button type="button" variant="ghost" onClick={() => setBrief(null)}>{zh ? '取消编辑' : 'Cancel edit'}</Button>
     </form> : null}
     {record.error || prepareBrief.error || applyBrief.error ? <p role="alert" className="text-sm text-destructive">{String(record.error ?? prepareBrief.error ?? applyBrief.error)}</p> : null}

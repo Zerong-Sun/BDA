@@ -6,6 +6,7 @@ import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../
 import { detectReviewIntent } from '../research/reviewIntent'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { requireCopilotWrite } from './commandAccess'
 
 const MAX_COPILOT_HISTORY = 20
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
@@ -61,10 +62,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     setSessionMessages(projectId, migratedMessages)
     setLegacyMessages([])
   }, [projectId, setLegacyMessages, setSessionMessages])
-  const [loading, setLoading] = useState(false)
-  const [loadingStage, setLoadingStage] = useState<CopilotLoadingStage>('idle')
-  const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const loading = Boolean(session?.pending)
+  const loadingStage: CopilotLoadingStage = session?.pending?.stage ?? 'idle'
+  const loadingDetail = session?.pending?.detail ?? null
+  const error = session?.error ?? null
+  const setRequest = useAppStore((state) => state.setCopilotSessionRequest)
   const [lastMode, setLastMode] = useState<string | null>(() => getLatestCopilotMode())
   // null means "let the message decide". Kept in the project's session rather
   // than in component state: the drawer unmounts every time it closes, and a
@@ -82,7 +84,19 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
 
   const send = async (input: string) => {
     const trimmed = input.trim()
-    if (!trimmed || loading) return
+    if (!trimmed || !projectId || useAppStore.getState().copilotSessions[projectId]?.pending) return
+    try { requireCopilotWrite() } catch { return }
+    const requestId = crypto.randomUUID()
+    setRequest(projectId, { id: requestId, stage: 'connecting', detail: null }, null)
+    // A reset, deletion or sign-out invalidates this request. A remount keeps it
+    // alive and sees the same lock, so concurrent replies cannot overwrite it.
+    const isCurrent = () => useAppStore.getState().copilotSessions[projectId]?.pending?.id === requestId
+    const writeMessages = (next: CopilotChatMessage[] | ((messages: CopilotChatMessage[]) => CopilotChatMessage[])) => {
+      if (isCurrent()) setMessages(next)
+    }
+    const updateStage = (stage: Exclude<CopilotLoadingStage, 'idle'>, detail: string | null = null) => {
+      if (isCurrent()) setRequest(projectId, { id: requestId, stage, detail })
+    }
 
     // One narrowing hint, derived from the served roster. There used to be a
     // second - a hand-written capability list in `skills/registry.ts` with its
@@ -101,11 +115,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         ...(reviewIntent ? { meta: { reviewIntent: true } } : {}),
       },
     ]
-    setMessages(nextMessages)
-    setLoading(true)
-    setLoadingStage('connecting')
-    setLoadingDetail(null)
-    setError(null)
+    writeMessages(nextMessages)
 
     const scopedMessages = nextMessages.slice(-MAX_COPILOT_HISTORY)
     const contextParams = new URLSearchParams((pageContext ?? '').replace(/;\s*/g, '&'))
@@ -130,32 +140,25 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
 
     try {
       let streamed = ''
-      setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+      writeMessages((prev) => [...prev, { role: 'assistant', content: '' }])
       const accepted = await streamCopilotMessage(payload, (chunk) => {
         streamed += chunk
-        setMessages((prev) => {
+        writeMessages((prev) => {
           const copy = [...prev]
           copy[copy.length - 1] = { role: 'assistant', content: streamed }
           return copy
         })
       }, (stage) => {
-        if (stage.startsWith('tool:')) {
-          setLoadingStage('tool')
-          setLoadingDetail(stage.slice('tool:'.length).replace(/[_-]+/g, ' '))
-          return
-        }
-        if (stage === 'done') {
-          setLoadingStage('idle')
-        } else if (stage === 'connecting' || stage === 'thinking' || stage === 'streaming') {
-          setLoadingStage(stage)
-        }
-        if (stage !== 'thinking') setLoadingDetail(null)
-        if (stage === 'done') {
+        if (!isCurrent()) return
+        if (stage.startsWith('tool:')) updateStage('tool', stage.slice('tool:'.length).replace(/[_-]+/g, ' '))
+        else if (stage === 'connecting' || stage === 'thinking' || stage === 'streaming') updateStage(stage)
+        else if (stage === 'done') {
           const mode = getLatestCopilotMode()
           if (mode) setLastMode(mode)
         }
       }, (message) => {
-        setMessages((prev) => {
+        if (!isCurrent()) return
+        writeMessages((prev) => {
           const copy = [...prev]
           copy[copy.length - 1] = {
             role: 'assistant',
@@ -172,13 +175,16 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
           void queryClient.invalidateQueries({ queryKey: copilotHandoffsQueryKey(projectId ?? null) })
         }
       })
-      if (projectId) setConversationId(projectId, accepted.conversationId)
-      setSelectedEntityIds([], projectId ?? '')
+      if (!isCurrent()) return
+      setConversationId(projectId, accepted.conversationId)
+      const currentSources = useAppStore.getState().copilotSessions[projectId]?.selectedEntityIds ?? []
+      const sentSources = payload.context.selected_entity_ids
+      if (currentSources.length === sentSources.length && currentSources.every((id, index) => id === sentSources[index])) setSelectedEntityIds([], projectId)
       if (!streamed) throw new Error('Copilot completed without an assistant response.')
     } catch (err) {
+      if (!isCurrent()) return
       const message = explainCopilotError(err)
-      setError(message)
-      setMessages((prev) => {
+      writeMessages((prev) => {
         const copy = [...prev]
         copy[copy.length - 1] = {
           role: 'assistant',
@@ -186,10 +192,9 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         }
         return copy
       })
+      setRequest(projectId, null, message)
     } finally {
-      setLoading(false)
-      setLoadingStage('idle')
-      setLoadingDetail(null)
+      if (isCurrent()) setRequest(projectId, null)
     }
   }
 

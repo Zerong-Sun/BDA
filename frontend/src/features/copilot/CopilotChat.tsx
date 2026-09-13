@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useCopilotReadOnly } from './commandAccess'
 import { ApiState } from '../../components/ui/ApiState'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -60,15 +61,16 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     bot,
     setBot,
   } = useCopilotChat(projectId, pageContext, language)
+  const readOnly = useCopilotReadOnly()
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
   const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
   const setInput = useCallback((value: string) => setSessionInput(projectId, value), [projectId, setSessionInput])
   const initialSent = useRef(false)
   useEffect(() => {
-    if (!initialQuestion || initialSent.current || projectsLoading || projectsError) return
+    if (!initialQuestion || initialSent.current || readOnly || projectsLoading || projectsError) return
     initialSent.current = true
     void send(initialQuestion)
-  }, [initialQuestion, send, projectsLoading, projectsError])
+  }, [initialQuestion, send, projectsLoading, projectsError, readOnly])
   const copilotDraft = useAppStore((state) => state.copilotDraft)
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -107,7 +109,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
 
   const handleSend = async () => {
     const trimmed = input.trim()
-    if (!trimmed) return
+    if (!trimmed || loading || readOnly) return
     setInput('')
     if (onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
     await send(trimmed)
@@ -123,6 +125,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
   }, [copilotDraft, setCopilotDraft, setInput, projectsLoading, projectsError])
 
   const sendStarter = async (starter: string) => {
+    if (loading || readOnly) return
     setInput('')
     await send(starter)
   }
@@ -147,6 +150,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {readOnly ? <p role="status" className="p-4 text-sm text-text-secondary">{language === 'zh' ? '只读模式：可以查看对话，不能发送新请求。' : 'Read-only mode: you can inspect conversations but cannot send requests.'}</p> : null}
       <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
         {/* Which project this conversation is bound to. Kept, and kept first:
             the drawer stays open while the reader navigates, and every answer
@@ -197,7 +201,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           size="icon-sm"
           aria-label={t.copilot.chat.resetAriaLabel}
           title={t.copilot.chat.resetTitle}
-          disabled={loading}
+          disabled={readOnly || loading}
           onClick={resetMessages}
         >
           <ArrowCounterClockwiseIcon aria-hidden="true" />
@@ -298,7 +302,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                       type="button"
                       variant="outline"
                       className="h-auto justify-start whitespace-normal text-left"
-                      disabled={loading}
+                      disabled={readOnly || loading}
                       onClick={() => void sendStarter(starter)}
                     >
                       {starter}
@@ -316,7 +320,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                     .find((item) => item.role === 'user')
                 : undefined
             const showSaveButton =
-              message.role === 'assistant' &&
+              !readOnly && message.role === 'assistant' &&
               Boolean(message.content) &&
               !loading &&
               projectId &&
@@ -324,7 +328,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                 userMessage?.meta?.reviewIntent ||
                 onResearchPage)
             const showResearchImport =
-              message.role === 'assistant' &&
+              !readOnly && message.role === 'assistant' &&
               !loading &&
               Boolean(activeProject?.organization_id) &&
               looksLikeCopilotResearchResult(message.content)
@@ -462,7 +466,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           placeholder={t.copilot.chat.inputPlaceholder}
           className="flex-1"
           value={input}
-          disabled={loading}
+          disabled={readOnly || loading}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
@@ -475,7 +479,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           variant="outline"
           size="icon"
           aria-label={t.copilot.chat.sendAriaLabel}
-          disabled={loading || !input.trim()}
+          disabled={readOnly || loading || !input.trim()}
           onClick={() => void handleSend()}
         >
           {loading ? (

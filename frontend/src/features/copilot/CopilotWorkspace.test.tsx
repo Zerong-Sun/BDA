@@ -6,6 +6,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { useAppStore } from '../../lib/store/appStore'
 import { CopilotWorkspace } from './CopilotWorkspace'
 import { deliveryState, suggestService } from './taskPresentation'
+import { useIsMutating } from '@tanstack/react-query'
 import type { AgentRun } from '../../lib/api/agentRuns'
 
 vi.mock('../../lib/hooks/useProjectContext', () => ({ useProjectContext: () => ({ projectId: 'project-task', activeProject: null }) }))
@@ -22,10 +23,38 @@ function handlers(eligible: string[] = ['literature']) {
     http.get('/api/v2/copilot/agent-runs/:runId/turns', () => HttpResponse.json({ items: [], next_cursor: null })),
   )
 }
-beforeEach(() => { useAppStore.setState({ language: 'en', copilotDraft: '', copilotTaskDrafts: {}, appMode: 'application' }); handlers() })
+beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ language: 'en', copilotDraft: '', copilotTaskDrafts: {}, appMode: 'application' }); handlers() })
 afterEach(cleanup)
 
 describe('task-centered Copilot', () => {
+  it('does not navigate back when task startup completes after leaving the workspace', async () => {
+    let release!: () => void
+    const responseReady = new Promise<void>((resolve) => { release = resolve })
+    server.use(http.post('/api/v2/copilot/agent-runs', async () => {
+      await responseReady
+      return HttpResponse.json({ run, operation_id: 'op' }, { status: 202 })
+    }))
+    function Pending() { return <span>Pending mutations: {useIsMutating()}</span> }
+    const navigate = vi.fn()
+    const ui = renderWithProviders(<><CopilotWorkspace initialGoal="Review sources" initialService="literature" onRunChange={navigate} /><Pending /></>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start this plan' }))
+    await screen.findByText('Pending mutations: 1')
+    ui.rerender(<Pending />)
+    release()
+    await screen.findByText('Pending mutations: 0')
+    expect(navigate).not.toHaveBeenCalled()
+  })
+  it.each(['viewer', 'demo'])('blocks task execution and delivery writes in %s mode', async (mode) => {
+    if (mode === 'viewer') sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    else useAppStore.setState({ appMode: 'demo' })
+    server.use(http.get('/api/v2/copilot/projects/:projectId/agent-runs', () => HttpResponse.json({ items: [run] })))
+    renderWithProviders(<CopilotWorkspace initialGoal="Review sources" initialService="literature" />)
+    expect(await screen.findByRole('button', { name: 'Start this plan' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Research PD1/ }))
+    expect(await screen.findByRole('button', { name: 'Continue this task' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save as a plan for review' })).toBeDisabled()
+    expect(screen.getByLabelText('Add information or revise the request')).toBeDisabled()
+  })
   it('retains a reviewed task draft on remount without starting a task', async () => {
     const rendered = renderWithProviders(<CopilotWorkspace rememberDraft />)
     fireEvent.change(screen.getByLabelText('Task goal'), { target: { value: 'Research existing evidence' } })
