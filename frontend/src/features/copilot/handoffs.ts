@@ -11,6 +11,14 @@ import { listHandoffsApiV2CopilotProjectsProjectIdHandoffsGet } from '../../lib/
  * the same reason.
  */
 
+/**
+ * Exported so a turn that records a handover can make the Chain tab show it.
+ *
+ * Without a consumer this was a key nobody could invalidate, which mattered less
+ * than it looks - the query sets no `staleTime`, so opening the tab refetches -
+ * but it meant a Chain tab left open while the conversation continued kept
+ * showing a chain that had moved on.
+ */
 export const copilotHandoffsQueryKey = (projectId: string | null) =>
   ['copilot', 'handoffs', projectId] as const
 

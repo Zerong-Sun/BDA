@@ -63,7 +63,10 @@ function campaign(stages: Record<string, unknown>[]) {
 }
 
 /** Drive the page to a confirmed campaign, which is the only way it holds one. */
-async function withCampaign(stages: Record<string, unknown>[]) {
+async function withCampaign(
+  stages: Record<string, unknown>[],
+  campaignOverrides: Record<string, unknown> = {},
+) {
   useAppStore.setState({ activeProjectId: PROJECT_ID, language: 'en' })
   server.use(
     http.get('/api/v2/projects', () =>
@@ -104,7 +107,10 @@ async function withCampaign(stages: Record<string, unknown>[]) {
       ),
     ),
     http.post('/api/v2/autopilot-drafts/draft_1/confirm', () =>
-      HttpResponse.json(campaign(stages), { status: 201, headers: { ETag: 'W/"1"' } }),
+      HttpResponse.json({ ...campaign(stages), ...campaignOverrides }, {
+        status: 201,
+        headers: { ETag: 'W/"1"' },
+      }),
     ),
   )
 
@@ -209,16 +215,49 @@ describe('Autopilot stages', () => {
     await waitFor(() => expect(seen).toBe('W/"7"'))
   })
 
+  it('stops offering start, cancel and takeover once a campaign has an outcome', async () => {
+    // The server refuses all three on a finished campaign. Before the chain
+    // could reach its own end nothing produced `succeeded`, so two of these had
+    // no reason to be disabled - and were not. Offering them puts a control in
+    // front of somebody whose only possible result is a 409.
+    await withCampaign([stage({ status: 'succeeded' })], { status: 'succeeded' })
+
+    expect(screen.getByRole('button', { name: 'Reserve budget and start' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Idempotent cancel' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Take over' })).toBeDisabled()
+    // Reading the stages back is still allowed; it changes nothing.
+    expect(screen.getByRole('button', { name: 'Refresh stages' })).toBeEnabled()
+  })
+
+  it('still offers them while a campaign is running', async () => {
+    await withCampaign([stage()])
+
+    expect(screen.getByRole('button', { name: 'Idempotent cancel' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Take over' })).toBeEnabled()
+  })
+
   it('names the operator accountable for a stage', async () => {
     await withCampaign([stage({ operator: 'librarian', stage_key: 'research' })])
 
     expect(await screen.findByText('· librarian')).toBeInTheDocument()
   })
 
-  it('says a stage has no operator rather than leaving it blank', async () => {
+  it('shows why a stage has no operator, as text rather than a tooltip', async () => {
     // A stage attributed to nobody with no explanation reads as an oversight
-    // rather than as the decision it is.
+    // rather than as the decision it is - and a `title` is hover-only, invisible
+    // on a touch screen, and unannounced on a bare span. `hold_reason` is inline
+    // in this same row, so two explanations were being treated differently.
     await withCampaign([stage()])
+
+    expect(
+      await screen.findByText(
+        "stage 'review' has no operator: a review stage is a person's judgement",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('falls back to a plain label when the server sent no reason', async () => {
+    await withCampaign([stage({ operator_reason: null })])
 
     expect(await screen.findByText('· no operator')).toBeInTheDocument()
   })

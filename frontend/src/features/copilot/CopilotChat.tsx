@@ -126,6 +126,11 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
   const activeBotSpec = bot ? (bots.find((entry) => entry.id === bot) ?? null) : null
   const reviewers = activeBotSpec ? reviewersOf(activeBotSpec, bots) : []
   const successors = activeBotSpec ? successorsOf(activeBotSpec, bots) : []
+  const byId = new Map(bots.map((entry) => [entry.id, entry]))
+  const directs = (activeBotSpec?.directs ?? []).flatMap((id) => {
+    const target = byId.get(id)
+    return target ? [target] : []
+  })
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -198,6 +203,26 @@ export function CopilotChat({ pageContext }: { pageContext?: string }) {
             <p className="mt-1 text-[11px] text-muted-foreground">
               {t.copilot.chat.reviewedBy}{' '}
               {reviewers.map((entry) => (language === 'zh' ? entry.title_zh : entry.title)).join('、')}
+            </p>
+          ) : null}
+          {directs.length > 0 ? (
+            // A director's declared reach. Served on every roster response and
+            // displayed nowhere until now, which left the one operator whose
+            // whole job is choosing another unable to show which ones.
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+              {t.copilot.chat.directs}
+              {directs.map((entry) => (
+                <Button
+                  key={entry.id}
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-[11px]"
+                  onClick={() => setBot(entry.id)}
+                >
+                  {language === 'zh' ? entry.title_zh : entry.title}
+                </Button>
+              ))}
             </p>
           ) : null}
           {successors.length > 0 ? (

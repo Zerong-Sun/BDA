@@ -87,6 +87,35 @@ export function AutopilotPage() {
       completeAutopilotStage(campaign!.id, stage.id, stage.version),
     onSuccess: () => refreshMutation.mutate(),
   })
+  // A campaign that has reached an outcome has nothing left to start, cancel or
+  // take over, and the server refuses all three. Offering them anyway would put
+  // a control in front of somebody whose only possible result is a 409 - and
+  // before the chain could reach its own end, two of these had no reason to be
+  // disabled at all, which is why they were not.
+  const settled =
+    campaign !== null &&
+    ['succeeded', 'failed', 'cancelled', 'manual_takeover'].includes(campaign.status)
+  /**
+   * The same control in two branches; the difference between them is upstream.
+   *
+   * A function returning JSX, not a component declared in this body. A component
+   * defined during render is a new type on every render, so React unmounts and
+   * remounts it each time - the button loses focus mid-interaction, which is a
+   * real regression and one the lint gate does not catch.
+   */
+  const completeStageButton = (stage: { id: string; version: number; status: string }) =>
+    stage.status === 'ready' ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={completeMutation.isPending}
+        onClick={() => completeMutation.mutate(stage)}
+      >
+        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
+      </Button>
+    ) : null
+
   const error =
     draftMutation.error ??
     confirmMutation.error ??
@@ -144,14 +173,14 @@ export function AutopilotPage() {
       {campaign ? (
         <AppFrame className="mt-5" heading={language === 'zh' ? '3. 启动与取消' : '3. Start and cancel'} panelClassName="flex flex-wrap items-center gap-3 p-5">
           <span className="text-sm">{campaign.name} · {campaign.status}</span>
-          <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>{language === 'zh' ? '预留预算并启动' : 'Reserve budget and start'}</Button>
-          <Button type="button" variant="outline" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>{language === 'zh' ? '幂等取消' : 'Idempotent cancel'}</Button>
+          <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending || settled}>{language === 'zh' ? '预留预算并启动' : 'Reserve budget and start'}</Button>
+          <Button type="button" variant="outline" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending || settled}>{language === 'zh' ? '幂等取消' : 'Idempotent cancel'}</Button>
           <Button type="button" variant="outline" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>{language === 'zh' ? '刷新阶段' : 'Refresh stages'}</Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => takeoverMutation.mutate()}
-            disabled={takeoverMutation.isPending || campaign.status === 'manual_takeover' || campaign.status === 'cancelled'}
+            disabled={takeoverMutation.isPending || settled}
           >
             {language === 'zh' ? '人工接管' : 'Take over'}
           </Button>
@@ -188,17 +217,23 @@ export function AutopilotPage() {
                 {/* Who is accountable for this step, and — where nobody is — why not.
                     A stage attributed to no one with no explanation reads as an
                     oversight rather than as the decision it is, which is the same
-                    reason `hold_reason` travels with a hold. */}
-                <span
-                  className="text-xs text-muted-foreground"
-                  title={stage.operator_reason ?? undefined}
-                >
-                  {stage.operator
-                    ? `· ${stage.operator}`
-                    : language === 'zh'
-                      ? '· 无负责 bot'
-                      : '· no operator'}
-                </span>
+                    reason `hold_reason` travels with a hold.
+
+                    The absent case shows its reason as text rather than a `title`.
+                    A tooltip is hover-only, invisible on a touch screen, and not
+                    announced on a bare span — the exact objection that moved the
+                    operator summary out of a `title` in the Copilot picker, made
+                    again one file over. `hold_reason` sits inline in this same row,
+                    so two explanations on one line were being treated differently
+                    for no reason. */}
+                {stage.operator ? (
+                  <span className="text-xs text-muted-foreground">· {stage.operator}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {stage.operator_reason ??
+                      (language === 'zh' ? '· 无负责 bot' : '· no operator')}
+                  </span>
+                )}
                 {stage.held ? (
                   <>
                     {/* The reason travels with the hold: a stop nobody can explain reads
@@ -224,17 +259,7 @@ export function AutopilotPage() {
                         who can say the step is over. Without this the chain
                         reached a compute stage and stopped there, which is the
                         same dead end `review` had one stage earlier. */}
-                    {stage.status === 'ready' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={completeMutation.isPending}
-                        onClick={() => completeMutation.mutate(stage)}
-                      >
-                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
-                      </Button>
-                    ) : null}
+                    {completeStageButton(stage)}
                   </>
                 ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
                   // An agent run has no page of its own; naming it is still better than
@@ -253,17 +278,7 @@ export function AutopilotPage() {
                         reached a human step and stopped there with no action
                         available anywhere, which the default campaign - ending
                         in `review` - did every time. */}
-                    {stage.status === 'ready' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={completeMutation.isPending}
-                        onClick={() => completeMutation.mutate(stage)}
-                      >
-                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
-                      </Button>
-                    ) : null}
+                    {completeStageButton(stage)}
                   </>
                 )}
               </li>

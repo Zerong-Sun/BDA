@@ -1,9 +1,11 @@
 import { getTranslations } from '../../lib/i18n'
 import { matchBot, useCopilotBots } from './bots/registry'
+import { copilotHandoffsQueryKey } from './handoffs'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 const MAX_COPILOT_HISTORY = 20
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
@@ -25,6 +27,7 @@ function explainCopilotError(err: unknown): string {
 }
 
 export function useCopilotChat(projectId?: string, pageContext?: string, language: 'en' | 'zh' = 'en') {
+  const queryClient = useQueryClient()
   const session = useAppStore((state) => projectId ? state.copilotSessions[projectId] : undefined)
   const legacyMessages = useAppStore((state) => state.copilotMessages)
   const messages = session?.messages ?? legacyMessages
@@ -161,6 +164,13 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
           }
           return copy
         })
+        // A turn that recorded a handover changed the chain, and a Chain tab
+        // left open beside the conversation would go on showing the one before
+        // it. Keyed on the tool actually called rather than invalidated every
+        // turn, because most turns do not touch the record.
+        if ((message.tool_calls ?? []).some((call) => call?.name === 'post_handoff')) {
+          void queryClient.invalidateQueries({ queryKey: copilotHandoffsQueryKey(projectId ?? null) })
+        }
       })
       if (projectId) setConversationId(projectId, accepted.conversationId)
       setSelectedEntityIds([])

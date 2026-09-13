@@ -320,6 +320,77 @@ describe('CopilotChat', () => {
     expect(payload?.skill).toBeUndefined()
     expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
   })
+  it('shows the selected operator its charter, its reviewers and its reach', async () => {
+    // All of this was on every roster response and none of it reached the
+    // screen, which made selecting an operator a gesture rather than a decision.
+    // `directs` was the last of them: the one operator whose whole job is
+    // choosing another could not show which ones.
+    server.use(
+      http.get('/api/v2/copilot/bots', () =>
+        HttpResponse.json([
+          {
+            id: 'conductor',
+            title: 'Conductor',
+            title_zh: '总调度',
+            phase: -1,
+            stance: 'direct',
+            summary: 'Decide which operator works next.',
+            charter: 'You route work; you do not do it.',
+            capabilities: ['project-read'],
+            handoff: ['auditor'],
+            reviews: [],
+            directs: ['planner'],
+            reviewed_by: [],
+            triggers: ['delegate'],
+          },
+          {
+            id: 'planner',
+            title: 'Planner',
+            title_zh: '路线规划',
+            phase: 4,
+            stance: 'produce',
+            summary: 'Choose the route.',
+            charter: 'Draft only.',
+            capabilities: ['project-read'],
+            handoff: [],
+            reviews: [],
+            directs: [],
+            reviewed_by: ['auditor'],
+            triggers: ['route'],
+          },
+          {
+            id: 'auditor',
+            title: 'Auditor',
+            title_zh: '复核',
+            phase: 9,
+            stance: 'review',
+            summary: 'Judge claims.',
+            charter: 'You judge claims; you never repair them.',
+            capabilities: ['project-read'],
+            handoff: [],
+            reviews: ['planner'],
+            directs: [],
+            reviewed_by: [],
+            triggers: ['verdict'],
+          },
+        ]),
+      ),
+    )
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Copilot bot' }))
+    const conductor = await screen.findByRole('option', { name: 'Conductor' })
+    fireEvent.pointerDown(conductor, { button: 0 })
+    fireEvent.pointerUp(conductor, { button: 0 })
+    fireEvent.click(conductor)
+
+    expect(await screen.findByText('You route work; you do not do it.')).toBeInTheDocument()
+    expect(screen.getByText('May delegate to')).toBeInTheDocument()
+    // ...and the named operator is a control, not prose: selecting it is the
+    // action a reader wants next.
+    expect(screen.getByRole('button', { name: 'Planner' })).toBeInTheDocument()
+  })
+
   it('keeps the selected bot when the drawer is closed and reopened', async () => {
     // Component state sent the operator back to Auto every time the drawer
     // unmounted, with nothing on screen saying it had changed. conversationId

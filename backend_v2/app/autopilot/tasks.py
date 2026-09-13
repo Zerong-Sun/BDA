@@ -28,9 +28,14 @@ def _worker_principal(session) -> AutopilotServicePrincipal:
     """The principal a worker-written ledger row is signed by.
 
     Resolved through the service's own lookup so the two cannot create two rows
-    named "autopilot-worker" and sign different entries with different ids.
+    named "autopilot-worker" and sign different entries with different ids. The
+    identity map answers the second read without a round trip, so this stays one
+    query in practice; going through the id keeps the creation in one place,
+    which is the part that matters.
     """
-    return session.get(AutopilotServicePrincipal, _worker_principal_id(session))
+    principal = session.get(AutopilotServicePrincipal, _worker_principal_id(session))
+    assert principal is not None  # just written or just read by the lookup above
+    return principal
 
 
 def _ledger_exists(session, campaign_id: uuid.UUID, event_type: str, operation_id: str) -> bool:
@@ -306,10 +311,18 @@ def stage_settled(self, run_id: str) -> dict:
             .with_for_update()
         )
         if campaign is None:
+            # Only reachable as a race: `campaign_id` cascades, so a stage cannot
+            # outlive its campaign, but the stage and the campaign are read in two
+            # statements and a delete can land between them. Returns rather than
+            # raises because a raise here is a Celery retry, and retrying a lookup
+            # that will never succeed is a task that runs for ever.
             return {"run_id": run_id, "status": "missing_campaign"}
 
         run = session.get(CopilotAgentRun, parsed)
         if run is None:
+            # Reachable without a race: `resource_id` is a bare column with no
+            # foreign key, because a stage points at whichever domain its adapter
+            # used. Same reason for returning rather than raising.
             return {"run_id": run_id, "status": "missing_run"}
         # The stage ends the way its product ended. A cancelled run is not a
         # failed step - somebody stopped it - and calling it failed would put a
