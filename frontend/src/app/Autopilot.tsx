@@ -95,6 +95,20 @@ export function AutopilotPage() {
   const settled =
     campaign !== null &&
     ['succeeded', 'failed', 'cancelled', 'manual_takeover'].includes(campaign.status)
+  /** The same control in two branches; the difference between them is upstream. */
+  const CompleteStageButton = ({ stage }: { stage: { id: string; version: number; status: string } }) =>
+    stage.status === 'ready' ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={completeMutation.isPending}
+        onClick={() => completeMutation.mutate(stage)}
+      >
+        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
+      </Button>
+    ) : null
+
   const error =
     draftMutation.error ??
     confirmMutation.error ??
@@ -196,17 +210,23 @@ export function AutopilotPage() {
                 {/* Who is accountable for this step, and — where nobody is — why not.
                     A stage attributed to no one with no explanation reads as an
                     oversight rather than as the decision it is, which is the same
-                    reason `hold_reason` travels with a hold. */}
-                <span
-                  className="text-xs text-muted-foreground"
-                  title={stage.operator_reason ?? undefined}
-                >
-                  {stage.operator
-                    ? `· ${stage.operator}`
-                    : language === 'zh'
-                      ? '· 无负责 bot'
-                      : '· no operator'}
-                </span>
+                    reason `hold_reason` travels with a hold.
+
+                    The absent case shows its reason as text rather than a `title`.
+                    A tooltip is hover-only, invisible on a touch screen, and not
+                    announced on a bare span — the exact objection that moved the
+                    operator summary out of a `title` in the Copilot picker, made
+                    again one file over. `hold_reason` sits inline in this same row,
+                    so two explanations on one line were being treated differently
+                    for no reason. */}
+                {stage.operator ? (
+                  <span className="text-xs text-muted-foreground">· {stage.operator}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {stage.operator_reason ??
+                      (language === 'zh' ? '· 无负责 bot' : '· no operator')}
+                  </span>
+                )}
                 {stage.held ? (
                   <>
                     {/* The reason travels with the hold: a stop nobody can explain reads
@@ -232,17 +252,7 @@ export function AutopilotPage() {
                         who can say the step is over. Without this the chain
                         reached a compute stage and stopped there, which is the
                         same dead end `review` had one stage earlier. */}
-                    {stage.status === 'ready' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={completeMutation.isPending}
-                        onClick={() => completeMutation.mutate(stage)}
-                      >
-                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
-                      </Button>
-                    ) : null}
+                    <CompleteStageButton stage={stage} />
                   </>
                 ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
                   // An agent run has no page of its own; naming it is still better than
@@ -261,17 +271,7 @@ export function AutopilotPage() {
                         reached a human step and stopped there with no action
                         available anywhere, which the default campaign - ending
                         in `review` - did every time. */}
-                    {stage.status === 'ready' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={completeMutation.isPending}
-                        onClick={() => completeMutation.mutate(stage)}
-                      >
-                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
-                      </Button>
-                    ) : null}
+                    <CompleteStageButton stage={stage} />
                   </>
                 )}
               </li>

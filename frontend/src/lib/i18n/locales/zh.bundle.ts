@@ -234,6 +234,7 @@ export const bundleZh = {
       citationExternal: '外部',
       citationSourceFallback: '来源 {index}',
       reviewedBy: '复核者：',
+      directs: '可委派给：',
       handsTo: '交给：',
       botLabel: 'Copilot 机器人',
       botAuto: '自动',

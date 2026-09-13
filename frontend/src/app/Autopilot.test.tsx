@@ -242,10 +242,22 @@ describe('Autopilot stages', () => {
     expect(await screen.findByText('· librarian')).toBeInTheDocument()
   })
 
-  it('says a stage has no operator rather than leaving it blank', async () => {
+  it('shows why a stage has no operator, as text rather than a tooltip', async () => {
     // A stage attributed to nobody with no explanation reads as an oversight
-    // rather than as the decision it is.
+    // rather than as the decision it is - and a `title` is hover-only, invisible
+    // on a touch screen, and unannounced on a bare span. `hold_reason` is inline
+    // in this same row, so two explanations were being treated differently.
     await withCampaign([stage()])
+
+    expect(
+      await screen.findByText(
+        "stage 'review' has no operator: a review stage is a person's judgement",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('falls back to a plain label when the server sent no reason', async () => {
+    await withCampaign([stage({ operator_reason: null })])
 
     expect(await screen.findByText('· no operator')).toBeInTheDocument()
   })

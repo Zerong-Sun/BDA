@@ -240,6 +240,7 @@ export const bundleEn = {
       citationExternal: 'External',
       citationSourceFallback: 'Source {index}',
       reviewedBy: 'Reviewed by',
+      directs: 'May delegate to',
       handsTo: 'Hands to',
       botLabel: 'Copilot bot',
       botAuto: 'Auto',
