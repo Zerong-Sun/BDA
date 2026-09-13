@@ -758,3 +758,41 @@ def test_completing_a_step_whose_successor_is_held_stops_at_the_gate(
     ).one()
     assert entry.payload["held"] is True
     assert entry.writer_user_id == user.id
+
+
+def test_a_workflow_draft_stage_is_finished_by_the_person_who_finished_it(
+    session: Session,
+) -> None:
+    """The dead end one stage past `review`.
+
+    `complete_stage` first refused every stage with a product. Only an agent run
+    ends its own stage; a `workflow_run` is a *draft* the adapter hands to a
+    person to open and finish, so nothing was ever going to settle it and the
+    chain stopped at the first `compute` stage with no action available.
+    """
+    from backend_v2.app.autopilot.service import complete_stage
+
+    campaign, _, user = _campaign(session, stage_keys=["compute", "report"])
+    compute, report = _stages(session, campaign)
+    compute.resource_type, compute.resource_id = "workflow_run", uuid.uuid4()
+    compute.status = "ready"
+    session.flush()
+
+    complete_stage(session, campaign, compute, compute.version, user)
+
+    assert compute.status == "succeeded"
+    assert report.status == "ready"
+
+
+def test_a_stage_carrying_an_agent_run_is_still_refused(session: Session) -> None:
+    """The narrowing is to `SELF_SETTLING_RESOURCE_TYPES`, not a removal."""
+    from backend_v2.app.autopilot.service import complete_stage
+
+    campaign, _, user = _campaign(session)
+    stage = _stages(session, campaign)[0]
+    adapters.ensure_stage_resource(session, campaign, stage)
+    stage.status = "ready"
+    session.flush()
+
+    with pytest.raises(DomainError, match="which settles it"):
+        complete_stage(session, campaign, stage, stage.version, user)

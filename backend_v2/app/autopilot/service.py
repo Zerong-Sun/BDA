@@ -608,6 +608,16 @@ UNSTARTED_STAGE_STATUSES = ("pending", "awaiting_release")
 #: `advance_campaign` steps over them looking for the next thing to do.
 SETTLED_STAGE_STATUSES = ("succeeded", "failed", "cancelled")
 
+#: Stage products that end their own stage, so a person must not also end it.
+#:
+#: Only the agent run does. A `workflow_run` is the opposite case and the
+#: distinction matters: its adapter deliberately creates a *draft* for somebody
+#: to open in the Workflow page and finish, so it is a product handed over rather
+#: than a product that reports back. Refusing completion for every product - the
+#: first version of this rule - left a `compute` stage with no way to end at all,
+#: which is the same dead end `review` had one stage earlier.
+SELF_SETTLING_RESOURCE_TYPES = frozenset({"copilot_agent_run"})
+
 
 def settle_stage(
     session: Session,
@@ -676,10 +686,12 @@ def complete_stage(
     there with no action available anywhere. The default campaign ends with
     `review`, so that was every default campaign.
 
-    Refused for a stage that has a product of its own. A run or a workflow settles
-    its own stage, and a second answer to "how did this step end" is worse than a
-    missing one - it would let a person mark a step complete while its operator is
-    still writing.
+    Refused only for a product that ends its own stage - an agent run. A
+    `workflow_run` is the opposite: its adapter creates a *draft* for somebody to
+    open in the Workflow page and finish, so the person who finished it is the
+    one who can say the step is over. Refusing every product, which is what this
+    rule said first, left a `compute` stage unfinishable and reproduced the dead
+    end `review` had one stage earlier.
     """
     if stage.version != expected_version:
         raise DomainError("version_conflict", "Autopilot stage changed", status_code=412)
@@ -693,7 +705,7 @@ def complete_stage(
             f"A {campaign.status} campaign has no stage to complete",
             status_code=409,
         )
-    if stage.resource_type is not None:
+    if stage.resource_type in SELF_SETTLING_RESOURCE_TYPES:
         raise DomainError(
             "autopilot_stage_has_a_product",
             f"Stage {stage.stage_key!r} produced a {stage.resource_type}, which settles it",

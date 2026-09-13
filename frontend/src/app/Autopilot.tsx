@@ -215,9 +215,27 @@ export function AutopilotPage() {
                     </Button>
                   </>
                 ) : stage.resource_type === 'workflow_run' && stage.resource_id ? (
-                  <Link className="text-xs underline" to={`/workflow?run=${stage.resource_id}`}>
-                    {language === 'zh' ? '在 Workflow 页打开' : 'Open in Workflow'}
-                  </Link>
+                  <>
+                    <Link className="text-xs underline" to={`/workflow?run=${stage.resource_id}`}>
+                      {language === 'zh' ? '在 Workflow 页打开' : 'Open in Workflow'}
+                    </Link>
+                    {/* A workflow run is a draft handed over, not a product that
+                        reports back - so the person who finished it is the one
+                        who can say the step is over. Without this the chain
+                        reached a compute stage and stopped there, which is the
+                        same dead end `review` had one stage earlier. */}
+                    {stage.status === 'ready' ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={completeMutation.isPending}
+                        onClick={() => completeMutation.mutate(stage)}
+                      >
+                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
+                      </Button>
+                    ) : null}
+                  </>
                 ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
                   // An agent run has no page of its own; naming it is still better than
                   // "no automatic product", which would be false.

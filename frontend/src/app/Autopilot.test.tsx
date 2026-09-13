@@ -145,13 +145,33 @@ describe('Autopilot stages', () => {
   })
 
   it('does not offer it for a stage whose product settles it', async () => {
-    // A run or a workflow ends its own stage. A second answer to "how did this
-    // end" would let somebody mark it done while its operator is still writing.
+    // An agent run ends its own stage. A second answer to "how did this end"
+    // would let somebody mark it done while its operator is still writing.
     await withCampaign([
       stage({ resource_type: 'copilot_agent_run', resource_id: 'run_1', operator: 'librarian' }),
     ])
 
     expect(screen.queryByRole('button', { name: 'Mark this stage done' })).not.toBeInTheDocument()
+  })
+
+  it('offers it for a workflow draft, which is handed over rather than reporting back', async () => {
+    // The adapter creates a draft for somebody to open in the Workflow page and
+    // finish, so the person who finished it is the one who can say the step is
+    // over. Refusing every product left a compute stage unfinishable - the same
+    // dead end `review` had one stage earlier.
+    await withCampaign([
+      stage({
+        stage_key: 'compute',
+        resource_type: 'workflow_run',
+        resource_id: 'wf_1',
+        operator: 'planner',
+      }),
+    ])
+
+    expect(await screen.findByRole('link', { name: 'Open in Workflow' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', { name: 'Mark this stage done' }),
+    ).toBeInTheDocument()
   })
 
   it('offers release rather than completion for a held stage', async () => {

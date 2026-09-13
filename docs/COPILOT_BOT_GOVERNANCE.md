@@ -313,8 +313,11 @@ that is not held, so a chain arriving at one stopped with no action available
 anywhere. The default campaign ends with `review`, so that was every default
 campaign. `POST …/stages/{id}/complete` is the missing verb, and it is
 deliberately not `release`: a release answers *may this act*, completion answers
-*is this done*, and a stage with a product of its own is settled by the product
-and refuses both. A campaign whose stages have all settled now reports
+*is this done*. Completion is refused only for a product that ends its own stage
+— today just the agent run. The first version refused every product and so
+reproduced the same dead end one stage later: a `workflow_run` is a draft the
+adapter hands to a person to open and finish, nothing was ever going to settle
+it, and the chain stopped at the first `compute` stage with nothing to click. A campaign whose stages have all settled now reports
 `succeeded` or `failed` too — `running` on a finished campaign is a status that
 means nothing.
 
@@ -364,3 +367,4 @@ nothing.
 | 23 | Taking over stops the stage's operator and does not thereby advance the campaign | `test_autopilot_lifecycle.py` |
 | 24 | A human step can be completed by a person, signed by them; a stage with a product of its own refuses it | `test_autopilot_lifecycle.py` |
 | 25 | A campaign whose every stage has settled reports `succeeded`, or `failed` if any stage failed | `test_autopilot_lifecycle.py` |
+| 26 | A workflow-draft stage is finished by the person who finished the draft; a stage carrying an agent run is still refused | `test_autopilot_lifecycle.py`, `Autopilot.test.tsx` |

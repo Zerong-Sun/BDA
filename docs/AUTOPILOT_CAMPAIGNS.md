@@ -97,7 +97,8 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 - 被 `gates.py` 判为需要放行的阶段不会有 operator，也不会开 run——`service.activate_stage` 在 adapter 之前就返回了。
 - 取消 campaign 会一并取消该阶段的 agent run，并把阶段标记为 `cancelled`。agent run 是唯一一种取消后仍会继续花钱的 stage 产物（workflow run 是不花钱的草稿，而且人可能还要用），所以两者在取消路径上的处理是不同的，不是遗漏。
 - **人工接管同样会停掉 stage 的 agent run**，但不动 job。接管交出的是对产物的权限，而一个还在跑的 compute job 是别人已经付过的 GPU 小时；agent run 不是「摆在那里的结果」，它是一个仍在思考、仍会通过自己工具写入的 operator——留着它就是接管本身要防的那个竞态，只是降了一层。
-- `release` 和 `complete` 是两个不同的问题：release 问「这一步**可以动吗**」，只有被 gate 拦住的阶段有这个问题；complete 问「这一步**做完了吗**」，只有做人工活的阶段有。有自动产物的阶段由产物结算，`complete` 会拒绝——否则就是对「这一步怎么结束的」给出第二个答案，并且允许人在 operator 还在写的时候把它标记完成。
+- `release` 和 `complete` 是两个不同的问题：release 问「这一步**可以动吗**」，只有被 gate 拦住的阶段有这个问题；complete 问「这一步**做完了吗**」。
+- `complete` 只拒绝**自己会结算自己**的产物（`SELF_SETTLING_RESOURCE_TYPES`，目前只有 `copilot_agent_run`）——否则就是对「这一步怎么结束的」给出第二个答案，并且允许人在 operator 还在写的时候把它标记完成。`workflow_run` 恰好相反：adapter 造的是一份**交给人去 Workflow 页完成的草稿**，没有任何东西会替它结算，所以把它一并拒绝会让 `compute` 阶段无法结束——那正是 `review` 在前一个阶段上的同一个死路。
 - 推进有三道拒绝：**已取消**的 campaign 无处可推；**已接管**的 campaign 属于人，worker 再推就是上面那个竞态；**被 gate 拦住**的阶段停在闸门前等签字——这不是推进失败，是推进走到了闸门。另外**同时只跑一个阶段**：已有阶段处于 `ready` 时不再推进，否则重投递会跳过中间那一阶段去启动再下一个。
 - 监督式 campaign 未声明预算时不得确认，`plan_only` 不得启动计算。
 - worker 必须在 operation 的项目上下文中运行，不能使用无项目边界的应用账号。
