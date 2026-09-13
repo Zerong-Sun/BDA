@@ -46,7 +46,7 @@ def pg_env():
     try:
         Base.metadata.create_all(engine)
         # Exercise the actual migration from the preceding table shape.
-        migration = importlib.import_module("backend_v2.alembic.versions.0056_workflow_gates")
+        migration = importlib.import_module("backend_v2.alembic.versions.0059_workflow_gates")
         with engine.begin() as connection:
             connection.exec_driver_sql("DROP TABLE workflow_gate_evaluations, workflow_results")
             connection.exec_driver_sql("ALTER TABLE workflow_nodes DROP COLUMN configuration")

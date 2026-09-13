@@ -18,7 +18,7 @@ export function ConnectionPicker({
   plugins: ModelPlugin[]
   source?: string
   target?: string
-  onConnect: (source: string, target: string, from: string, to: string) => Promise<void>
+  onConnect: (source: string, target: string, from: string | null, to: string | null) => Promise<void>
   onClose: () => void
 }) {
   const { language } = useI18n()
@@ -39,7 +39,18 @@ export function ConnectionPicker({
         .map((b) => [a.name, b.name]),
     )
   }, [src, dst, plugins, nodes])
-  const chosen = pairs.length === 1 ? pairs[0] : pairs.find((p) => JSON.stringify(p) === pair)
+  // `ORDERING` is a valid answer, not a fallback for failure: two stages can legitimately
+  // need to run in order while sharing no data. Without it, a pair of plugins with no
+  // compatible port could not be connected at all - the dialog said "no compatible ports"
+  // and left the Connect button disabled with nothing else to choose.
+  const ORDERING = '__ordering__'
+  const ordering = pair === ORDERING
+  const chosen = ordering
+    ? null
+    : pairs.length === 1
+      ? pairs[0]
+      : pairs.find((p) => JSON.stringify(p) === pair)
+  const canConnect = Boolean(src && dst && (chosen || ordering))
   return (
     <Dialog
       open
@@ -96,31 +107,30 @@ export function ConnectionPicker({
               ))}
           </WorkflowSelect>
         </label>
-        {pairs.length === 1 ? (
-          <p className="text-xs">{pairs[0].join(' → ')}</p>
-        ) : (
-          <WorkflowSelect
-            aria-label={zh ? '兼容端口' : 'Ports'}
-            disabled={busy}
-            className="w-full bg-surface-2 p-2"
-            value={pair}
-            onChange={(e) => setPair(e.target.value)}
-          >
-            <WorkflowOption value="">
-              {zh ? '选择兼容端口' : 'Select compatible ports'}
+        <WorkflowSelect
+          aria-label={zh ? '连接方式' : 'Connection'}
+          disabled={busy}
+          className="w-full bg-surface-2 p-2"
+          value={pair || (pairs.length === 1 ? JSON.stringify(pairs[0]) : '')}
+          onChange={(e) => setPair(e.target.value)}
+        >
+          <WorkflowOption value="">
+            {zh ? '选择兼容端口' : 'Select compatible ports'}
+          </WorkflowOption>
+          {pairs.map((p) => (
+            <WorkflowOption key={JSON.stringify(p)} value={JSON.stringify(p)}>
+              {p.join(' → ')}
             </WorkflowOption>
-            {pairs.map((p) => (
-              <WorkflowOption key={JSON.stringify(p)} value={JSON.stringify(p)}>
-                {p.join(' → ')}
-              </WorkflowOption>
-            ))}
-          </WorkflowSelect>
-        )}
+          ))}
+          <WorkflowOption value={ORDERING}>
+            {zh ? '仅次序：等待上一步完成，不传数据' : 'Ordering only: wait for the previous step, pass no data'}
+          </WorkflowOption>
+        </WorkflowSelect>
         {src && dst && pairs.length === 0 && (
-          <p role="alert">
+          <p role="alert" className="text-xs text-text-secondary">
             {zh
-              ? '没有兼容端口，请检查插件的输入输出声明。'
-              : 'No compatible ports. Check the plugin declarations.'}
+              ? '两个节点没有兼容的数据端口。可以只建立次序关系，或检查插件的输入输出声明。'
+              : 'These two nodes share no compatible data port. Connect them for ordering only, or check the plugin declarations.'}
           </p>
         )}
         {error && (
@@ -131,13 +141,13 @@ export function ConnectionPicker({
         <div className="flex gap-2">
           <Button
             type="button"
-            disabled={!chosen || busy}
+            disabled={!canConnect || busy}
             onClick={async () => {
-              if (!chosen) return
+              if (!canConnect) return
               setError('')
               setBusy(true)
               try {
-                await onConnect(src, dst, chosen[0], chosen[1])
+                await onConnect(src, dst, chosen?.[0] ?? null, chosen?.[1] ?? null)
                 onClose()
               } catch (e) {
                 setError(e instanceof Error ? e.message : String(e))

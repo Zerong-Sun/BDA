@@ -21,8 +21,14 @@ frontend/.npm-cache
 
 # Local data, secrets, and artifacts (never bake into images)
 .env
+secrets
 .env.*
 !.env.example
+**/secrets.env
+**/scheduler.env
+**/interpolation.env
+**/*.dump
+private/maintenance/insr-scheduler-20260908/evidence/*.gz
 backend/db/*.sqlite3*
 artifacts/uploads
 artifacts/structures

@@ -13,11 +13,13 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.exceptions import _Error as _JsonSchemaError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..compute.binding import binding_blockers, edge_port_blockers
 from ..core.config import get_settings
 from ..registry.models import ModelPlugin
+from ..registry.ports import parse_output_ports
 from ..registry.runtime_validation import runtime_validation_is_current
 from .models import WorkflowRun
 from .repository import WorkflowRepository
@@ -345,6 +347,8 @@ def evaluate_preflight(
                 "message": "Configure the cluster SSH host and remote working directory before submitting",
             }
         )
+    warnings.extend(unroutable_output_warnings(workflow, plugins))
+    warnings.extend(queue_capability_warnings(session, nodes, plugins))
 
     return (
         blockers,
@@ -365,6 +369,107 @@ def evaluate_preflight(
             "dispatch_node_count": len(nodes) - len(manual_nodes),
         },
     )
+
+
+
+def unroutable_output_warnings(workflow: WorkflowRun, plugins: dict[str, Any]) -> list[dict]:
+    """Connections whose source port can never be attached to a collected file.
+
+    Collection tags an output with a port in one of two ways: the file sits under
+    ``outputs/<port>/``, or its name matches the port's ``filename_glob``. A glob of
+    ``*`` is deliberately not matched - it would claim every file for whichever port
+    happened to be declared first - so a port left at the default can only ever be
+    filled by the directory route.
+
+    When neither applies the artifact is stored untyped, the gate finds no records on
+    that port and settles as ``error``, and the downstream node waits forever. That is
+    the state a real run reached on 2026-09-11: ProteinMPNN succeeded on the cluster,
+    three outputs were collected and verified, and the gate could not see any of them.
+    """
+    findings: dict[str, dict] = {}
+    for edge in workflow.graph.get("edges", []):
+        if (edge.get("gate") or {}).get("mode") == "dependency":
+            continue
+        source_key, port_name = edge.get("source"), edge.get("source_port")
+        plugin = plugins.get(str(source_key))
+        if not port_name or plugin is None:
+            continue
+        port = next(
+            (item for item in parse_output_ports(plugin.output_ports) if item.name == port_name), None
+        )
+        if port is None or port.filename_glob not in {"", "*"}:
+            continue
+        findings[f"{plugin.plugin_key}:{port_name}"] = {
+            "code": "output_port_unroutable",
+            "message": (
+                f"Plugin '{plugin.plugin_key}' declares output port '{port_name}' with no filename "
+                f"pattern, so a collected file can only be attached to it by being written to "
+                f"outputs/{port_name}/. If the model writes elsewhere the gate on this connection "
+                f"will find no results and stop with an error."
+            ),
+            "plugin_key": plugin.plugin_key,
+            "plugin_id": str(plugin.id),
+            "port": str(port_name),
+        }
+    return [findings[key] for key in sorted(findings)]
+
+
+def queue_capability_warnings(session: Session, nodes: list, plugins: dict[str, Any]) -> list[dict]:
+    """A node whose queue contradicts what its plugin says it needs.
+
+    The platform cannot tell a GPU queue from a CPU one by its name - ``63``, ``v3-64``
+    and ``4v100-16-e5`` are all just strings. It can tell when the deployment has said
+    so: a ``compute_nodes`` row names a queue and labels its ``gpu_count``. Nothing is
+    reported for a queue nobody registered, so this is silent until it can be right.
+
+    Both directions matter and both have been paid for here. A GPU plugin on a queue with
+    no GPUs pends or dies. A CPU-only stage on a GPU queue holds an exclusive card it
+    never uses, which this project treats as a violation rather than a notice - and the
+    queue can merge that request in on its own, so an absent ``-gpu`` line is no defence.
+    """
+    from ..registry.models import ComputeNode
+
+    registered = session.scalars(select(ComputeNode).where(ComputeNode.enabled.is_(True))).all()
+    by_queue = {node.queue: node for node in registered if node.queue}
+    if not by_queue:
+        return []
+    findings: list[dict] = []
+    for node in nodes:
+        if getattr(node, "execution_mode", "dispatch") == "manual" or not node.queue:
+            continue
+        plugin = plugins.get(node.node_key)
+        target = by_queue.get(node.queue)
+        if plugin is None or target is None:
+            continue
+        labels = target.labels if isinstance(target.labels, dict) else {}
+        available = labels.get("gpu_count")
+        if not isinstance(available, int):
+            continue
+        resources = plugin.resources if isinstance(plugin.resources, dict) else {}
+        wanted = int(resources.get("gpu_count") or 1) if resources.get("gpu") else 0
+        if wanted and not available:
+            message = (
+                f"Plugin '{plugin.plugin_key}' declares {wanted} GPU(s) but queue '{node.queue}' is "
+                f"registered with none; the job will ask for hardware the queue cannot give it."
+            )
+        elif available and not wanted:
+            message = (
+                f"Plugin '{plugin.plugin_key}' declares no GPU but queue '{node.queue}' is registered "
+                f"with {available}; the queue can attach one anyway and the job would hold it unused."
+            )
+        else:
+            continue
+        findings.append(
+            {
+                "code": "node_queue_capability_mismatch",
+                "message": message,
+                "node_key": node.node_key,
+                "node_id": str(node.id),
+                "queue": node.queue,
+                "plugin_key": plugin.plugin_key,
+            }
+        )
+    return findings
 
 
 def _upstream_binding_blockers(

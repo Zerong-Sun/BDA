@@ -18,6 +18,7 @@ import { WorkflowToolbar } from '../features/workflow/WorkflowToolbar'
 import {
   defaultWorkflowEdges,
   defaultWorkflowNodes,
+  isOrderingHandle,
   type NodeTemplate,
 } from '../features/workflow/workflowTypes'
 import { ApiState } from '../components/ui/ApiState'
@@ -106,6 +107,9 @@ function routeTarget(
     project?.name?.trim() || objective.trim().split(/[.;\n]/)[0] || 'protein design target'
   return target.slice(0, 200)
 }
+
+/** How many preflight findings to show before the list has to be expanded. */
+const PREFLIGHT_PREVIEW_COUNT = 4
 
 const statusLegendKeys = [
   ['notStarted', 'border-border-soft'],
@@ -238,6 +242,7 @@ export function WorkflowPage() {
   const workflowSeed = useAppStore((s) => s.workflowSeed)
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
+  const [preflightExpanded, setPreflightExpanded] = useState(false)
   const [goal, setGoal] = useState(() =>
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
   )
@@ -374,7 +379,16 @@ export function WorkflowPage() {
     mapped.nodes = mapped.nodes.map(n => {
       const apiNode = workflowNodes.find(item => item.id === n.id)
       const plugin = modelPlugins.find(p => p.id === apiNode?.model_plugin_id)
-      return { ...n, data: { ...n.data, inputPorts: plugin?.input_ports.map(p => p.name), outputPorts: plugin?.output_ports.map(p => p.name) } }
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          inputPorts: plugin?.input_ports.map(p => p.name),
+          outputPorts: plugin?.output_ports.map(p => p.name),
+          requiredPorts: plugin?.input_ports.filter(p => p.required).map(p => p.name),
+          boundPorts: (apiNode?.input_bindings ?? []).map(b => b.port),
+        },
+      }
     })
     mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { setSelectedEdgeId(e.id); setSelectedNodeId(null); setSelectedArtifactId(undefined) } } }))
     return mapped
@@ -386,22 +400,57 @@ export function WorkflowPage() {
     queryClient.setQueryData(['workflow-graph', workflowRunId], saved)
     await queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
   }
-  const connectPorts = async (source: string, target: string, from: string, to: string) => {
+  /**
+   * Save one connection. `from`/`to` null means an ordering-only relationship: the
+   * server records it as a `dependency` gate, stages no data and adds no input binding,
+   * which is what "run B after A" has to mean when the two share no compatible port.
+   */
+  const connectPorts = async (source: string, target: string, from: string | null, to: string | null) => {
     const existing = workflowGraph?.edges.find(e => e.id === connectionPicker?.edgeId)
-    const edge = { id: existing?.id ?? crypto.randomUUID(), source, target, source_port: from, target_port: to, gate: existing?.gate ?? emptyPolicy() }
+    const ordering = from === null || to === null
+    const edge = {
+      id: existing?.id ?? crypto.randomUUID(),
+      source,
+      target,
+      source_port: ordering ? null : from,
+      target_port: ordering ? null : to,
+      gate: ordering
+        ? { ...emptyPolicy(), mode: 'dependency' as const, configured: true }
+        : existing?.gate ?? emptyPolicy(),
+    }
     await persistConnections([...(workflowGraph?.edges ?? []).filter(e => e.id !== existing?.id), edge])
     setSelectedEdgeId(edge.id)
     setSelectedNodeId(null)
   }
   const requestConnection = (connection: Connection) => {
+    // Dragging between the two ordering handles states the intent outright, so it does
+    // not need a port search or a dialog.
+    if (isOrderingHandle(connection.sourceHandle) && isOrderingHandle(connection.targetHandle)) {
+      void connectPorts(connection.source, connection.target, null, null).catch(e =>
+        showToast(e.message, 'error'),
+      )
+      return
+    }
     const fromNode = workflowNodes.find(n => n.id === connection.source)
     const toNode = workflowNodes.find(n => n.id === connection.target)
     const from = modelPlugins.find(p => p.id === fromNode?.model_plugin_id)?.output_ports ?? []
     const to = modelPlugins.find(p => p.id === toNode?.model_plugin_id)?.input_ports ?? []
-    const pairs = from.flatMap(a => to.filter(b => a.kind === b.kind && (!b.accepts.length || b.accepts.includes(a.artifact_type)) && (!connection.sourceHandle || connection.sourceHandle === 'output' || connection.sourceHandle === a.name) && (!connection.targetHandle || connection.targetHandle === 'input' || connection.targetHandle === b.name)).map(b => [a.name, b.name]))
+    const pairs = from.flatMap(a => to.filter(b => a.kind === b.kind && (!b.accepts.length || b.accepts.includes(a.artifact_type)) && (!connection.sourceHandle || isOrderingHandle(connection.sourceHandle) || connection.sourceHandle === a.name) && (!connection.targetHandle || isOrderingHandle(connection.targetHandle) || connection.targetHandle === b.name)).map(b => [a.name, b.name]))
     if (pairs.length === 1) void connectPorts(connection.source, connection.target, pairs[0][0], pairs[0][1]).catch(e => showToast(e.message, 'error'))
     else setConnectionPicker({ source: connection.source, target: connection.target })
   }
+  const preflightBlockers = workflowPreflight.data?.blockers ?? []
+  const preflightWarnings = workflowPreflight.data?.warnings ?? []
+  const preflightItemCount = preflightBlockers.length + preflightWarnings.length
+  // Blockers stop a submission and warnings do not, so the short list is blockers first
+  // and warnings only fill the remaining slots.
+  const visiblePreflightBlockers = preflightExpanded
+    ? preflightBlockers
+    : preflightBlockers.slice(0, PREFLIGHT_PREVIEW_COUNT)
+  const visiblePreflightWarnings = preflightExpanded
+    ? preflightWarnings
+    : preflightWarnings.slice(0, Math.max(0, PREFLIGHT_PREVIEW_COUNT - preflightBlockers.length))
+
   const selectedNode = workflowNodes.find((node) => node.id === selectedNodeId) ?? null
   const selectedArtifact =
     visibleArtifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null
@@ -657,15 +706,43 @@ export function WorkflowPage() {
           className="mb-4"
           variant={workflowPreflight.data.allowed ? 'success' : 'warning'}
         >
-          <AlertTitle>
-            {workflowPreflight.data.allowed
-              ? t.workflowExt.routePlanner.preflightReadyTitle
-              : t.workflowExt.routePlanner.preflightBlockedTitle}
+          <AlertTitle className="flex flex-wrap items-center gap-2">
+            <span>
+              {workflowPreflight.data.allowed
+                ? t.workflowExt.routePlanner.preflightReadyTitle
+                : t.workflowExt.routePlanner.preflightBlockedTitle}
+            </span>
+            {preflightItemCount > 0 ? (
+              <span className="text-xs font-normal text-text-secondary">
+                {format(t.workflowExt.routePlanner.preflightCounts, {
+                  blockers: workflowPreflight.data.blockers.length,
+                  warnings: workflowPreflight.data.warnings.length,
+                })}
+              </span>
+            ) : null}
+            {preflightItemCount > PREFLIGHT_PREVIEW_COUNT ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                aria-expanded={preflightExpanded}
+                onClick={() => setPreflightExpanded((open) => !open)}
+              >
+                {preflightExpanded
+                  ? t.workflowExt.routePlanner.preflightShowLess
+                  : format(t.workflowExt.routePlanner.preflightShowAll, {
+                      count: preflightItemCount,
+                    })}
+              </Button>
+            ) : null}
           </AlertTitle>
           <AlertDescription>
-          {workflowPreflight.data.blockers.length > 0 ? (
+          {/* Collapsed by default. A nine-node route routinely produces twenty lines here,
+              which pushed the canvas a full screen below the fold and made the list read
+              as a wall rather than as the few things to fix next. */}
+          {visiblePreflightBlockers.length > 0 ? (
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              {workflowPreflight.data.blockers.map((blocker, index) => (
+              {visiblePreflightBlockers.map((blocker, index) => (
                 <li key={`${blocker.code}-${blocker.node_key ?? blocker.port ?? index}`}>
                   {blocker.node_key ? `${blocker.node_key}: ` : ''}
                   {blocker.message}
@@ -674,7 +751,7 @@ export function WorkflowPage() {
             </ul>
           ) : null}
           {/* Keyed on plugin too: plugin-level warnings share a code, one per plugin. */}
-          {workflowPreflight.data.warnings.map((warning, index) => {
+          {visiblePreflightWarnings.map((warning, index) => {
             const plugin =
               modelPlugins.find((item) => item.id === warning.plugin_id) ??
               modelPlugins.find(

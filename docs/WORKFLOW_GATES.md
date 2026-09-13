@@ -72,7 +72,7 @@ Before submitting a scripted gate, preview the exact policy against a completed 
 
 ## Deployment and existing workflows
 
-1. Back up the database and apply Alembic revision `0056_workflow_gates` before starting the new API/worker image. This adds attempt-specific results, gate evaluations (with project/user/worker RLS) and node configuration; job/node `skipped` statuses are exposed in OpenAPI and the generated client.
+1. Back up the database and apply Alembic revision `0059_workflow_gates` before starting the new API/worker image. This adds attempt-specific results, gate evaluations (with project/user/worker RLS) and node configuration; job/node `skipped` statuses are exposed in OpenAPI and the generated client.
 2. Deploy the API, workers and frontend together. Keep the worker `collect` queue enabled and prepare the gate script image on its Docker daemon.
 3. Audit workflows using the normal administrative database context:
 

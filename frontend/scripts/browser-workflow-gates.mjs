@@ -60,7 +60,9 @@ async function routeApi(request) {
     if (rejectSave) { rejectSave = false; return { status: 409, body: { status: 409, title: 'Conflict', detail: 'Graph changed; retry your connection save.' } } }
     assert.equal(request.headers()['if-match'], `W/"${graph.workflow.version}"`)
     graph.edges = body.edges.map((edge) => ({ ...edge, source: nodeBy(edge.source).node_key, target: nodeBy(edge.target).node_key }))
-    for (const node of graph.nodes) node.input_bindings = graph.edges.filter((edge) => edge.target === node.node_key).map((edge) => ({ source: 'upstream', port: edge.target_port, from_node: edge.source, from_port: edge.source_port }))
+    // Mirrors `replace_connections`: a dependency edge is ordering only and stages no
+    // data, so it must not produce an input binding here either.
+    for (const node of graph.nodes) node.input_bindings = graph.edges.filter((edge) => edge.target === node.node_key && edge.gate?.mode !== 'dependency').map((edge) => ({ source: 'upstream', port: edge.target_port, from_node: edge.source, from_port: edge.source_port }))
     graph.workflow.version++
     return ok(graph)
   }
@@ -140,12 +142,40 @@ try {
   await page.getByText('Connection gate', { exact: true }).waitFor({ state: 'hidden' })
   assert.equal(graph.edges.length, 0)
   assert.deepEqual(graph.nodes[1].input_bindings, [])
-  const sourceHandle = page.locator('.react-flow__node[data-id="node_browser"] .source')
-  const targetHandle = page.locator('.react-flow__node[data-id="node_1"] .target')
-  await sourceHandle.dragTo(targetHandle)
+  // Address the handles by port name: every card also carries the ordering handles, so
+  // a bare `.source`/`.target` now matches more than one element.
+  const handle = (node, kind, port) =>
+    page.locator(`.react-flow__node[data-id="${node}"] [data-handleid="${port}"].${kind}`)
+  await handle('node_browser', 'source', 'sequences').dragTo(handle('node_1', 'target', 'sequences'))
   await page.getByText('Connection gate', { exact: true }).waitFor()
   assert.equal(graph.edges.length, 1)
   steps.push('Edit ports without replacing edge identity, delete bindings, reconnect by dragging')
+
+  // Ordering handle to ordering handle: states "run after" with no data, which is the
+  // only way to relate two stages that share no compatible port.
+  await button('Delete connection').click()
+  await page.getByText('Connection gate', { exact: true }).waitFor({ state: 'hidden' })
+  await handle('node_browser', 'source', '__order_out').dragTo(
+    handle('node_1', 'target', '__order_in'),
+  )
+  // The badge on an ordering arrow says what it does rather than asking for a gate.
+  await page.getByRole('button', { name: 'Wait for completion' }).waitFor()
+  assert.equal(graph.edges.length, 1)
+  assert.equal(graph.edges[0].gate.mode, 'dependency')
+  assert.equal(graph.edges[0].source_port, null)
+  assert.equal(graph.edges[0].target_port, null)
+  // Ordering stages no data, so it must not create an input binding.
+  assert.deepEqual(graph.nodes[1].input_bindings, [])
+  steps.push('Create an ordering-only connection by dragging between the ordering handles')
+
+  // Back to the data connection the rest of this run configures gates against.
+  await page.getByRole('button', { name: 'Wait for completion' }).click()
+  await button('Delete connection').click()
+  await page.getByText('Connection gate', { exact: true }).waitFor({ state: 'hidden' })
+  await handle('node_browser', 'source', 'sequences').dragTo(handle('node_1', 'target', 'sequences'))
+  await page.getByText('Connection gate', { exact: true }).waitFor()
+  assert.equal(graph.edges.length, 1)
+  assert.equal(graph.edges[0].gate.mode, 'automatic')
   await button('Branch screening policy').click()
   for (const label of ['Manual selection', 'Automatic screening']) {
     await page.getByRole('combobox', { name: 'Release mode' }).click()

@@ -201,7 +201,24 @@ def _defer_event(event: OutboxEvent, reason: str) -> None:
 
 
 @celery_app.task(name="bda_v2.publish_outbox")
-def publish_outbox(batch_size: int = 100) -> dict:
+def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None) -> dict:
+    """Publish due events, optionally restricted to an audited recovery allowlist.
+
+    None retains periodic publishing; an empty list publishes nothing. Parse the
+    entire allowlist before opening a transaction so bad input cannot broaden it.
+    Already published/dead-lettered events retain their normal exclusion rules.
+    """
+    if type(batch_size) is not int or not 1 <= batch_size <= 1000:
+        raise ValueError("outbox_batch_size_invalid")
+    selected_ids = None
+    if event_ids is not None:
+        if not isinstance(event_ids, list) or any(not isinstance(value, str) for value in event_ids):
+            raise ValueError("outbox_recovery_allowlist_invalid")
+        if len(event_ids) > 100:
+            raise ValueError("outbox_recovery_allowlist_too_large")
+        selected_ids = list(dict.fromkeys(uuid.UUID(value) for value in event_ids))
+        if len(selected_ids) > batch_size:
+            raise ValueError("outbox_recovery_batch_too_small")
     published = 0
     with session_scope() as session:
         events = list(
@@ -211,6 +228,7 @@ def publish_outbox(batch_size: int = 100) -> dict:
                     OutboxEvent.published_at.is_(None),
                     OutboxEvent.dead_lettered_at.is_(None),
                     OutboxEvent.available_at <= datetime.now(UTC),
+                    sa.true() if selected_ids is None else OutboxEvent.id.in_(selected_ids),
                 )
                 .order_by(OutboxEvent.created_at)
                 .limit(batch_size)

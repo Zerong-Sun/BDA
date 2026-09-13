@@ -72,6 +72,7 @@ class _FakeStorage:
 def _adapter(transport: _FakeTransport) -> LSFAdapter:
     adapter = LSFAdapter.__new__(LSFAdapter)
     adapter.host, adapter.root, adapter.timeout = "qm", "/work/bda", 5
+    adapter.command_timeout = 60
     adapter.ssh_key, adapter.default_queue, adapter.upload_wrapper = None, "normal", "/upload"
     adapter.staging_mode = "ssh"
     adapter.transport = transport
@@ -304,3 +305,56 @@ def test_a_catch_all_glob_does_not_capture_unrelated_outputs(monkeypatch) -> Non
     collected = _adapter(transport)._collect_over_ssh(job)
     assert collected[0]["port"] is None
     assert collected[0]["artifact_type"] == "compute_output"
+
+
+def test_every_declared_input_port_gets_a_directory_before_the_command_runs() -> None:
+    """An unbound input port must still have a directory, or the job dies before it starts.
+
+    Plugin commands probe optional inputs with
+    `staged="$(find "$BDA_INPUT_DIR/<port>" ... 2>/dev/null | sort | head -1)"`. Under the
+    `set -Eeuo pipefail` this renderer emits, find on a missing directory exits 1,
+    pipefail carries it out, and set -e kills the job on the assignment - with the
+    message swallowed by the command's own 2>/dev/null.
+
+    An exclusive group makes this unavoidable rather than rare: every alternative is
+    marked required yet exactly one is ever bound, so ProteinMPNN died on `jsonl_path`
+    when `pdb_path` was bound (LSF 4267513) and would die on `pdb_path` the other way
+    round. It could never complete.
+    """
+    from backend_v2.app.compute.scripts import ScriptContext, render_script
+
+    script = render_script(
+        ScriptContext(
+            job_name="bda-test",
+            remote_dir="/work/bda/jobs/x/attempt-1",
+            command='staged="$(find "$BDA_INPUT_DIR/jsonl_path" -type f 2>/dev/null | head -1)"',
+            queue="v3-64",
+            backend="lsf",
+            staging_mode="ssh",
+            input_ports=["pdb_path", "jsonl_path", "fixed_positions"],
+        )
+    )
+    mkdir = next(line for line in script.splitlines() if line.startswith("mkdir -p \"$BDA_INPUT_DIR\""))
+    for port in ("pdb_path", "jsonl_path", "fixed_positions"):
+        assert f'"$BDA_INPUT_DIR"/{port}' in mkdir
+    # Created before the command that probes them, and after the output directory.
+    lines = script.splitlines()
+    assert lines.index(mkdir) < next(i for i, line in enumerate(lines) if "find" in line)
+    assert lines.index('mkdir -p "$BDA_OUTPUT_DIR"') < lines.index(mkdir)
+
+
+def test_no_input_port_directory_line_when_a_plugin_declares_none() -> None:
+    from backend_v2.app.compute.scripts import ScriptContext, render_script
+
+    script = render_script(
+        ScriptContext(
+            job_name="bda-test",
+            remote_dir="/work/bda/jobs/x/attempt-1",
+            command="run-model",
+            queue="v3-64",
+            backend="lsf",
+            staging_mode="ssh",
+            input_ports=[],
+        )
+    )
+    assert 'mkdir -p "$BDA_INPUT_DIR"' not in script

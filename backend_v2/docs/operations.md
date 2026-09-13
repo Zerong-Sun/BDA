@@ -3,11 +3,60 @@
 ## Local development
 
 Copy `.env.example` (repository root, the only environment template) to `.env`, replace
-every secret, then run:
+every shared secret, then create a separate mode-0600 scheduler environment file.
+Set `BDA_SCHEDULER_URL` from your secret manager to a URL of the form
+`postgresql+psycopg://bda_scheduler:<URL-encoded-password>@postgres-v2:5432/bda_v2`.
+The raw password must contain at least 32 characters. Do not put this URL in the
+shared `.env`: every application service loads that file.
 
 ```bash
-docker compose up --build
+umask 077
+mkdir -p secrets
+printf 'BDA_V2_DATABASE_URL=%s\n' "$BDA_SCHEDULER_URL" > secrets/scheduler.env
 ```
+
+`BDA_V2_SCHEDULER_ENV_FILE` selects this file; only scheduler loads it. The old
+shared `BDA_V2_SCHEDULER_DATABASE_URL` variable is masked to prevent legacy
+configuration from leaking it to other services. Start the API and its dependencies
+so migrations create the tables:
+
+```bash
+docker compose up -d --build api-v2
+```
+
+Export `BDA_V2_SCHEDULER_PASSWORD` from your secret manager (at least 32 characters,
+matching the URL-encoded password in `secrets/scheduler.env`), then provision
+the scheduler login and start the remaining services:
+
+```bash
+docker compose exec -T -e BDA_V2_SCHEDULER_PASSWORD postgres-v2 \
+  psql -U bda -d bda_v2 < backend_v2/deploy/postgres/scheduler.sql
+docker compose up -d
+```
+
+The scheduler connects directly to PostgreSQL as `bda_scheduler`, a non-superuser
+with `BYPASSRLS` and table DML permissions. It consumes only `scheduler`, with one
+process and prefetch one. Its startup wrapper verifies the dedicated login,
+BYPASSRLS, required outbox/heartbeat privileges, and absence of superuser or DDL
+capabilities before starting Celery. An empty file cannot fall back to the shared
+application login, and queue overrides are refused. Connection errors are logged
+without their potentially sensitive details. Never give that login to an API or
+operation worker.
+When migrations use a different table owner, apply the default grants in
+`scheduler.sql` for that owner as well. Helm already declares a scheduler deployment
+and supplies its separate `maintenanceSecret` login.
+
+For an existing installation with an accumulated scheduler queue, keep Beat and
+the scheduler stopped until the broker state has been backed up and audited.
+Quarantine old ticks; do not start a consumer on the historical backlog. For a
+bounded recovery, `publish_outbox` accepts `event_ids=[...]` and must be sent to
+the `scheduler` queue. An empty list publishes nothing. Original event IDs,
+payloads and project headers are preserved; published and dead-lettered events
+are not selected. The allowlist must be a list of at most 100 UUID strings; the
+batch size must cover all distinct selected IDs. Invalid types and undersized
+batches fail before database access. It does not make the downstream import task idempotent: after
+an uncertain send, inspect broker state, operations, artifacts and stored bytes
+before any further action. Never clear `published_at` just to retry.
 
 ```bash
 docker compose exec api-v2 python -m backend_v2.scripts.bootstrap_admin --username admin
@@ -54,7 +103,16 @@ the LSF credential and the BYOK provider keys require, are documented in
 variables on purpose, and the chart refuses to render an LSF release without them.
 
 Use `/api/v2/health/live` for process liveness and `/api/v2/health/ready` for
-PostgreSQL, Redis and MinIO readiness. Prometheus metrics are exposed at
+PostgreSQL, schema revision, Redis, MinIO and worker readiness. Scheduler is
+mandatory even if `BDA_V2_REQUIRED_WORKER_QUEUES` omits it. Missing heartbeats,
+heartbeats older than 90 seconds, or build/schema mismatches return HTTP 503.
+Compose's API startup health check stays on liveness to avoid a worker dependency
+cycle. When Beat/dispatch is deliberately paused for containment, set
+`BDA_V2_SCHEDULER_DISPATCH_PAUSED=true` on the API so readiness returns 503 with
+`scheduler_dispatch: paused`. Clear this flag only when global dispatch is resumed.
+The flag records an intentional pause; this gate does not automatically detect an
+unexpected Beat process failure.
+Prometheus metrics are exposed at
 `/internal/metrics`.
 
 ## Migration rehearsal

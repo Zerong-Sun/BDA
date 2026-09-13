@@ -209,10 +209,33 @@ describe('workflow gates', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
-  it('does not offer phantom handles when a plugin explicitly declares no ports', () => {
+  it('does not offer phantom data handles when a plugin explicitly declares no ports', () => {
     render(<WorkflowNodeCard {...({ data: { label: 'Sink', inputPorts: [], outputPorts: [] } } as unknown as ComponentProps<typeof WorkflowNodeCard>)} />)
     expect(screen.queryByTestId('target-input')).not.toBeInTheDocument()
     expect(screen.queryByTestId('source-output')).not.toBeInTheDocument()
+    // Ordering is still a valid relationship for a stage that carries no data, so the
+    // ordering handles stay: they are what a `dependency` connection attaches to.
+    expect(screen.getByTestId('target-__order_in')).toBeVisible()
+    expect(screen.getByTestId('source-__order_out')).toBeVisible()
+  })
+
+  it('marks a required input port that has no binding', () => {
+    render(
+      <WorkflowNodeCard
+        {...({
+          data: {
+            label: 'Predict',
+            inputPorts: ['input_path', 'reference'],
+            outputPorts: [],
+            requiredPorts: ['input_path'],
+            boundPorts: ['reference'],
+          },
+        } as unknown as ComponentProps<typeof WorkflowNodeCard>)}
+      />,
+    )
+    expect(screen.getByTitle('input_path — 必填，尚未连接')).toBeInTheDocument()
+    // A bound port, and an optional one, are not flagged.
+    expect(screen.getByTitle('reference')).toBeInTheDocument()
   })
   it('renders explicit named input and output handles', () => {
     render(

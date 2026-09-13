@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import io
+import uuid
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from backend_v2.app.workflows.assistance import parse_script
 from backend_v2.app.workflows.gate_engine import evaluate, records_in_file, subset_file
 from backend_v2.app.workflows.gate_schemas import GatePolicy, ScriptImport, StructurePolicy
 from backend_v2.app.workflows.structure_metrics import count_helices
-from backend_v2.tests.test_compute_binding import _node
+from backend_v2.tests.test_compute_binding import BACKBONE_OUT, _node
 from backend_v2.tests.test_compute_binding import env as _binding_env
 
 env = _binding_env
@@ -132,6 +134,54 @@ def test_connections_update_graph_and_binding_and_reject_cycle(env):
         )
     replace_connections(s, w, [], w.version)
     assert b.input_bindings == []
+
+
+def test_ordering_connection_between_incompatible_stages(env):
+    """Two stages that share no compatible port can still be sequenced.
+
+    This is what the canvas now offers when a drag finds no port pair: the alternative
+    was a dialog that said "no compatible ports" and left the user with no way to state
+    "run this after that", even though the server has always accepted a dependency.
+    """
+    from backend_v2.app.core.problem import DomainError
+    from backend_v2.app.workflows.connections import replace_connections
+    from backend_v2.app.workflows.models import WorkflowRun
+
+    s = env["session"]
+    w = WorkflowRun(
+        project_id=env["project"].id,
+        name="ordering",
+        created_by=env["user"].id,
+        graph={"nodes": [{"key": "a"}, {"key": "b"}], "edges": []},
+    )
+    s.add(w)
+    s.flush()
+    # Both on the consumer plugin: it emits protein_sequence and accepts only
+    # protein_structure, so a to b has no compatible pair in either direction.
+    a, b = _node(w, "a", env["consumer"], []), _node(w, "b", env["consumer"], [])
+    s.add_all([a, b])
+    s.flush()
+
+    with pytest.raises(DomainError) as refused:
+        replace_connections(s, w, [{"id": "ab", "source": "a", "target": "b"}], w.version)
+    assert refused.value.error_code == "connection_ports_ambiguous"
+
+    result = replace_connections(
+        s, w, [{"id": "ab", "source": "a", "target": "b", "gate": {"mode": "dependency"}}], w.version
+    )
+    assert result[0]["source_port"] is None and result[0]["target_port"] is None
+    assert result[0]["gate"]["configured"] is True
+    # Ordering stages nothing, so it must not manufacture an input binding.
+    assert b.input_bindings == []
+
+    # It is still a real graph edge, so the cycle check applies to it.
+    with pytest.raises(DomainError):
+        replace_connections(
+            s,
+            w,
+            [*result, {"id": "ba", "source": "b", "target": "a", "gate": {"mode": "dependency"}}],
+            w.version,
+        )
 
 
 def test_layout_cannot_rewire_execution(env):
@@ -475,7 +525,7 @@ def test_migration_upgrade_and_downgrade():
     from alembic.operations import Operations
     from sqlalchemy import create_engine, inspect
 
-    migration = importlib.import_module("backend_v2.alembic.versions.0056_workflow_gates")
+    migration = importlib.import_module("backend_v2.alembic.versions.0059_workflow_gates")
     engine = create_engine("sqlite+pysqlite://")
     with engine.begin() as connection:
         for table in ["projects", "users", "jobs", "workflow_runs", "workflow_nodes"]:
@@ -636,3 +686,72 @@ def test_parameter_suggestions_use_explicit_mapping_and_attempt_results(env):
     assert target.parameters == {"sampling": 0.1, "unrelated": 1}
     source.parameters = {"temperature": 0.5}
     assert suggest_parameters(w, target, nodes, plugin, env["project"], s)["fingerprint"] != result["fingerprint"]
+
+
+def test_preflight_warns_when_a_source_port_cannot_be_routed(env):
+    """A gate on a port with no filename pattern will never see a result.
+
+    Collection tags an output by its directory (outputs/<port>/) or by the port's
+    filename_glob, and a glob of '*' is deliberately never matched. On 2026-09-11
+    ProteinMPNN succeeded on the cluster, three outputs were collected and verified,
+    and the gate settled as `error` with nothing to screen because every output port
+    was left at the default.
+    """
+    from backend_v2.app.workflows.preflight import unroutable_output_warnings
+
+    plugin = env["producer"]
+    plugin.output_ports = [{**BACKBONE_OUT, "filename_glob": "*"}]
+    workflow = SimpleNamespace(
+        graph={
+            "edges": [
+                {"id": "e", "source": "a", "target": "b", "source_port": "backbones", "gate": {"mode": "manual"}}
+            ]
+        }
+    )
+    warnings = unroutable_output_warnings(workflow, {"a": plugin})
+    assert [w["code"] for w in warnings] == ["output_port_unroutable"]
+    assert "backbones" in warnings[0]["message"]
+
+    # A declared pattern is routable, and an ordering connection carries no data at all.
+    plugin.output_ports = [{**BACKBONE_OUT, "filename_glob": "*.pdb"}]
+    assert unroutable_output_warnings(workflow, {"a": plugin}) == []
+    plugin.output_ports = [{**BACKBONE_OUT, "filename_glob": "*"}]
+    workflow.graph["edges"][0]["gate"] = {"mode": "dependency"}
+    assert unroutable_output_warnings(workflow, {"a": plugin}) == []
+
+
+def test_preflight_warns_when_a_queue_contradicts_the_plugin(env):
+    """Both directions of a queue/plugin mismatch, and silence for an unknown queue."""
+    from backend_v2.app.registry.models import ComputeNode
+    from backend_v2.app.workflows.preflight import queue_capability_warnings
+
+    s = env["session"]
+    s.add_all(
+        [
+            ComputeNode(name="cpu", backend="lsf", queue="63", labels={"gpu_count": 0}, enabled=True),
+            ComputeNode(name="gpu", backend="lsf", queue="4v100-16-e5", labels={"gpu_count": 4}, enabled=True),
+        ]
+    )
+    s.flush()
+    plugin = env["consumer"]
+    plugin.resources = {"gpu": True, "gpu_count": 1}
+
+    def _node(queue):
+        return SimpleNamespace(node_key="design", id=uuid.uuid4(), queue=queue, execution_mode="dispatch")
+
+    # A GPU plugin on a queue registered with none.
+    found = queue_capability_warnings(s, [_node("63")], {"design": plugin})
+    assert [w["code"] for w in found] == ["node_queue_capability_mismatch"]
+    assert "cannot give it" in found[0]["message"]
+
+    # Matching capability is silent.
+    assert queue_capability_warnings(s, [_node("4v100-16-e5")], {"design": plugin}) == []
+
+    # A CPU-only stage on a GPU queue would hold a card it never uses.
+    plugin.resources = {"cpus": 1}
+    held = queue_capability_warnings(s, [_node("4v100-16-e5")], {"design": plugin})
+    assert [w["code"] for w in held] == ["node_queue_capability_mismatch"]
+    assert "hold it unused" in held[0]["message"]
+
+    # A queue nobody registered says nothing, rather than guessing from its name.
+    assert queue_capability_warnings(s, [_node("v3-64")], {"design": plugin}) == []

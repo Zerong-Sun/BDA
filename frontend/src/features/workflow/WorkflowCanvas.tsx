@@ -367,11 +367,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       [nodes, edges],
     )
 
+    // `h-full` rather than a viewport fraction: the page gives the canvas column a
+    // height, and a second independent one left the cell short of its own row and the
+    // graph zoomed further out than it needed to be. The min-height still applies on
+    // narrow layouts, where the column is not height-constrained.
     return (
-      <Frame variant="inverse" spacing="xs" className="h-[min(72vh,760px)] min-h-[34rem]">
-        <FramePanel className="relative overflow-hidden bg-bg-canvas p-0">
+      <Frame variant="inverse" spacing="xs" className="h-full min-h-[34rem]">
+        <FramePanel className="relative flex h-full flex-col overflow-hidden bg-bg-canvas p-0">
+        {/* Banner and legend sit above the graph rather than floating on it. As overlays
+            they covered the top-left corner of the route permanently, and with both
+            present the legend was drawn straight over the read-only sentence. */}
         {readOnly ? (
-          <p className="border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
+          <p className="shrink-0 border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
             {t.workflowExt.canvas.readOnlyBanner}
           </p>
         ) : null}
@@ -392,22 +399,25 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             </div>
           </div>
         ) : (
-          <div className="pointer-events-none absolute left-3 top-3 z-[1] max-w-[calc(100%-1.5rem)] rounded-md border border-border-soft bg-bg-app/85 px-3 py-2 text-xs text-text-secondary backdrop-blur">
-            <p>{t.workflowExt.canvas.connectHint}</p>
-            <div
-              className="mt-2 flex flex-wrap gap-x-3 gap-y-1"
-              aria-label={t.workflowExt.canvas.statusLegendAria}
-            >
-              {statusLegendKeys.map(([status, labelKey, borderClass]) => (
-                <span key={status} className="inline-flex items-center gap-1">
-                  <span className={`h-3 w-3 rounded border-2 ${borderClass}`} aria-hidden="true" />
-                  {t.shared.status[labelKey]}
-                </span>
-              ))}
+          <div className="shrink-0 border-b border-border-soft px-3 py-1.5 text-[11px] text-text-secondary">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{t.workflowExt.canvas.connectHint}</span>
+              <span
+                className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                aria-label={t.workflowExt.canvas.statusLegendAria}
+              >
+                {statusLegendKeys.map(([status, labelKey, borderClass]) => (
+                  <span key={status} className="inline-flex items-center gap-1">
+                    <span className={`h-3 w-3 rounded border-2 ${borderClass}`} aria-hidden="true" />
+                    {t.shared.status[labelKey]}
+                  </span>
+                ))}
+              </span>
             </div>
           </div>
         )}
         <ReactFlow
+          className="min-h-0 flex-1"
           key={flowKey}
           nodes={nodes}
           edges={edges}
@@ -432,10 +442,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           selectionOnDrag={false}
         >
           <Background gap={20} color={gridColor} style={{ opacity: 0.15 }} />
+          {/* Default minimap is 200x150 and covers a corner of the route on the column
+              widths this page uses; a route of a handful of stages does not need that
+              much of the canvas spent on an overview of itself. */}
           <MiniMap
             nodeColor={accentColor}
             maskColor={maskColor}
-            className="!bg-surface-1 !border-border-soft"
+            pannable
+            zoomable
+            style={{ width: 128, height: 88 }}
+            // Hidden on phones: the canvas there is short enough that the overview covers
+            // a quarter of the route it is meant to summarise.
+            className="!hidden !bg-surface-1 !border-border-soft md:!block"
           />
           <Controls fitViewOptions={{ padding: 0.2, minZoom: 0.1 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
         </ReactFlow>

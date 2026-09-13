@@ -1,15 +1,15 @@
 """Persist attempt-specific results and data-transfer decisions.
 
-Revision ID: 0056_workflow_gates
-Revises: 0055_autopilot_worker_rls
+Revision ID: 0059_workflow_gates
+Revises: 0058_autopilot_stage_gates
 """
 
 import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0056_workflow_gates"
-down_revision = "0055_autopilot_worker_rls"
+revision = "0059_workflow_gates"
+down_revision = "0058_autopilot_stage_gates"
 branch_labels = None
 depends_on = None
 
