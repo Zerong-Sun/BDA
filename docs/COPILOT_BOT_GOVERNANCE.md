@@ -302,3 +302,4 @@ nothing.
 | 16 | Every staffed Autopilot stage names a producer, and every staffed stage is unheld | `test_autopilot_operators.py` |
 | 17 | A stage's run is owned by the operator frozen on the row, authorised by the person's brief, and limited to bot ∩ project | `test_autopilot_operators.py` |
 | 18 | An unstaffed, retired-operator or nothing-enabled stage opens no run rather than a broken one | `test_autopilot_operators.py` |
+| 19 | Cancelling a campaign cancels its stage's agent run and marks the stage, without rewriting a stage that already finished | `test_autopilot_operators.py` |

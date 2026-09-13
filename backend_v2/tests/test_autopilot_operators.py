@@ -315,3 +315,69 @@ class TestWhatTheStageReports:
         stage = _stage(session, campaign, stage_key="review")
 
         assert "person's judgement" in (stage.operator_reason or "")
+
+
+class TestCancelStopsTheOperator:
+    """The one stage resource that keeps spending after a cancel.
+
+    A workflow run left behind is a draft that costs nothing and may still be
+    wanted. An agent run left alive keeps thinking, and can hold compute through
+    its own tools - which is precisely what `agent_runs.cancel` exists to stop:
+    "a cancelled parent leaving GPU jobs running and subagents thinking is how a
+    budget disappears without anyone deciding to spend it."
+    """
+
+    def _cancelled(self, session: Session, campaign, project, user):
+        from backend_v2.app.autopilot.service import cancel_campaign
+
+        campaign.status = "running"
+        session.flush()
+        return cancel_campaign(session, campaign, user)
+
+    def test_cancelling_a_campaign_cancels_its_operators_run(self, session: Session) -> None:
+        campaign, project, user = _campaign(session)
+        stage = _stage(session, campaign)
+        _, run_id = adapters.ensure_stage_resource(session, campaign, stage)  # type: ignore[misc]
+
+        self._cancelled(session, campaign, project, user)
+
+        run = session.get(CopilotAgentRun, run_id)
+        assert run is not None and run.status == "cancelled"
+        assert "campaign cancelled" in (run.error or "")
+
+    def test_the_stage_says_so_rather_than_staying_ready(self, session: Session) -> None:
+        """A `ready` stage beside a cancelled run would be the page reporting
+        work that is no longer happening."""
+        campaign, project, user = _campaign(session)
+        stage = _stage(session, campaign)
+        adapters.ensure_stage_resource(session, campaign, stage)
+        stage.status = "ready"
+        session.flush()
+
+        self._cancelled(session, campaign, project, user)
+
+        assert stage.status == "cancelled"
+
+    def test_cancelling_twice_is_harmless(self, session: Session) -> None:
+        campaign, project, user = _campaign(session)
+        stage = _stage(session, campaign)
+        _, run_id = adapters.ensure_stage_resource(session, campaign, stage)  # type: ignore[misc]
+
+        self._cancelled(session, campaign, project, user)
+        campaign.status = "running"
+        session.flush()
+        self._cancelled(session, campaign, project, user)
+
+        run = session.get(CopilotAgentRun, run_id)
+        assert run is not None and run.status == "cancelled"
+
+    def test_a_finished_stage_is_not_rewritten_by_a_cancel(self, session: Session) -> None:
+        campaign, project, user = _campaign(session)
+        stage = _stage(session, campaign)
+        adapters.ensure_stage_resource(session, campaign, stage)
+        stage.status = "succeeded"
+        session.flush()
+
+        self._cancelled(session, campaign, project, user)
+
+        assert stage.status == "succeeded"

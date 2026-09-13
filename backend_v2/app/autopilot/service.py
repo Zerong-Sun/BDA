@@ -12,6 +12,7 @@ from ..campaigns.models import Campaign
 from ..compute.models import Job
 from ..compute.repository import ComputeRepository
 from ..compute.service import transition_job
+from ..copilot.models import CopilotAgentRun
 from ..core import review
 from ..core.problem import DomainError
 from ..identity.models import User
@@ -370,6 +371,22 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
                         project_id=job.project_id,
                         payload={"job_id": str(job.id)},
                     )
+        if stage.resource_type == "copilot_agent_run" and stage.resource_id:
+            # An agent run left alive is the one stage resource that keeps *spending*
+            # after the campaign is cancelled - `agent_runs.cancel` says it outright:
+            # a cancelled parent leaving GPU jobs running and subagents thinking is how
+            # a budget disappears without anyone deciding to spend it. A workflow run is
+            # a draft that costs nothing and may still be wanted, which is why the two
+            # resource types are treated differently here rather than uniformly.
+            from ..copilot import agent_runs as copilot_runs
+
+            run = session.get(CopilotAgentRun, stage.resource_id)
+            if run is not None:
+                copilot_runs.cancel(session, run, reason="autopilot campaign cancelled")
+            # ...and then the stage says so. Leaving it `ready` beside a cancelled run
+            # would be the page reporting work that is no longer happening.
+            if stage.status not in {"succeeded", "failed", "cancelled"}:
+                stage.status = "cancelled"
         if stage.resource_type == "research_generation" and stage.resource_id:
             generation = session.get(ResearchGeneration, stage.resource_id)
             if generation and generation.status not in {"succeeded", "failed", "cancelled"}:

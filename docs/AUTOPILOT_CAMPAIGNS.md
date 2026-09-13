@@ -93,6 +93,7 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 - 用户必须先选择项目；后端项目权限是唯一安全边界。
 - stage 开出的 agent run **不扩大任何权限**：工具是该 bot 的能力与项目已启用能力的交集，和手工开 run 完全相同；写操作仍由 `actions.request_allows` 按**人写下的 brief 原文**判定，平台自己拼的句子不构成授权。
 - 被 `gates.py` 判为需要放行的阶段不会有 operator，也不会开 run——`service.activate_stage` 在 adapter 之前就返回了。
+- 取消 campaign 会一并取消该阶段的 agent run，并把阶段标记为 `cancelled`。agent run 是唯一一种取消后仍会继续花钱的 stage 产物（workflow run 是不花钱的草稿，而且人可能还要用），所以两者在取消路径上的处理是不同的，不是遗漏。
 - 监督式 campaign 未声明预算时不得确认，`plan_only` 不得启动计算。
 - worker 必须在 operation 的项目上下文中运行，不能使用无项目边界的应用账号。
 - 不应根据归档分支、原型截图或旧 README 推断当前功能；只有当前 release 的 API、迁移、测试和本文档共同定义实现范围。
