@@ -82,13 +82,17 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 | stage 产物指针与前端深链 | 已实现 | `autopilot_stages.resource_type` / `resource_id`；Autopilot 页每个阶段直达 Workflow 页 |
 | 人工接管（`manual_takeover`） | 已实现 | 迁移 `0054`、`service.take_over_campaign`、`POST …/takeover` |
 | 预算 reserved → committed 实拨对账 | 已实现 | `tasks.settle_reservation`；按预留封顶，超出部分记为 `unbilled_overrun_gpu_seconds` |
-| research / collect / review stage adapter | 尚未实现 | 这些阶段的产物依赖真实计算完成后的回写，不能凭 spec 生成 |
+| stage 负责 bot（`autopilot_stages.operator`） | 已实现 | `backend_v2/app/autopilot/operators.py`、迁移 `0061`；确认时冻结，和 `risk_tier` 同理——重新分工不得改变已确认 campaign 的归属 |
+| research / plan / report stage adapter（agent run） | 已实现 | `adapters.AgentRunAdapter`；由该阶段的 operator 开一条 durable agent run，goal 是人写下并确认的 brief 原文，工具为 `bot.capabilities ∩ project.enabled_skills` |
+| collect / review stage adapter | 尚未实现 | `collect` 的产物依赖真实计算完成后的回写，不能凭 spec 生成；`review` 是人的判断，按设计没有 operator |
 | 自动结果回写、候选漏斗和实验复盘 | 尚未实现 | 需要上一行的 adapter、领域事件与新界面 |
-| 完整无人值守闭环 | 尚未达成 | 见 §6：真实 adapter 的故障恢复已有测试，但端到端闭环未在真实计算上跑通 |
+| 完整无人值守闭环 | 尚未达成 | 见 §6：真实 adapter 的故障恢复已有测试，但端到端闭环未在真实计算上跑通。agent run stage 也不改变这一行——它让一个阶段有了负责人和一条 run，不代表链条能无人跑完 |
 
 ## 5. 操作约束
 
 - 用户必须先选择项目；后端项目权限是唯一安全边界。
+- stage 开出的 agent run **不扩大任何权限**：工具是该 bot 的能力与项目已启用能力的交集，和手工开 run 完全相同；写操作仍由 `actions.request_allows` 按**人写下的 brief 原文**判定，平台自己拼的句子不构成授权。
+- 被 `gates.py` 判为需要放行的阶段不会有 operator，也不会开 run——`service.activate_stage` 在 adapter 之前就返回了。
 - 监督式 campaign 未声明预算时不得确认，`plan_only` 不得启动计算。
 - worker 必须在 operation 的项目上下文中运行，不能使用无项目边界的应用账号。
 - 不应根据归档分支、原型截图或旧 README 推断当前功能；只有当前 release 的 API、迁移、测试和本文档共同定义实现范围。

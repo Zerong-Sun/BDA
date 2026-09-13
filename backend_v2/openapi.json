@@ -1221,6 +1221,28 @@
             "title": "Id",
             "type": "string"
           },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "operator_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Reason"
+          },
           "position": {
             "title": "Position",
             "type": "integer"

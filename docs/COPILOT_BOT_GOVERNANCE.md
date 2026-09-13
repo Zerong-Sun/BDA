@@ -229,7 +229,8 @@ asking who the operators are.
 
 ## Where the roster reaches the rest of the platform
 
-One surface used to describe operators without using the roster.
+Two surfaces used to describe operators without using the roster, and both are
+now derived from it.
 
 **The client's own capability list is gone.** `features/copilot/skills/registry.ts`
 held nine capability ids with their own bilingual triggers, consulted whenever no
@@ -249,6 +250,24 @@ both claimed "review", and `runner` claimed "run" — the verb in nearly every
 imperative a user types, which tied it against whichever operator the sentence
 actually named. A trigger has to name an operator's *subject*, and a test now
 refuses the common verbs.
+
+**An Autopilot stage has an operator.** `gates.py` answered whether a step may
+act without a person; nothing answered whose job it was when it did, so a
+campaign — the platform's own name for running these phases in order — was the
+one place the chain ran with none of the charters applying. `autopilot/operators.py`
+maps stage key to bot, frozen onto the stage at confirmation exactly as
+`risk_tier` is, and `AgentRunAdapter` opens a run owned by that operator for the
+stages whose product is reasoning.
+
+That grants nothing, and three existing rules are what make it so: the run's
+tools are `bot.capabilities ∩ project.enabled_skills`; its authorising text is
+the brief a person wrote and confirmed, never a sentence the adapter composed —
+the same rule that stops a director manufacturing consent, one level up; and a
+held stage returns from `activate_stage` before the adapter runs, so no operator
+is already working on a step nobody has released. Every staffed stage is
+`reversible_draft`, and a test asserts it: naming a default operator for a step a
+person must accept the risk of would be the platform answering that question for
+them.
 
 ## What is deliberately not added
 
@@ -280,3 +299,6 @@ nothing.
 | 13 | No two operators claim one trigger, and no trigger is a bare common verb | `test_copilot_bots.py` |
 | 14 | Every case the retired client-side skill registry routed still resolves to exactly one operator | `test_copilot_bots.py` |
 | 15 | A contained token loses to the phrase containing it; an unrelated longer token does not outrank a shorter one | `bots/registry.test.ts` |
+| 16 | Every staffed Autopilot stage names a producer, and every staffed stage is unheld | `test_autopilot_operators.py` |
+| 17 | A stage's run is owned by the operator frozen on the row, authorised by the person's brief, and limited to bot ∩ project | `test_autopilot_operators.py` |
+| 18 | An unstaffed, retired-operator or nothing-enabled stage opens no run rather than a broken one | `test_autopilot_operators.py` |

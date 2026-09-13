@@ -382,6 +382,16 @@ would be authoring the user's half of the conversation. The same hole existed in
   contains it, which is what lets "literature review" reach `librarian` without
   `auditor`'s bare "review" turning it into a tie. See
   [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
+- **An Autopilot stage names the operator accountable for it**
+  (`autopilot_stages.operator`, migration `0061`), frozen at confirmation like
+  its risk tier, and the stages whose product is reasoning open a durable run
+  owned by that operator. It grants nothing: the run resolves
+  `bot.capabilities ∩ project.enabled_skills`, its authorising text is the brief
+  a person confirmed, and a held stage never reaches the adapter. Scope and
+  maturity stay as recorded in
+  [Autopilot campaigns](AUTOPILOT_CAMPAIGNS.md) — a stage with an operator is not
+  a complete unattended loop.
+
 ## What this does not change
 
 - No bot executes shell commands, reads arbitrary paths, or reaches credentials.
@@ -437,6 +447,7 @@ Each of these holds, and has a test that fails when it stops holding.
 | 32 | `steward` can reach a declaration from a plugin id or a workflow node, and reviewing one changes nothing | `test_copilot_chain.py` |
 | 33 | A delegated or spawned child run is dispatched through the outbox when it is created, so the pair cannot deadlock | `test_copilot_chain.py` |
 | 34 | No two operators claim one trigger; no trigger is a bare common verb; every case the retired client-side skill registry routed still resolves | `test_copilot_bots.py` |
+| 35 | Each Autopilot stage's operator is frozen at confirmation, names a producer, and is absent on every held stage | `test_autopilot_operators.py` |
 
 Gates run for this change, on `bda-public/main`:
 

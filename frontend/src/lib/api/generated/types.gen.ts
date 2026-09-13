@@ -734,6 +734,14 @@ export type AutopilotStageResponse = {
      */
     id: string;
     /**
+     * Operator
+     */
+    operator?: string | null;
+    /**
+     * Operator Reason
+     */
+    operator_reason?: string | null;
+    /**
      * Position
      */
     position: number;

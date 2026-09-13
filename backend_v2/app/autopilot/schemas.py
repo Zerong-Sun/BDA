@@ -77,6 +77,13 @@ class AutopilotStageResponse(BaseModel):
     #: One line saying why this stage is held. Shown where the hold is, because a hold
     #: nobody can explain reads as a failure.
     hold_reason: str | None = None
+    #: The roster operator accountable for this stage, frozen at confirmation. NULL where
+    #: a stage deliberately has none.
+    operator: str | None = None
+    #: One line naming that operator and what it is for, or saying why the stage has none.
+    #: Shown for the same reason `hold_reason` is: a stage attributed to nobody, with no
+    #: explanation, reads as an oversight rather than as a decision.
+    operator_reason: str | None = None
     #: Exposed because releasing carries `If-Match`, and a client that cannot read the
     #: version cannot satisfy a precondition the server requires.
     version: int

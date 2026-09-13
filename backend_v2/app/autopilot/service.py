@@ -19,7 +19,7 @@ from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
 from ..research.models import ResearchGeneration
-from . import gates
+from . import gates, operators
 from .models import (
     AutopilotCampaign,
     AutopilotDraft,
@@ -142,6 +142,10 @@ def confirm_draft(
                 # Frozen with the spec: the tier is part of what is being approved, so a
                 # later reclassification must not re-open a confirmed campaign.
                 risk_tier=gates.tier_for(key),
+                # Frozen for the same reason. Who carries a stage is part of the protocol
+                # a person approved, not a lookup done later against whatever the roster
+                # happens to say by then.
+                operator=operators.operator_for(key),
             )
         )
     draft.status = "confirmed"

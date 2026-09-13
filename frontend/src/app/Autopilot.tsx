@@ -172,6 +172,20 @@ export function AutopilotPage() {
               >
                 <span className="font-medium">{stage.stage_key}</span>
                 <span className="text-xs text-muted-foreground">{stage.status}</span>
+                {/* Who is accountable for this step, and — where nobody is — why not.
+                    A stage attributed to no one with no explanation reads as an
+                    oversight rather than as the decision it is, which is the same
+                    reason `hold_reason` travels with a hold. */}
+                <span
+                  className="text-xs text-muted-foreground"
+                  title={stage.operator_reason ?? undefined}
+                >
+                  {stage.operator
+                    ? `· ${stage.operator}`
+                    : language === 'zh'
+                      ? '· 无负责 bot'
+                      : '· no operator'}
+                </span>
                 {stage.held ? (
                   <>
                     {/* The reason travels with the hold: a stop nobody can explain reads
@@ -191,6 +205,14 @@ export function AutopilotPage() {
                   <Link className="text-xs underline" to={`/workflow?run=${stage.resource_id}`}>
                     {language === 'zh' ? '在 Workflow 页打开' : 'Open in Workflow'}
                   </Link>
+                ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
+                  // An agent run has no page of its own; naming it is still better than
+                  // "no automatic product", which would be false.
+                  <span className="text-xs text-muted-foreground">
+                    {language === 'zh'
+                      ? `由 ${stage.operator ?? 'bot'} 承担的 agent run`
+                      : `carried by an agent run (${stage.operator ?? 'bot'})`}
+                  </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
                     {language === 'zh' ? '这一阶段没有自动产物，需要人工完成' : 'no automatic product — a human step'}
