@@ -711,3 +711,50 @@ class TestCampaignFinishes:
         finish_campaign(session, campaign)
 
         assert campaign.status == "cancelled"
+
+
+def test_a_released_stage_is_then_completed_by_hand(session: Session) -> None:
+    """The full path for a held human step, which is two different signatures.
+
+    `submit` is held and has no operator, so a person releases it (*may this
+    act*) and later marks it done (*is this done*). `complete_stage` refuses a
+    held stage, and release is what clears the hold - so the order is forced and
+    neither signature stands in for the other.
+    """
+    from backend_v2.app.autopilot.service import complete_stage, release_stage
+
+    campaign, _, user = _campaign(session, stage_keys=["submit", "report"])
+    submit, report = _stages(session, campaign)
+    submit.status = "awaiting_release"
+    session.flush()
+
+    release_stage(session, campaign, submit, user, submit.version)
+    assert submit.held is False
+    assert submit.status == "ready"
+
+    complete_stage(session, campaign, submit, submit.version, user)
+
+    assert submit.status == "succeeded"
+    assert report.status == "ready"
+
+
+def test_completing_a_step_whose_successor_is_held_stops_at_the_gate(
+    session: Session,
+) -> None:
+    """A person finishing one step does not thereby approve the next."""
+    from backend_v2.app.autopilot.service import complete_stage
+
+    campaign, _, user = _campaign(session, stage_keys=["review", "submit"])
+    review, submit = _stages(session, campaign)
+    review.status = "ready"
+    session.flush()
+
+    complete_stage(session, campaign, review, review.version, user)
+
+    assert submit.status == "awaiting_release"
+    assert submit.held is True
+    entry = session.scalars(
+        select(AutopilotLedgerEntry).where(AutopilotLedgerEntry.event_type == "campaign.advanced")
+    ).one()
+    assert entry.payload["held"] is True
+    assert entry.writer_user_id == user.id
