@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
-import { CopilotAgentRuns } from './CopilotAgentRuns'
+import { AgentRunDetail, CopilotAgentRuns } from './CopilotAgentRuns'
 
 /**
  * The panel over the durable substrate.
@@ -57,6 +57,25 @@ function runReturns(run: Record<string, unknown>, turns: Record<string, unknown>
 afterEach(() => cleanup())
 
 describe('agent run panel', () => {
+  it('rejects a task from another project before loading its transcript or actions', async () => {
+    runReturns({ ...RUN, project_id: 'another-project' })
+    let transcriptReads = 0
+    server.use(http.get('/api/v2/copilot/agent-runs/:runId/turns', () => { transcriptReads++; return HttpResponse.json({ items: [] }) }))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('This task belongs to another project')
+    expect(screen.queryByText(RUN.goal)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    expect(transcriptReads).toBe(0)
+  })
+  it('retries a failed task detail in place', async () => {
+    server.use(http.get('/api/v2/copilot/agent-runs/:runId', () => HttpResponse.json({ detail: 'Temporarily unavailable' }, { status: 422 })))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const reload = await screen.findByRole('button', { name: 'Reload task records' })
+    runReturns(RUN)
+    fireEvent.click(reload)
+    expect(await screen.findByText(RUN.goal)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
   it('starts a run and opens it, rather than waiting for an answer', async () => {
     // The run outlives the request that starts it, so there is nothing to await;
     // a panel that blocked on a result would block for hours.

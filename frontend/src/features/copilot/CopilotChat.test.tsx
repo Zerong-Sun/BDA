@@ -64,7 +64,7 @@ describe('CopilotChat', () => {
   it('keeps one conversation across drawer/page remounts', async () => {
     const rendered = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Plan the next protein workflow step' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -83,11 +83,20 @@ describe('CopilotChat', () => {
     })
   })
 
+  it('preserves unsent text across remounts without invoking the model', async () => {
+    const rendered = renderWithProviders(<CopilotChat pageContext="route=/bots; project_id=proj_test" />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Which sources support this observation?' } })
+    rendered.unmount()
+    renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
+    expect(await screen.findByLabelText('Ask the Copilot a question')).toHaveValue('Which sources support this observation?')
+    expect(streamCopilotMessage).not.toHaveBeenCalled()
+  })
+
   it('shows a readable failure reason when the Copilot request fails', async () => {
     vi.mocked(streamCopilotMessage).mockRejectedValueOnce(new Error('503 model unavailable'))
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Show Botrytis research' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -101,7 +110,7 @@ describe('CopilotChat', () => {
   it('uses registry controls and one owning conversation scroll area', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    expect(screen.getByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
+    expect(await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
       'data-slot',
       'input',
     )
@@ -111,7 +120,7 @@ describe('CopilotChat', () => {
     )
     expect(document.querySelectorAll('[data-slot="scroll-area"]')).toHaveLength(1)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Plan the next protein workflow step' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -127,7 +136,7 @@ describe('CopilotChat', () => {
   it('does not submit Enter while an IME composition is active', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    const input = screen.getByRole('textbox', { name: 'Ask the Copilot a question' })
+    const input = await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })
     fireEvent.change(input, { target: { value: '蛋白质设计' } })
     fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
 
@@ -180,7 +189,7 @@ describe('CopilotChat', () => {
     })
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Search PDB structures for this target' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -202,7 +211,7 @@ describe('CopilotChat', () => {
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Follow-up question' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -284,7 +293,7 @@ describe('CopilotChat', () => {
     fireEvent.pointerUp(planner, { button: 0 })
     fireEvent.click(planner)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Adjust the workflow threshold' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -309,7 +318,7 @@ describe('CopilotChat', () => {
     // applied when the roster request had failed.
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Adjust the workflow threshold' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))

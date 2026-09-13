@@ -42,4 +42,43 @@ describe('project-scoped Bot context', () => {
     expect(useAppStore.getState().copilotDraft).toBe('Unsent question from A')
     expect(useAppStore.getState().copilotSelectedEntityIds).toEqual(['structure-a'])
   })
+
+  it('restores each project’s own unsent input and selected sources', () => {
+    const state = useAppStore.getState()
+    state.setCopilotSessionInput('project-a', 'Explain source A')
+    state.setCopilotSelectedEntityIds(['structure-a'])
+    state.setActiveProjectId('project-b')
+    expect(useAppStore.getState().copilotSelectedEntityIds).toEqual([])
+    expect(useAppStore.getState().copilotSessions['project-b']).toBeUndefined()
+    state.setCopilotSessionInput('project-b', 'Explain source B')
+    state.setCopilotSelectedEntityIds(['structure-b'])
+    state.setActiveProjectId('project-a')
+    expect(useAppStore.getState().copilotSelectedEntityIds).toEqual(['structure-a'])
+    expect(useAppStore.getState().copilotSessions['project-a'].input).toBe('Explain source A')
+    expect(useAppStore.getState().copilotSessions['project-b'].input).toBe('Explain source B')
+  })
+
+  it('removes drafts on project deletion and clears all drafts on sign out', () => {
+    const state = useAppStore.getState()
+    const draft = { goal: 'Review evidence', selected: null, preview: false, writes: [], maxTurns: 24, maxCost: '' }
+    state.setCopilotTaskDraft('project-a', draft)
+    state.setCopilotTaskDraft('project-b', draft)
+    state.clearProjectState('project-a')
+    expect(useAppStore.getState().copilotTaskDrafts['project-a']).toBeUndefined()
+    expect(useAppStore.getState().copilotSessions['project-a']).toBeUndefined()
+    expect(useAppStore.getState().copilotDraft).toBe('')
+    state.resetAuthenticatedState()
+    expect(useAppStore.getState().copilotTaskDrafts).toEqual({})
+    expect(useAppStore.getState().copilotSessions).toEqual({})
+  })
+
+  it('does not clear another project’s sources when a previous reply finishes', () => {
+    const state = useAppStore.getState()
+    state.setCopilotSelectedEntityIds(['structure-a'])
+    state.setActiveProjectId('project-b')
+    state.setCopilotSelectedEntityIds(['structure-b'])
+    state.setCopilotSelectedEntityIds([], 'project-a')
+    expect(useAppStore.getState().copilotSelectedEntityIds).toEqual(['structure-b'])
+    expect(useAppStore.getState().copilotSessions['project-a'].selectedEntityIds).toEqual([])
+  })
 })

@@ -173,7 +173,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         }
       })
       if (projectId) setConversationId(projectId, accepted.conversationId)
-      setSelectedEntityIds([])
+      setSelectedEntityIds([], projectId ?? '')
       if (!streamed) throw new Error('Copilot completed without an assistant response.')
     } catch (err) {
       const message = explainCopilotError(err)

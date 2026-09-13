@@ -22,10 +22,46 @@ function handlers(eligible: string[] = ['literature']) {
     http.get('/api/v2/copilot/agent-runs/:runId/turns', () => HttpResponse.json({ items: [], next_cursor: null })),
   )
 }
-beforeEach(() => { useAppStore.setState({ language: 'en', copilotDraft: '', appMode: 'application' }); handlers() })
+beforeEach(() => { useAppStore.setState({ language: 'en', copilotDraft: '', copilotTaskDrafts: {}, appMode: 'application' }); handlers() })
 afterEach(cleanup)
 
 describe('task-centered Copilot', () => {
+  it('retains a reviewed task draft on remount without starting a task', async () => {
+    const rendered = renderWithProviders(<CopilotWorkspace rememberDraft />)
+    fireEvent.change(screen.getByLabelText('Task goal'), { target: { value: 'Research existing evidence' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Research the evidence' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Allow saving research notes for review' }))
+    rendered.unmount()
+    renderWithProviders(<CopilotWorkspace rememberDraft />)
+    expect(screen.getByLabelText('Task goal')).toHaveValue('Research existing evidence')
+    expect(await screen.findByRole('checkbox', { name: 'Allow saving research notes for review' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Start this plan' })).toBeInTheDocument()
+  })
+  it('blocks invalid budgets and turn limits with a visible correction', async () => {
+    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" initialService="literature" />)
+    const start = await screen.findByRole('button', { name: 'Start this plan' })
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced options and direct editing' }))
+    const budget = screen.getByLabelText('Estimated model budget (cents, optional)')
+    for (const value of ['-1', '1.5', '1000001']) {
+      fireEvent.change(budget, { target: { value } })
+      expect(start).toBeDisabled()
+      expect(screen.getByRole('alert')).toHaveTextContent('Budget must be a whole number')
+    }
+    fireEvent.change(budget, { target: { value: '0' } })
+    expect(start).toBeEnabled()
+    fireEvent.change(screen.getByLabelText('Turn limit'), { target: { value: '0' } })
+    expect(start).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Turn limit must be a whole number')
+  })
+  it('recovers the unavailable service list without losing the request', async () => {
+    server.use(http.get('/api/v2/copilot/task-services', () => HttpResponse.json({ detail: 'Service unavailable' }, { status: 422 })))
+    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" />)
+    const reload = await screen.findByRole('button', { name: 'Reload task workspace' })
+    handlers()
+    fireEvent.click(reload)
+    expect(await screen.findByRole('button', { name: 'Research the evidence' })).toBeEnabled()
+    expect(screen.getByLabelText('Task goal')).toHaveValue('Research PD1')
+  })
   it('shows a reviewable task scope and sends only explicitly checked writes', async () => {
     const bodies: unknown[] = []
     server.use(http.post('/api/v2/copilot/agent-runs', async ({ request }) => { bodies.push(await request.json()); return HttpResponse.json({ run, operation_id: 'op' }, { status: 202 }) }))

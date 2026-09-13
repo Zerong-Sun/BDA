@@ -34,6 +34,13 @@ function BotProjectWorkspace() {
   const selected = bots.data?.find((bot) => bot.id === selectedId)
   const view = ['tasks', 'chat', 'handoffs'].includes(search.get('view') ?? '') ? search.get('view')! : 'tasks'
   const selectView = (value: string) => { const next = new URLSearchParams(search); next.set('view', value); setSearch(next) }
+  const selectRun = (id: string | null) => {
+    const next = new URLSearchParams(search)
+    next.set('view', 'tasks')
+    if (id) next.set('run', id)
+    else next.delete('run')
+    setSearch(next)
+  }
   const selectBot = (id: string | null) => { setBot(projectId, id); selectView('chat') }
   const context = `route=/bots; project_id=${projectId}; name=${activeProject?.name ?? ''}; query=${search.toString()}; ${selectedEntities.map((id) => `entity=${encodeURIComponent(id)}`).join('; ')}`
   const name = (bot: { title: string; title_zh: string }) => zh ? bot.title_zh : bot.title
@@ -69,7 +76,7 @@ function BotProjectWorkspace() {
                 <TabsTrigger value="chat">{zh ? '对话' : 'Conversation'}</TabsTrigger>
                 <TabsTrigger value="handoffs">{zh ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
               </TabsList>
-              <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft /></TabsContent>
+              <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} /></TabsContent>
               <TabsContent value="chat">
                 {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{selected.summary}</p>
                   {successorsOf(selected, bots.data ?? []).length ? <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>{zh ? '可交接给' : 'Can hand off to'}</span>{successorsOf(selected, bots.data ?? []).map((bot) => <Button type="button" size="sm" variant="link" key={bot.id} onClick={() => selectBot(bot.id)}>{name(bot)}<ArrowRightIcon /></Button>)}</div> : null}

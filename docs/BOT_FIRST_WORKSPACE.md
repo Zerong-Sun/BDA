@@ -117,3 +117,46 @@ handoff record use the existing server APIs; avatars do not invent activity.
 Structure comparison presents independent cameras, not computed alignment.
 Advanced workflows and the contextual drawer remain reachable. No production
 deployment or private project content migration is included in this branch.
+
+## Iteration 2 — continuous research navigation
+
+The second review followed a complete user journey: open a public question,
+prepare a Bot conversation, inspect project materials, and return to a task's
+deliverable. The implementation addresses the breaks found along that path:
+
+- Every source-derived public brief question has a **Discuss with a Bot** action.
+  It prepares an editable draft with source-citation requirements, resets stale
+  source selections, and uses auto-match. Navigation does not invoke a model.
+- Conversation input, source selections and full-page task drafts are scoped to
+  the project. Switching tabs or visiting project materials preserves them.
+  These are memory-only drafts: page reload clears unsent work, while the task
+  detail URL survives reload. Project deletion and sign-out clear draft state.
+- Task details use `/bots?project=…&view=tasks&run=…`. Opening, browser Back,
+  reloading, and returning from project materials all resolve the same task.
+  A run must belong to the current project before its transcript is requested
+  or its delivery actions are rendered.
+- Failed service, readiness, task-list and task-detail reads offer local retry.
+  An unavailable suggested service has an explicit fallback. Turn and budget
+  limits validate the server's integer ranges before enabling task start.
+- Chat waits for project resolution before showing its composer or sending an
+  initial question. A response finishing after a project switch only clears
+  source context in its originating project.
+- The pipeline now marks the actual page as **You are here** and separately
+  labels the project's progress. Previously Research could be selected while
+  Results incorrectly carried the location caption.
+
+The browser suite now includes eleven scenario groups. New checks cover an
+unsent brief-question handoff, draft round trips, durable task links, and task
+retry. Browser fixtures remain explicitly synthetic; no model, database write,
+external retrieval or compute was invoked. The new brief and task-delivery
+screenshots are included in the existing `/tmp/bda-bot-workspace` output.
+
+Final validation for iteration 2:
+
+- Full Vitest regression: **122 files / 700 tests passed**.
+- Production TypeScript/build and bundle gate passed (entry 397.8 KiB).
+- ESLint passed with the same three existing TanStack Table warnings, no errors.
+- Browser acceptance: **11/11 scenario groups passed**, including responsive
+  layouts, project-location captions, real Mol* fixture rendering and task retry.
+- Public-data allowlist/checksums and `git diff --check` passed. Public source
+  package data and model/backend contracts are unchanged.

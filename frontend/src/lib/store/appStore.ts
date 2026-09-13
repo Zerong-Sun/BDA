@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { ServiceKind } from '../../features/copilot/taskPresentation'
 import {
   adjacentTourStep,
   firstTourStep,
@@ -23,6 +24,9 @@ export interface CopilotChatMessage {
 }
 
 export interface CopilotProjectSession {
+  /** Unsent text and source selection live only in this signed-in browser session. */
+  input?: string
+  selectedEntityIds?: string[]
   conversationId: string | null
   messages: CopilotChatMessage[]
   /**
@@ -35,6 +39,15 @@ export interface CopilotProjectSession {
    * changed.
    */
   bot: string | null
+}
+
+export interface CopilotTaskDraft {
+  goal: string
+  selected: ServiceKind | null
+  preview: boolean
+  writes: string[]
+  maxTurns: number
+  maxCost: string
 }
 
 export interface WorkflowSeed {
@@ -73,6 +86,7 @@ interface AppState {
   activeProjectId: string
   copilotMessages: CopilotChatMessage[]
   copilotSessions: Record<string, CopilotProjectSession>
+  copilotTaskDrafts: Record<string, CopilotTaskDraft>
   copilotDraft: string
   copilotSelectedEntityIds: string[]
   copilotOpen: boolean
@@ -101,9 +115,11 @@ interface AppState {
   ) => void
   setCopilotConversationId: (projectId: string, conversationId: string | null) => void
   setCopilotSessionBot: (projectId: string, bot: string | null) => void
+  setCopilotSessionInput: (projectId: string, input: string) => void
+  setCopilotTaskDraft: (projectId: string, draft: CopilotTaskDraft) => void
   resetCopilotSession: (projectId: string) => void
   setCopilotDraft: (draft: string) => void
-  setCopilotSelectedEntityIds: (entityIds: string[]) => void
+  setCopilotSelectedEntityIds: (entityIds: string[], projectId?: string) => void
   resetCopilotMessages: () => void
   setCopilotOpen: (open: boolean) => void
   setSettingsOpen: (open: boolean) => void
@@ -133,6 +149,7 @@ export const useAppStore = create<AppState>()(
       activeProjectId: '',
       copilotMessages: defaultCopilotMessages,
       copilotSessions: {},
+      copilotTaskDrafts: {},
       copilotDraft: '',
       copilotSelectedEntityIds: [],
       copilotOpen: true,
@@ -150,12 +167,17 @@ export const useAppStore = create<AppState>()(
       setThemePreference: (themePreference) => set({ themePreference }),
       setActiveProjectId: (activeProjectId) => set((state) => ({
         activeProjectId,
-        ...(state.activeProjectId !== activeProjectId ? { copilotDraft: '', copilotSelectedEntityIds: [] } : {}),
+        ...(state.activeProjectId !== activeProjectId ? { copilotDraft: '', copilotSelectedEntityIds: state.copilotSessions[activeProjectId]?.selectedEntityIds ?? [] } : {}),
       })),
-      clearProjectState: (projectId) =>
-        set((state) => ({
-          activeProjectId: state.activeProjectId === projectId ? '' : state.activeProjectId,
-        })),
+      clearProjectState: (projectId) => set((state) => {
+        const copilotSessions = { ...state.copilotSessions }
+        const copilotTaskDrafts = { ...state.copilotTaskDrafts }
+        delete copilotSessions[projectId]
+        delete copilotTaskDrafts[projectId]
+        return { copilotSessions, copilotTaskDrafts,
+          ...(state.activeProjectId === projectId ? { activeProjectId: '', copilotDraft: '', copilotSelectedEntityIds: [] } : {}),
+        }
+      }),
       setCopilotMessages: (messages) =>
         set((state) => ({
           copilotMessages:
@@ -183,14 +205,30 @@ export const useAppStore = create<AppState>()(
         const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
         return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, bot } } }
       }),
+      setCopilotSessionInput: (projectId, input) => set((state) => {
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
+        return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, input } } }
+      }),
+      setCopilotTaskDraft: (projectId, draft) => set((state) => ({
+        copilotTaskDrafts: { ...state.copilotTaskDrafts, [projectId]: draft },
+      })),
       resetCopilotSession: (projectId) => set((state) => ({
+        ...(state.activeProjectId === projectId ? { copilotDraft: '', copilotSelectedEntityIds: [] } : {}),
         copilotSessions: {
           ...state.copilotSessions,
           [projectId]: { conversationId: null, messages: [], bot: null },
         },
       })),
       setCopilotDraft: (copilotDraft) => set({ copilotDraft }),
-      setCopilotSelectedEntityIds: (copilotSelectedEntityIds) => set({ copilotSelectedEntityIds }),
+      setCopilotSelectedEntityIds: (copilotSelectedEntityIds, projectId) => set((state) => {
+        const scope = projectId ?? state.activeProjectId
+        if (!scope) return state.activeProjectId ? {} : { copilotSelectedEntityIds }
+        const current = state.copilotSessions[scope] ?? { conversationId: null, messages: [], bot: null }
+        return { ...(scope === state.activeProjectId ? { copilotSelectedEntityIds } : {}), copilotSessions: {
+          ...state.copilotSessions,
+          [scope]: { ...current, selectedEntityIds: copilotSelectedEntityIds },
+        } }
+      }),
       resetCopilotMessages: () => set({ copilotMessages: defaultCopilotMessages }),
       setCopilotOpen: (copilotOpen) => set({ copilotOpen }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
@@ -264,6 +302,7 @@ export const useAppStore = create<AppState>()(
         activeProjectId: '',
         copilotMessages: [],
         copilotSessions: {},
+        copilotTaskDrafts: {},
         copilotDraft: '',
         copilotSelectedEntityIds: [],
         copilotOpen: false,

@@ -66,6 +66,6 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
       <Button type="button" variant="ghost" onClick={() => setBrief(null)}>{zh ? '取消编辑' : 'Cancel edit'}</Button>
     </form> : null}
     {record.error || prepareBrief.error || applyBrief.error ? <p role="alert" className="text-sm text-destructive">{String(record.error ?? prepareBrief.error ?? applyBrief.error)}</p> : null}
-    <Link className="text-sm text-primary" to={`${base}&tab=timeline`}>{zh ? '查看项目决策树' : 'Open the project decision tree'}</Link>
+    <Link className="block pt-1 text-sm text-primary" to={`${base}&tab=timeline`}>{zh ? '查看项目决策树' : 'Open the project decision tree'}</Link>
   </section>
 }

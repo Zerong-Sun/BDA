@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { ApiState } from '../../components/ui/ApiState'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowCounterClockwiseIcon,
@@ -44,7 +45,7 @@ const AUTO_BOT = '__auto__'
 
 export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, externalRoster = false }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void; externalRoster?: boolean }) {
   const { t, format, language } = useI18n()
-  const { projectId, activeProject, setProjectId } = useProjectContext()
+  const { projectId, activeProject, setProjectId, projectsLoading, projectsError, projectsQueryError, refetchProjects } = useProjectContext()
   const queryClient = useQueryClient()
   const {
     messages,
@@ -59,13 +60,15 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     bot,
     setBot,
   } = useCopilotChat(projectId, pageContext, language)
-  const [input, setInput] = useState('')
+  const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
+  const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
+  const setInput = useCallback((value: string) => setSessionInput(projectId, value), [projectId, setSessionInput])
   const initialSent = useRef(false)
   useEffect(() => {
-    if (!initialQuestion || initialSent.current) return
+    if (!initialQuestion || initialSent.current || projectsLoading || projectsError) return
     initialSent.current = true
     void send(initialQuestion)
-  }, [initialQuestion, send])
+  }, [initialQuestion, send, projectsLoading, projectsError])
   const copilotDraft = useAppStore((state) => state.copilotDraft)
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -111,13 +114,13 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
   }
 
   useEffect(() => {
-    if (!copilotDraft) return
+    if (!copilotDraft || projectsLoading || projectsError) return
     const timer = window.setTimeout(() => {
       setInput(copilotDraft)
       setCopilotDraft('')
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [copilotDraft, setCopilotDraft])
+  }, [copilotDraft, setCopilotDraft, setInput, projectsLoading, projectsError])
 
   const sendStarter = async (starter: string) => {
     setInput('')
@@ -139,6 +142,8 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     const target = byId.get(id)
     return target ? [target] : []
   })
+
+  if (projectsLoading || projectsError) return <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>{null}</ApiState>
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">

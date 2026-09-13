@@ -234,7 +234,11 @@ export function AgentRunDetail({
   const [retainedWrites, setRetainedWrites] = useState<string[] | null>(null)
   const run = useQuery({
     queryKey: ['agent-run', projectId, runId],
-    queryFn: () => getAgentRun(runId),
+    queryFn: async () => {
+      const result = await getAgentRun(runId)
+      if (result.project_id !== projectId) throw new Error(language === 'zh' ? '此任务不属于当前项目，请返回任务列表。' : 'This task belongs to another project. Return to the task list.')
+      return result
+    },
     refetchInterval: (query) =>
       query.state.data && isLive(query.state.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
@@ -242,6 +246,7 @@ export function AgentRunDetail({
   const turns = useQuery({
     queryKey: ['agent-run-turns', projectId, runId],
     queryFn: () => listAgentTurns(runId),
+    enabled: Boolean(run.data) && !run.isError,
     refetchInterval: run.data && isLive(run.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
 
@@ -326,7 +331,8 @@ export function AgentRunDetail({
       ) : null}
 
       {run.data ? <TaskDelivery run={run.data} /> : null}
-      {run.error || turns.error ? <p role="alert">{language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.'}</p> : null}
+      {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
+      {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
       {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
         <label className="text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
         {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}

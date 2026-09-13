@@ -24,6 +24,13 @@ workspace.structures = [0, 1].map((index) => ({
 }))
 let failRoster = false
 let emptyProjects = false
+let failTask = false
+const task = {
+  id: 'task-browser', project_id: 'proj_browser', goal: 'Review the synthetic QA sources', status: 'succeeded',
+  parent_run_id: null, allowed_tools: [], version: 1, turn_count: 2, max_turns: 24, cost_usd_cents: 0,
+  task_contract: { version: 1, service_kind: 'literature' },
+  outcome: { status: 'needs_input', summary: 'Synthetic QA delivery: source review needs your input.', missing: ['Confirm the source selection.'], next_action: 'Review the project materials.', steps: [] },
+}
 const writes = []
 const failures = []
 const browser = await chromium.launch({ headless: true })
@@ -51,6 +58,9 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     else if (path === '/api/v2/projects/library') reply = { status: 200, body: { items: [{ ...project, reference_count: 12, structure_count: 4, finding_count: 4 }], next_cursor: null } }
     else if (path.endsWith('/research-workspace')) reply = { status: 200, body: workspace }
     else if (path.endsWith('/research-goals')) reply = { status: 200, body: { items: [], next_cursor: null } }
+    else if (path === '/api/v2/copilot/projects/proj_browser/agent-runs') reply = { status: 200, body: { items: [task], next_cursor: null } }
+    else if (path === '/api/v2/copilot/agent-runs/task-browser') reply = failTask ? { status: 422, body: { detail: 'Task unavailable for this test' } } : { status: 200, body: task }
+    else if (path === '/api/v2/copilot/agent-runs/task-browser/turns') reply = { status: 200, body: { items: [], next_cursor: null } }
     else if (path === '/api/v2/copilot/bots' && failRoster) reply = { status: 422, body: { status: 422, title: 'Roster unavailable', detail: 'Roster unavailable for this test' } }
     else if (path.includes('/handoffs')) reply = { status: 200, body: { items: [], next_cursor: null } }
     else reply = await base.resolve(method, url.href, { body: request.postDataJSON() })
@@ -91,8 +101,18 @@ try {
   await page.getByRole('region', { name: 'Project brief' }).waitFor()
   assert.ok(page.url().includes('/research?project=proj_browser&tab=goals'))
   assert.ok(await page.getByText('Which structures and sources support ligand recognition and antibody binding?').isVisible())
+  const currentStage = page.locator('[data-slot="stepper-trigger"][aria-current="page"]')
+  assert.ok((await currentStage.textContent()).includes('Research'))
+  assert.ok((await currentStage.textContent()).includes('You are here'))
   checks.push('Open reaches the project brief in one click; no decorative project images; source-derived questions are visible without saved goals')
   await screenshot(page, 'brief-en-light')
+  await page.getByRole('button', { name: 'Discuss with a Bot: Which structures and sources support ligand recognition and antibody binding?', exact: true }).click()
+  await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Ask the Copilot a question"]')?.value.includes('Which structures and sources'))
+  assert.equal(writes.length, 0)
+  await page.goBack()
+  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  checks.push('A brief question opens an editable, unsent Bot draft with citation requirements')
   await page.goBack()
   await page.locator('.project-row').waitFor()
   assert.ok(page.url().includes('/projects'))
@@ -121,7 +141,8 @@ try {
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
   await page.getByRole('tab', { name: 'Conversation', exact: true }).waitFor()
   assert.ok(page.url().includes('/bots?project=proj_browser&view=chat'))
-  const drafted = await page.locator('input').evaluateAll((inputs) => inputs.map((input) => input.value).join(' '))
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Ask the Copilot a question"]')?.value.includes('DEMO-2'))
+  const drafted = await page.getByLabel('Ask the Copilot a question', { exact: true }).inputValue()
   assert.ok(drafted.includes('DEMO-1') && drafted.includes('DEMO-2'))
   assert.equal(writes.length, 0, 'Selecting a structure or Bot must not send or execute anything')
   checks.push('Both synthetic structures render; comparison transfers both source IDs to an unsent Bot draft')
@@ -132,12 +153,38 @@ try {
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
   await page.getByRole('heading', { name: 'What would you like to accomplish?' }).waitFor()
   await screenshot(page, 'bots-en-light')
+  await page.getByLabel('Task goal', { exact: true }).fill('Research the existing project sources')
+  await page.getByRole('button', { name: 'Research the evidence', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Allow saving research notes for review' }).check()
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).focus()
   await page.keyboard.press('ArrowRight')
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Conversation')
   await page.keyboard.press('Enter')
   await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
+  assert.equal(await page.getByLabel('Ask the Copilot a question', { exact: true }).inputValue(), drafted)
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
+  assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
+  assert.ok(await page.getByRole('checkbox', { name: 'Allow saving research notes for review' }).isChecked())
+  await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
+  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  await page.goBack()
+  await page.getByLabel('Task goal', { exact: true }).waitFor()
+  assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
+  checks.push('Unsent conversation and reviewed task drafts survive view changes and a trip to project materials')
+  await page.getByRole('button', { name: /Review the synthetic QA sources/ }).click()
+  await page.getByText(task.outcome.summary, { exact: true }).waitFor()
+  assert.ok(page.url().includes('run=task-browser'))
+  await page.reload()
+  await page.getByText(task.outcome.summary, { exact: true }).waitFor()
+  await screenshot(page, 'task-delivery-en-light')
+  await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
+  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  await page.goBack()
+  await page.getByText(task.outcome.summary, { exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Back to runs', exact: true }).click()
+  assert.ok(!page.url().includes('run='))
+  await page.getByLabel('Task goal', { exact: true }).waitFor()
+  checks.push('Task delivery has a durable URL; reload and material round trips return to the same task')
   checks.push('Roster selection updates the project-scoped Bot and handoffs are directly reachable')
 
   for (const width of [320, 390, 768, 1024, 1440, 1920, 2560]) {
@@ -169,6 +216,14 @@ try {
   await errorPage.getByRole('button', { name: 'Retry', exact: true }).click()
   await errorPage.getByRole('button', { name: 'Conductor conductor', exact: true }).waitFor()
   checks.push('Roster failure is recoverable through Retry')
+  failTask = true
+  const taskError = await newPage()
+  await taskError.goto(`${origin}/#/bots?project=proj_browser&view=tasks&run=task-browser`)
+  await taskError.getByRole('button', { name: 'Reload task records', exact: true }).waitFor()
+  failTask = false
+  await taskError.getByRole('button', { name: 'Reload task records', exact: true }).click()
+  await taskError.getByText(task.outcome.summary, { exact: true }).waitFor()
+  checks.push('Failed task deep links can be retried without leaving the workspace')
   emptyProjects = true
   const empty = await newPage()
   await empty.goto(`${origin}/#/bots`)

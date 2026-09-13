@@ -218,3 +218,6 @@ body { line-height: 1.6; }
   .bot-avatar, .bot-face i, .project-row { transition: none; }
   .bot-roster-item:hover .bot-avatar, .bot-roster-item:focus-visible .bot-avatar, .science-team-roles > div:hover .bot-avatar { transform: none; }
 }
+
+/* Keep each source question and its next action together without a new card. */
+.project-brief .brief-question-action { display: flex; padding: 0; margin-top: 4px; height: auto; min-height: 32px; justify-content: flex-start; white-space: normal; text-align: left; }
