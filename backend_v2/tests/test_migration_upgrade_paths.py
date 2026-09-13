@@ -22,6 +22,8 @@ pytestmark = pytest.mark.skipif(os.getenv("BDA_V2_RUN_DB_TESTS") != "1", reason=
 @pytest.mark.parametrize("previous", [
     "0056_workflow_gates", "0059_workflow_gates",
     "0056_copilot_task_contracts", "0061_autopilot_stage_operator",
+    "0057_plugin_output_routing", "0058_staged_port_paths",
+    "0062_proteinmpnn_parser", "0064_public_integration",
 ])
 def test_existing_feature_head_upgrades_and_downgrades(previous, monkeypatch):
     settings = settings_module.get_settings()
