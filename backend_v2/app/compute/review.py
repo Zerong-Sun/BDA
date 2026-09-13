@@ -11,7 +11,9 @@ from .scripts import preview_context, render_script
 
 
 def render_review(node, plugin, backend: str, manifest: dict) -> tuple[str, str]:
-    command = (plugin.command if plugin else None) or node.command or ""
+    from ..workflows.assistance import node_command
+
+    command = node_command(node, plugin)
     script = render_script(preview_context(node, plugin, backend, command, manifest["parameters"]))
     settings = get_settings()
     site = (

@@ -84,6 +84,8 @@ export function preflightBlockersFrom(error: unknown): string[] {
 
 export interface ScriptPreviewOptions {
   /** Unsaved parameters may be previewed, but must be saved before submission. */
+  configuration?: Record<string, unknown>
+  input_bindings?: WorkflowInputBinding[]
   override_params?: Record<string, unknown>
   compute_backend?: 'lsf' | 'docker'
 }
@@ -100,6 +102,8 @@ export function previewWorkflowNodeScript(nodeRunId: string, options: ScriptPrev
     body: {
       compute_backend: options.compute_backend,
       overrides: options.override_params ?? {},
+      configuration: options.configuration,
+      input_bindings: options.input_bindings,
     }, throwOnError: true,
   }).then(({ data }) => data)
 }
@@ -117,6 +121,7 @@ export function addWorkflowNode(
     key: string
     model_plugin?: string
     model_plugin_id?: string
+    configuration?: Record<string, unknown>
     parameters?: Record<string, unknown>
     position?: { x: number; y: number }
   },
@@ -140,16 +145,18 @@ export function updateWorkflowNode(
   workflowRunId: string,
   nodeRunId: string,
   payload: {
+    configuration?: Record<string, unknown>
     parameters?: Record<string, unknown>
     position?: { x: number; y: number }
     status?: string
     input_bindings?: WorkflowInputBinding[]
     queue?: string | null
   },
+  expectedVersion?: number,
 ) {
-  return workflowIfMatch(workflowRunId).then((headers) => patchWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesNodeIdPatch<true>({
+  return (expectedVersion === undefined ? workflowIfMatch(workflowRunId) : Promise.resolve({ 'If-Match': `W/"${expectedVersion}"` })).then((headers) => patchWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesNodeIdPatch<true>({
     path: { workflow_id: workflowRunId, node_id: nodeRunId }, headers, body: {
-      parameters: payload.parameters, position: payload.position,
+      configuration: payload.configuration, parameters: payload.parameters, position: payload.position,
       input_bindings: payload.input_bindings, queue: payload.queue,
     }, throwOnError: true,
   }).then(({ data }) => WorkflowNodeSchema.parse(data)))

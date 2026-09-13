@@ -14,6 +14,9 @@
 
 按下面顺序阅读即可了解从建项目到运行的完整路径；只想使用计算器或仪器预览，可直接看第一份指南的“独立实验工具”。
 
+- [Workflow connections and gates](WORKFLOW_GATES.md)
+- [Workflow gate validation and repairs](WORKFLOW_GATES_REVIEW.md)
+
 - [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
 - [Backend v2](BACKEND_V2.md)
 - [Frontend v2](FRONTEND_V2.md)

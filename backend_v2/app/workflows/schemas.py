@@ -4,9 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..core.statuses import WorkflowNodeStatus, WorkflowRunStatus
+from .gate_schemas import GatePolicy
 
 
 class WorkflowInputBinding(BaseModel):
@@ -36,12 +37,15 @@ class WorkflowNodeInput(BaseModel):
     container_image: str | None = Field(default=None, max_length=500)
     command: str | None = None
     queue: str | None = Field(default=None, max_length=120)
+    configuration: dict = Field(default_factory=dict)
     parameters: dict = Field(default_factory=dict)
     input_bindings: list[WorkflowInputBinding] = Field(default_factory=list, max_length=50)
     position: dict[str, float] | None = None
 
 
 class WorkflowEdgeInput(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=160)
+    gate: GatePolicy = Field(default_factory=GatePolicy)
     source: str
     target: str
     source_port: str | None = Field(default=None, max_length=120)
@@ -118,6 +122,7 @@ class WorkflowNodeUpdate(BaseModel):
     container_image: str | None = Field(default=None, max_length=500)
     command: str | None = None
     queue: str | None = Field(default=None, max_length=120)
+    configuration: dict | None = None
     parameters: dict | None = None
     input_bindings: list[WorkflowInputBinding] | None = Field(default=None, max_length=50)
     position: dict[str, float] | None = None
@@ -125,6 +130,14 @@ class WorkflowNodeUpdate(BaseModel):
 
 class WorkflowNodeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_legacy_status(cls, status):
+        # Read old imported nodes without rewriting their historical database rows.
+        if isinstance(status, str):
+            return {"not_started": "draft", "completed": "succeeded"}.get(status, status)
+        return status
 
     id: uuid.UUID
     workflow_run_id: uuid.UUID
@@ -137,6 +150,7 @@ class WorkflowNodeResponse(BaseModel):
     queue: str | None
     status: WorkflowNodeStatus
     execution_mode: Literal["dispatch", "manual"] = "dispatch"
+    configuration: dict = Field(default_factory=dict)
     parameters: dict
     input_bindings: list = Field(default_factory=list)
     error_message: str | None
@@ -172,6 +186,8 @@ class WorkflowPreflightResponse(BaseModel):
 
 
 class ScriptPreviewCreate(BaseModel):
+    configuration: dict | None = None
+    input_bindings: list[WorkflowInputBinding] | None = None
     compute_backend: str = Field(default="lsf", pattern="^(docker|lsf)$")
     overrides: dict = Field(default_factory=dict)
 

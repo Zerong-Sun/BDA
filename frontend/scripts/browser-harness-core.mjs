@@ -1117,6 +1117,7 @@ function createStrictRoutes({ scenario, routeId }) {
     script: '#!/bin/bash\n#BSUB -q cpu\nscore --input candidates.json',
     input_manifest: { parameters: workflowNode.parameters, inputs: [], pending_inputs: [] },
   }))
+  add('GET', `/api/v2/workflow-runs/${workflowRun.id}/gates`, {}, () => ok({ items: [] }))
   add('GET', `/api/v2/workflow-runs/${workflowRun.id}/jobs`, {}, () => ok({
     items: empty ? [] : [jobFixture(scenario)],
     next_cursor: null,
