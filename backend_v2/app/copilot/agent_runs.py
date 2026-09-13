@@ -366,6 +366,29 @@ def resumable_runs(session: Session, limit: int = 50) -> list[CopilotAgentRun]:
     return [run for run in waiting if not outstanding_tasks(session, run)]
 
 
+def announce_settled(session: Session, run: CopilotAgentRun) -> None:
+    """Tell whoever was waiting on this run from outside the copilot.
+
+    `settle_parent` wakes a parent run; nothing told another *domain*. An
+    Autopilot stage that opened a run had no way to learn it had finished, so the
+    stage sat at `ready` for ever and the campaign never moved - the mechanism
+    was there and the signal was not.
+
+    Through the outbox, as `job.settled` is, and on every terminal state rather
+    than on success. Emitting only on success is the mistake compute already
+    made and recorded: a consumer left to discover failure by polling does not,
+    and the thing waiting sleeps for ever.
+    """
+    from ..compute.repository import ComputeRepository
+
+    ComputeRepository(session).enqueue(
+        "copilot.agent_run.settled",
+        run.id,
+        project_id=run.project_id,
+        payload={"run_id": str(run.id), "status": run.status},
+    )
+
+
 def finish(
     session: Session, run: CopilotAgentRun, *, status: str, error: str | None = None
 ) -> CopilotAgentRun:
@@ -379,6 +402,7 @@ def finish(
     run.error = error
     run.version += 1
     session.flush()
+    announce_settled(session, run)
     return run
 
 
@@ -415,6 +439,10 @@ def cancel(session: Session, run: CopilotAgentRun, *, reason: str = "") -> int:
     run.error = reason or None
     run.version += 1
     session.flush()
+    # Cancelled is terminal too. A stage whose operator was stopped has to learn
+    # that as surely as one whose operator finished, or it waits on a run that
+    # will never report - which is the same shape as emitting on success only.
+    announce_settled(session, run)
     return cancelled
 
 

@@ -25,6 +25,7 @@ from .models import (
     AutopilotCampaign,
     AutopilotDraft,
     AutopilotLedgerEntry,
+    AutopilotServicePrincipal,
     AutopilotStage,
     BudgetReservation,
     CampaignBudget,
@@ -447,12 +448,16 @@ def take_over_campaign(
     campaign.taken_over_at = datetime.now(UTC)
     campaign.taken_over_by = user.id
     campaign.version += 1
+    stopped = _stop_operators(session, campaign, reason="autopilot campaign taken over")
     session.add(
         AutopilotLedgerEntry(
             campaign_id=campaign.id,
             writer_user_id=user.id,
             event_type="campaign.takeover",
-            payload={"taken_over_by": str(user.id)},
+            # What the handover actually stopped, signed by the person who asked
+            # for it. A takeover that quietly cancelled work would be a worse
+            # record than one that never mentioned the work at all.
+            payload={"taken_over_by": str(user.id), "operators_stopped": stopped},
         )
     )
     record_audit(
@@ -548,6 +553,44 @@ def release_stage(
     return stage
 
 
+def _stop_operators(
+    session: Session, campaign: AutopilotCampaign, *, reason: str
+) -> list[str]:
+    """Stop any agent run this campaign's stages are still carrying.
+
+    Takeover deliberately leaves the products alone - what changes hands is
+    authority over the runs, jobs and candidates the stages created, and a
+    compute job left running keeps GPU hours somebody already paid for. An agent
+    run is the one product where that reasoning inverts: it is not a *result*
+    sitting there, it is an operator still thinking and still writing through its
+    own tools. Leaving it alive is the race takeover exists to prevent, one level
+    down - the worker moving on while a person corrects the step before it.
+
+    So: jobs keep running, operators stop. Cheap to restart, and the person now
+    holds the campaign.
+
+    Returns the stage keys it stopped, for the ledger.
+    """
+    from ..copilot import agent_runs as copilot_runs
+
+    stopped: list[str] = []
+    stages = session.scalars(
+        select(AutopilotStage).where(
+            AutopilotStage.campaign_id == campaign.id,
+            AutopilotStage.resource_type == "copilot_agent_run",
+        )
+    )
+    for stage in stages:
+        if stage.resource_id is None:
+            continue
+        run = session.get(CopilotAgentRun, stage.resource_id)
+        if run is None:
+            continue
+        if copilot_runs.cancel(session, run, reason=reason):
+            stopped.append(stage.stage_key)
+    return stopped
+
+
 def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
     stage = session.get(AutopilotStage, stage_id)
     if stage is None:
@@ -560,6 +603,138 @@ def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
 #: query that skipped it would advance to the stage *behind* the gate on the next
 #: redelivery - walking past the exact thing the gate exists to stop.
 UNSTARTED_STAGE_STATUSES = ("pending", "awaiting_release")
+
+#: A stage that has finished, one way or the other. Nothing restarts one, and
+#: `advance_campaign` steps over them looking for the next thing to do.
+SETTLED_STAGE_STATUSES = ("succeeded", "failed", "cancelled")
+
+
+def settle_stage(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage: AutopilotStage,
+    *,
+    status: str,
+) -> AutopilotStage:
+    """Record that a stage's product reached a terminal state.
+
+    Before this, a stage went `pending` -> `ready` and stopped. Nothing ever
+    wrote `succeeded`, so the Autopilot page reported "ready" for ever after the
+    work was done and the campaign had no way to know a step was over - the one
+    half of the loop that was missing was not the advancing, it was the knowing.
+
+    Idempotent and one-way: a settled stage is not re-settled, because the second
+    write would be a second answer to "how did this step end" and the ledger
+    would carry both.
+    """
+    if status not in SETTLED_STAGE_STATUSES:
+        raise DomainError(
+            "autopilot_stage_bad_terminal_status",
+            f"A stage settles as one of {', '.join(SETTLED_STAGE_STATUSES)}",
+            status_code=422,
+        )
+    if stage.status in SETTLED_STAGE_STATUSES:
+        return stage
+    stage.status = status
+    stage.version += 1
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            service_principal_id=_worker_principal_id(session),
+            event_type="stage.settled",
+            payload={
+                "stage_id": str(stage.id),
+                "stage_key": stage.stage_key,
+                "status": status,
+                "operator": stage.operator,
+            },
+        )
+    )
+    return stage
+
+
+def next_stage(session: Session, campaign: AutopilotCampaign) -> AutopilotStage | None:
+    """The frontmost stage that has not acted.
+
+    Deliberately not "the first `pending` one": a held stage sits in
+    `awaiting_release`, and selecting on `pending` alone steps over the gate to
+    the stage behind it. `execute_campaign` has always read it this way and this
+    is that same read, shared so the two cannot drift apart.
+    """
+    return session.scalar(
+        select(AutopilotStage)
+        .where(
+            AutopilotStage.campaign_id == campaign.id,
+            AutopilotStage.status.in_(UNSTARTED_STAGE_STATUSES),
+        )
+        .order_by(AutopilotStage.position)
+        .limit(1)
+    )
+
+
+def advance_campaign(
+    session: Session, campaign: AutopilotCampaign
+) -> tuple[AutopilotStage | None, tuple[str, uuid.UUID] | None]:
+    """Activate the next stage, if the campaign is still the worker's to advance.
+
+    Three refusals, and none of them is optional:
+
+    * a **cancelled** campaign has nothing to advance to;
+    * a **taken-over** campaign belongs to a person now, and advancing it is the
+      exact race takeover exists to prevent - the worker moving a step on while
+      someone is correcting the products of the one before it;
+    * a **held** stage stops here, because `activate_stage` refuses to create its
+      resource and the campaign waits for a signature. That is not a failure of
+      advancing; it is advancing arriving at the gate.
+
+    Returns the stage it reached and whatever its adapter created, so the caller
+    can record both. A `None` stage means the chain is finished.
+    """
+    if campaign.status in {"cancelled", "manual_takeover"}:
+        return None, None
+    in_flight = session.scalar(
+        select(AutopilotStage).where(
+            AutopilotStage.campaign_id == campaign.id,
+            AutopilotStage.status == "ready",
+        )
+    )
+    if in_flight is not None:
+        # A campaign runs one stage at a time - `execute_campaign` activates only
+        # the frontmost - so a stage already in flight means this advance has
+        # happened. Without this, a redelivered settlement advances a second
+        # time: the stage it activated is `ready`, which `next_stage` does not
+        # count as unstarted, so it finds the stage *after* it and starts that
+        # one while the one between has not run.
+        return None, None
+    stage = next_stage(session, campaign)
+    if stage is None:
+        return None, None
+    resource = activate_stage(session, campaign, stage)
+    return stage, resource
+
+
+def _worker_principal_id(session: Session) -> uuid.UUID:
+    """The service principal a worker-written ledger row is signed by.
+
+    A ledger entry needs an author. This one is written from a worker with no
+    person behind it, so it carries the principal rather than borrowing the
+    confirmer's identity - "who caused this" has to stay answerable, and
+    attributing an automatic settlement to the person who confirmed the campaign
+    would answer it wrongly.
+    """
+    principal = session.scalar(
+        select(AutopilotServicePrincipal).where(
+            AutopilotServicePrincipal.name == "autopilot-worker"
+        )
+    )
+    if principal is None:
+        principal = AutopilotServicePrincipal(
+            name="autopilot-worker",
+            allowed_actions=["campaign.execute", "campaign.cancel.reconcile"],
+        )
+        session.add(principal)
+        session.flush()
+    return principal.id
 
 
 def activate_stage(

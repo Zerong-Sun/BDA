@@ -276,6 +276,42 @@ is already working on a step nobody has released. Every staffed stage is
 person must accept the risk of would be the platform answering that question for
 them.
 
+### The stage had no way to end
+
+Wiring an operator into a stage left the other half missing, and it was not the
+one that looks missing. A stage went `pending` → `ready` and stopped there: the
+page reported "ready" after the work was finished, and the campaign had no way to
+know a step was over. The advancing was not what was absent — the *knowing* was.
+
+`agent_runs.finish` and `cancel` now emit `copilot.agent_run.settled` through the
+outbox, on every terminal state rather than on success, which is the mistake
+compute already made and recorded: a consumer left to discover failure by polling
+does not, and the thing waiting sleeps for ever. `autopilot.tasks.stage_settled`
+settles the stage and then asks `advance_campaign` for the next one.
+
+What stops it matters more than what moves it, because advancing is the one thing
+here that acts with no person in the loop:
+
+- a **cancelled** campaign has nothing to advance to;
+- a **taken-over** campaign belongs to a person, and advancing it is the race
+  takeover exists to prevent;
+- a **held** stage stops the chain at the gate — advancing arriving at a
+  signature, not failing;
+- a stage **already in flight** stops it too. Without that, a redelivered
+  settlement advanced twice: the stage the first advance activated is `ready`,
+  which the unstarted query does not match, so the second found the stage *after*
+  it and started that one while the one between had not run.
+
+Takeover also stops the stage's operator now, and leaves compute jobs alone. The
+asymmetry is the point: a running job is GPU hours somebody already paid for, and
+an agent run is not a result sitting there — it is an operator still writing.
+
+None of this makes the unattended loop complete, and
+[Autopilot campaigns](AUTOPILOT_CAMPAIGNS.md) still says so. The chain stops at
+the first `compute` or `design` stage, whose product is a workflow-run draft that
+nothing settles by design, and the end-to-end loop has still not been run on real
+compute. The mechanism existing and the loop being proven are different claims.
+
 ## What is deliberately not added
 
 More bots along the capability axis. The roster does not need a "reporter", a
@@ -310,3 +346,7 @@ nothing.
 | 17 | A stage's run is owned by the operator frozen on the row, authorised by the person's brief, and limited to bot ∩ project | `test_autopilot_operators.py` |
 | 18 | An unstaffed, retired-operator or nothing-enabled stage opens no run rather than a broken one | `test_autopilot_operators.py` |
 | 19 | Cancelling a campaign cancels its stage's agent run and marks the stage, without rewriting a stage that already finished | `test_autopilot_operators.py` |
+| 20 | A run announces itself on every terminal state - succeeded, failed and cancelled - carrying the project the worker fence needs | `test_autopilot_lifecycle.py` |
+| 21 | A settled stage records how it ended, once, signed by the worker principal rather than by the person who confirmed the campaign | `test_autopilot_lifecycle.py` |
+| 22 | A cancelled, taken-over, or already-in-flight campaign does not advance; a held stage stops the chain at the gate rather than being stepped over | `test_autopilot_lifecycle.py` |
+| 23 | Taking over stops the stage's operator and does not thereby advance the campaign | `test_autopilot_lifecycle.py` |
