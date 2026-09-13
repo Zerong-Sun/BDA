@@ -206,7 +206,11 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_operator_charters", "read_operator_work"],
+        "chat_tools": [
+            "list_operator_charters",
+            "read_operator_work",
+            "review_compute_declaration",
+        ],
     },
     {
         "id": "compute-drafting",

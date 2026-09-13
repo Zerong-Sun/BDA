@@ -17,6 +17,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from sqlalchemy import select
+
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -1487,5 +1489,92 @@ _register(
         needs_operator=True,
         awaits="subagent",
         handler=_delegate_to_operator,
+    )
+)
+
+
+def _review_compute_declaration(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """What a plugin declares against what the cluster will give it.
+
+    Added because `steward`'s charter named a comparison no tool could make.
+    `get_compute_status` returns a draft's free-form specification, while the
+    numbers that reach LSF live on the plugin registry row and on the queue - so
+    the reviewer was being asked to check four things it could not see, which is
+    the same defect the roster already fixed once in `archivist`.
+    """
+    from ..compute import declarations
+    from ..registry.models import ComputeNode, ModelPlugin
+    from ..workflows.models import WorkflowNode
+
+    plugin_id = _arg_str(args, "plugin_id")
+    node_id = _arg_str(args, "node_id")
+    if not plugin_id and not node_id:
+        raise ValueError("copilot_plugin_or_node_required")
+    if node_id:
+        # A reviewer reads the route before it reads the plugin, so a workflow
+        # node is the identifier it actually has. Resolved here rather than left
+        # to the model to look up, which would be a second chance to pick the
+        # wrong plugin by name.
+        node = ctx.session.get(WorkflowNode, uuid.UUID(node_id))
+        if node is None or node.model_plugin_id is None:
+            raise ValueError("workflow_node_has_no_plugin")
+        plugin_id = str(node.model_plugin_id)
+
+    plugin = ctx.session.get(ModelPlugin, uuid.UUID(plugin_id))
+    if plugin is None:
+        raise ValueError("registry_plugin_not_found")
+
+    queue = _arg_str(args, "queue") or None
+    backend = _arg_str(args, "backend") or "lsf"
+    if queue is None:
+        # The queue is chosen at submission and is what merges a GPU request in,
+        # so a review with no queue named is a review of half the question. The
+        # project's own node is the honest default; when there is none the
+        # finding set simply cannot include the queue rules, and says so through
+        # a null `queue` rather than by assuming a safe one.
+        node = ctx.session.scalars(
+            select(ComputeNode).where(ComputeNode.backend == backend, ComputeNode.enabled.is_(True))
+        ).first()
+        if node is not None:
+            queue = node.queue
+
+    return declarations.review(
+        plugin_key=plugin.plugin_key,
+        plugin_version=plugin.plugin_version,
+        resources=dict(plugin.resources or {}),
+        backend=backend,
+        queue=queue,
+    )
+
+
+_register(
+    ToolSpec(
+        id="review_compute_declaration",
+        description=(
+            "Compare what a compute plugin declares it needs - slots, per-host "
+            "span, GPU - against what the chosen queue will actually give it. "
+            "Returns the directives that would be submitted and the "
+            "disagreements, and says plainly when the declaration is sound."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "plugin_id": {"type": "string"},
+                "node_id": {
+                    "type": "string",
+                    "description": "A workflow node, whose plugin is read from it. Use this or plugin_id.",
+                },
+                "queue": {
+                    "type": "string",
+                    "description": "The queue this would be submitted to. Omitted, the project's enabled node is used.",
+                },
+                "backend": {"type": "string", "enum": ["lsf", "docker"]},
+            },
+            "additionalProperties": False,
+        },
+        capability="review-audit",
+        execution_mode="read",
+        requires="session",
+        handler=_review_compute_declaration,
     )
 )

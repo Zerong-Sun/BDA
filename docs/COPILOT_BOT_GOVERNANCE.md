@@ -180,13 +180,26 @@ what it finds; it posts the verdict back to the operator that made the claim.
 
 Capabilities: `project-read`, `review-audit`, `chain-messaging`. Zero writes.
 
-Reviews a compute draft's declared resources before a human confirms it: `-n`,
-`ptile`, the exported CPU count and the GPU declaration against what the tool
-can actually use. This repository already encodes the rules in
-`backend_v2/scripts/check_cluster_claims.py`, and treats a low-utilisation
-inspection mail from the cluster as a violation rather than a notice. That makes
-it the one review in the chain with a mechanical standard to check against, and
-a distinct accountability from `planner`, which chooses the route.
+Reviews a compute declaration before a human confirms the draft that uses it:
+`-n`, `span[ptile]`, the exported CPU count and the GPU against what the queue
+will actually give it. This repository already encodes the rules in
+`check_plugin_cpu_declarations.py` and `check_cluster_claims.py`, and treats a
+low-utilisation inspection mail from the cluster as a violation rather than a
+notice. That makes it the one review in the chain with a mechanical standard to
+check against, and a distinct accountability from `planner`, which chooses the
+route.
+
+- `review_compute_declaration(plugin_id | node_id, queue?)` — the declaration,
+  the directives that would be submitted, and the disagreements
+
+The first version of this bot shipped without that tool, and is worth recording
+as the defect it was: the charter named four numbers, and the only compute tool
+`steward` held returned a draft's *free-form specification*, while the numbers
+that reach LSF live on the plugin registry row and on the queue. That is
+`archivist` being told to close a goal, one bot later — an operator instructed to
+do something no tool exposes. The rule it most earns its place on is the queue's
+own GPU request: `#BSUB` carrying no `-gpu` does not mean no GPU, because
+`2v100-32-e5` merges `num=1:mode=exclusive_process` into everything it runs.
 
 ## A tool that needs an operator is not offered without one
 
@@ -228,3 +241,5 @@ nothing.
 | 8b | A turn with no operator is not offered the tools that need one, and nothing else is withdrawn with them | `test_copilot_chat_surface.py` |
 | 8c | A settled delegation folds back under `delegate_to_operator` and a settled subagent under `spawn_subagent` | `test_copilot_chain.py` |
 | 9 | Every capability is owned by at least one bot | `test_v2_domains.py` |
+| 10 | A slot count above one with no evidence, and a CPU-only stage on a GPU-forcing queue, are violations; the queue rules stay silent on a backend that ignores the queue | `test_compute_declarations.py` |
+| 11 | A sound declaration is reported as sound, not as an empty finding list | `test_compute_declarations.py` |

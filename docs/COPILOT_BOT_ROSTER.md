@@ -64,7 +64,7 @@ step.
 | 2 | `scout` | 靶点情报 | produce | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `structuralist`, `planner` |
 | 3 | `structuralist` | 结构与残基 | produce | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis`, `chain-messaging` | `planner`, `analyst` |
 | 4 | `planner` | 路线规划 | produce | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner` |
-| 4 | `steward` | 资源守门 | review | Checking a draft's declared resources against what the job can actually use | `project-read`, `review-audit`, `chain-messaging` | `planner` |
+| 4 | `steward` | 资源守门 | review | Checking a plugin's declared resources against what the chosen queue will actually give it | `project-read`, `review-audit`, `chain-messaging` | `planner` |
 | 5 | `runner` | 步骤推进 | produce | Carrying a confirmed run across its waits and reporting what settled | `project-read`, `workflow-planning`, `agent-orchestration`, `chain-messaging` | `medic`, `analyst` |
 | 6 | `medic` | 故障诊断 | produce | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis`, `chain-messaging` | `planner`, `runner` |
 | 7 | `analyst` | 结果解读 | produce | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `chain-messaging` | `archivist`, `structuralist` |
@@ -118,7 +118,13 @@ model verbatim.
 - `steward` — must not edit the draft it reviews and must not confirm it. It
   reports the two numbers that disagree and hands the finding to `planner`. It
   must also approve when the declaration is sound, because a review that only
-  ever objects stops being read.
+  ever objects stops being read. Its charter named four numbers — slots,
+  per-host span, thread budget, GPU — that no tool exposed: `get_compute_status`
+  returns a draft's free-form specification, while the numbers that reach LSF
+  come from the plugin registry row and from the queue chosen on the `bsub`
+  command line. `review_compute_declaration` reads them the way the cluster
+  does, so the charter stopped naming work the platform could not do — the same
+  defect `archivist` had, caught the same way.
 - `auditor` — must not repair what it finds. Its output is a verdict per claim
   (`supported` / `unsupported` / `contradicted` / `outside_charter`), ruled on
   what the operator actually called rather than on what it said it did. A claim
@@ -289,7 +295,7 @@ grants tools. After this change the full list is:
 | `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, briefing, scout, structuralist, planner, steward, runner, medic, analyst, auditor |
 | `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, briefing, librarian, scout, planner, archivist, auditor |
 | `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
-| `review-audit` | read | `list_operator_charters`, `read_operator_work` | steward, auditor |
+| `review-audit` | read | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | steward, auditor |
 | `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | structuralist |
 | `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
 | `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, briefing, librarian, scout, structuralist, planner, steward, runner, medic, analyst, archivist, auditor |
@@ -416,6 +422,9 @@ Each of these holds, and has a test that fails when it stops holding.
 | 27 | The picker groups operators by stance, drops a stance it cannot label, and renders nothing for an empty roster | `bots/registry.test.ts` |
 | 28 | A turn that named no operator is not offered the tools that need one; reading the roster and the handover record never needs one | `test_copilot_chat_surface.py` |
 | 29 | A settled delegation and a settled subagent fold back under the tool that opened them | `test_copilot_chain.py` |
+| 30 | A slot count above one without evidence, and a CPU-only stage on a GPU-forcing queue, are both violations; a sound declaration is reported as sound | `test_compute_declarations.py` |
+| 31 | The queue rules do not fire on a backend that ignores the queue | `test_compute_declarations.py` |
+| 32 | `steward` can reach a declaration from a plugin id or a workflow node, and reviewing one changes nothing | `test_copilot_chain.py` |
 
 Gates run for this change, on `bda-public/main`:
 

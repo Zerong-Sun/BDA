@@ -549,3 +549,119 @@ def test_a_settled_subagent_still_folds_back_as_spawn_subagent(session: Session)
 
     folded = [turn for turn in agent_runs.transcript(session, run) if turn.role == "tool"]
     assert folded[-1].tool_calls[0]["name"] == "spawn_subagent"
+
+
+# --- Steward's tool ----------------------------------------------------------
+
+
+def test_the_steward_can_reach_a_declaration_to_review(session: Session) -> None:
+    """The charter names four numbers; this is the tool that shows them.
+
+    Without it `steward` was `archivist` before its charter was fixed - an
+    operator instructed to do something no tool exposes.
+    """
+    from backend_v2.app.registry.models import ModelPlugin
+
+    project, user = _project(session)
+    plugin = ModelPlugin(
+        plugin_key="probe",
+        plugin_version="1",
+        name="Probe",
+        container_image="probe:1",
+        command="run",
+        resources={"cpus": 8},
+    )
+    session.add(plugin)
+    session.flush()
+    reviewer = agent_runs.create_run(
+        session,
+        project_id=project.id,
+        user_id=user.id,
+        goal="Check the draft",
+        allowed_tools=sorted(
+            tools_for_capabilities(bots.capabilities_for_bot("steward", normalize_capabilities(None)))
+        ),
+        bot="steward",
+    )
+    assert "review_compute_declaration" in reviewer.allowed_tools
+
+    result = REGISTRY.execute(
+        "review_compute_declaration",
+        _ctx(session, reviewer),
+        {"plugin_id": str(plugin.id), "queue": "2v100-32-e5"},
+    )
+
+    found = {finding["id"] for finding in result["findings"]}
+    assert found == {"cpus_without_evidence", "queue_forces_unrequested_gpu"}
+    assert result["verdict"] == "violation"
+    assert "#BSUB -n 8" in result["directives"]
+
+
+def test_a_workflow_node_is_enough_to_review_its_plugin(session: Session) -> None:
+    """A reviewer reads the route before the registry, so the node is the id it
+    actually has - and `workflow_status` now returns it alongside the name."""
+    from backend_v2.app.registry.models import ModelPlugin
+    from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
+
+    project, user = _project(session)
+    plugin = ModelPlugin(
+        plugin_key="probe",
+        plugin_version="1",
+        name="Probe",
+        container_image="probe:1",
+        command="run",
+        resources={"cpus": 1},
+    )
+    run = WorkflowRun(project_id=project.id, name="w", created_by=user.id)
+    session.add_all([plugin, run])
+    session.flush()
+    node = WorkflowNode(
+        workflow_run_id=run.id,
+        node_key="n1",
+        node_type="predict",
+        model_plugin="Probe",
+        model_plugin_id=plugin.id,
+    )
+    session.add(node)
+    session.flush()
+    reviewer = agent_runs.create_run(
+        session,
+        project_id=project.id,
+        user_id=user.id,
+        goal="Check",
+        allowed_tools=["review_compute_declaration"],
+        bot="steward",
+    )
+
+    result = REGISTRY.execute(
+        "review_compute_declaration",
+        _ctx(session, reviewer),
+        {"node_id": str(node.id), "queue": "63"},
+    )
+
+    assert result["plugin"] == "probe@1"
+    assert result["verdict"] == "sound"
+
+
+def test_reviewing_a_declaration_needs_a_plugin_or_a_node(session: Session) -> None:
+    project, user = _project(session)
+    reviewer = agent_runs.create_run(
+        session,
+        project_id=project.id,
+        user_id=user.id,
+        goal="Check",
+        allowed_tools=["review_compute_declaration"],
+        bot="steward",
+    )
+
+    with pytest.raises(ValueError, match="copilot_plugin_or_node_required"):
+        REGISTRY.execute("review_compute_declaration", _ctx(session, reviewer), {})
+
+
+def test_reviewing_a_declaration_changes_nothing(session: Session) -> None:
+    """The stance rule, at the level of the one tool that could have broken it."""
+    spec = REGISTRY.get("review_compute_declaration")
+
+    assert spec is not None
+    assert spec.execution_mode == "read"
+    assert spec.id not in REGISTRY.write_ids()
