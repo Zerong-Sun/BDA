@@ -95,8 +95,15 @@ export function AutopilotPage() {
   const settled =
     campaign !== null &&
     ['succeeded', 'failed', 'cancelled', 'manual_takeover'].includes(campaign.status)
-  /** The same control in two branches; the difference between them is upstream. */
-  const CompleteStageButton = ({ stage }: { stage: { id: string; version: number; status: string } }) =>
+  /**
+   * The same control in two branches; the difference between them is upstream.
+   *
+   * A function returning JSX, not a component declared in this body. A component
+   * defined during render is a new type on every render, so React unmounts and
+   * remounts it each time - the button loses focus mid-interaction, which is a
+   * real regression and one the lint gate does not catch.
+   */
+  const completeStageButton = (stage: { id: string; version: number; status: string }) =>
     stage.status === 'ready' ? (
       <Button
         type="button"
@@ -252,7 +259,7 @@ export function AutopilotPage() {
                         who can say the step is over. Without this the chain
                         reached a compute stage and stopped there, which is the
                         same dead end `review` had one stage earlier. */}
-                    <CompleteStageButton stage={stage} />
+                    {completeStageButton(stage)}
                   </>
                 ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
                   // An agent run has no page of its own; naming it is still better than
@@ -271,7 +278,7 @@ export function AutopilotPage() {
                         reached a human step and stopped there with no action
                         available anywhere, which the default campaign - ending
                         in `review` - did every time. */}
-                    <CompleteStageButton stage={stage} />
+                    {completeStageButton(stage)}
                   </>
                 )}
               </li>
