@@ -42,7 +42,7 @@ import {
 //: value of its own.
 const AUTO_BOT = '__auto__'
 
-export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void }) {
+export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, externalRoster = false }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void; externalRoster?: boolean }) {
   const { t, format, language } = useI18n()
   const { projectId, activeProject, setProjectId } = useProjectContext()
   const queryClient = useQueryClient()
@@ -152,7 +152,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
-        {bots.length > 0 ? (
+        {bots.length > 0 && !externalRoster ? (
           <Select
             value={bot ?? AUTO_BOT}
             onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
@@ -203,7 +203,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
           the screen, which made selecting one a gesture rather than a decision.
           Only when a bot is chosen: the undifferentiated case has no charter to
           show and the row would be permanent chrome. */}
-      {activeBotSpec ? (
+      {activeBotSpec && !externalRoster ? (
         <div className="shrink-0 border-b bg-muted/40 px-4 py-2">
           <p className="text-xs font-medium text-foreground">{activeBotSpec.summary}</p>
           <p className="mt-1 text-xs text-muted-foreground">{activeBotSpec.charter}</p>

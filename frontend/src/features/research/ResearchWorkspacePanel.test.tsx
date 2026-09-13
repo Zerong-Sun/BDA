@@ -99,6 +99,9 @@ describe('ResearchWorkspacePanel', () => {
 
   it('renders the project review inside relationship evidence', async () => {
     renderWithProviders(<ResearchWorkspacePanel view="evidence" />)
+    const reviewToggle = await screen.findByRole('button', { name: 'Project Review' })
+    expect(reviewToggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(reviewToggle)
     await screen.findByText('Unique review body')
     expect(screen.getAllByText('Unique review body')).toHaveLength(1)
   })
@@ -125,6 +128,9 @@ describe('ResearchWorkspacePanel', () => {
 
   it('switches research body language without fetching again', async () => {
     const rendered = renderWithProviders(<ResearchWorkspacePanel view="evidence" />)
+    const reviewToggle = await screen.findByRole('button', { name: 'Project Review' })
+    expect(reviewToggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(reviewToggle)
     await screen.findByText('Unique review body')
     useAppStore.setState({ language: 'zh' })
     rendered.rerender(<ResearchWorkspacePanel view="evidence" />)
@@ -156,6 +162,7 @@ describe('ResearchWorkspacePanel', () => {
     getWorkspace.mockResolvedValueOnce(data)
     useAppStore.setState({ language: 'zh' })
     renderWithProviders(<ResearchWorkspacePanel view="evidence" />)
+    fireEvent.click(await screen.findByRole('button', { name: '项目综述' }))
     await screen.findByText('English only body')
     expect(screen.queryByText('该条目尚无当前语言译文，正在显示原文。')).not.toBeInTheDocument()
   })

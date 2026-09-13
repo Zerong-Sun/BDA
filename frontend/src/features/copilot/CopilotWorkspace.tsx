@@ -14,16 +14,16 @@ import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
 import { deliveryLabel, isQuestion, suggestService, type ServiceKind } from './taskPresentation'
 
-export function CopilotWorkspace({ pageContext, initialGoal = '', initialService }: { pageContext?: string; initialGoal?: string; initialService?: ServiceKind }) {
+export function CopilotWorkspace({ pageContext, initialGoal = '', initialService, ignoreDraft = false }: { pageContext?: string; initialGoal?: string; initialService?: ServiceKind; ignoreDraft?: boolean }) {
   const { projectId } = useProjectContext()
-  return <ProjectTaskWorkspace key={projectId} projectId={projectId} pageContext={pageContext} initialGoal={initialGoal} initialService={initialService} />
+  return <ProjectTaskWorkspace key={projectId} projectId={projectId} pageContext={pageContext} initialGoal={initialGoal} initialService={initialService} ignoreDraft={ignoreDraft} />
 }
 
-function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialService }: { projectId: string; pageContext?: string; initialGoal: string; initialService?: ServiceKind }) {
+function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialService, ignoreDraft }: { projectId: string; pageContext?: string; initialGoal: string; initialService?: ServiceKind; ignoreDraft: boolean }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const queryClient = useQueryClient()
-  const draft = useAppStore((s) => s.copilotDraft)
+  const draft = useAppStore((s) => ignoreDraft ? '' : s.copilotDraft)
   const demo = useAppStore((s) => s.appMode === 'demo')
   const [goal, setGoal] = useState(initialGoal)
   const [selected, setSelected] = useState<ServiceKind | null>(initialService ?? null)

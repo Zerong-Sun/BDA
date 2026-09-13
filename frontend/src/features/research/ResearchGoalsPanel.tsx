@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select'
 import { ApiState } from '../../components/ui/ApiState'
 import { useI18n } from '../../lib/i18n'
+import { useAppStore } from '../../lib/store/appStore'
+import { currentRole } from './jsonHelpers'
 import { useToastStore } from '../../components/ui/toastStore'
 import {
   buildGoalTree,
@@ -50,6 +52,8 @@ interface ResearchGoalsPanelProps {
 export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
   const { t, format } = useI18n()
   const copy = t.research.goals
+  const demo = useAppStore((s) => s.appMode === 'demo')
+  const readOnly = demo || currentRole() === 'viewer'
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const [title, setTitle] = useState('')
@@ -109,11 +113,12 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
     return (
     <li key={node.goal.id} style={{ marginInlineStart: `${node.depth * 1.25}rem` }}>
       <div className="flex flex-wrap items-baseline gap-2 rounded-md border border-border-soft bg-bg-app px-3 py-2">
-        <span className="min-w-0 flex-1 truncate text-text-primary">{node.goal.title}</span>
+        <span className="min-w-0 flex-1 break-words text-text-primary">{node.goal.title}</span>
         <Select
+          disabled={readOnly || setStatus.isPending}
           value={node.goal.status}
           onValueChange={(next) => {
-            if (next) setStatus.mutate({ goal: node.goal, status: next as GoalStatus })
+            if (next && !readOnly) setStatus.mutate({ goal: node.goal, status: next as GoalStatus })
           }}
         >
           <SelectTrigger
@@ -135,6 +140,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
           size="sm"
           variant="outline"
           aria-label={format(copy.addChildTo, { title: node.goal.title })}
+          disabled={readOnly}
           onClick={() => setParentId(node.goal.id)}
         >
           <PlusIcon aria-hidden="true" />
@@ -144,6 +150,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
           size="sm"
           variant="outline"
           aria-label={format(copy.deleteGoal, { title: node.goal.title })}
+          disabled={readOnly || removeGoal.isPending}
           onClick={() => removeGoal.mutate(node.goal)}
         >
           <TrashIcon aria-hidden="true" />
@@ -167,6 +174,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
                 size="sm"
                 className="h-4 w-4 p-0 text-text-muted"
                 aria-label={format(copy.detachLink, { type: link.resource_type })}
+                disabled={readOnly || detach.isPending}
                 onClick={() => detach.mutate({ goalId: node.goal.id, linkId: link.id })}
               >
                 ×
@@ -195,12 +203,13 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
         className="flex flex-wrap items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault()
-          if (title.trim()) addGoal.mutate()
+          if (title.trim() && !readOnly && !addGoal.isPending) addGoal.mutate()
         }}
       >
         <Input
           className="min-w-0 flex-1"
           value={title}
+          disabled={readOnly}
           placeholder={parentTitle ? format(copy.childPlaceholder, { title: parentTitle }) : copy.placeholder}
           aria-label={copy.placeholder}
           onChange={(event) => setTitle(event.target.value)}
@@ -210,13 +219,14 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
             {copy.clearParent}
           </Button>
         ) : null}
-        <Button type="submit" size="sm" disabled={!title.trim() || addGoal.isPending}>
+        <Button type="submit" size="sm" disabled={readOnly || !title.trim() || addGoal.isPending}>
           {addGoal.isPending ? copy.adding : copy.add}
         </Button>
       </form>
 
       <ApiState
         isLoading={goalsQuery.isLoading}
+        isError={goalsQuery.isError}
         error={goalsQuery.error}
         onRetry={() => void goalsQuery.refetch()}
       >

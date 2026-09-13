@@ -14,9 +14,11 @@
 
 交付目标为桌面网页版，同时覆盖新手引导与专业操作。页面布局、工作流画布、Copilot 和验收均以桌面浏览器为重点；手机端不在当前开发与交付范围内。浏览器验收默认只运行桌面用例。
 
-前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Experiments、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
+前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 项目上下文使用 UUID；一个项目可包含多个 target，并以 primary target 兼容旧的单目标视图。Candidates 在没有项目时禁止发起查询，避免空项目串数据。
+
+新增 Bot 工作区、公开项目简报、结构对照和验收记录见[前端交互改版](BOT_FIRST_WORKSPACE.md)。项目 Open 直接进入目标页；Bot 对话、任务及交接具有独立路由 `/bots?project=...`。项目切换清理临时草稿及选中实体，已保存会话保持按项目隔离。
 
 ## 2. API 契约
 

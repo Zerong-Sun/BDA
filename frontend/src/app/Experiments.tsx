@@ -1,6 +1,6 @@
 import { Disclosure } from '../components/ui/Disclosure'
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { PlayCircle, X } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/reui/alert'
@@ -12,7 +12,7 @@ import { useDeleteProjectLifecycle } from '../lib/hooks/useDeleteProjectLifecycl
 import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { useAppStore } from '../lib/store/appStore'
 import { useI18n } from '../lib/i18n'
-import { PageHead } from '../components/ui/PageHead'
+import { ScienceWelcome } from '../features/experiments/ScienceWelcome'
 import { ApiState } from '../components/ui/ApiState'
 import { OverviewCards } from '../features/experiments/OverviewCards'
 import { DesignPromptCard } from '../features/experiments/DesignPromptCard'
@@ -23,17 +23,15 @@ import { ManageProjectDrawer } from '../features/experiments/ManageProjectDrawer
 import { CampaignPanel } from '../features/research/CampaignPanel'
 import { findDemoProject, isDemoProject } from '../features/tour'
 
-import { ProjectNextAction } from '../features/projects/ProjectNextAction'
 
 export function ExperimentsPage() {
   const { t, format, language } = useI18n()
-  const setCopilotOpen = useAppStore((s) => s.setCopilotOpen)
   const setAppMode = useAppStore((s) => s.setAppMode)
   const appMode = useAppStore((s) => s.appMode)
   const tourState = useAppStore((s) => s.tourState)
   const startTour = useAppStore((s) => s.startTour)
   const resumeTour = useAppStore((s) => s.resumeTour)
-  const [showIntro, setShowIntro] = useState(() => localStorage.getItem('bda_intro_dismissed') !== 'true')
+  const [showIntro, setShowIntro] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [demoUnavailable, setDemoUnavailable] = useState(false)
@@ -71,30 +69,7 @@ export function ExperimentsPage() {
 
   return (
     <section>
-      <PageHead
-        eyebrow={t.experiments.eyebrow}
-        title={t.experiments.title}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {!showIntro ? (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setShowIntro(true)}>
-                {t.experimentsExt.gettingStarted}
-              </Button>
-            ) : null}
-            <Button type="button" onClick={openCreate}>
-              {t.common.newExperiment}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!projectId}
-              render={projectId ? <Link to={`/autopilot?project=${encodeURIComponent(projectId)}`} /> : undefined}
-            >
-              Autopilot
-            </Button>
-          </div>
-        }
-      />
+      <ScienceWelcome onCreate={openCreate} />
 
       {appMode === 'demo' ? (
         <Alert className="mb-5" variant="warning">
@@ -107,12 +82,13 @@ export function ExperimentsPage() {
         <Alert className="mb-5" variant="warning">
           <AlertDescription>
             {language === 'zh'
-              ? 'PD‑1 项目仅包含预计算的合成演示数据；它不是实时模型运行、真实实验结果或科研结论。'
-              : 'The PD-1 project contains precomputed synthetic demo data only; it is not a live model run, experimental result, or research conclusion.'}
+              ? '公开演示项目 · 候选指标为合成数据，文献与结构保留来源。'
+              : 'Public demo · Candidate metrics are synthetic; literature and structures retain their sources.'}
           </AlertDescription>
         </Alert>
       ) : null}
 
+      <div className="mb-4 flex justify-end"><Button type="button" variant="ghost" size="sm" onClick={() => setShowIntro(!showIntro)} aria-expanded={showIntro}>{t.experimentsExt.gettingStarted}</Button></div>
       {showIntro ? (
         <AppFrame className="mb-6" panelClassName="p-4">
           <div className="flex items-start justify-between gap-3">
@@ -150,7 +126,6 @@ export function ExperimentsPage() {
         </AppFrame>
       ) : null}
 
-      {overview ? <ProjectNextAction overview={overview} /> : null}
 
       <div data-tour-id="project-library">
       <ProjectLibrary
@@ -165,7 +140,7 @@ export function ExperimentsPage() {
 
       {showCampaigns ? <div className="mb-6"><CampaignPanel /></div> : null}
 
-      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={overview?.target_readiness?.ready_for_workflow !== true} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={false} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
       <ActiveProjectPanel
         project={activeProject}
         projectQuery={query}
@@ -198,17 +173,7 @@ export function ExperimentsPage() {
         </ApiState>
       ) : null}
 
-      {overview ? <DesignPromptCard project={overview.project} /> : null}
-
-      <AppFrame className="mb-6" panelClassName="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div>
-          <h2 className="text-card-title font-semibold">{t.experiments.copilotTitle}</h2>
-          <p className="mt-1 text-sm text-text-secondary">{t.experiments.copilotBody}</p>
-        </div>
-        <Button type="button" variant="outline" onClick={() => setCopilotOpen(true)}>
-          {t.experimentsExt.openCopilotChat}
-        </Button>
-      </AppFrame>
+      {overview ? <Disclosure title={language === 'zh' ? '高级：设计任务书' : 'Advanced: design brief'} className="science-document"><DesignPromptCard project={overview.project} /></Disclosure> : null}
 
       {projectDelete.isSuccess ? (
         <Alert className="mb-4" variant="success">

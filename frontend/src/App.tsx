@@ -49,6 +49,7 @@ const TimelinePage = lazy(() => import('./app/Timeline'))
 const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: module.FAQPage })))
 const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
 const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
+const BotsPage = lazy(() => import('./app/Bots').then((module) => ({ default: module.BotsPage })))
 
 function RouteFallback() {
   return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
@@ -124,7 +125,7 @@ export function AppShell() {
       `project_status=${activeProject?.status ?? 'unknown'}`,
     ]
     if (location.pathname === '/research') {
-      entries.push(`research_tab=${search.get('tab') || 'evidence'}`)
+      entries.push(`research_tab=${search.get('tab') || 'goals'}`)
       entries.push(...copilotSelectedEntityIds.map((entityId) => `entity=${encodeURIComponent(entityId)}`))
     }
     if (activeProject?.summary) {
@@ -142,7 +143,7 @@ export function AppShell() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {showRail ? <PipelineRail /> : null}
-          <div className="mx-auto max-w-[1480px] px-6 py-6">
+          <div className="app-content mx-auto max-w-[1600px] px-6 py-6">
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>
@@ -173,6 +174,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
+                <Route path="/bots" element={<BotsPage />} />
                 {/* The page was always labelled "Projects"; only the URL said
                     otherwise. Kept as a redirect so existing links and
                     bookmarks still land, rather than 404ing on a rename. */}

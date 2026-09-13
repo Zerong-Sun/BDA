@@ -1,0 +1,119 @@
+# Bot-first science workspace
+
+Status: implemented and reviewed · 2026-09-14
+
+Branch: `codex/bot-first-science-workspace`
+
+## Diagnosis and design
+
+The project library's Open action only selects a project. Research lives behind
+a second action. The home page mixes portfolio browsing with target preparation,
+workflow metrics and assistant onboarding. Decorative structure previews do not
+communicate project purpose. The goal tree is independent of imported research
+briefs, so imported projects appear to have no objective. Long reviews repeat the
+reference catalog before readers reach individual evidence records.
+
+The new hierarchy is **Projects → project brief / Bots → evidence, structures,
+plans and decisions**. Projects remain the scope of every conversation and task.
+Bots have a full page, a real server-provided roster, task deliverables and a
+handoff record. Existing execution checks and scientific provenance remain.
+
+Visual direction follows the supplied Bigo V2: bone #F3F0E8, ink #171A16,
+lime #D3ED70, coral/cyan supporting accents, fine rules, restrained corners,
+readable metadata and motion only for interaction or actual activity. Dark mode
+uses the same hierarchy. No arbitrary generated project illustrations.
+
+References consulted on 2026-09-14:
+
+- [Grok Bot design, 2026-09-03](https://x.ai/news/designing-grok-bot): persistent
+  roster, identity and state, progressively revealed activity.
+- [Linear Agent](https://linear.app/changelog/2026-03-24-introducing-linear-agent):
+  project context and inspectable outcomes.
+- [Notion Agents](https://www.notion.com/product/agents): goal-based assignment,
+  visible responsibilities and scoped permissions.
+- User-supplied **Bigo.bio visual system V2**, dated 2026-09-14.
+
+These inform interaction choices; no external artwork or product code is copied.
+
+## Implementation and acceptance
+
+1. [x] Align shared colors, surfaces, typography and responsive navigation.
+2. [x] Replace portfolio illustrations with readable project rows, concise
+   objectives, source-backed counts, search/reset and direct Open navigation.
+3. [x] Introduce a full-page Bot workspace using the existing roster, chat,
+   durable task API and actual handoff records. Preserve project scoping.
+4. [x] Present the public PD1 package as a client-readable brief: objective,
+   questions, deliverables, provenance. For other projects use stored content;
+   never invent completed goals, experimental results or agent activity.
+5. [x] Reduce repeated research prose, keep full source documents accessible,
+   and add an interactive structure comparison workspace.
+6. [x] Run meaningful regression tests, type checking, lint, production build
+   and browser adversarial checks; inspect light/dark and Chinese/English
+   layouts, keyboard navigation, narrow widths, empty/error/read-only states.
+7. [x] Fix findings, document verification and limitations, commit changes.
+
+## Public content scope
+
+The approved public package contains one project (PD1), twelve references and
+four source structures. The private overlay is outside this content pass.
+Presentation changes retain the versioned source data and all citations. Brief
+questions derived from the package are labelled as brief content, not persisted
+goal records. Missing data is explicit and recoverable. Dataset publication,
+live compute, production deployment and private-data synchronization are not
+needed for this frontend branch.
+
+## Verification record
+
+- Production build and TypeScript: passed. Entry chunk 395.2 KiB, below the 750 KiB gate.
+- ESLint: no errors; three pre-existing TanStack Table compiler warnings remain in laboratory components.
+- Vitest: 122 files / 691 tests passed.
+- Bot workspace browser acceptance: seven scenario groups, including direct Open and Back, brief content, two real Mol* viewers with synthetic PDB fixtures, unsent source-scoped Bot drafts, roster selection, keyboard tabs, read-only controls, empty projects and roster retry. No backend mutations or uncaught browser errors.
+- Responsive checks: Bot page at 320/390/768/1024/1440/1920/2560px; Chinese brief at 320/390/768/1024/1440px; project list at 320/390/768px; structure comparison at 390px. Light English and dark Chinese screenshots inspected.
+- Existing workflow browser gates: 10/10 passed, including graph editing, preview, source selection, versioned release and mobile layout.
+- Existing production browser matrix: Workflow, Candidates and Results, desktop English/light: 3/3 passed.
+- `git diff --check`: passed. The approved public JSON package and synthetic fixtures are unchanged; no private research files were added.
+- Public data allowlist: passed, including checksums for the six synthetic fixtures. The feature branch is based directly on public main `fa7520be`, with no private overlay history.
+
+Adversarial findings resolved:
+
+| Finding | Repair |
+| --- | --- |
+| Open only selected a project | Link directly to the project's goals route; URL is the source of project context |
+| Imported brief and saved goal tree disconnected | Show the source-derived public brief above editable saved questions; label the distinction |
+| Global unsent draft and entity IDs survived a project switch | Clear transient context when project changes; retain per-project conversation history |
+| Viewer/demo users could operate goal editing controls | Disable creation, deletion, status and link edits; guard submit; show retryable API failures |
+| Dark/light semantic badges lacked contrast | Set legible light-theme status foregrounds and preserve dark-theme semantic colors |
+| Small-screen header and Bot tabs overflowed | Wrap header actions, constrain project label, wrap tabs and reflow workspace columns |
+| Task view could unexpectedly consume a structure discussion draft | Keep task and conversation surfaces separate while retaining the unsent draft |
+| Full reviews and method documents buried actionable content | Default to concise brief and evidence records, with full source documents expandable |
+
+## Reproduce
+
+From `frontend`:
+
+```sh
+npm ci
+npm run build
+npm run lint
+npm test
+npm run test:bot-workspace
+node scripts/browser-workflow-gates.mjs
+BDA_BROWSER_ROUTES=workflow,candidates,results BDA_BROWSER_APPEARANCES=en-light BDA_BROWSER_STATES=populated npm run test:browser
+```
+
+The Bot test starts a production preview on port 4188; set `BDA_BOT_TEST_ORIGIN`
+to use an existing server. Screenshots and the JSON result are written to
+`/tmp/bda-bot-workspace` by default, configurable with `BDA_BOT_TEST_OUTPUT`.
+The browser API and structures are explicitly synthetic QA fixtures. Real model
+credentials, external retrieval, persisted database writes and production
+compute were not invoked by these checks.
+
+## Presentation boundaries
+
+The public PD1 brief is an editorial reading of the existing package objective,
+questions and scope. It does not create or mark database goals complete.
+Other projects display their stored objective/summary. The Bot roster and
+handoff record use the existing server APIs; avatars do not invent activity.
+Structure comparison presents independent cameras, not computed alignment.
+Advanced workflows and the contextual drawer remain reachable. No production
+deployment or private project content migration is included in this branch.

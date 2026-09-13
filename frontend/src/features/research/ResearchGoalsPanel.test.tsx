@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { buildGoalTree, flattenGoalTree, type ResearchGoal } from '../../lib/api/researchGoals'
 import { ResearchGoalsPanel } from './ResearchGoalsPanel'
+import { useAppStore } from '../../lib/store/appStore'
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -131,5 +132,23 @@ describe('ResearchGoalsPanel', () => {
     await waitFor(() =>
       expect(api.update).toHaveBeenCalledWith('root', 1, { status: 'answered' }),
     )
+  })
+
+  it('prevents viewer edits and status changes', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    useAppStore.setState({ appMode: 'application' })
+    renderWithProviders(<ResearchGoalsPanel projectId="project-one" />)
+    await screen.findByText('Can this bind CBD?')
+    expect(screen.getByLabelText('A question this project has to answer')).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Status of Can this bind CBD?' })).toBeDisabled()
+    expect(screen.getByLabelText('Delete Can this bind CBD?')).toBeDisabled()
+    sessionStorage.removeItem('bda_user')
+  })
+
+  it('shows a retryable error rather than an empty goal tree on network failure', async () => {
+    api.list.mockRejectedValueOnce(new Error('Goal service unavailable'))
+    renderWithProviders(<ResearchGoalsPanel projectId="project-one" />)
+    expect(await screen.findByText('Goal service unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 })

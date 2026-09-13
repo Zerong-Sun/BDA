@@ -148,7 +148,10 @@ export const useAppStore = create<AppState>()(
       setAppMode: (appMode) => set({ appMode }),
       setUiDensity: (uiDensity) => set({ uiDensity }),
       setThemePreference: (themePreference) => set({ themePreference }),
-      setActiveProjectId: (activeProjectId) => set({ activeProjectId }),
+      setActiveProjectId: (activeProjectId) => set((state) => ({
+        activeProjectId,
+        ...(state.activeProjectId !== activeProjectId ? { copilotDraft: '', copilotSelectedEntityIds: [] } : {}),
+      })),
       clearProjectState: (projectId) =>
         set((state) => ({
           activeProjectId: state.activeProjectId === projectId ? '' : state.activeProjectId,

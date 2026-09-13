@@ -1,0 +1,220 @@
+/* Bigo V2 application tokens. Scientific structure colors retain their source palettes. */
+:root, [data-theme="light"] {
+  --bg-app: #f3f0e8;
+  --bg-canvas: #e8eadf;
+  --bg-surface-1: #faf9f4;
+  --bg-surface-2: #eeeee5;
+  --bg-surface-3: #fffef9;
+  --border-soft: #d3d3c7;
+  --border-default: #c7c9bb;
+  --border-strong: #929987;
+  --text-primary: #171a16;
+  --text-secondary: #50564a;
+  --text-muted: #686b61;
+  --text-inverse: #f3f0e8;
+  --bda-primary: #d3ed70;
+  --bda-primary-foreground: #171a16;
+  --accent: #4e651e;
+  --accent-foreground: #f3f0e8;
+  --accent-hover: #bfd854;
+  --accent-pressed: #abc341;
+  --accent-muted: #526728;
+  --accent-bg: #e8edcf;
+  --accent-border: #a9bb6e;
+  --accent-2: #ad482b;
+  --accent-2-hover: #923b24;
+  --accent-2-bg: #f4e1d7;
+  --accent-2-border: #daae97;
+  --background: var(--bg-app);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface-1);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface-3);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--bda-primary);
+  --primary-foreground: var(--bda-primary-foreground);
+  --secondary: var(--bg-surface-2);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-surface-2);
+  --muted-foreground: var(--text-muted);
+  --border: var(--border-soft);
+  --input: var(--border-default);
+  --ring: #637a2b;
+  --success-foreground: #2d6541;
+  --info-foreground: #335770;
+  --warning-foreground: #7c4d14;
+  --destructive-foreground: #9d382f;
+  --radius: .35rem;
+  --shadow-soft: 0 1px 2px rgb(23 26 22 / 3%);
+  --shadow-medium: 0 8px 24px rgb(23 26 22 / 8%);
+}
+
+.dark, [data-theme="dark"] {
+  --bg-app: #111612;
+  --bg-canvas: #171c18;
+  --bg-surface-1: #1a211b;
+  --bg-surface-2: #232b24;
+  --bg-surface-3: #2a332b;
+  --border-soft: #374135;
+  --border-default: #46523f;
+  --border-strong: #6f805f;
+  --text-primary: #f3f0e8;
+  --text-secondary: #c7cfbd;
+  --text-muted: #a6b19b;
+  --text-inverse: #171a16;
+  --bda-primary: #d3ed70;
+  --bda-primary-foreground: #171a16;
+  --accent: #d3ed70;
+  --accent-foreground: #171a16;
+  --accent-bg: #303b22;
+  --accent-muted: #bfd854;
+  --accent-border: #7c944c;
+  --accent-2: #e97953;
+  --accent-2-bg: #372b23;
+  --accent-2-border: #855944;
+  --background: var(--bg-app);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface-1);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface-3);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-surface-2);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-surface-2);
+  --muted-foreground: var(--text-muted);
+  --border: var(--border-soft);
+  --input: var(--border-default);
+  --ring: #d3ed70;
+}
+
+html { font-family: var(--font-sans); }
+body { line-height: 1.6; }
+[data-slot="button"], [data-slot="accordion-trigger"] { font-size: .875rem; line-height: 1.45; }
+[data-slot="badge"] { font-size: .75rem; min-height: 20px; }
+.research-page .text-primary, .bot-page .text-primary { color: var(--accent); }
+.research-page [data-slot="button"].text-primary-foreground, .bot-page [data-slot="button"].text-primary-foreground { color: var(--primary-foreground); }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.science-eyebrow { font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; letter-spacing: .07em; color: var(--text-muted); }
+.science-welcome { display: grid; grid-template-columns: 1.12fr 1fr; gap: 4rem; padding: 2rem 0 3rem; align-items: center; border-bottom: 1px solid var(--border-soft); margin-bottom: 2rem; }
+.science-welcome h1 { font-size: clamp(2.5rem, 4.5vw, 4.5rem); font-weight: 450; letter-spacing: -.045em; line-height: 1.1; margin: 1rem 0 1.5rem; }
+:lang(zh) .science-welcome h1 { letter-spacing: 0; line-height: 1.2; }
+.science-intro { max-width: 33rem; font-size: 1rem; line-height: 1.7; color: var(--text-secondary); }
+:lang(zh) .science-intro { font-size: 1.0625rem; }
+.science-primary { min-height: 48px; padding-inline: 1.25rem; }
+.science-team-preview { background: #171c18; color: #f3f0e8; border: 1px solid #374135; padding: 1.75rem; border-radius: 8px; }
+.science-team-preview .science-eyebrow { color: #d3ed70; }
+.science-team-roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; padding: 3rem 0; }
+.science-team-roles > div { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; font-size: .875rem; }
+.science-team-roles .bot-avatar { width: 64px; height: 64px; margin-bottom: .5rem; }
+.science-preview-footer { border-top: 1px solid #485040; padding-top: 1.25rem; display: grid; gap: .35rem; font-size: .875rem; overflow-wrap: anywhere; }
+.science-preview-footer > span:first-child { color: #afb9a5; font-family: var(--font-mono); font-size: .75rem; }
+.bot-avatar { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 38px; height: 38px; background: #d3ed70; color: #171a16; border-radius: 10px 10px 6px 6px; transition: transform 220ms ease; }
+.bot-avatar--produce { background: #72cbd1; }
+.bot-avatar--review { background: #e97953; }
+.bot-avatar--1 { border-radius: 50% 50% 9px 9px; }
+.bot-avatar--2 { border-radius: 7px 16px 7px 16px; }
+.bot-antenna { width: 5px; height: 6px; background: currentColor; position: absolute; top: -5px; border-radius: 3px; opacity: .75; }
+.bot-face { display: flex; align-items: center; gap: 7px; }
+.bot-face i { width: 4px; height: 7px; background: currentColor; border-radius: 2px; transition: transform 180ms ease; }
+.bot-roster-item:hover .bot-avatar, .bot-roster-item:focus-visible .bot-avatar, .science-team-roles > div:hover .bot-avatar { transform: translateY(-3px) rotate(-4deg); }
+.bot-roster-item[aria-pressed="true"] .bot-face i { transform: scaleY(.65); }
+.project-list { border-top: 1px solid var(--border-soft); }
+.project-row { display: grid; grid-template-columns: 2rem minmax(0,1fr) auto; gap: 1.5rem; padding: 1.75rem .75rem; border-bottom: 1px solid var(--border-soft); transition: background 200ms ease; }
+.project-row:hover, .project-row[data-active] { background: var(--bg-surface-1); }
+.project-index { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); padding-top: .3rem; }
+.project-row h3 { font-size: 1.25rem; line-height: 1.4; font-weight: 550; margin: .65rem 0; }
+.project-row h3 a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.project-row-objective { max-width: 52rem; color: var(--text-secondary); font-size: .9375rem; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.project-source { font-size: .75rem; border-left: 1px solid var(--border-soft); padding-left: .5rem; color: var(--text-muted); }
+.project-facts { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 1rem; font-size: .75rem; color: var(--text-muted); }
+.project-facts a:hover { color: var(--accent); text-decoration: underline; }
+.project-row-actions { display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: .5rem; max-width: 21rem; }
+.project-row-menu { font-size: .875rem; }
+.project-row-menu summary { padding: .5rem; cursor: pointer; }
+.project-row-menu > div { display: flex; flex-wrap: wrap; gap: .5rem; padding-top: .5rem; }
+.science-page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin: 1rem 0 2rem; }
+.science-page-header h1 { font-size: clamp(1.75rem, 2.7vw, 2.5rem); font-weight: 500; line-height: 1.2; margin: .6rem 0; overflow-wrap: anywhere; }
+.science-page-header p:not(.science-eyebrow) { color: var(--text-secondary); font-size: .875rem; }
+.bot-workspace-grid { display: grid; grid-template-columns: 210px minmax(0,1fr) 260px; gap: 1.5rem; align-items: start; }
+.bot-roster { border-right: 1px solid var(--border-soft); padding-right: 1rem; }
+.bot-roster > h2 { font-size: 1rem; font-weight: 550; }
+.bot-roster-item { display: flex; align-items: center; justify-content: flex-start; height: auto; min-height: 64px; white-space: normal; gap: .75rem; width: 100%; text-align: left; padding: .75rem .5rem; border: 1px solid transparent; border-radius: 5px; cursor: pointer; }
+.bot-roster-item:hover { background: var(--bg-surface-1); }
+.bot-roster-item[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent-border); }
+.bot-roster-item strong { display: block; font-size: .875rem; font-weight: 500; }
+.bot-roster-item small { display: block; font-size: .75rem; color: var(--text-muted); }
+.bot-stance { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); padding: 1.25rem .5rem .5rem; }
+.bot-main { min-width: 0; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--bg-surface-1); overflow: hidden; }
+.bot-surface-tabs { width: 100%; height: auto; min-height: 52px; padding: .5rem .75rem; flex-wrap: wrap; justify-content: flex-start; border-bottom: 1px solid var(--border-soft); }
+.bot-surface-tabs [role="tab"] { flex: 0 1 auto; height: auto; min-height: 40px; white-space: normal; padding: .5rem; font-size: .875rem; }
+.bot-main textarea { min-height: 120px; background: var(--bg-app); }
+.bot-main form [data-slot="button"][aria-pressed] { min-height: 40px; padding: .6rem .75rem; }
+.bot-main form [type="submit"] { min-height: 44px; padding-inline: 1.25rem; }
+.bot-selected-header { display: flex; align-items: flex-start; gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-soft); }
+.bot-selected-header h2 { font-size: 1.125rem; font-weight: 550; }
+.bot-selected-header p { font-size: .875rem; color: var(--text-secondary); margin-top: .5rem; }
+.bot-chat-surface { display: flex; flex-direction: column; height: 650px; min-height: 450px; max-height: 85vh; }
+.bot-context { min-width: 0; }
+.bot-context nav { margin-top: 1rem; border-top: 1px solid var(--border-soft); }
+.bot-context nav a { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .85rem 0; border-bottom: 1px solid var(--border-soft); font-size: .875rem; }
+.bot-context nav a:hover { color: var(--accent); }
+.project-brief { padding: 1.5rem 0; }
+.project-objective { font-size: 1.125rem; line-height: 1.7; margin-top: .75rem; max-width: 65rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.project-brief--compact { padding: 0; }
+.project-brief--compact .project-objective { font-size: .9375rem; margin-bottom: 1rem; }
+.brief-details { display: grid; grid-template-columns: 1.5fr 1fr; gap: 2.5rem; border-top: 1px solid var(--border-soft); margin-top: 1.5rem; padding-top: 1.5rem; }
+.brief-details h3 { font-size: .875rem; font-weight: 600; margin-bottom: .75rem; }
+.brief-details ol, .brief-details ul { padding-left: 1.2rem; list-style: decimal; color: var(--text-secondary); font-size: .9375rem; }
+.brief-details ul { list-style: disc; }
+.brief-details li + li { margin-top: .65rem; }
+.science-empty { padding: 4rem 1rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1rem; border: 1px solid var(--border-soft); }
+.science-empty h2 { font-size: 1.5rem; }
+.science-empty p { color: var(--text-secondary); }
+.science-document { border-top: 1px solid var(--border-soft); padding: 1rem 0; }
+.science-document > summary { cursor: pointer; font-size: .9375rem; font-weight: 500; }
+.science-document[open] > summary { margin-bottom: 1rem; }
+.structure-comparison { display: grid; gap: 1rem; }
+.structure-comparison-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.structure-comparison-panes[data-single="true"] { grid-template-columns: minmax(0, 1fr); }
+.structure-comparison-pane { min-width: 0; background: var(--bg-surface-1); border: 1px solid var(--border-soft); padding: 1rem; border-radius: 8px; }
+.structure-comparison-pane h3 { margin: 1rem 0 .25rem; font-weight: 550; }
+.structure-comparison-pane select { display: block; width: 100%; border: 1px solid var(--input); background: var(--bg-app); padding: .7rem .5rem; border-radius: 4px; margin-top: .5rem; font-size: .875rem; }
+.structure-comparison-pane select:disabled { opacity: .6; }
+.science-route-links { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+@media (min-width: 1100px) { .bot-roster { max-height: calc(100vh - 220px); overflow-y: auto; position: sticky; top: 90px; } }
+@media (max-width: 1250px) {
+  .bot-workspace-grid { grid-template-columns: 185px minmax(0, 1fr); }
+  .bot-context { grid-column: 2; }
+  .project-row-actions { max-width: 12rem; }
+}
+@media (max-width: 900px) {
+  .science-welcome { gap: 2rem; }
+  .science-team-preview { padding: 1rem; }
+  .science-team-roles { gap: .75rem; padding: 2rem 0; }
+  .structure-comparison-panes { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 640px) {
+  .topbar-actions { flex-wrap: wrap; gap: .25rem; flex-shrink: 1; }
+  .topbar-actions > * { max-width: 100%; }
+  .app-content { padding: 1rem; }
+  .science-welcome { grid-template-columns: 1fr; padding-top: 1rem; }
+  .science-welcome h1 { font-size: 2.5rem; }
+  .science-team-roles { padding: 1.5rem 0; }
+  .science-team-roles .bot-avatar { width: 44px; height: 44px; }
+  .project-row { grid-template-columns: minmax(0,1fr); padding: 1.5rem .5rem; gap: .75rem; }
+  .project-index { display: none; }
+  .project-row-actions { max-width: none; }
+  .bot-workspace-grid { grid-template-columns: minmax(0,1fr); }
+  .bot-roster { border-right: 0; border-bottom: 1px solid var(--border-soft); max-height: 250px; overflow: auto; padding-bottom: 1rem; }
+  .bot-context { grid-column: 1; }
+  .brief-details { grid-template-columns: 1fr; gap: 1.5rem; }
+  .science-page-header { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .science-welcome, .science-page-header { animation: science-enter 420ms ease-out both; }
+  @keyframes science-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-avatar, .bot-face i, .project-row { transition: none; }
+  .bot-roster-item:hover .bot-avatar, .bot-roster-item:focus-visible .bot-avatar, .science-team-roles > div:hover .bot-avatar { transform: none; }
+}

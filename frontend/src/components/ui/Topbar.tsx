@@ -23,6 +23,7 @@ import {
 
 const mobileRoutes = [
   { to: '/projects', key: 'projects' as const },
+  { to: '/bots', key: 'bots' as const },
   { to: '/research', key: 'research' as const },
   { to: '/workflow', key: 'workflow' as const },
   { to: '/candidates', key: 'candidates' as const },
@@ -81,7 +82,7 @@ export function Topbar() {
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 text-xs">
+        <div className="topbar-actions flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
           <span className="hidden sm:inline-flex">
             <StatusBadge
               status={appMode === 'application' ? 'info' : 'warning'}
@@ -132,22 +133,24 @@ export function Topbar() {
           full route list for reachability (and for accessibility tests). */}
       <nav
         aria-label={t.shared.mainNavigation}
-        className="flex gap-1 overflow-x-auto border-b border-border-soft bg-bg-app px-3 py-2 md:hidden"
+        className="flex gap-1 overflow-x-auto border-b border-border-soft bg-bg-app px-3 py-2"
       >
         {mobileRoutes.map((route) => (
           <NavLink
             key={route.to}
+            data-nav-route={route.to}
             to={`${route.to}${projectQuery}`}
             className={({ isActive }) =>
               clsx(
-                'shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                'shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
+                !['/projects', '/bots', '/research'].includes(route.to) && 'md:hidden',
                 isActive
                   ? 'bg-accent/15 text-accent'
                   : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
               )
             }
           >
-            {t.nav[route.key]}
+            {route.key === 'bots' ? (language === 'zh' ? 'Bot 工作区' : 'Bots') : t.nav[route.key]}
           </NavLink>
         ))}
       </nav>
@@ -158,7 +161,7 @@ export function Topbar() {
             variant="ghost"
             size="sm"
             aria-label={t.projects.activeProjectPanel.manageProject}
-            className="truncate"
+            className="max-w-full justify-start truncate"
             onClick={() => navigate(`/projects${projectQuery}`)}
           >
             {projectText(activeProject, 'name', language)}

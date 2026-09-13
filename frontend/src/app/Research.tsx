@@ -15,6 +15,8 @@ import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { useI18n } from '../lib/i18n'
 import { useAppStore, type Language } from '../lib/store/appStore'
 import { isDemoProject } from '../features/tour'
+import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
+import { projectText } from '../lib/i18n/projectText'
 
 export function ResearchPage() {
   const { language, t } = useI18n()
@@ -59,7 +61,7 @@ export function ResearchPage() {
     timeline: { label: t.research.workspace.tabTimeline },
   }
   return (
-    <div className="mx-auto max-w-[1180px]">
+    <div className="research-page mx-auto max-w-[1360px]">
       <Tabs
         value={group}
         onValueChange={(value) => selectTab(value as ResearchTab)}
@@ -68,23 +70,24 @@ export function ResearchPage() {
         <header className="mb-5 border-b border-border-soft pb-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p>
-            <h1 className="text-xl font-semibold text-text-primary">{t.research.page.title}</h1>
+            <h1 className="mt-2 text-3xl font-medium text-text-primary">{activeProject ? projectText(activeProject, 'name', language) : t.research.page.title}</h1>
           </div>
           {isPd1Demo ? (
             <Alert className="mt-3" variant="warning">
               <AlertDescription>
                 {language === 'zh'
-                  ? 'PD‑1 页面仅展示预计算的合成演示数据；它不是实时模型运行、真实实验结果或科研结论。'
-                  : 'This PD-1 page contains precomputed synthetic demo data only; it is not a live model run, experimental result, or research conclusion.'}
+                  ? '公开演示项目 · 候选指标为合成数据，文献与结构保留来源。'
+                  : 'Public demo · Candidate metrics are synthetic; literature and structures retain their sources.'}
               </AlertDescription>
             </Alert>
           ) : null}
           {projectId ? (
+            <div className="science-route-links">
+            <Button type="button" render={<Link to={`/bots?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '进入 Bot 工作区' : 'Open Bot workspace'}</Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="mt-3"
               onClick={() => {
                 setCopilotSelectedEntityIds([])
                 setCopilotDraft(languagePrompt(tab, tabConfig[tab].label, language))
@@ -94,6 +97,7 @@ export function ResearchPage() {
               <ChatCircleIcon aria-hidden="true" />
               {t.copilot.drawer.toggleLabel}: {tabConfig[tab].label}
             </Button>
+            </div>
           ) : null}
           <TabsList
             aria-label={t.research.page.tabsLabel}
@@ -112,11 +116,8 @@ export function ResearchPage() {
             <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
           ))}
         </nav> : null}
-        {projectId ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-soft p-4">
-          <p className="text-sm text-text-secondary">{language === 'zh'
-            ? ({ goals: '先明确目标、约束和成功标准，再拆出需要回答的问题。', evidence: '区分已读正文、摘要与待核实资料。每个结论都应能回到证据。', methods: '比较方案并确认输入。创建工作流后，还需通过执行检查。', timeline: '沿目标查看计算、实验和判断；点击卡片展开证据与详细记录。' }[group])
-            : ({ goals: 'Define objectives, constraints and success criteria, then identify open questions.', evidence: 'Distinguish full text, abstracts and unverified sources. Trace conclusions to evidence.', methods: 'Compare methods and confirm inputs. A workflow draft still needs execution checks.', timeline: 'Follow goals through computations, experiments and decisions. Open cards for evidence.' }[group])}</p>
-          {group === 'methods' ? <Button render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
+        {projectId && (group === 'methods' || group === 'evidence') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          {group === 'methods' ? <Button type="button" render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
           {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
         </div> : null}
         {projectId && group === 'evidence' && researchAgentOpen ? <CopilotWorkspace key={projectId} initialService="literature" initialGoal={language === 'zh'
@@ -132,11 +133,14 @@ export function ResearchPage() {
               </FramePanel>
             </Frame>
           ) : tab === 'goals' ? (
+            <>
+            {activeProject ? <ProjectBriefPanel project={activeProject} /> : null}
             <Frame>
               <FramePanel>
-                <div data-tour-id="research-goals"><ResearchGoalsPanel projectId={projectId} /></div>
+                <div data-tour-id="research-goals"><ResearchGoalsPanel key={projectId} projectId={projectId} /></div>
               </FramePanel>
             </Frame>
+            </>
           ) : tab === 'timeline' ? (
             <div data-tour-id="research-timeline"><ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} /></div>
           ) : <div data-tour-id="research-workspace"><ResearchWorkspacePanel view={tab} /></div>}
