@@ -26,7 +26,12 @@ from backend_v2.app.autopilot.models import (
     AutopilotLedgerEntry,
     AutopilotStage,
 )
-from backend_v2.app.autopilot.service import advance_campaign, next_stage, settle_stage
+from backend_v2.app.autopilot.service import (
+    SETTLED_STAGE_STATUSES,
+    advance_campaign,
+    next_stage,
+    settle_stage,
+)
 from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.copilot import agent_runs
 from backend_v2.app.copilot.models import CopilotAgentRun, CopilotConfig
@@ -796,3 +801,66 @@ def test_a_stage_carrying_an_agent_run_is_still_refused(session: Session) -> Non
 
     with pytest.raises(DomainError, match="which settles it"):
         complete_stage(session, campaign, stage, stage.version, user)
+
+
+def test_every_stage_key_has_a_way_to_end(session: Session) -> None:
+    """The guard against the pattern that produced the last three commits.
+
+    Making one step of a chain possible does not remove the stopping point; it
+    moves it, and the new one looks like working software until somebody asks
+    what they are supposed to click. `review` stopped the chain, then `compute`
+    did.
+
+    So this walks every stage key the platform classifies and asserts each can
+    reach a settled state by *some* route - the product settling itself, or a
+    person releasing and completing it. A new stage key, or a new resource type
+    whose stage nothing can finish, fails here rather than in a campaign.
+    """
+    from backend_v2.app.autopilot.service import complete_stage
+
+    #: Resource types a *worker* will settle, stated here rather than read from
+    #: `SELF_SETTLING_RESOURCE_TYPES`. Reading that constant would make this walk
+    #: circular - widening it would simply send the walk down the other branch,
+    #: and the test would keep passing while the stage it describes became
+    #: unfinishable. The fact this encodes is about subscriptions: `stage_settled`
+    #: consumes `copilot.agent_run.settled`, and nothing consumes anything for a
+    #: workflow run.
+    REPORTED_BACK_BY_A_WORKER = {"copilot_agent_run"}
+
+    keys = sorted(set(gates.STAGE_TIERS))
+    campaign, _, user = _campaign(session, stage_keys=keys)
+
+    for stage in _stages(session, campaign):
+        resource = adapters.ensure_stage_resource(session, campaign, stage)
+        if stage.held:
+            # The gate is a stop for a person, not a dead end: releasing clears
+            # it, which is the path the chain takes afterwards.
+            from backend_v2.app.autopilot.service import release_stage
+
+            release_stage(session, campaign, stage, user, stage.version)
+        stage.status = "ready"
+        session.flush()
+
+        if resource is not None and resource[0] in REPORTED_BACK_BY_A_WORKER:
+            # Ends itself; a person completing it would be a second answer.
+            settle_stage(session, campaign, stage, status="succeeded")
+        else:
+            # Everything else has to be finishable by the person looking at it.
+            complete_stage(session, campaign, stage, stage.version, user)
+
+        assert stage.status in SETTLED_STAGE_STATUSES, stage.stage_key
+
+
+def test_the_adapter_set_is_pinned_so_a_new_one_revisits_the_walk_above() -> None:
+    """A guard on the guard.
+
+    The walk above exercises whatever the current adapters produce, so it stays
+    honest only while somebody notices that a new adapter needs thinking about.
+    Pinning the set here is what makes adding one a deliberate edit with that
+    walk in front of it - a third resource type which neither settles itself nor
+    accepts completion would reproduce the `compute` dead end silently.
+    """
+    from backend_v2.app.autopilot.service import SELF_SETTLING_RESOURCE_TYPES
+
+    assert set(adapters.ADAPTERS) == {"compute", "design", "research", "plan", "report"}
+    assert SELF_SETTLING_RESOURCE_TYPES == frozenset({"copilot_agent_run"})
