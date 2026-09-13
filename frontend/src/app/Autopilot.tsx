@@ -10,6 +10,7 @@ import { PageHead } from '@/components/ui/PageHead'
 import { Textarea } from '@/components/ui/textarea'
 import {
   cancelAutopilotCampaign,
+  completeAutopilotStage,
   confirmAutopilotDraft,
   createAutopilotDraft,
   getAutopilotCampaign,
@@ -76,13 +77,25 @@ export function AutopilotPage() {
       releaseAutopilotStage(campaign!.id, stage.id, stage.version),
     onSuccess: () => refreshMutation.mutate(),
   })
+  // Completing is a different question from releasing and gets its own control:
+  // a release says *may this act*, which only a held stage has open, and this
+  // says *is this done*, which only a stage doing human work has. Re-reads the
+  // campaign for the same reason - the server decides what happens next, and a
+  // client that advanced the chain locally would be a second authority.
+  const completeMutation = useMutation({
+    mutationFn: (stage: { id: string; version: number }) =>
+      completeAutopilotStage(campaign!.id, stage.id, stage.version),
+    onSuccess: () => refreshMutation.mutate(),
+  })
   const error =
     draftMutation.error ??
     confirmMutation.error ??
     startMutation.error ??
     cancelMutation.error ??
     refreshMutation.error ??
-    takeoverMutation.error
+    takeoverMutation.error ??
+    releaseMutation.error ??
+    completeMutation.error
 
   return (
     <section className="mx-auto max-w-5xl" data-tour-id="autopilot-page">
@@ -214,9 +227,26 @@ export function AutopilotPage() {
                       : `carried by an agent run (${stage.operator ?? 'bot'})`}
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground">
-                    {language === 'zh' ? '这一阶段没有自动产物，需要人工完成' : 'no automatic product — a human step'}
-                  </span>
+                  <>
+                    <span className="text-xs text-muted-foreground">
+                      {language === 'zh' ? '这一阶段没有自动产物，需要人工完成' : 'no automatic product — a human step'}
+                    </span>
+                    {/* ...and a way to say it is done. Without this the chain
+                        reached a human step and stopped there with no action
+                        available anywhere, which the default campaign - ending
+                        in `review` - did every time. */}
+                    {stage.status === 'ready' ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={completeMutation.isPending}
+                        onClick={() => completeMutation.mutate(stage)}
+                      >
+                        {language === 'zh' ? '标记这一阶段完成' : 'Mark this stage done'}
+                      </Button>
+                    ) : null}
+                  </>
                 )}
               </li>
             ))}

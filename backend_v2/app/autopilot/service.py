@@ -615,6 +615,7 @@ def settle_stage(
     stage: AutopilotStage,
     *,
     status: str,
+    user: User | None = None,
 ) -> AutopilotStage:
     """Record that a stage's product reached a terminal state.
 
@@ -640,17 +641,182 @@ def settle_stage(
     session.add(
         AutopilotLedgerEntry(
             campaign_id=campaign.id,
-            service_principal_id=_worker_principal_id(session),
+            # Signed by the person when a person did it, and by the principal
+            # when the platform did. "Who caused this" has to stay answerable,
+            # and a human step marked complete by a worker id reads as automatic
+            # work that never happened.
+            writer_user_id=user.id if user is not None else None,
+            service_principal_id=None if user is not None else _worker_principal_id(session),
             event_type="stage.settled",
             payload={
                 "stage_id": str(stage.id),
                 "stage_key": stage.stage_key,
                 "status": status,
                 "operator": stage.operator,
+                "by": "user" if user is not None else "worker",
             },
         )
     )
     return stage
+
+
+def complete_stage(
+    session: Session,
+    campaign: AutopilotCampaign,
+    stage: AutopilotStage,
+    expected_version: int,
+    user: User,
+) -> AutopilotStage:
+    """A person marks a human step done, and the chain continues.
+
+    Some stages have no automatic product on purpose - `review` is somebody's
+    judgement, and `operators.UNSTAFFED` records which keys are in that state and
+    why. Those stages reach `ready` and nothing moves them: `release` refuses
+    anything that is not held, so until now a chain that reached one stopped
+    there with no action available anywhere. The default campaign ends with
+    `review`, so that was every default campaign.
+
+    Refused for a stage that has a product of its own. A run or a workflow settles
+    its own stage, and a second answer to "how did this step end" is worse than a
+    missing one - it would let a person mark a step complete while its operator is
+    still writing.
+    """
+    if stage.version != expected_version:
+        raise DomainError("version_conflict", "Autopilot stage changed", status_code=412)
+    if stage.campaign_id != campaign.id:
+        raise DomainError(
+            "autopilot_stage_not_found", "Stage does not belong to this campaign", status_code=404
+        )
+    if campaign.status in {"cancelled", "manual_takeover"}:
+        raise DomainError(
+            "autopilot_campaign_not_running",
+            f"A {campaign.status} campaign has no stage to complete",
+            status_code=409,
+        )
+    if stage.resource_type is not None:
+        raise DomainError(
+            "autopilot_stage_has_a_product",
+            f"Stage {stage.stage_key!r} produced a {stage.resource_type}, which settles it",
+            status_code=409,
+        )
+    if stage.held:
+        raise DomainError(
+            "autopilot_stage_held",
+            f"Stage {stage.stage_key!r} is held; release it rather than completing it",
+            status_code=409,
+        )
+    if stage.status in SETTLED_STAGE_STATUSES:
+        return stage
+    if stage.status != "ready":
+        raise DomainError(
+            "autopilot_stage_not_started",
+            f"Stage {stage.stage_key!r} has not started; there is nothing to complete",
+            status_code=409,
+        )
+
+    settle_stage(session, campaign, stage, status="succeeded", user=user)
+    record_audit(
+        session,
+        action="autopilot.stage.complete",
+        entity_type="autopilot_stage",
+        entity_id=stage.id,
+        project_id=campaign.project_id,
+        actor_id=user.id,
+        payload={"stage_key": stage.stage_key},
+    )
+    _advance_and_record(session, campaign, stage, user=user)
+    return stage
+
+
+def _advance_and_record(
+    session: Session,
+    campaign: AutopilotCampaign,
+    from_stage: AutopilotStage,
+    *,
+    user: User | None = None,
+) -> AutopilotStage | None:
+    """Move to the next stage and write down where it got to.
+
+    Shared by the worker and by a person completing a human step, so the two
+    cannot disagree about what advancing writes - the ledger is the thing anyone
+    reconstructing a campaign reads, and two shapes of "advanced" entry would
+    make it answer differently depending on who caused the step.
+    """
+    principal = None if user is not None else _worker_principal_id(session)
+    reached, resource = advance_campaign(session, campaign)
+    if reached is None:
+        finish_campaign(session, campaign, user=user)
+        return None
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            writer_user_id=user.id if user is not None else None,
+            service_principal_id=principal,
+            event_type="campaign.advanced",
+            payload={
+                "from_stage_id": str(from_stage.id),
+                "stage_id": str(reached.id),
+                "stage_key": reached.stage_key,
+                "held": bool(reached.held),
+                "hold_reason": reached.hold_reason,
+            },
+        )
+    )
+    if resource is not None:
+        session.add(
+            AutopilotLedgerEntry(
+                campaign_id=campaign.id,
+                writer_user_id=user.id if user is not None else None,
+                service_principal_id=principal,
+                event_type="stage.resource_created",
+                payload={
+                    "stage_id": str(reached.id),
+                    "resource_type": resource[0],
+                    "resource_id": str(resource[1]),
+                },
+            )
+        )
+    return reached
+
+
+def finish_campaign(
+    session: Session, campaign: AutopilotCampaign, *, user: User | None = None
+) -> AutopilotCampaign:
+    """Mark a campaign whose chain has run out of stages.
+
+    A campaign stayed `running` after its last stage, because nothing ever
+    advanced and so nothing ever reached the end. Now that the chain moves, a
+    campaign that finished has to say so: "running" on a campaign with every
+    stage settled is a status that means nothing and a page that invites someone
+    to wait for a step that will not come.
+
+    `failed` when any stage failed. The campaign's outcome is not the last
+    stage's - a chain that lost a step in the middle and carried on did not
+    succeed - and reporting otherwise would make the ledger the only place the
+    failure survived.
+    """
+    if campaign.status in {"cancelled", "manual_takeover"}:
+        return campaign
+    stages = list(
+        session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id))
+    )
+    if any(stage.status not in SETTLED_STAGE_STATUSES for stage in stages):
+        return campaign
+    outcome = "failed" if any(stage.status == "failed" for stage in stages) else "succeeded"
+    if campaign.status == outcome:
+        return campaign
+    campaign.status = outcome
+    campaign.version += 1
+    session.add(
+        AutopilotLedgerEntry(
+            campaign_id=campaign.id,
+            writer_user_id=user.id if user is not None else None,
+            service_principal_id=None if user is not None else _worker_principal_id(session),
+            event_type="campaign.finished",
+            payload={"status": outcome, "stages": len(stages)},
+        )
+    )
+    return campaign
 
 
 def next_stage(session: Session, campaign: AutopilotCampaign) -> AutopilotStage | None:

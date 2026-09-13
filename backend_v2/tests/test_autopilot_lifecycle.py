@@ -534,3 +534,180 @@ def test_a_campaign_with_a_stage_in_flight_does_not_start_another(session: Sessi
 
     assert reached is None and resource is None
     assert third.status == "pending"
+
+
+# --- A human step a human can finish -------------------------------------------
+
+
+class TestCompleteStage:
+    """The dead end that advancing made reachable.
+
+    `review` has no automatic product by design, and `release` refuses anything
+    that is not held - so a chain that reached one stopped there with no action
+    available anywhere. The default campaign ends with `review`, so that was
+    every default campaign.
+    """
+
+    def _complete(self, session: Session, campaign, stage, user, version=None):
+        from backend_v2.app.autopilot.service import complete_stage
+
+        return complete_stage(
+            session, campaign, stage, stage.version if version is None else version, user
+        )
+
+    def test_a_person_finishes_a_human_step(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review", "report"])
+        review, report = _stages(session, campaign)
+        review.status = "ready"
+        session.flush()
+
+        self._complete(session, campaign, review, user)
+
+        assert review.status == "succeeded"
+        assert report.status == "ready"
+
+    def test_the_person_signs_it_not_the_worker(self, session: Session) -> None:
+        """A human step marked complete by a worker id reads as automatic work
+        that never happened."""
+        campaign, _, user = _campaign(session, stage_keys=["review", "report"])
+        review = _stages(session, campaign)[0]
+        review.status = "ready"
+        session.flush()
+
+        self._complete(session, campaign, review, user)
+
+        entry = session.scalars(
+            select(AutopilotLedgerEntry).where(AutopilotLedgerEntry.event_type == "stage.settled")
+        ).one()
+        assert entry.writer_user_id == user.id
+        assert entry.service_principal_id is None
+        assert entry.payload["by"] == "user"
+
+    def test_a_stage_with_a_product_is_refused(self, session: Session) -> None:
+        """Its product settles it. A second answer to "how did this end" would let
+        somebody mark a step complete while its operator is still writing."""
+        campaign, _, user = _campaign(session)
+        stage = _stages(session, campaign)[0]
+        adapters.ensure_stage_resource(session, campaign, stage)
+        stage.status = "ready"
+        session.flush()
+
+        with pytest.raises(DomainError, match="which settles it"):
+            self._complete(session, campaign, stage, user)
+
+    def test_a_held_stage_is_released_not_completed(self, session: Session) -> None:
+        """Two different questions. A release says *may this act*; completing says
+        *is this done*."""
+        campaign, _, user = _campaign(session, stage_keys=["submit"])
+        stage = _stages(session, campaign)[0]
+        stage.status = "awaiting_release"
+        session.flush()
+
+        with pytest.raises(DomainError, match="release it rather than completing it"):
+            self._complete(session, campaign, stage, user)
+
+    def test_a_stage_that_has_not_started_is_refused(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review"])
+        stage = _stages(session, campaign)[0]
+
+        with pytest.raises(DomainError, match="has not started"):
+            self._complete(session, campaign, stage, user)
+
+    def test_a_stale_version_is_refused(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review"])
+        stage = _stages(session, campaign)[0]
+        stage.status = "ready"
+        session.flush()
+
+        with pytest.raises(DomainError, match="Autopilot stage changed") as raised:
+            self._complete(session, campaign, stage, user, version=stage.version + 5)
+
+        assert raised.value.error_code == "version_conflict"
+        assert raised.value.status_code == 412
+
+    def test_completing_twice_is_idempotent(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review", "report"])
+        review = _stages(session, campaign)[0]
+        review.status = "ready"
+        session.flush()
+
+        self._complete(session, campaign, review, user)
+        self._complete(session, campaign, review, user)
+
+        assert (
+            len(
+                list(
+                    session.scalars(
+                        select(AutopilotLedgerEntry).where(
+                            AutopilotLedgerEntry.event_type == "stage.settled"
+                        )
+                    )
+                )
+            )
+            == 1
+        )
+
+    def test_a_cancelled_campaign_has_no_step_to_complete(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review"])
+        stage = _stages(session, campaign)[0]
+        stage.status = "ready"
+        campaign.status = "cancelled"
+        session.flush()
+
+        with pytest.raises(DomainError, match="has no stage to complete"):
+            self._complete(session, campaign, stage, user)
+
+
+class TestCampaignFinishes:
+    """A campaign stayed `running` after its last stage, because nothing ever
+    reached the end. Now that the chain moves, "running" on a campaign with every
+    stage settled is a status that means nothing and a page inviting someone to
+    wait for a step that will not come."""
+
+    def test_the_last_stage_finishes_the_campaign(self, session: Session) -> None:
+        campaign, _, user = _campaign(session, stage_keys=["review"])
+        stage = _stages(session, campaign)[0]
+        stage.status = "ready"
+        session.flush()
+        from backend_v2.app.autopilot.service import complete_stage
+
+        complete_stage(session, campaign, stage, stage.version, user)
+
+        assert campaign.status == "succeeded"
+
+    def test_a_chain_that_lost_a_step_did_not_succeed(self, session: Session) -> None:
+        """The campaign's outcome is not the last stage's. Reporting otherwise
+        would make the ledger the only place the failure survived."""
+        from backend_v2.app.autopilot.service import complete_stage, settle_stage
+
+        campaign, _, user = _campaign(session, stage_keys=["review", "report"])
+        review, report = _stages(session, campaign)
+        settle_stage(session, campaign, review, status="failed")
+        report.status = "ready"
+        session.flush()
+
+        complete_stage(session, campaign, report, report.version, user)
+
+        assert campaign.status == "failed"
+
+    def test_a_campaign_with_work_left_is_not_finished(self, session: Session) -> None:
+        from backend_v2.app.autopilot.service import finish_campaign
+
+        campaign, _, _ = _campaign(session)
+
+        finish_campaign(session, campaign)
+
+        assert campaign.status == "running"
+
+    def test_a_cancelled_campaign_is_not_overwritten(self, session: Session) -> None:
+        from backend_v2.app.autopilot.service import finish_campaign
+
+        campaign, _, _ = _campaign(session)
+        for stage in _stages(session, campaign):
+            stage.status = "cancelled"
+        campaign.status = "cancelled"
+        session.flush()
+
+        finish_campaign(session, campaign)
+
+        assert campaign.status == "cancelled"

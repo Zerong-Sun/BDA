@@ -85,6 +85,7 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 | stage 负责 bot（`autopilot_stages.operator`） | 已实现 | `backend_v2/app/autopilot/operators.py`、迁移 `0061`；确认时冻结，和 `risk_tier` 同理——重新分工不得改变已确认 campaign 的归属 |
 | research / plan / report stage adapter（agent run） | 已实现 | `adapters.AgentRunAdapter`；由该阶段的 operator 开一条 durable agent run，goal 是人写下并确认的 brief 原文，工具为 `bot.capabilities ∩ project.enabled_skills` |
 | stage 结算与链条推进 | 已实现 | `copilot.agent_run.settled` → `tasks.stage_settled`；stage 落到 `succeeded`/`failed`/`cancelled` 并写 ledger，然后 `service.advance_campaign` 激活下一阶段 |
+| 人工步骤的完成与 campaign 终态 | 已实现 | `POST …/stages/{id}/complete`（带 `If-Match`，由人签名）；最后一阶段结算后 `finish_campaign` 把 campaign 置为 `succeeded`/`failed` |
 | collect / review stage adapter | 尚未实现 | `collect` 的产物依赖真实计算完成后的回写，不能凭 spec 生成；`review` 是人的判断，按设计没有 operator |
 | 自动结果回写、候选漏斗和实验复盘 | 尚未实现 | 需要上一行的 adapter、领域事件与新界面 |
 | 完整无人值守闭环 | 尚未达成 | 见 §6。推进机制现在存在了，但这一行说的是**验证**：端到端闭环仍未在真实计算上跑通。而且链条到第一个 `compute`/`design` 阶段就会停——它们的产物是 workflow run 草稿，没有东西结算草稿，按设计要人去 Workflow 页完成。所以「能自动跨过若干个 agent run 阶段」和「能无人跑完」之间的距离，正是这一行 |
@@ -96,6 +97,7 @@ Ledger 只接受真实用户或受限 service principal 两类 writer。重复�
 - 被 `gates.py` 判为需要放行的阶段不会有 operator，也不会开 run——`service.activate_stage` 在 adapter 之前就返回了。
 - 取消 campaign 会一并取消该阶段的 agent run，并把阶段标记为 `cancelled`。agent run 是唯一一种取消后仍会继续花钱的 stage 产物（workflow run 是不花钱的草稿，而且人可能还要用），所以两者在取消路径上的处理是不同的，不是遗漏。
 - **人工接管同样会停掉 stage 的 agent run**，但不动 job。接管交出的是对产物的权限，而一个还在跑的 compute job 是别人已经付过的 GPU 小时；agent run 不是「摆在那里的结果」，它是一个仍在思考、仍会通过自己工具写入的 operator——留着它就是接管本身要防的那个竞态，只是降了一层。
+- `release` 和 `complete` 是两个不同的问题：release 问「这一步**可以动吗**」，只有被 gate 拦住的阶段有这个问题；complete 问「这一步**做完了吗**」，只有做人工活的阶段有。有自动产物的阶段由产物结算，`complete` 会拒绝——否则就是对「这一步怎么结束的」给出第二个答案，并且允许人在 operator 还在写的时候把它标记完成。
 - 推进有三道拒绝：**已取消**的 campaign 无处可推；**已接管**的 campaign 属于人，worker 再推就是上面那个竞态；**被 gate 拦住**的阶段停在闸门前等签字——这不是推进失败，是推进走到了闸门。另外**同时只跑一个阶段**：已有阶段处于 `ready` 时不再推进，否则重投递会跳过中间那一阶段去启动再下一个。
 - 监督式 campaign 未声明预算时不得确认，`plan_only` 不得启动计算。
 - worker 必须在 operation 的项目上下文中运行，不能使用无项目边界的应用账号。

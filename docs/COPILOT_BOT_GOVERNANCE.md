@@ -306,6 +306,18 @@ Takeover also stops the stage's operator now, and leaves compute jobs alone. The
 asymmetry is the point: a running job is GPU hours somebody already paid for, and
 an agent run is not a result sitting there — it is an operator still writing.
 
+Advancing also made a dead end reachable, which is worth recording as the cost of
+the feature rather than as a separate bug. Some stages have no automatic product
+by design — `review` is somebody's judgement — and `release` refuses anything
+that is not held, so a chain arriving at one stopped with no action available
+anywhere. The default campaign ends with `review`, so that was every default
+campaign. `POST …/stages/{id}/complete` is the missing verb, and it is
+deliberately not `release`: a release answers *may this act*, completion answers
+*is this done*, and a stage with a product of its own is settled by the product
+and refuses both. A campaign whose stages have all settled now reports
+`succeeded` or `failed` too — `running` on a finished campaign is a status that
+means nothing.
+
 None of this makes the unattended loop complete, and
 [Autopilot campaigns](AUTOPILOT_CAMPAIGNS.md) still says so. The chain stops at
 the first `compute` or `design` stage, whose product is a workflow-run draft that
@@ -350,3 +362,5 @@ nothing.
 | 21 | A settled stage records how it ended, once, signed by the worker principal rather than by the person who confirmed the campaign | `test_autopilot_lifecycle.py` |
 | 22 | A cancelled, taken-over, or already-in-flight campaign does not advance; a held stage stops the chain at the gate rather than being stepped over | `test_autopilot_lifecycle.py` |
 | 23 | Taking over stops the stage's operator and does not thereby advance the campaign | `test_autopilot_lifecycle.py` |
+| 24 | A human step can be completed by a person, signed by them; a stage with a product of its own refuses it | `test_autopilot_lifecycle.py` |
+| 25 | A campaign whose every stage has settled reports `succeeded`, or `failed` if any stage failed | `test_autopilot_lifecycle.py` |

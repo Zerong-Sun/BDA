@@ -17,9 +17,9 @@ from .models import (
 )
 from .service import (
     UNSTARTED_STAGE_STATUSES,
+    _advance_and_record,
     _worker_principal_id,
     activate_stage,
-    advance_campaign,
     settle_stage,
 )
 
@@ -316,44 +316,13 @@ def stage_settled(self, run_id: str) -> dict:
         # fault in the record where a decision belongs.
         settle_stage(session, campaign, stage, status=run.status)
 
-        stage_reached, resource = advance_campaign(session, campaign)
-        if stage_reached is None:
+        reached = _advance_and_record(session, campaign, stage)
+        if reached is None:
             return {"run_id": run_id, "status": "settled", "advanced": False}
-
-        principal = _worker_principal(session)
-        session.add(
-            AutopilotLedgerEntry(
-                campaign_id=campaign.id,
-                service_principal_id=principal.id,
-                event_type="campaign.advanced",
-                payload={
-                    "from_stage_id": str(stage.id),
-                    "stage_id": str(stage_reached.id),
-                    "stage_key": stage_reached.stage_key,
-                    "held": bool(stage_reached.held),
-                    # Why it stopped where it did, in the ledger and not only in
-                    # the UI: a hold nobody can explain reads as a failure.
-                    "hold_reason": stage_reached.hold_reason,
-                },
-            )
-        )
-        if resource is not None:
-            session.add(
-                AutopilotLedgerEntry(
-                    campaign_id=campaign.id,
-                    service_principal_id=principal.id,
-                    event_type="stage.resource_created",
-                    payload={
-                        "stage_id": str(stage_reached.id),
-                        "resource_type": resource[0],
-                        "resource_id": str(resource[1]),
-                    },
-                )
-            )
         return {
             "run_id": run_id,
             "status": "settled",
             "advanced": True,
-            "next_stage": str(stage_reached.id),
-            "held": bool(stage_reached.held),
+            "next_stage": str(reached.id),
+            "held": bool(reached.held),
         }
