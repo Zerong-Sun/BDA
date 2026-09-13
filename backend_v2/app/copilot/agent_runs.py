@@ -106,6 +106,44 @@ def create_run(
     return run
 
 
+def enqueue_first_step(session: Session, run: CopilotAgentRun) -> None:
+    """Hand a newly created child run to a worker.
+
+    `start_agent_run` does this for a run a person started; nothing did it for a
+    child. The result was a deadlock neither the sweep nor an event could break:
+    the parent sits in `awaiting_tasks` with an outstanding subagent task, the
+    child sits in `running` - and `resumable_runs` only reads `awaiting_tasks`,
+    so the sweep looks at neither. The child's completion is what would wake the
+    parent, and nothing was ever going to run the child.
+
+    Through the outbox rather than `send_task`, for the reason the compute path
+    uses it: this runs inside the parent's transaction, and a worker that picked
+    the child up before that transaction committed would not find it.
+    """
+    from ..identity.models import User
+    from ..platform.operations import enqueue_operation
+    from ..projects.models import Project
+
+    project = session.get(Project, run.project_id)
+    user = session.get(User, run.created_by)
+    if project is None or user is None:
+        raise DomainError(
+            "agent_run_actor_unavailable",
+            "A child run needs its project and its creator to be dispatchable.",
+            status_code=409,
+        )
+    enqueue_operation(
+        session,
+        topic="copilot.agent_step",
+        resource_type="copilot_agent_run",
+        resource_id=run.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        user=user,
+        payload={"run_id": str(run.id)},
+    )
+
+
 def append_turn(
     session: Session,
     run: CopilotAgentRun,

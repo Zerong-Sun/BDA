@@ -31,7 +31,7 @@ from backend_v2.app.core.models import Base
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -665,3 +665,70 @@ def test_reviewing_a_declaration_changes_nothing(session: Session) -> None:
     assert spec is not None
     assert spec.execution_mode == "read"
     assert spec.id not in REGISTRY.write_ids()
+
+
+# --- The child actually runs -------------------------------------------------
+
+
+def _outbox(session: Session) -> list[str]:
+    from backend_v2.app.compute.models import OutboxEvent
+
+    return [
+        str(row.payload.get("run_id"))
+        for row in session.scalars(select(OutboxEvent).where(OutboxEvent.topic == "copilot.agent_step"))
+    ]
+
+
+def test_a_delegated_child_is_handed_to_a_worker(session: Session) -> None:
+    """Otherwise the chain deadlocks with nothing to break it.
+
+    `start_agent_run` dispatches a run a person started; nothing dispatched a
+    child. The parent then sits in `awaiting_tasks` with an outstanding subagent
+    task while the child sits in `running` - and `resumable_runs` reads only
+    `awaiting_tasks`, so the sweep looks at neither. The child's completion is
+    what wakes the parent, and nothing was going to run the child.
+    """
+    project, user = _project(session)
+    run = _conductor_run(session, project, user, goal="Work out what to do")
+
+    result = REGISTRY.execute(
+        "delegate_to_operator",
+        _ctx(session, run),
+        {"bot": "librarian", "instruction": "Collect the literature"},
+    )
+
+    assert result["run_id"] in _outbox(session)
+
+
+def test_a_spawned_subagent_is_handed_to_a_worker_too(session: Session) -> None:
+    """The defect was `spawn_subagent`'s first; fixing only delegation would
+    have left the older tool deadlocking."""
+    project, user = _project(session)
+    run = agent_runs.create_run(
+        session,
+        project_id=project.id,
+        user_id=user.id,
+        goal="Work out what to do",
+        allowed_tools=["spawn_subagent", "research_overview"],
+        bot="runner",
+    )
+
+    result = REGISTRY.execute(
+        "spawn_subagent", _ctx(session, run), {"goal": "Part of it"}
+    )
+
+    assert result["run_id"] in _outbox(session)
+
+
+def test_the_dispatch_names_the_child_not_the_parent(session: Session) -> None:
+    """A parent re-dispatched instead of its child would spin without progress."""
+    project, user = _project(session)
+    run = _conductor_run(session, project, user, goal="Work out what to do")
+
+    result = REGISTRY.execute(
+        "delegate_to_operator",
+        _ctx(session, run),
+        {"bot": "planner", "instruction": "Pick a route"},
+    )
+
+    assert _outbox(session) == [result["run_id"]]

@@ -913,6 +913,7 @@ def _spawn_subagent(ctx: ToolContext, args: dict[str, Any]) -> Any:
         parent_run_id=parent.id,
         max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
     )
+    agent_runs.enqueue_first_step(ctx.session, child)
     return {
         "resource_id": str(child.id),
         "run_id": str(child.id),
@@ -1435,6 +1436,7 @@ def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
         max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
         bot=target,
     )
+    agent_runs.enqueue_first_step(ctx.session, child)
     return {
         "resource_id": str(child.id),
         "run_id": str(child.id),

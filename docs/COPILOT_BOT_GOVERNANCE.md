@@ -162,6 +162,16 @@ Delegation requires an agent run (`requires="agent_run"`), so in chat the
 conductor can only recommend an operator. That matches `spawn_subagent` and
 keeps the chat surface incapable of opening runs behind the user's back.
 
+A child run is also **dispatched**, through the outbox, at the moment it is
+created. `start_agent_run` did that for a run a person started and nothing did
+it for a child, which deadlocked the pair with nothing able to break it: the
+parent sits in `awaiting_tasks` holding an outstanding subagent task, the child
+sits in `running`, and `resumable_runs` reads only `awaiting_tasks` — so the
+sweep looks at neither, and the thing that would wake the parent is the child
+that nothing was going to run. The defect was `spawn_subagent`'s first;
+`delegate_to_operator` inherited it, which would have made `conductor` a bot
+that cannot complete a single delegation.
+
 ### `auditor` — 复核 (stance: `review`)
 
 Capabilities: `project-read`, `research-read`, `review-audit`,
@@ -243,3 +253,4 @@ nothing.
 | 9 | Every capability is owned by at least one bot | `test_v2_domains.py` |
 | 10 | A slot count above one with no evidence, and a CPU-only stage on a GPU-forcing queue, are violations; the queue rules stay silent on a backend that ignores the queue | `test_compute_declarations.py` |
 | 11 | A sound declaration is reported as sound, not as an empty finding list | `test_compute_declarations.py` |
+| 12 | Every child run - delegated or spawned - is dispatched when it is created, and the dispatch names the child | `test_copilot_chain.py` |

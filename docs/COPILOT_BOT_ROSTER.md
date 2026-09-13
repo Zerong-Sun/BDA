@@ -425,6 +425,7 @@ Each of these holds, and has a test that fails when it stops holding.
 | 30 | A slot count above one without evidence, and a CPU-only stage on a GPU-forcing queue, are both violations; a sound declaration is reported as sound | `test_compute_declarations.py` |
 | 31 | The queue rules do not fire on a backend that ignores the queue | `test_compute_declarations.py` |
 | 32 | `steward` can reach a declaration from a plugin id or a workflow node, and reviewing one changes nothing | `test_copilot_chain.py` |
+| 33 | A delegated or spawned child run is dispatched through the outbox when it is created, so the pair cannot deadlock | `test_copilot_chain.py` |
 
 Gates run for this change, on `bda-public/main`:
 
