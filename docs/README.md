@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-07（Asia/Shanghai；按当前使用、工程、规划与归档重新整理）
+最后核验：2026-09-12（Asia/Shanghai；补入工作区结构说明与归档索引）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -21,6 +21,7 @@
 - [Workflow gate validation and repairs](WORKFLOW_GATES_REVIEW.md)
 - [System operability review](SYSTEM_OPERABILITY_REVIEW.md)
 
+- [Workspace map / 工作区结构说明](WORKSPACE_MAP.md)
 - [Autopilot protocol and implementation boundary](AUTOPILOT_CAMPAIGNS.md)
 - [Backend v2](BACKEND_V2.md)
 - [Frontend v2](FRONTEND_V2.md)
@@ -79,3 +80,16 @@
 
 - [六维复核与修复清单](GUIDED_PLATFORM_REVIEW.md)
 - [前端插件检查与修复](FRONTEND_PLUGIN_CHECK_2026-09-07.md)
+
+Generated plugin runbooks live under `qm-scripts/plugins/`. Backend-adjacent notes
+that sit next to the code they describe — [architecture](../backend_v2/docs/architecture.md),
+[operations](../backend_v2/docs/operations.md), [testing](../backend_v2/docs/testing.md) and
+[the operational scripts](../backend_v2/scripts/README.md) — are reached through
+`backend_v2/README.md`. Historical v1 documents that contain private paths or research
+runs are retained only in the private recovery archive, not in this public repository.
+
+## Archive
+
+Retired plans, designs, and reviews live in [docs/archive/](archive/README.md), which also
+registers removed source files and the command that recovers them. Archived material
+records past intent; it never describes current behavior.

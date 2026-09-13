@@ -40,4 +40,4 @@ protein-lab 在服务端用 matplotlib 出 PNG，因为它是没有前端构建�
 
 分析响应里的 `summary` 因此带上**抽稀后的曲线本身**（BLI 结合曲线、AKTA 色谱、各孔动力学，每条 ≤600 点，按步长抽取而非平滑，抽稀后的点仍是实测点）。曲线只返回、不入库：`result_metadata` 只存拟合出的数值，原始 artifact 才是那份轨迹唯一的不可变副本。前端 `features/lab/LineChart.tsx` 用内联 SVG 画，不引图表库。
 
-详见 `docs/refactor/PRESERVED_PRINCIPLES.md`（含 AKTA zip 与 ForteBio CSV 的格式逆向结论）。
+AKTA zip 与 ForteBio CSV 的格式逆向结论记在私有恢复库的 v1 文档里，公开树不重建；解析行为本身以 `backend_v2/app/wetlab/kernels/akta.py`、`kernels/bli.py` 与它们的测试为准。

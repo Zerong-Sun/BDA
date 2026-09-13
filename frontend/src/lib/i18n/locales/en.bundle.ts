@@ -958,12 +958,6 @@ export const bundleEn = {
         from: 'Baseline',
         to: 'This run',
       },
-    pluginRegistry: {
-      eyebrow: 'Model plugin registry',
-      title: 'Registered models',
-      loading: 'Loading plugins...',
-      runtimeProof: 'Runtime: {status}',
-    },
     scriptAssets: {
       archiveOnly: 'Archived · no execution binding',
       eyebrow: 'Scripts',

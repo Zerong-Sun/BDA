@@ -931,12 +931,6 @@ export const bundleZh = {
         from: '基线',
         to: '本次',
       },
-    pluginRegistry: {
-      eyebrow: '模型插件注册表',
-      title: '已注册模型',
-      loading: '加载插件中...',
-      runtimeProof: '运行证据：{status}',
-    },
     scriptAssets: {
       archiveOnly: '已归档 · 尚未绑定执行',
       eyebrow: '脚本',
