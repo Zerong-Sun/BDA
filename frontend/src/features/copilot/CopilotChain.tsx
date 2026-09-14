@@ -52,7 +52,7 @@ function operatorName(id: string, bots: readonly CopilotBot[], zh: boolean): str
   return zh ? bot.title_zh : bot.title
 }
 
-function HandoffCard({
+export function HandoffCard({
   handoff,
   bots,
   onSelectOperator,

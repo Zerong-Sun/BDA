@@ -16,6 +16,7 @@ import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
 import { BotAvatar } from './BotAvatar'
 import { reviewersOf, useCopilotBots, type CopilotBot } from './bots/registry'
+import { botHref } from './bots/workbenches'
 import { deliveryLabel, groupRunsByOwner, isQuestion, ownerOf, suggestAssignee, taskOwners, type ServiceKind } from './taskPresentation'
 
 interface WorkspaceProps {
@@ -148,7 +149,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       {groupRunsByOwner(runs.data?.filter((r) => !r.parent_run_id) ?? [], bots.data ?? []).map((group) => {
         const label = group.bot ? name(group.bot) : group.botId ?? (zh ? '未指定负责人' : 'No assigned owner')
         return <div key={group.key} role="group" aria-label={label} className="space-y-2">
-          <p className="task-owner-heading">{group.bot ? <BotAvatar id={group.bot.id} stance={group.bot.stance} /> : null}<span>{label}</span><span className="text-text-muted">{group.runs.length}</span></p>
+          <p className="task-owner-heading">{group.bot ? <BotAvatar id={group.bot.id} stance={group.bot.stance} /> : null}{group.bot ? <Link to={botHref(group.bot.id, projectId)}>{label}</Link> : <span>{label}</span>}<span className="text-text-muted">{group.runs.length}</span></p>
           {group.runs.map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
         </div>
       })}
