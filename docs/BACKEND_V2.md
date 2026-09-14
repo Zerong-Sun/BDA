@@ -18,7 +18,7 @@ v2 是 FastAPI 模块化单体。API、通用 worker、research worker、copilot
 
 ## 2. 模块边界
 
-`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、autopilot、timeline、ligands、wetlab、audit 与 platform 划分，共 22 个领域，登记在 `app/module_registry.py`。`app/core/` 与 `app/migration/` 不是领域：前者是跨域基础设施，后者是 v1 迁移原语。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
+`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、autopilot、timeline、ligands、wetlab、sequences、audit 与 platform 划分，共 23 个领域，登记在 `app/module_registry.py`。其中 sequences 没有表：序列分析与密码子优化都由其他领域已存的记录算出，存一份派生结果就会多出一个真值来源。`structures` 同样无表，且暂无 HTTP 路由，只经 copilot 工具调用。`app/core/` 与 `app/migration/` 不是领域：前者是跨域基础设施，后者是 v1 迁移原语。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
 
 跨域写入通过 service 或 outbox 事件完成。Copilot 只编排领域服务；compute 不直接访问 Campaign repository。请求使用短生命周期 SQLAlchemy session，SSE 建立前完成授权并释放连接。
 
@@ -74,6 +74,7 @@ Artifact 状态为 uploading、available、failed、deleted。reconciliation 检
 - Registry 管理 server、compute node、model/method plugin、参数目录、script asset 和 LLM provider；数据库只存 `credential_ref`。
 - Copilot 提供聊天、持久化 agent run、配置、能力、路线建议和记录摘要。聊天/agent 由 copilot worker 处理；模型测试与 use_model 路线建议当前在请求中调用模型。详见 [服务及接口指南](COPILOT_SERVICE_GUIDE.md)。
 - Compute draft 确认后创建普通 job；配体查询无副作用，导入必须生成项目 artifact。
+- Sequences 只读不存：`analyse_sequence` 走 copilot 工具，只返回位点与数值；密码子优化只走 HTTP（`GET /codon-hosts`、`POST /projects/{id}/codon-optimisations`），因为它返回 DNA，而工具结果会写进对话记录，等于多出一份明文。宿主权重由 `scripts/build_codon_usage.py` 从注释基因组统计（大肠杆菌 K-12 U00096 共 4297 个 CDS；酿酒酵母 S288C 十六条染色体共 6002 个 CDS），不采用只基于十几条序列的公开表；构建结果必须能翻译回原蛋白，否则报错不返回。
 
 ## 8. 配置与启动门禁
 

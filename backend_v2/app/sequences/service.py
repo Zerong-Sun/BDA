@@ -33,7 +33,7 @@ from ..candidates.models import Candidate
 from ..core.problem import DomainError
 from ..targets.models import Target
 from ..wetlab.models import Protein
-from . import kernels
+from . import codon, kernels
 
 
 def _digest(sequence: str) -> str:
@@ -133,6 +133,54 @@ def resolve(
         # the row is what identifies the construct everywhere else.
         "sequence_sha256": protein.sequence_sha256,
     }
+
+
+def optimise_codons(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    candidate_id: uuid.UUID | None = None,
+    target_id: uuid.UUID | None = None,
+    protein_id: uuid.UUID | None = None,
+    host: str,
+    avoid_sites: dict[str, str] | None = None,
+    prefix: str = "",
+    suffix: str = "",
+    add_stop: bool = True,
+    max_homopolymer: int = codon.MAX_HOMOPOLYMER,
+) -> dict[str, Any]:
+    """A DNA construct for whichever protein was named, and how it was built.
+
+    The one place in this domain that returns a sequence. It is DNA rather than
+    the protein, and it goes to the authenticated person who asked over HTTP -
+    not through a copilot tool, whose results are written into the transcript.
+    Nothing is stored: the construct is a function of the record and the
+    constraints, both of which are in the response.
+    """
+    try:
+        text, source = resolve(
+            session,
+            project_id,
+            candidate_id=candidate_id,
+            target_id=target_id,
+            protein_id=protein_id,
+        )
+        result = codon.optimise(
+            text,
+            host=host,
+            avoid_sites=avoid_sites,
+            prefix=prefix,
+            suffix=suffix,
+            add_stop=add_stop,
+            max_homopolymer=max_homopolymer,
+        )
+    except codon.CodonError as error:
+        raise DomainError("codon_request_invalid", str(error), status_code=422) from error
+    except kernels.SequenceError as error:
+        # Either the stored text is not a protein, or the construct failed its
+        # own round-trip check. Both mean no construct is returned.
+        raise DomainError("sequence_unreadable", str(error), status_code=422) from error
+    return {"source": source, **result}
 
 
 def analyse(

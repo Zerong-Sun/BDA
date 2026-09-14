@@ -1672,6 +1672,278 @@ export type CodeRef = {
 };
 
 /**
+ * CodonAssessmentRead
+ */
+export type CodonAssessmentRead = {
+    /**
+     * Cai
+     */
+    cai: number;
+    /**
+     * Forbidden Sites
+     */
+    forbidden_sites: Array<SiteHit>;
+    /**
+     * Gc
+     */
+    gc: number;
+    /**
+     * Gc3
+     */
+    gc3: number;
+    gc_band: GcBandRead;
+    /**
+     * Gc Windows Outside Band
+     */
+    gc_windows_outside_band: Array<GcWindowRead>;
+    /**
+     * Homopolymer Runs
+     */
+    homopolymer_runs: Array<HomopolymerRunRead>;
+    /**
+     * Length Nt
+     */
+    length_nt: number;
+    /**
+     * Rare Codon Threshold
+     */
+    rare_codon_threshold: number;
+    /**
+     * Rare Codons
+     */
+    rare_codons: Array<RareCodonRead>;
+};
+
+/**
+ * CodonCompromiseRead
+ *
+ * A position where no synonymous codon could satisfy the constraints.
+ */
+export type CodonCompromiseRead = {
+    /**
+     * Codon
+     */
+    codon: string;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Residue
+     */
+    residue: string;
+};
+
+/**
+ * CodonHostRead
+ *
+ * An expression host, with the evidence its weights rest on.
+ */
+export type CodonHostRead = {
+    /**
+     * Accessions
+     */
+    accessions: Array<string>;
+    /**
+     * Cds Counted
+     */
+    cds_counted: number;
+    /**
+     * Codons Counted
+     */
+    codons_counted: number;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Note
+     */
+    note: string;
+    /**
+     * Organism
+     */
+    organism: string;
+    /**
+     * Taxon Id
+     */
+    taxon_id: number;
+    /**
+     * Translation Table
+     */
+    translation_table: number;
+};
+
+/**
+ * CodonHostSummary
+ */
+export type CodonHostSummary = {
+    /**
+     * Cds Counted
+     */
+    cds_counted: number;
+    /**
+     * Codons Counted
+     */
+    codons_counted: number;
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Organism
+     */
+    organism: string;
+    /**
+     * Taxon Id
+     */
+    taxon_id: number;
+    /**
+     * Translation Table
+     */
+    translation_table: number;
+};
+
+/**
+ * CodonOptimiseRequest
+ */
+export type CodonOptimiseRequest = {
+    /**
+     * Add Stop
+     */
+    add_stop?: boolean;
+    /**
+     * Avoid Sites
+     */
+    avoid_sites?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Candidate Id
+     */
+    candidate_id?: string | null;
+    /**
+     * Host
+     */
+    host: string;
+    /**
+     * Max Homopolymer
+     */
+    max_homopolymer?: number;
+    /**
+     * Prefix
+     */
+    prefix?: string;
+    /**
+     * Protein Id
+     */
+    protein_id?: string | null;
+    /**
+     * Suffix
+     */
+    suffix?: string;
+    /**
+     * Target Id
+     */
+    target_id?: string | null;
+};
+
+/**
+ * CodonOptimiseResponse
+ */
+export type CodonOptimiseResponse = {
+    assessment: CodonAssessmentRead;
+    /**
+     * Compromises
+     */
+    compromises: Array<CodonCompromiseRead>;
+    /**
+     * Dna
+     */
+    dna: string;
+    /**
+     * Flanks
+     */
+    flanks: {
+        [key: string]: string | boolean;
+    };
+    host: CodonHostSummary;
+    /**
+     * Protein Length
+     */
+    protein_length: number;
+    /**
+     * Respelled
+     */
+    respelled: Array<CodonRespellRead>;
+    source: CodonSourceRead;
+};
+
+/**
+ * CodonRespellRead
+ *
+ * A position re-spelled so the next residue could avoid a site.
+ */
+export type CodonRespellRead = {
+    /**
+     * From Codon
+     */
+    from_codon: string;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Residue
+     */
+    residue: string;
+    /**
+     * To Codon
+     */
+    to_codon: string;
+};
+
+/**
+ * CodonSourceRead
+ *
+ * Where the protein came from. Never the residues themselves.
+ */
+export type CodonSourceRead = {
+    /**
+     * Id
+     */
+    id?: string | null;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Sequence Sha256
+     */
+    sequence_sha256: string;
+};
+
+/**
  * ComputeDraftCreate
  */
 export type ComputeDraftCreate = {
@@ -3603,6 +3875,46 @@ export type GateRelease = {
 };
 
 /**
+ * GcBandRead
+ */
+export type GcBandRead = {
+    /**
+     * Max
+     */
+    max?: number;
+    /**
+     * Min
+     */
+    min?: number;
+    /**
+     * Window
+     */
+    window?: number;
+};
+
+/**
+ * GcWindowRead
+ */
+export type GcWindowRead = {
+    /**
+     * Direction
+     */
+    direction: string;
+    /**
+     * End
+     */
+    end: number;
+    /**
+     * Extreme
+     */
+    extreme: number;
+    /**
+     * Start
+     */
+    start: number;
+};
+
+/**
  * HandoffClaim
  */
 export type HandoffClaim = {
@@ -3690,6 +4002,28 @@ export type HealthResponse = {
      * Status
      */
     status: string;
+};
+
+/**
+ * HomopolymerRunRead
+ */
+export type HomopolymerRunRead = {
+    /**
+     * Base
+     */
+    base: string;
+    /**
+     * End
+     */
+    end: number;
+    /**
+     * Length
+     */
+    length: number;
+    /**
+     * Start
+     */
+    start: number;
 };
 
 /**
@@ -6313,6 +6647,24 @@ export type ProteinUpdate = {
 };
 
 /**
+ * RareCodonRead
+ */
+export type RareCodonRead = {
+    /**
+     * Codon
+     */
+    codon: string;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Weight
+     */
+    weight: number;
+};
+
+/**
  * RefreshRequest
  */
 export type RefreshRequest = {
@@ -8244,6 +8596,32 @@ export type ScriptPreviewResponse = {
      * Workflow Node Id
      */
     workflow_node_id: string;
+};
+
+/**
+ * SiteHit
+ */
+export type SiteHit = {
+    /**
+     * End
+     */
+    end: number;
+    /**
+     * Enzyme
+     */
+    enzyme: string;
+    /**
+     * Site
+     */
+    site: string;
+    /**
+     * Start
+     */
+    start: number;
+    /**
+     * Strand
+     */
+    strand: string;
 };
 
 /**
@@ -21524,6 +21902,316 @@ export type ListCandidateMetricsApiV2CandidatesCandidateIdMetricsGetResponses = 
 };
 
 export type ListCandidateMetricsApiV2CandidatesCandidateIdMetricsGetResponse = ListCandidateMetricsApiV2CandidatesCandidateIdMetricsGetResponses[keyof ListCandidateMetricsApiV2CandidatesCandidateIdMetricsGetResponses];
+
+export type ListCodonHostsApiV2CodonHostsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v2/codon-hosts';
+};
+
+export type ListCodonHostsApiV2CodonHostsGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ListCodonHostsApiV2CodonHostsGetError = ListCodonHostsApiV2CodonHostsGetErrors[keyof ListCodonHostsApiV2CodonHostsGetErrors];
+
+export type ListCodonHostsApiV2CodonHostsGetResponses = {
+    /**
+     * Response List Codon Hosts Api V2 Codon Hosts Get
+     *
+     * Successful Response
+     */
+    200: Array<CodonHostRead>;
+};
+
+export type ListCodonHostsApiV2CodonHostsGetResponse = ListCodonHostsApiV2CodonHostsGetResponses[keyof ListCodonHostsApiV2CodonHostsGetResponses];
 
 export type ListComputeDraftsApiV2ComputeDraftsGetData = {
     body?: never;
@@ -53701,6 +54389,319 @@ export type PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromo
 };
 
 export type PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponse = PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponses[keyof PostPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPostResponses];
+
+export type PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostData = {
+    body: CodonOptimiseRequest;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v2/projects/{project_id}/codon-optimisations';
+};
+
+export type PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostError = PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostErrors[keyof PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostErrors];
+
+export type PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: CodonOptimiseResponse;
+};
+
+export type PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostResponse = PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostResponses[keyof PostCodonOptimisationApiV2ProjectsProjectIdCodonOptimisationsPostResponses];
 
 export type PostDecisionTreeApiV2ProjectsProjectIdDecisionTreePostData = {
     body: DecisionTreeProposal;

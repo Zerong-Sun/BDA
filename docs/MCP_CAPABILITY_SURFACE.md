@@ -2,7 +2,7 @@
 
 状态：活跃 / §6 四步全部已实现
 
-最后核验：2026-09-14（Asia/Shanghai；本轮新增 structure-interaction capability、request_decision 工具与 MCP Apps 的 `ui://` 残基选择器，更新工具与能力计数）
+最后核验：2026-09-15（Asia/Shanghai；重新实测 operation 与 `x-permission` 计数；新增的密码子优化端点**故意不做成工具**——它返回 DNA，而工具结果会写进 `copilot_messages.tool_calls`，等于在对话记录里多留一份构建体明文。工具与能力计数不变）
 
 权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
@@ -18,7 +18,7 @@
 
 - **体量**：当前 `openapi.json` 是 185 条 path / **251 个 operation** / 4.3 MB。一个工具清单塞进模型上下文就已经越界，而 MCP 客户端要在每轮对话里带着它。
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
-- **控制面丢失**：251 个 operation 中只有 121 个带 `x-permission`。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
+- **控制面丢失**：286 个 operation 中只有 140 个带 `x-permission`（本轮实测；此处此前写的 251/121 已过期，数字按 `backend_v2/openapi.json` 重新数过）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
 同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **48 个工具 / 20 个 capability**，按执行模式分为 read 34 / draft 11 / queue 3。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
