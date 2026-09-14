@@ -49,6 +49,26 @@ if (!HTMLElement.prototype.scrollIntoView) {
   })
 }
 
+// jsdom has no Web Animations API. base-ui's scroll area returns early when
+// `ResizeObserver` is missing; with the stub above it continues, and a timer it
+// schedules beside the observer calls `viewport.getAnimations()`. That throws
+// unhandled, and vitest fails the run on it even though every test passes. No
+// animations run in jsdom, so an empty list is the true answer.
+//
+// Defining it has a second effect: base-ui's popups close synchronously only
+// while `getAnimations` is missing, and otherwise wait a frame for exit
+// animations. That would turn every "Escape closes it" assertion asynchronous.
+// `BASE_UI_ANIMATIONS_DISABLED` is base-ui's own switch for exactly this, and
+// restores the synchronous close the suite was written against.
+if (!Element.prototype.getAnimations) {
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    writable: true,
+    value: () => [],
+  })
+}
+;(globalThis as { BASE_UI_ANIMATIONS_DISABLED?: boolean }).BASE_UI_ANIMATIONS_DISABLED = true
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 
 // Testing Library only auto-cleans when vitest runs with `globals: true`, which this
