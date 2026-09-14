@@ -176,3 +176,31 @@ Final validation for iteration 2:
 The follow-up [verification and repair checklist](BOT_WORKSPACE_VERIFICATION.md)
 records requirements, logic, boundary cases, code quality, test coverage and
 runtime evidence, including streaming races and the full backend Bot catalog.
+
+## Iteration 3 — tasks are assigned to an owner
+
+Branch: `claude/bot-task-assignment`, from `codex/bot-first-science-workspace`.
+
+The task composer asked the person to pick a *service* (brief, literature,
+planning, execution, interpretation) — a split by function that ran parallel to
+the Bot roster, so a task had no operator answering for it. The composer now
+asks **who should own this**:
+
+- The roster declares ownership. Each recipe in `task_contracts.SERVICES` has
+  exactly one producing owner (`BotSpec.task_service`), checked at import; see
+  [Guided task ownership](COPILOT_BOT_ROSTER.md#guided-task-ownership).
+  `/copilot/bots` serves `task_service` and `task_write_tools`.
+- The client sends `bot` with the owner's `service_kind`. The server refuses a
+  recipe started under a bot that does not own it (`copilot_task_owner_mismatch`),
+  because `bot ∩ recipe` would otherwise silently strip the operator's own tools.
+- Only writes the owner can be granted are offered. The Research page's literature
+  task therefore no longer asks to save notes: note authoring belongs to Archivist.
+- A goal suggests an owner (a named trigger first, then the keyword guess); the
+  person can reassign it. Reviewers and the director are never offered as owners.
+- Tasks are listed under their owner in roster order; runs started without an
+  owner are grouped last. A task's detail shows its owner.
+- A roster failure is explained once in the composer and recovers through Retry.
+
+Operators without a recipe (Scout, Structuralist, Medic, Archivist, Conductor,
+Steward, Auditor) keep working through conversation, handoffs and delegation.
+Per-bot pages, a decision inbox and role-based navigation are later steps.

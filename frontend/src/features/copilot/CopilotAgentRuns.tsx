@@ -14,6 +14,8 @@ import {
   type AgentTurn,
 } from '../../lib/api/agentRuns'
 import { TaskDelivery } from './TaskDelivery'
+import { BotAvatar } from './BotAvatar'
+import { useCopilotBots } from './bots/registry'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { deliveryLabel } from './taskPresentation'
@@ -247,6 +249,9 @@ export function AgentRunDetail({
       query.state.data && isLive(query.state.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
 
+  const bots = useCopilotBots()
+  const owner = bots.data?.find((bot) => bot.id === run.data?.bot)
+
   const turns = useQuery({
     queryKey: ['agent-run-turns', projectId, runId],
     queryFn: () => listAgentTurns(runId),
@@ -319,6 +324,12 @@ export function AgentRunDetail({
               <SpinnerGapIcon aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
             ) : null}
           </div>
+          {run.data.bot ? (
+            <p className="task-owner-heading text-text-secondary">
+              {owner ? <BotAvatar id={owner.id} stance={owner.stance} /> : null}
+              {language === 'zh' ? `负责人：${owner?.title_zh ?? run.data.bot}` : `Owner: ${owner?.title ?? run.data.bot}`}
+            </p>
+          ) : null}
           <p className="text-sm">{run.data.goal}</p>
           <p className="text-xs tabular-nums text-text-secondary">
             {format(copy.turns, { count: run.data.turn_count })} ·{' '}

@@ -323,3 +323,9 @@ body { line-height: 1.6; }
 
 /* Keep each source question and its next action together without a new card. */
 .project-brief .brief-question-action { display: flex; padding: 0; margin-top: 4px; height: auto; min-height: 32px; justify-content: flex-start; white-space: normal; text-align: left; }
+.task-owner-text { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.task-owner-text small { color: var(--text-secondary); font-size: .75rem; }
+.task-service .bot-avatar { width: 30px; height: 30px; }
+.task-plan-owner { display: flex; align-items: flex-start; gap: .75rem; }
+.task-owner-heading { display: flex; align-items: center; gap: .5rem; font-size: .75rem; font-weight: 600; }
+.task-owner-heading .bot-avatar { width: 22px; height: 22px; }

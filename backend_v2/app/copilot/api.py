@@ -105,6 +105,8 @@ BOTS = [
         directs=list(bot.directs),
         reviewed_by=[other.id for other in bot_roster.reviewers_of(bot.id)],
         triggers=list(bot.triggers),
+        task_service=bot.task_service,
+        task_write_tools=bot_roster.task_write_tools(bot),
     )
     for bot in bot_roster.all_bots()
 ]

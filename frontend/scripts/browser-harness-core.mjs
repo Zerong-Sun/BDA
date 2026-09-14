@@ -1338,10 +1338,12 @@ function createStrictRoutes({ scenario, routeId }) {
   }))
   // The bot roster is a server-side declaration, not project data, so it is the
   // same in every scenario - including `empty`, where a project with no data
-  // still has the same operators available to it. Three entries rather than all
-  // twelve, one per stance: the picker groups by stance, so a stub carrying only
-  // producers would render one group and pass a test the real roster fails. A
-  // full copy would be a second roster to keep in step with `copilot/bots.py`.
+  // still has the same operators available to it. Four entries rather than all
+  // twelve: one per stance, because the picker groups by stance and a stub
+  // carrying only producers would pass a test the real roster fails, plus the
+  // librarian, which owns the one stubbed task service so the task composer has
+  // someone to assign work to. A full copy would be a second roster to keep in
+  // step with `copilot/bots.py`.
   add('GET', '/api/v2/copilot/bots', {}, () => ok([
     {
       id: 'conductor',
@@ -1357,6 +1359,8 @@ function createStrictRoutes({ scenario, routeId }) {
       directs: ['structuralist', 'planner'],
       reviewed_by: [],
       triggers: ['delegate', '调度'],
+      task_service: null,
+      task_write_tools: [],
     },
     {
       id: 'structuralist',
@@ -1372,6 +1376,25 @@ function createStrictRoutes({ scenario, routeId }) {
       directs: [],
       reviewed_by: ['auditor'],
       triggers: ['structure', 'residue'],
+      task_service: null,
+      task_write_tools: [],
+    },
+    {
+      id: 'librarian',
+      title: 'Librarian',
+      title_zh: '文献整理',
+      phase: 1,
+      stance: 'produce',
+      summary: 'Find, ingest and organise literature with retrievable provenance.',
+      charter: 'Never summarise a paper you have not retrieved.',
+      capabilities: ['research-read', 'literature-search', 'chain-messaging'],
+      handoff: ['structuralist'],
+      reviews: [],
+      directs: [],
+      reviewed_by: ['auditor'],
+      triggers: ['literature', '文献'],
+      task_service: 'literature',
+      task_write_tools: ['start_literature_search'],
     },
     {
       id: 'auditor',
@@ -1387,6 +1410,8 @@ function createStrictRoutes({ scenario, routeId }) {
       directs: [],
       reviewed_by: [],
       triggers: ['review', '复核'],
+      task_service: null,
+      task_write_tools: [],
     },
   ]))
   add('GET', '/api/v2/compute-drafts', { limit: '200', project_id: PROJECT_ID }, () => ok({

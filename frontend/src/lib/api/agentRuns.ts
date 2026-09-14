@@ -30,6 +30,7 @@ export function isLive(run: Pick<AgentRun, 'status'>): boolean {
 export async function startAgentRun(body: {
   project_id: string
   goal: string
+  bot?: string
   service_kind?: 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation' | 'custom'
   authorized_writes?: string[]
   skills?: string[]

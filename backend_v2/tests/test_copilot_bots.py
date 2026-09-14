@@ -587,6 +587,14 @@ def _spec(**overrides) -> bots.BotSpec:
             _spec(stance="review", capabilities=("review-audit",), reviews=("ghost",)),
             "unknown operator",
         ),
+        (_spec(task_service="not-a-service"), "unknown task service"),
+        (
+            _spec(stance="review", capabilities=("review-audit",), reviews=("planner",), task_service="brief"),
+            "only a producer delivers",
+        ),
+        # Owning a recipe whose steps the owner cannot call would be a task that
+        # is assigned to someone and can never be delivered by them.
+        (_spec(task_service="planning"), "cannot reach its steps"),
     ],
 )
 def test_a_broken_roster_fails_at_import_rather_than_at_use(
@@ -599,6 +607,51 @@ def test_a_broken_roster_fails_at_import_rather_than_at_use(
 
     with pytest.raises(ValueError, match=message):
         bots._validate_roster()
+
+
+def test_every_guided_task_has_exactly_one_producing_owner() -> None:
+    from backend_v2.app.copilot.task_contracts import SERVICES
+
+    owners = {kind: [bot.id for bot in bots.BOTS if bot.task_service == kind] for kind in SERVICES}
+
+    assert all(len(ids) == 1 for ids in owners.values()), owners
+    assert {bots.get(ids[0]).stance for ids in owners.values()} == {"produce"}  # type: ignore[union-attr]
+
+
+def test_a_recipe_with_two_owners_fails_at_import(monkeypatch: pytest.MonkeyPatch) -> None:
+    rival = _spec(id="rival", capabilities=("project-read", "research-read"), task_service="brief")
+    monkeypatch.setattr(bots, "BOTS", (*bots.BOTS, rival))
+    monkeypatch.setattr(bots, "_BY_ID", {**bots._BY_ID, rival.id: rival})
+
+    with pytest.raises(ValueError, match="exactly one owning bot"):
+        bots._validate_roster()
+
+
+def test_an_owner_is_offered_only_the_writes_it_can_be_granted() -> None:
+    librarian = bots.require("librarian")
+
+    # The literature recipe offers note authoring too, but that is the
+    # archivist's capability; a checkbox for it would be refused on start.
+    assert bots.task_write_tools(librarian) == ["start_literature_search"]
+    assert bots.task_write_tools(bots.require("auditor")) == []
+
+
+def test_a_guided_task_assigned_to_a_non_owner_is_refused(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend_v2.app.copilot import qualification
+
+    monkeypatch.setattr(qualification, "readiness", lambda *a: {"eligible_services": ["literature", "planning"]})
+    project, user = _project(session, enabled_skills=["research"])
+
+    with pytest.raises(DomainError) as error:
+        _run(session, project, user, bot="planner", service_kind="literature")
+    assert error.value.error_code == "copilot_task_owner_mismatch"
+    assert error.value.status_code == 422
+
+    run = _run(session, project, user, bot="librarian", service_kind="literature", authorized_writes=[])
+    assert run.bot == "librarian"
+    assert run.task_contract["service_kind"] == "literature"
 
 
 def test_get_returns_the_spec_or_none_without_raising() -> None:

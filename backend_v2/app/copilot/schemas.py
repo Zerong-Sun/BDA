@@ -133,6 +133,12 @@ class BotResponse(BaseModel):
     #: because a producer does not choose who checks it.
     reviewed_by: list[str] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)
+    #: The guided task recipe this operator owns, or null when it takes no
+    #: guided tasks. A task client assigns work to a bot and sends this as
+    #: `service_kind`.
+    task_service: str | None = None
+    #: The owned recipe's optional writes this bot can be granted.
+    task_write_tools: list[str] = Field(default_factory=list)
 
 
 class HandoffClaim(BaseModel):
