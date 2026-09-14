@@ -51,6 +51,9 @@ function itemLabel(item: Record<string, unknown>, language: 'en' | 'zh'): string
   return id || String(item.kind || 'Gap')
 }
 
+// A stable reference, so re-renders do not read as a changed Accordion default.
+const GAPS_OPEN = ['gaps']
+
 export function ResearchGapResolutionButton({
   projectId,
   researchTargetId,
@@ -95,7 +98,7 @@ export function ResearchGapResolutionButton({
       </Button>
 
       {items.length ? (
-        <Accordion defaultValue={['gaps']} className="mt-2 border border-border-soft bg-bg-app px-2">
+        <Accordion defaultValue={GAPS_OPEN} className="mt-2 border border-border-soft bg-bg-app px-2">
           <AccordionItem value="gaps" className="border-0">
             <AccordionTrigger className="py-2 text-[10px] font-semibold text-text-secondary">
               {language === 'zh' ? '全部 Gaps：补齐状态' : 'All Gaps: Resolution Status'}

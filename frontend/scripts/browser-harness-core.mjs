@@ -1344,6 +1344,14 @@ function createStrictRoutes({ scenario, routeId }) {
   // researcher, which owns the one stubbed task service so the task composer has
   // someone to assign work to. A full copy would be a second roster to keep in
   // step with `copilot/bots.py`.
+  // Project access narrows command controls. The read-only scenario is a project
+  // viewer; every other scenario may act, as the session role already allows.
+  add('GET', `/api/v2/projects/${PROJECT_ID}/access`, {}, () => ok({
+    project_id: PROJECT_ID,
+    role: scenario === 'read-only' ? 'viewer' : 'owner',
+    permissions: Object.fromEntries(['read', 'write', 'compute', 'research_import', 'artifact', 'experiment', 'autopilot', 'manage']
+      .map((action) => [action, action === 'read' || scenario !== 'read-only'])),
+  }))
   add('GET', '/api/v2/copilot/bots', {}, () => ok([
     {
       id: 'conductor',

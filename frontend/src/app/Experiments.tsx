@@ -66,6 +66,10 @@ export function ExperimentsPage() {
     })
 
   const query = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
+  // Target preparation opens on arrival unless the target is already known to be
+  // ready. Decided once: an uncontrolled disclosure whose default moves after
+  // mount warns, and remounting it would close a panel the visitor is reading.
+  const [targetPanelOpen] = useState(() => overview?.target_readiness?.ready_for_workflow !== true)
 
   return (
     <section className="projects-page">
@@ -141,7 +145,7 @@ export function ExperimentsPage() {
 
       {showCampaigns ? <div className="mb-6"><CampaignPanel /></div> : null}
 
-      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={overview?.target_readiness?.ready_for_workflow !== true} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={targetPanelOpen} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
       <ActiveProjectPanel
         project={activeProject}
         projectQuery={query}

@@ -1,6 +1,6 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { lazy, Suspense, useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { Topbar } from './components/ui/Topbar'
 import { PipelineRail } from './components/ui/PipelineRail'
 import { Toast } from './components/ui/Toast'
@@ -109,6 +109,14 @@ export function AppShell() {
   const location = useLocation()
   const { projectId, activeProject } = useProjectContext()
   const showRail = Boolean(activeProject) && railRoutes.some((route) => location.pathname.startsWith(route))
+  // `<main>` is the scroll container and outlives every route, so without this a
+  // new page opens at whatever depth the previous one was scrolled to.
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [location.pathname])
 
   useEffect(() => {
     if (appMode === 'demo' && activeProject && !isDemoProject(activeProject)) {
@@ -143,7 +151,7 @@ export function AppShell() {
     >
       <Topbar />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {showRail ? <PipelineRail /> : null}
           <div className="app-content mx-auto max-w-[1600px] px-6 py-6">
             <ErrorBoundary>

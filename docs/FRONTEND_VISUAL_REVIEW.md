@@ -81,3 +81,24 @@ Bot pages in both themes/languages, mobile layouts and the compact utility menu.
 
 Publication target remains `bda-public`, branch
 `codex/bot-first-science-workspace`; this change does not merge or deploy main.
+
+## Local review of the role-based workspace — 2026-09-14
+
+Reviewed in the in-app browser against a synthetic local API (harness fixtures,
+the real six-operator catalog, synthetic tasks, a handoff with an unsupported
+claim, pending claims and a compute draft) at 1440×900 and 390×844, light and
+dark. No credentials, model calls or database writes were involved.
+
+| ID | Finding | Repair |
+| --- | --- | --- |
+| R1 | Projects and Research logged a Base UI error on every visit: `Disclosure` and three accordions passed a new `defaultValue` array each render, which Base UI reads as a changed default | Stable module-level default arrays; the target-preparation panel decides its default once, on arrival |
+| R2 | A new page opened at the previous page's scroll depth; on mobile Decisions opened half way down | Reset both the document and `<main>` scroll on route change |
+| R3 | The Copilot drawer opened as a modal over every fresh session, covering the page that loaded | Closed by default; the top bar button opens it |
+| R4 | Drawer model settings were offered to every role, unlike the Research team page | Shown only to project admins and owners |
+| R5 | Drawer surfaces were named by function (Tasks / Chat / Chain / Agent runs / MCP) and Agent runs repeated Tasks | Tasks & deliverables / Conversation / Bot handoffs / External access; the duplicate run list is removed; a handoff to a retired id selects its successor |
+| R6 | "Open Bot workspace", "Work with Bots" and "Bot workspace views" contradicted the Research team navigation | Renamed to the research team everywhere |
+| R7 | The Projects team card showed `director` (not an operator) and generic steps | Shows the five working operators and their responsibilities |
+| R8 | With five task owners the first spanned the grid and read as a heading | Removed the odd-count full-width rule |
+| R9 | Research showed "Copilot: <tab>" beside the team link, an unclear second entry point | "Ask about <tab>", stating what it does |
+| R10 | Compute drafts showed the raw backend id `lsf` | Named in words (LSF cluster) |
+| R11 | Research team repeated its page title as the roster heading | Roster heading is Team members |

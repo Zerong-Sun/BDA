@@ -93,6 +93,9 @@ function AskCopilotButton({ entityId, entityType, label }: { entityId: string; e
   )
 }
 
+// A stable reference, so re-renders do not read as a changed Accordion default.
+const NONE_OPEN: string[] = []
+
 function ReferenceUrl({ url, label }: { url: string; label: string }) {
   return <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline"><FileMagnifyingGlassIcon aria-hidden="true" />{label}</a>
 }
@@ -336,7 +339,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
               {/* Methods entries are long-form documents, so each one collapses; the
                   first stays open so the tab still shows content on arrival. */}
               {workspace.methods.length ? (
-                <Accordion defaultValue={[]}>
+                <Accordion defaultValue={NONE_OPEN}>
                   {workspace.methods.map((method) => (
                     <AccordionItem key={method.id} value={method.id}>
                       <AccordionTrigger className="text-sm">{workspaceText(method.title, language)}</AccordionTrigger>

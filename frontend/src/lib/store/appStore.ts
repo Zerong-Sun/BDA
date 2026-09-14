@@ -157,7 +157,9 @@ export const useAppStore = create<AppState>()(
       copilotTaskDrafts: {},
       copilotDraft: '',
       copilotSelectedEntityIds: [],
-      copilotOpen: true,
+      // Closed until asked for: the research team and the decisions page are the
+      // entry points, and a modal drawer on arrival covered whichever page loaded.
+      copilotOpen: false,
       settingsOpen: false,
       activityOpen: false,
       copilotWidth: 380,

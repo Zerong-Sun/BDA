@@ -242,7 +242,6 @@ body { line-height: 1.6; }
 .task-services-label { color: var(--text-muted); font-size: .8125rem; padding-top: .5rem; }
 .task-services { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
 .bot-main form .task-service[aria-pressed] { min-height: 60px; padding: .75rem; gap: .75rem; background: var(--bg-surface-1); border-color: var(--border-soft); border-radius: 8px; font-size: .875rem; line-height: 1.4; }
-.task-service:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
 .task-service-icon { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; background: var(--bg-surface-2); border-radius: 7px; color: var(--text-secondary); }
 .task-service > span:nth-child(2) { flex: 1; }
 .task-service-arrow { opacity: .5; flex-shrink: 0; }

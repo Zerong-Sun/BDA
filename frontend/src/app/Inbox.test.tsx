@@ -45,6 +45,7 @@ describe('Decision inbox', () => {
         run('r2', 'Plan the route', 'planner', 'succeeded', 'completed'),
         run('r3', 'Still thinking', 'runner', 'running', null),
         run('r4', 'Delegated child', 'researcher', 'succeeded', 'needs_input', { parent_run_id: 'r2' }),
+        run('r5', 'Already recorded', 'analyst', 'succeeded', 'completed', { outcome: { status: 'completed', decision_record_id: 'entry-1' } }),
       ],
       drafts: [draft('d1', 'AF3 MSA stage', 'draft'), draft('d2', 'Old submission', 'confirmed')],
       claims: [{ id: 'c1' }, { id: 'c2' }],
@@ -58,6 +59,7 @@ describe('Decision inbox', () => {
     expect(within(input).queryByText(/Delegated child/)).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Ready for your review' })).getByRole('link', { name: /Plan the route/ })).toHaveAttribute('href', '#/bots/planner?project=project-inbox&run=r2')
     expect(screen.queryByText(/Still thinking/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Already recorded/)).not.toBeInTheDocument()
 
     const drafts = screen.getByRole('region', { name: 'Compute drafts to confirm' })
     expect(await within(drafts).findByRole('link', { name: /AF3 MSA stage/ })).toHaveAttribute('href', '#/workflow?project=project-inbox')

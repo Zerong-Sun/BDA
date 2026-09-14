@@ -15,6 +15,8 @@ import { CopilotSettings } from '../features/copilot/CopilotSettings'
 import { useCopilotBots } from '../features/copilot/bots/registry'
 import { botHref } from '../features/copilot/bots/workbenches'
 import { BotRoster } from '../features/copilot/BotRoster'
+import { managesProject, useProjectAccess } from '../lib/hooks/useProjectAccess'
+import { currentRole } from '../features/research/jsonHelpers'
 import { BotAvatar } from '../features/copilot/BotAvatar'
 import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
 
@@ -30,6 +32,9 @@ function BotProjectWorkspace() {
   const [search, setSearch] = useSearchParams()
   const navigate = useNavigate()
   const [settings, setSettings] = useState(false)
+  // Model configuration is a project manager's decision; researchers and viewers work with the model they are given.
+  const access = useProjectAccess(projectId)
+  const canConfigure = managesProject(access.data) || currentRole() === 'admin'
   const bots = useCopilotBots()
   const selectedEntities = useAppStore((s) => s.copilotSelectedEntityIds)
   const selectedId = useAppStore((s) => s.copilotSessions[projectId]?.bot ?? null)
@@ -54,16 +59,16 @@ function BotProjectWorkspace() {
         <h1>{zh ? '研究团队' : 'Research team'}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
-      {projectId ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
+      {projectId && canConfigure ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
     </header>
     <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>
       {!activeProject ? <div className="science-empty"><BotAvatar id="director" stance="direct" /><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><p>{zh ? '任务、证据和对话会保存在同一个项目里。' : 'Tasks, evidence and conversations stay together in the same project.'}</p><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>
-        {settings ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
+        {settings && canConfigure ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
         <div className="bot-workspace-grid">
           <BotRoster projectId={projectId} autoActive={view === 'chat' && !selectedId} onAuto={() => selectBot(null)} />
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
-              <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? 'Bot 工作区视图' : 'Bot workspace views'}>
+              <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? '研究团队视图' : 'Research team views'}>
                 <TabsTrigger value="tasks">{zh ? '任务与交付' : 'Tasks & deliverables'}</TabsTrigger>
                 <TabsTrigger value="chat">{zh ? '对话' : 'Conversation'}</TabsTrigger>
                 <TabsTrigger value="handoffs">{zh ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
