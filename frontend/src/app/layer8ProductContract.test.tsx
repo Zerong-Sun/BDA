@@ -279,6 +279,56 @@ describe('Layer 8 product contract pages', () => {
     expect(screen.getByRole('button', { name: 'Submit workflow' })).toBeDisabled()
   })
 
+  it('Workflow keeps the chosen run in the URL and refuses a run from another project', async () => {
+    // The run lives in `?run=` so the workbench can be linked to. A link to a run
+    // this project does not own must not open that graph under this project's name.
+    window.location.hash = '/workflow?project=proj_layer8&run=run_elsewhere'
+    installBaseHandlers(readinessReady)
+    const workflowRun = {
+      id: 'run_layer8',
+      project_id: 'proj_layer8',
+      name: 'Binder design route',
+      status: 'draft',
+      graph: { nodes: [], edges: [], layout: {} },
+      version: 1,
+      created_by: 'user_test',
+      created_at: '2026-07-01T00:00:00Z',
+      updated_at: '2026-07-01T00:00:00Z',
+    }
+    const requestedGraphs: string[] = []
+    server.use(
+      http.get('/api/v2/projects/proj_layer8/workflow-runs', () =>
+        envelope({ items: [workflowRun] }),
+      ),
+      http.get('/api/v2/workflow-runs/:runId/graph', ({ params }) => {
+        requestedGraphs.push(String(params.runId))
+        return envelope({ workflow: workflowRun, nodes: [], edges: [], layout: {} })
+      }),
+      http.get('/api/v2/workflow-runs/:runId/preflight', () =>
+        envelope({
+          stage: 'workflow',
+          allowed: true,
+          project_id: 'proj_layer8',
+          workflow_run_id: 'run_layer8',
+          node_run_id: null,
+          blockers: [],
+          warnings: [],
+          checks: {},
+        }),
+      ),
+    )
+
+    renderWithProviders(<WorkflowPage />)
+
+    expect(await screen.findByText(/The run in this link is not part of this project/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear link' }))
+
+    await waitFor(() => expect(window.location.hash).not.toContain('run='))
+    expect(window.location.hash).toContain('project=proj_layer8')
+    expect(screen.queryByText(/The run in this link is not part of this project/)).not.toBeInTheDocument()
+    expect(requestedGraphs).toContain('run_layer8')
+  })
+
   it('Workflow preflight names the offending node and keeps one line per unproven plugin', async () => {
     // Regression: blockers were read for a `workflow_node_id` the API never sends, so
     // "Required input port 'input_path' has no binding" appeared with no clue which stage
