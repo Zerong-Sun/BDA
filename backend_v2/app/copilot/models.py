@@ -33,6 +33,12 @@ class CopilotMessage(UUIDVersionMixin, Base):
         ForeignKey("copilot_conversations.id", ondelete="CASCADE"), index=True
     )
     role: Mapped[str] = mapped_column(String(40))
+    #: The roster operator that produced this message, or None for the
+    #: undifferentiated Copilot. The id and not the charter, exactly as
+    #: `copilot_agent_runs.bot` holds it: the charter is read from the roster
+    #: each turn, and a transcript that cannot say who answered cannot be read
+    #: as a room where several operators speak.
+    bot: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(40), default="pending")
     citations: Mapped[list] = mapped_column(JSON, default=list)

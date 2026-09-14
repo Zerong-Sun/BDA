@@ -36,6 +36,10 @@ class MessageResponse(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
     role: str
+    #: Which operator said this, when one was acting. None is the
+    #: undifferentiated Copilot, and also every message written before the
+    #: column existed - absence means unattributed, never "the default bot".
+    bot: str | None = None
     content: str
     status: str
     citations: list
@@ -166,6 +170,53 @@ class HandoffResponse(BaseModel):
 
 class HandoffPage(BaseModel):
     items: list[HandoffResponse]
+
+
+class RoomTask(BaseModel):
+    """A durable task as the room shows it: who owns it and where it stands."""
+
+    id: uuid.UUID
+    goal: str
+    bot: str | None = None
+    status: str
+    #: Set when this task was opened by another operator rather than by a
+    #: person. The room nests it under the entry that opened it instead of
+    #: listing it as work that arrived from nowhere.
+    parent_run_id: uuid.UUID | None = None
+    turn_count: int = 0
+    #: The delivery, which is not the transport status: a run can be finished as
+    #: a process and still be `needs_input` as a deliverable.
+    delivery_state: str | None = None
+    #: Present once the delivery was saved as a decision record, which is what
+    #: takes it out of the decision inbox.
+    decision_record_id: str | None = None
+    updated_at: datetime
+
+
+class RoomEvent(BaseModel):
+    """One entry in the room, carrying exactly the record it came from.
+
+    A discriminated union rather than a flattened row: a handover's claims and a
+    message's citations are different evidence with different review rules, and
+    squashing both into one "text" field is how a surface starts telling readers
+    that an unsupported claim and a cited answer are the same kind of thing.
+    """
+
+    kind: Literal["message", "handoff", "task"]
+    id: uuid.UUID
+    occurred_at: datetime
+    #: The operator this entry belongs to: the speaker, the sender of a
+    #: handover, or the owner of a task. None is an unattributed Copilot turn or
+    #: a task started without an owner.
+    bot: str | None = None
+    message: MessageResponse | None = None
+    handoff: HandoffResponse | None = None
+    task: RoomTask | None = None
+
+
+class RoomPage(BaseModel):
+    items: list[RoomEvent]
+    next_cursor: str | None = None
 
 
 class RoutePlanCreate(BaseModel):

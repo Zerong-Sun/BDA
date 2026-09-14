@@ -19,7 +19,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, handoffs, mcp
+from . import agent_runs, handoffs, mcp, room
 from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
@@ -58,6 +58,8 @@ from .schemas import (
     McpSessionResponse,
     MessagePage,
     MessageResponse,
+    RoomEvent,
+    RoomPage,
     RoutePlanCreate,
     RoutePlanResponse,
     SkillResponse,
@@ -248,6 +250,33 @@ def list_handoffs(
         session, project_id=project_id, to_bot=to_bot, from_bot=from_bot, limit=limit
     )
     return HandoffPage(items=[HandoffResponse(**handoffs.to_json_model(row)) for row in rows])
+
+
+@router.get("/projects/{project_id}/room", response_model=RoomPage)
+def read_room(
+    project_id: uuid.UUID,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=room.DEFAULT_LIMIT, ge=1, le=room.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> RoomPage:
+    """What happened in this project, in one order.
+
+    A read projection over three tables that each already have their own
+    endpoint. It exists because the three lists were only ever read together and
+    interleaving them by eye is the reader's job today; it writes nothing, so a
+    room entry can never disagree with the record it came from.
+
+    Ordered by when each entry happened, newest first, on a keyset cursor: a
+    room paged by row id would reorder itself as soon as two entries shared an
+    instant, and a conversation that reorders is not readable.
+    """
+    require_project(session, project_id, user)
+    entries, next_cursor = room.events(session, project_id=project_id, limit=limit, cursor=cursor)
+    return RoomPage(
+        items=[RoomEvent.model_validate(entry) for entry in entries],
+        next_cursor=next_cursor,
+    )
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)

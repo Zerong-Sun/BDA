@@ -9,7 +9,7 @@ import {
   SpinnerGapIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
-import { Link } from 'react-router'
+import { CopilotCitations } from './CopilotCitations'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { useCopilotChat } from './useCopilotChat'
 import { byStance, reviewersOf, successorsOf } from './bots/registry'
@@ -27,7 +27,6 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
-import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import {
   Select,
@@ -352,77 +351,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                       ''
                     ))}
                   {message.role === 'assistant' && message.meta?.citations?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-2">
-                      {message.meta.citations.map((citation, citationIndex) => {
-                        const url = typeof citation.url === 'string' ? citation.url : ''
-                        const label = String(
-                          citation.label ||
-                            citation.entity_id ||
-                            citation.workspace_type ||
-                            format(t.copilot.chat.citationSourceFallback, {
-                              index: citationIndex + 1,
-                            }),
-                        )
-                        const evidence = [citation.evidence_grade, citation.review_status]
-                          .filter(Boolean)
-                          .join(' · ')
-                        const internal = citation.source_type === 'research_workspace'
-                        const origin = internal
-                          ? t.copilot.chat.citationProject
-                          : t.copilot.chat.citationExternal
-                        const accessibleLabel = [label, origin, evidence]
-                          .filter(Boolean)
-                          .join(' ')
-                        const kind = String(citation.workspace_type || '')
-                        const tab =
-                          kind === 'reference'
-                            ? 'references'
-                            : kind === 'structure'
-                              ? 'structures'
-                              : ['dataset', 'research_target'].includes(kind)
-                                ? 'data'
-                                : kind === 'method'
-                                  ? 'methods'
-                                  : 'evidence'
-                        const badge = (
-                          <Badge
-                            variant={internal ? 'info-light' : 'outline'}
-                            size="xs"
-                            className="h-auto whitespace-normal py-1"
-                          >
-                            <span>{label}</span>
-                            <span className="text-[9px] uppercase">
-                              {origin}
-                              {evidence ? ` · ${String(evidence)}` : ''}
-                            </span>
-                          </Badge>
-                        )
-                        const key = `${String(citation.entity_id)}-${citationIndex}`
-                        return url ? (
-                          <a
-                            key={key}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={accessibleLabel}
-                            className="hover:underline"
-                          >
-                            {badge}
-                          </a>
-                        ) : internal && projectId ? (
-                          <Link
-                            key={key}
-                            to={`/research?tab=${tab}&project=${encodeURIComponent(projectId)}`}
-                            aria-label={accessibleLabel}
-                            className="hover:underline"
-                          >
-                            {badge}
-                          </Link>
-                        ) : (
-                          <span key={key}>{badge}</span>
-                        )
-                      })}
-                    </div>
+                    <CopilotCitations citations={message.meta.citations} projectId={projectId} />
                   ) : null}
                   {showSaveButton ? (
                     <SaveToReviewButton

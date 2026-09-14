@@ -4580,6 +4580,10 @@ export type MessagePage = {
  */
 export type MessageResponse = {
     /**
+     * Bot
+     */
+    bot?: string | null;
+    /**
      * Citations
      */
     citations: Array<unknown>;
@@ -7431,6 +7435,96 @@ export type ReviewUpdate = {
      * Review Status
      */
     review_status: string;
+};
+
+/**
+ * RoomEvent
+ *
+ * One entry in the room, carrying exactly the record it came from.
+ *
+ * A discriminated union rather than a flattened row: a handover's claims and a
+ * message's citations are different evidence with different review rules, and
+ * squashing both into one "text" field is how a surface starts telling readers
+ * that an unsupported claim and a cited answer are the same kind of thing.
+ */
+export type RoomEvent = {
+    /**
+     * Bot
+     */
+    bot?: string | null;
+    handoff?: HandoffResponse | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'message' | 'handoff' | 'task';
+    message?: MessageResponse | null;
+    /**
+     * Occurred At
+     */
+    occurred_at: string;
+    task?: RoomTask | null;
+};
+
+/**
+ * RoomPage
+ */
+export type RoomPage = {
+    /**
+     * Items
+     */
+    items: Array<RoomEvent>;
+    /**
+     * Next Cursor
+     */
+    next_cursor?: string | null;
+};
+
+/**
+ * RoomTask
+ *
+ * A durable task as the room shows it: who owns it and where it stands.
+ */
+export type RoomTask = {
+    /**
+     * Bot
+     */
+    bot?: string | null;
+    /**
+     * Decision Record Id
+     */
+    decision_record_id?: string | null;
+    /**
+     * Delivery State
+     */
+    delivery_state?: string | null;
+    /**
+     * Goal
+     */
+    goal: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Parent Run Id
+     */
+    parent_run_id?: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Turn Count
+     */
+    turn_count?: number;
+    /**
+     * Updated At
+     */
+    updated_at: string;
 };
 
 /**
@@ -30315,6 +30409,328 @@ export type ListMcpSessionsApiV2CopilotProjectsProjectIdMcpSessionsGetResponses 
 };
 
 export type ListMcpSessionsApiV2CopilotProjectsProjectIdMcpSessionsGetResponse = ListMcpSessionsApiV2CopilotProjectsProjectIdMcpSessionsGetResponses[keyof ListMcpSessionsApiV2CopilotProjectsProjectIdMcpSessionsGetResponses];
+
+export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v2/copilot/projects/{project_id}/room';
+};
+
+export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetError = ReadRoomApiV2CopilotProjectsProjectIdRoomGetErrors[keyof ReadRoomApiV2CopilotProjectsProjectIdRoomGetErrors];
+
+export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: RoomPage;
+};
+
+export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetResponse = ReadRoomApiV2CopilotProjectsProjectIdRoomGetResponses[keyof ReadRoomApiV2CopilotProjectsProjectIdRoomGetResponses];
 
 export type GetTaskReadinessApiV2CopilotProjectsProjectIdTaskReadinessGetData = {
     body?: never;

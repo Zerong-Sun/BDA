@@ -17,17 +17,39 @@ export function isQuestion(goal: string): boolean {
     !/帮我|请.*(?:生成|检索|调研|起草)|please.*(?:research|draft|prepare)/i.test(goal)
 }
 
+/**
+ * What a run's transport status implies about its delivery, for a run that has
+ * not computed one yet. A run carries both, and they answer different
+ * questions: `failed` is how the process ended, `blocked` is what the person
+ * now has in hand.
+ */
+const STATUS_FALLBACK: Record<string, string> = {
+  running: 'running', awaiting_tasks: 'waiting', failed: 'blocked', cancelled: 'cancelled',
+}
+
+const DELIVERY_LABELS: Record<string, [string, string]> = {
+  running: ['Working', '进行中'], waiting: ['Waiting for results', '等待结果'],
+  completed: ['Draft ready for review', '交付物待审核'], partial: ['Partially delivered', '部分完成'],
+  blocked: ['Blocked', '受阻'], needs_input: ['Needs your input', '需要补充信息'],
+  review_required: ['Needs review', '需要审核'], cancelled: ['Cancelled', '已取消'],
+}
+
 export function deliveryState(run: AgentRun): string {
-  return String(run.outcome?.status ?? ({ running: 'running', awaiting_tasks: 'waiting', failed: 'blocked', cancelled: 'cancelled' } as Record<string, string>)[run.status] ?? 'review_required')
+  return String(run.outcome?.status ?? STATUS_FALLBACK[run.status] ?? 'review_required')
 }
 export function deliveryLabel(run: AgentRun, zh: boolean): string {
-  const labels: Record<string, [string, string]> = {
-    running: ['Working', '进行中'], waiting: ['Waiting for results', '等待结果'],
-    completed: ['Draft ready for review', '交付物待审核'], partial: ['Partially delivered', '部分完成'],
-    blocked: ['Blocked', '受阻'], needs_input: ['Needs your input', '需要补充信息'],
-    review_required: ['Needs review', '需要审核'], cancelled: ['Cancelled', '已取消'],
-  }
-  return (labels[deliveryState(run)] ?? labels.review_required)[zh ? 1 : 0]
+  return (DELIVERY_LABELS[deliveryState(run)] ?? DELIVERY_LABELS.review_required)[zh ? 1 : 0]
+}
+
+/**
+ * The same label for a room entry, which carries the delivery the server
+ * already resolved rather than the whole run. Sharing the table is the point:
+ * a task reading "Needs your input" in the inbox and something else in the
+ * room would be two vocabularies for one state.
+ */
+export function roomTaskLabel(task: { status: string; delivery_state?: string | null }, zh: boolean): string {
+  const state = task.delivery_state || STATUS_FALLBACK[task.status] || 'review_required'
+  return (DELIVERY_LABELS[state] ?? DELIVERY_LABELS.review_required)[zh ? 1 : 0]
 }
 
 /** One kind of guided task and the operator accountable for it. */

@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
 import { ApiState } from '../components/ui/ApiState'
 import { CopilotWorkspace } from '../features/copilot/CopilotWorkspace'
-import { CopilotChat } from '../features/copilot/CopilotChat'
+import { Room } from '../features/copilot/Room'
 import { CopilotChain } from '../features/copilot/CopilotChain'
 import { CopilotSettings } from '../features/copilot/CopilotSettings'
 import { useCopilotBots } from '../features/copilot/bots/registry'
@@ -40,7 +40,11 @@ function BotProjectWorkspace() {
   const selectedId = useAppStore((s) => s.copilotSessions[projectId]?.bot ?? null)
   const setBot = useAppStore((s) => s.setCopilotSessionBot)
   const selected = bots.data?.find((bot) => bot.id === selectedId)
-  const view = ['tasks', 'chat', 'handoffs'].includes(search.get('view') ?? '') ? search.get('view')! : 'tasks'
+  // `chat` was this page's conversation tab before the room existed. An old
+  // link resolves to the room rather than landing silently on the default,
+  // because the room contains what that tab used to show.
+  const requested = search.get('view') === 'chat' ? 'room' : search.get('view') ?? ''
+  const view = ['room', 'tasks', 'handoffs'].includes(requested) ? requested : 'room'
   const selectView = (value: string) => { const next = new URLSearchParams(search); next.set('view', value); setSearch(next) }
   const selectRun = (id: string | null) => {
     const next = new URLSearchParams(search)
@@ -49,7 +53,7 @@ function BotProjectWorkspace() {
     else next.delete('run')
     setSearch(next)
   }
-  const selectBot = (id: string | null) => { setBot(projectId, id); selectView('chat') }
+  const selectBot = (id: string | null) => { setBot(projectId, id); selectView('room') }
   const context = `route=/bots; project_id=${projectId}; name=${activeProject?.name ?? ''}; query=${search.toString()}; ${selectedEntities.map((id) => `entity=${encodeURIComponent(id)}`).join('; ')}`
   const name = (bot: { title: string; title_zh: string }) => zh ? bot.title_zh : bot.title
 
@@ -69,16 +73,16 @@ function BotProjectWorkspace() {
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
               <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? '研究团队视图' : 'Research team views'}>
+                <TabsTrigger value="room">{zh ? '研究室' : 'Research room'}</TabsTrigger>
                 <TabsTrigger value="tasks">{zh ? '任务与交付' : 'Tasks & deliverables'}</TabsTrigger>
-                <TabsTrigger value="chat">{zh ? '对话' : 'Conversation'}</TabsTrigger>
                 <TabsTrigger value="handoffs">{zh ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
               </TabsList>
               <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} /></TabsContent>
-              <TabsContent value="chat">
+              <TabsContent value="room">
                 {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{selected.summary}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><Button type="button" size="sm" variant="outline" render={<Link to={botHref(selected.id, projectId)} />}>{zh ? '查看职责页' : 'Open responsibility page'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setBot(projectId, null)}>{zh ? '改为自动匹配' : 'Switch to auto-match'}</Button></div>
                 </div></div> : null}
-                <div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div>
+                <Room pageContext={context} onOpenRun={selectRun} onOpenBot={(id: string) => navigate(botHref(id, projectId))} />
               </TabsContent>
               <TabsContent value="handoffs"><CopilotChain onSelectOperator={(id) => navigate(botHref(id, projectId))} /></TabsContent>
             </Tabs>
