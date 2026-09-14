@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import type { HandoffResponse } from '../lib/api/generated'
@@ -19,7 +19,7 @@ import { AgentRunDetail } from '../features/copilot/CopilotAgentRuns'
 import { HandoffCard } from '../features/copilot/CopilotChain'
 import { useCopilotHandoffs } from '../features/copilot/handoffs'
 import { useCopilotReadOnly } from '../features/copilot/commandAccess'
-import { reviewersOf, successorsOf, useCopilotBots, type CopilotBot } from '../features/copilot/bots/registry'
+import { resolveBot, reviewersOf, successorsOf, useCopilotBots, type CopilotBot } from '../features/copilot/bots/registry'
 import { BOT_WORKBENCHES, botHref, workbenchHref } from '../features/copilot/bots/workbenches'
 import { deliveryLabel } from '../features/copilot/taskPresentation'
 
@@ -43,6 +43,9 @@ function BotResponsibility({ botId }: { botId: string }) {
   const [search, setSearch] = useSearchParams()
   const bots = useCopilotBots()
   const bot = bots.data?.find((entry) => entry.id === botId)
+  // A retired id (an old link, or a handoff recorded before the merge) opens the
+  // operator that absorbed it rather than a "not in the roster" page.
+  const successor = !bot ? resolveBot(botId, bots.data ?? []) : undefined
   const setSessionBot = useAppStore((s) => s.setCopilotSessionBot)
   const selectedEntities = useAppStore((s) => s.copilotSelectedEntityIds)
   // Opening an operator's page scopes this project's conversation to it, as
@@ -62,6 +65,8 @@ function BotResponsibility({ botId }: { botId: string }) {
   const name = (entry: CopilotBot) => zh ? entry.title_zh : entry.title
   const context = `route=/bots/${botId}; project_id=${projectId}; name=${activeProject?.name ?? ''}; bot=${botId}; ${selectedEntities.map((id) => `entity=${encodeURIComponent(id)}`).join('; ')}`
   const stanceLabel: Record<string, string> = { direct: zh ? '协调' : 'Coordinate', produce: zh ? '研究与产出' : 'Research & produce', review: zh ? '审阅' : 'Review' }
+
+  if (successor && projectId) return <Navigate replace to={`${botHref(successor.id, projectId)}${search.get('run') ? `&run=${encodeURIComponent(search.get('run') ?? '')}` : ''}`} />
 
   return <section className="bot-page" data-tour-id="bot-responsibility">
     <header className="science-page-header">
@@ -109,19 +114,21 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   const navigate = useNavigate()
   const readOnly = useCopilotReadOnly()
   const runs = useQuery({ queryKey: ['agent-runs', projectId], queryFn: () => listAgentRuns(projectId), enabled: Boolean(projectId), refetchInterval: (q) => q.state.data?.some(isLive) ? 4000 : false })
-  const services = useQuery({ queryKey: ['copilot-task-services'], queryFn: listTaskServices, enabled: Boolean(bot.task_service) })
+  const services = useQuery({ queryKey: ['copilot-task-services'], queryFn: listTaskServices, enabled: Boolean(bot.task_services?.length) })
   const handoffs = useCopilotHandoffs(projectId)
   const botName = zh ? bot.title_zh : bot.title
-  const service = services.data?.find((entry) => entry.id === bot.task_service)
-  const held: AgentRun[] = runs.data?.filter((run) => run.bot === bot.id) ?? []
-  const received = handoffs.data?.filter((handoff) => handoff.to_bot === bot.id) ?? []
-  const sent = handoffs.data?.filter((handoff) => handoff.from_bot === bot.id) ?? []
+  // History recorded under the retired ids this operator absorbed is its history.
+  const ids = new Set([bot.id, ...(bot.absorbs ?? [])])
+  const held: AgentRun[] = runs.data?.filter((run) => Boolean(run.bot && ids.has(run.bot))) ?? []
+  const received = handoffs.data?.filter((handoff) => ids.has(handoff.to_bot)) ?? []
+  const sent = handoffs.data?.filter((handoff) => ids.has(handoff.from_bot)) ?? []
+  const owned = bot.task_services ?? []
   // Assigning prepares the composer with this owner and opens it. Nothing
   // starts here: the plan, writes and budget are still reviewed there.
-  const assign = () => {
+  const assign = (kind: string) => {
     const store = useAppStore.getState()
     const current = store.copilotTaskDrafts[projectId]
-    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', maxTurns: current?.maxTurns ?? 24, maxCost: current?.maxCost ?? '', writes: [], bot: bot.id, preview: true })
+    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', maxTurns: current?.maxTurns ?? 24, maxCost: current?.maxCost ?? '', writes: [], bot: bot.id, service: kind, preview: true })
     navigate(`/bots?project=${encodeURIComponent(projectId)}&view=tasks`)
   }
   const handoffList = (label: string, items: HandoffResponse[], empty: string) => <div role="group" aria-label={label}>
@@ -137,10 +144,14 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
     </section>
     <section aria-label={zh ? '托管任务' : 'Guided tasks'}>
       <h3>{zh ? '托管任务' : 'Guided tasks'}</h3>
-      {bot.task_service ? <div className="space-y-3">
-        <p className="text-sm">{service ? (zh ? `负责“${service.title_zh}”：${service.deliverable_zh}` : `Owns “${service.title}”: ${service.deliverable}`) : (zh ? '负责一类托管任务。' : 'Owns a kind of guided task.')}</p>
-        <Button type="button" disabled={readOnly} onClick={assign}>{zh ? `给 ${botName} 分派任务` : `Assign a task to ${botName}`}<ArrowRightIcon aria-hidden="true" /></Button>
-      </div> : <div className="space-y-3">
+      {owned.length ? <div className="space-y-4">{owned.map((kind) => {
+        const service = services.data?.find((entry) => entry.id === kind)
+        const title = service ? (zh ? service.title_zh : service.title) : kind
+        return <div key={kind} className="space-y-2">
+          <p className="text-sm">{service ? (zh ? `负责“${title}”：${service.deliverable_zh}` : `Owns “${title}”: ${service.deliverable}`) : (zh ? `负责“${kind}”类任务。` : `Owns “${kind}” tasks.`)}</p>
+          <Button type="button" disabled={readOnly} onClick={() => assign(kind)}>{zh ? `把“${title}”交给 ${botName}` : `Assign “${title}” to ${botName}`}<ArrowRightIcon aria-hidden="true" /></Button>
+        </div>
+      })}</div> : <div className="space-y-3">
         <p className="text-sm text-text-secondary">{zh ? '不承接托管任务，通过对话、交接和委派开展工作。' : 'Takes no guided tasks; works through conversation, handoffs and delegation.'}</p>
         <Button type="button" variant="outline" onClick={onChat}>{zh ? `与 ${botName} 对话` : `Talk to ${botName}`}</Button>
       </div>}

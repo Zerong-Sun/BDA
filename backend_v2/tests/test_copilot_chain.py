@@ -3,7 +3,7 @@
 The roster shipped nine operators with no relationship between any two of them.
 `handoff` was prose, a subagent inherited its parent's bot, and no operator could
 read another's work - so nine bots were nine tool sets, and the charters that
-said "hand this to medic" described something the platform could not do.
+said "hand this to runner" described something the platform could not do.
 
 These tests are about the relationships rather than about any operator:
 
@@ -107,7 +107,7 @@ def test_a_delegated_run_is_owned_by_the_target_operator(session: Session) -> No
     """The relationship the roster could not express.
 
     `spawn_subagent` deliberately inherits the parent's bot - a child of the
-    medic is still doing the medic's work. Delegation is the opposite move, and
+    runner is still doing the runner's work. Delegation is the opposite move, and
     is why a director needs a tool of its own rather than a flag on that one.
     """
     project, user = _project(session)
@@ -116,11 +116,11 @@ def test_a_delegated_run_is_owned_by_the_target_operator(session: Session) -> No
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": "Collect the affinity literature"},
+        {"bot": "researcher", "instruction": "Collect the affinity literature"},
     )
 
     child = agent_runs.require_run(session, uuid.UUID(result["run_id"]))
-    assert child.bot == "librarian"
+    assert child.bot == "researcher"
     assert child.parent_run_id == run.id
     assert result["waiting"] is True
 
@@ -129,7 +129,7 @@ def test_delegating_resolves_the_targets_capabilities_not_the_directors(session:
     """Routing, not escalation.
 
     The director holds no literature tool at all. The child holds one, because
-    it resolved `librarian ∩ project` - so the reach of the pair is bounded by
+    it resolved `researcher ∩ project` - so the reach of the pair is bounded by
     what the project enabled and never by the director, who executes none of it.
     """
     project, user = _project(session)
@@ -139,18 +139,18 @@ def test_delegating_resolves_the_targets_capabilities_not_the_directors(session:
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": "Collect the affinity literature"},
+        {"bot": "researcher", "instruction": "Collect the affinity literature"},
     )
 
     child = agent_runs.require_run(session, uuid.UUID(result["run_id"]))
-    librarian = set(
-        tools_for_capabilities(bots.capabilities_for_bot("librarian", normalize_capabilities(None)))
+    researcher = set(
+        tools_for_capabilities(bots.capabilities_for_bot("researcher", normalize_capabilities(None)))
     )
     # Exactly the target's resolution. An earlier version intersected the child
     # with the parent the way `spawn_subagent` does, which dropped
-    # `start_literature_search` - the one tool that makes a librarian a
-    # librarian - and produced a child that read like an operator that failed.
-    assert set(child.allowed_tools) == librarian
+    # `start_literature_search` - the one tool that makes a researcher a
+    # researcher - and produced a child that read like an operator that failed.
+    assert set(child.allowed_tools) == researcher
     assert "start_literature_search" in child.allowed_tools
 
 
@@ -221,7 +221,7 @@ def test_a_turn_without_the_projects_capabilities_refuses_to_delegate(
 
     with pytest.raises(ValueError, match="copilot_project_capabilities_required"):
         REGISTRY.execute(
-            "delegate_to_operator", context, {"bot": "librarian", "instruction": "Go"}
+            "delegate_to_operator", context, {"bot": "researcher", "instruction": "Go"}
         )
 
 
@@ -258,8 +258,8 @@ def test_an_operator_with_nothing_enabled_is_refused_rather_than_delegated_to(
     with pytest.raises(ValueError, match="copilot_delegate_no_capabilities"):
         REGISTRY.execute(
             "delegate_to_operator",
-            _ctx(session, run, enabled={"project-read"}),
-            {"bot": "librarian", "instruction": "Collect the literature"},
+            _ctx(session, run, enabled={"wetlab-read"}),
+            {"bot": "researcher", "instruction": "Collect the literature"},
         )
 
 
@@ -295,7 +295,7 @@ def test_a_director_cannot_authorise_a_write_by_writing_the_users_words(
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": DIRECTOR_INSTRUCTION},
+        {"bot": "researcher", "instruction": DIRECTOR_INSTRUCTION},
     )
     child = agent_runs.require_run(session, uuid.UUID(result["run_id"]))
 
@@ -315,7 +315,7 @@ def test_the_users_own_words_still_reach_a_delegated_run(session: Session) -> No
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": "Collect the affinity literature"},
+        {"bot": "researcher", "instruction": "Collect the affinity literature"},
     )
     child = agent_runs.require_run(session, uuid.UUID(result["run_id"]))
 
@@ -370,7 +370,7 @@ def test_a_reviewer_reads_what_an_operator_called_not_what_it_said(session: Sess
         user_id=user.id,
         goal="Collect the affinity literature",
         allowed_tools=["research_overview"],
-        bot="librarian",
+        bot="researcher",
     )
     agent_runs.append_turn(
         session,
@@ -383,7 +383,7 @@ def test_a_reviewer_reads_what_an_operator_called_not_what_it_said(session: Sess
         session,
         project_id=project.id,
         user_id=user.id,
-        goal="Check the librarian",
+        goal="Check the researcher",
         allowed_tools=sorted(
             tools_for_capabilities(bots.capabilities_for_bot("auditor", normalize_capabilities(None)))
         ),
@@ -394,7 +394,7 @@ def test_a_reviewer_reads_what_an_operator_called_not_what_it_said(session: Sess
         "read_operator_work", _ctx(session, reviewer), {"run_id": str(worked.id)}
     )
 
-    assert result["bot"] == "librarian"
+    assert result["bot"] == "researcher"
     assert [call["name"] for call in result["tool_calls"]] == ["research_overview"]
 
 
@@ -448,7 +448,7 @@ def test_the_charters_a_reviewer_rules_against_are_returned_as_data(session: Ses
     assert set(by_id) == {bot.id for bot in bots.producers()}
     assert by_id["planner"]["charter"] == bots.require("planner").charter
     assert "auditor" in by_id["planner"]["reviewed_by"]
-    assert "steward" in by_id["planner"]["reviewed_by"]
+    assert "auditor" in by_id["planner"]["reviewed_by"]
 
 
 def test_a_reviewer_holds_nothing_that_could_repair_what_it_finds(session: Session) -> None:
@@ -500,7 +500,7 @@ def test_a_settled_delegation_is_folded_back_under_the_right_tool_name(
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": "Collect the literature"},
+        {"bot": "researcher", "instruction": "Collect the literature"},
     )
     child_id = uuid.UUID(result["run_id"])
     session.add(
@@ -557,7 +557,7 @@ def test_a_settled_subagent_still_folds_back_as_spawn_subagent(session: Session)
 def test_the_steward_can_reach_a_declaration_to_review(session: Session) -> None:
     """The charter names four numbers; this is the tool that shows them.
 
-    Without it `steward` was `archivist` before its charter was fixed - an
+    Without it `auditor` was `analyst` before its charter was fixed - an
     operator instructed to do something no tool exposes.
     """
     from backend_v2.app.registry.models import ModelPlugin
@@ -579,9 +579,9 @@ def test_the_steward_can_reach_a_declaration_to_review(session: Session) -> None
         user_id=user.id,
         goal="Check the draft",
         allowed_tools=sorted(
-            tools_for_capabilities(bots.capabilities_for_bot("steward", normalize_capabilities(None)))
+            tools_for_capabilities(bots.capabilities_for_bot("auditor", normalize_capabilities(None)))
         ),
-        bot="steward",
+        bot="auditor",
     )
     assert "review_compute_declaration" in reviewer.allowed_tools
 
@@ -630,7 +630,7 @@ def test_a_workflow_node_is_enough_to_review_its_plugin(session: Session) -> Non
         user_id=user.id,
         goal="Check",
         allowed_tools=["review_compute_declaration"],
-        bot="steward",
+        bot="auditor",
     )
 
     result = REGISTRY.execute(
@@ -651,7 +651,7 @@ def test_reviewing_a_declaration_needs_a_plugin_or_a_node(session: Session) -> N
         user_id=user.id,
         goal="Check",
         allowed_tools=["review_compute_declaration"],
-        bot="steward",
+        bot="auditor",
     )
 
     with pytest.raises(ValueError, match="copilot_plugin_or_node_required"):
@@ -694,7 +694,7 @@ def test_a_delegated_child_is_handed_to_a_worker(session: Session) -> None:
     result = REGISTRY.execute(
         "delegate_to_operator",
         _ctx(session, run),
-        {"bot": "librarian", "instruction": "Collect the literature"},
+        {"bot": "researcher", "instruction": "Collect the literature"},
     )
 
     assert result["run_id"] in _outbox(session)

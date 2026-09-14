@@ -87,7 +87,7 @@ class TestTheMapping:
         assert gates.tier_for("compute") == "reversible_draft"
 
     def test_lookup_is_case_and_whitespace_insensitive(self) -> None:
-        assert operators.operator_for("  Research ") == "librarian"
+        assert operators.operator_for("  Research ") == "researcher"
 
     def test_a_stage_naming_a_non_producer_fails_the_import_guard(
         self, monkeypatch: pytest.MonkeyPatch
@@ -184,7 +184,7 @@ class TestTheStageOpensARun:
         kind, run_id = resource
         assert kind == "copilot_agent_run"
         run = session.get(CopilotAgentRun, run_id)
-        assert run is not None and run.bot == "librarian"
+        assert run is not None and run.bot == "researcher"
         assert (stage.resource_type, stage.resource_id) == ("copilot_agent_run", run.id)
 
     def test_the_run_is_authorised_by_the_persons_brief(self, session: Session) -> None:
@@ -217,7 +217,7 @@ class TestTheStageOpensARun:
         run = session.get(CopilotAgentRun, run_id)
         assert run is not None
         assert set(run.allowed_tools) == tools_for_capabilities(
-            bots.capabilities_for_bot("librarian", normalize_capabilities(["research"]))
+            bots.capabilities_for_bot("researcher", normalize_capabilities(["research"]))
         )
 
     def test_the_run_is_dispatched_rather_than_left_for_a_sweep(self, session: Session) -> None:
@@ -249,7 +249,7 @@ class TestTheStageOpensARun:
 
         assert first == second
         assert (
-            len(list(session.scalars(select(CopilotAgentRun).where(CopilotAgentRun.bot == "librarian"))))
+            len(list(session.scalars(select(CopilotAgentRun).where(CopilotAgentRun.bot == "researcher"))))
             == 1
         )
 
@@ -279,7 +279,7 @@ class TestTheStageOpensARun:
 
     def test_an_operator_with_nothing_enabled_opens_no_run(self, session: Session) -> None:
         """Rather than a run with no tools, which reads as a failed operator."""
-        campaign, _, _ = _campaign(session, enabled_skills=["structure"])
+        campaign, _, _ = _campaign(session, enabled_skills=["wetlab-read"])
         stage = _stage(session, campaign)
 
         assert adapters.ensure_stage_resource(session, campaign, stage) is None
@@ -290,8 +290,8 @@ class TestWhatTheStageReports:
         campaign, _, _ = _campaign(session)
         stage = _stage(session, campaign)
 
-        assert stage.operator == "librarian"
-        assert "librarian" in (stage.operator_reason or "")
+        assert stage.operator == "researcher"
+        assert "researcher" in (stage.operator_reason or "")
 
     def test_the_reason_comes_from_the_stored_operator_not_the_current_mapping(
         self, session: Session, monkeypatch: pytest.MonkeyPatch
@@ -300,9 +300,9 @@ class TestWhatTheStageReports:
         campaign that was approved."""
         campaign, _, _ = _campaign(session)
         stage = _stage(session, campaign)
-        monkeypatch.setattr(operators, "STAGE_OPERATORS", {"research": "scout"})
+        monkeypatch.setattr(operators, "STAGE_OPERATORS", {"research": "researcher"})
 
-        assert "librarian" in (stage.operator_reason or "")
+        assert "researcher" in (stage.operator_reason or "")
 
     def test_a_retired_operator_is_named_rather_than_hidden(self, session: Session) -> None:
         campaign, _, _ = _campaign(session)

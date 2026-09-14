@@ -34,7 +34,7 @@ from ..copilot import bots
 #: `review` stage is a person's judgement, and naming a bot for it would be the
 #: platform quietly answering a question it was asked to hold open.
 STAGE_OPERATORS: dict[str, str] = {
-    "research": "librarian",
+    "research": "researcher",
     "plan": "planner",
     "design": "planner",
     # `planner`, not `runner`, and the difference is the whole reason `gates.py`
@@ -44,7 +44,7 @@ STAGE_OPERATORS: dict[str, str] = {
     # outside the campaign's automatic path - naming it here would put an
     # operator's name on work the campaign does not do.
     "compute": "planner",
-    "report": "archivist",
+    "report": "analyst",
 }
 
 #: Stage keys that exist and deliberately have no operator, each with why. Kept

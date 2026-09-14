@@ -585,7 +585,7 @@ def start_agent_run(
     from .task_contracts import SERVICES, build_contract
 
     recipe = SERVICES.get(payload.service_kind)
-    if recipe and payload.bot and bot_roster.require(payload.bot).task_service != payload.service_kind:
+    if recipe and payload.bot and payload.service_kind not in bot_roster.require(payload.bot).task_services:
         owner = bot_roster.owner_of_service(payload.service_kind)
         raise DomainError(
             "copilot_task_owner_mismatch",

@@ -69,7 +69,7 @@ def create_run(
                 status_code=422,
             )
         # A child inherits its parent's charter unless it was given one. A
-        # subagent spawned by the medic is still doing the medic's work, and a
+        # subagent spawned by the runner is still doing the runner's work, and a
         # child that silently lost the refusals its parent was operating under
         # would be the one place the roster stopped applying.
         delegated = bot is not None and bot != parent.bot
@@ -80,10 +80,10 @@ def create_run(
             # rather than trusting the caller's list.
             allowed_tools = sorted(set(allowed_tools) & set(parent.allowed_tools or []))
         # Otherwise the child is a *different* operator, and intersecting would
-        # be wrong rather than merely strict: a librarian delegated to by a
+        # be wrong rather than merely strict: a researcher delegated to by a
         # director holds none of the director's tools, so the intersection is
-        # exactly the librarian's own work minus the part that makes it a
-        # librarian - `start_literature_search` is dropped and the child looks
+        # exactly the researcher's own work minus the part that makes it a
+        # researcher - `start_literature_search` is dropped and the child looks
         # like an operator that failed. The bound that matters is the project's,
         # and the caller has already applied it: `delegate_to_operator` passes
         # `target.capabilities ∩ project.enabled`, so the pair still cannot

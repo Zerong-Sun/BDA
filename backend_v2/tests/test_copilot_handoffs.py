@@ -69,8 +69,8 @@ def _post(session: Session, project: Project, user: User, **kwargs):
     payload = {
         "project_id": project.id,
         "user_id": user.id,
-        "from_bot": "librarian",
-        "to_bot": "scout",
+        "from_bot": "researcher",
+        "to_bot": "planner",
         "summary": "Collected the PD-1 affinity literature.",
     }
     payload.update(kwargs)
@@ -85,12 +85,12 @@ def test_a_handover_names_two_real_operators(session: Session) -> None:
 
     row = _post(session, project, user)
 
-    assert (row.from_bot, row.to_bot) == ("librarian", "scout")
+    assert (row.from_bot, row.to_bot) == ("researcher", "planner")
 
 
 @pytest.mark.parametrize(
     ("from_bot", "to_bot"),
-    [("ghost", "scout"), ("librarian", "ghost")],
+    [("ghost", "planner"), ("researcher", "ghost")],
 )
 def test_an_unknown_operator_is_refused(
     session: Session, from_bot: str, to_bot: str
@@ -109,7 +109,7 @@ def test_an_operator_does_not_hand_over_to_itself(session: Session) -> None:
     project, user = _project(session)
 
     with pytest.raises(DomainError, match="does not hand over to itself"):
-        _post(session, project, user, to_bot="librarian")
+        _post(session, project, user, to_bot="researcher")
 
 
 def test_an_unusual_route_is_reported_rather_than_refused() -> None:
@@ -118,8 +118,8 @@ def test_an_unusual_route_is_reported_rather_than_refused() -> None:
     Enforcing the tuple would make the review stance structurally unable to
     deliver a verdict, so the route is surfaced instead.
     """
-    assert handoffs.is_off_chain("auditor", "planner") is True
-    assert handoffs.is_off_chain("librarian", "scout") is False
+    assert handoffs.is_off_chain("auditor", "runner") is True
+    assert handoffs.is_off_chain("researcher", "planner") is False
 
 
 # --- The shape a reviewer reads ----------------------------------------------
@@ -245,21 +245,21 @@ def test_empty_open_questions_and_refs_are_dropped_rather_than_stored(
 
 def test_an_operator_reads_the_notes_addressed_to_it(session: Session) -> None:
     project, user = _project(session)
-    _post(session, project, user, from_bot="librarian", to_bot="scout", summary="for scout")
-    _post(session, project, user, from_bot="scout", to_bot="planner", summary="for planner")
+    _post(session, project, user, from_bot="researcher", to_bot="planner", summary="for planner")
+    _post(session, project, user, from_bot="planner", to_bot="runner", summary="for runner")
 
-    inbox = handoffs.inbox(session, project_id=project.id, to_bot="scout")
+    inbox = handoffs.inbox(session, project_id=project.id, to_bot="planner")
 
-    assert [row.summary for row in inbox] == ["for scout"]
+    assert [row.summary for row in inbox] == ["for planner"]
 
 
 def test_a_reviewer_reads_what_one_operator_has_been_claiming(session: Session) -> None:
     project, user = _project(session)
-    _post(session, project, user, from_bot="librarian", to_bot="scout", summary="a")
-    _post(session, project, user, from_bot="librarian", to_bot="briefing", summary="b")
-    _post(session, project, user, from_bot="scout", to_bot="planner", summary="c")
+    _post(session, project, user, from_bot="researcher", to_bot="planner", summary="a")
+    _post(session, project, user, from_bot="researcher", to_bot="analyst", summary="b")
+    _post(session, project, user, from_bot="planner", to_bot="runner", summary="c")
 
-    sent = handoffs.inbox(session, project_id=project.id, from_bot="librarian")
+    sent = handoffs.inbox(session, project_id=project.id, from_bot="researcher")
 
     assert {row.summary for row in sent} == {"a", "b"}
 
@@ -303,7 +303,7 @@ def test_an_unowned_turn_cannot_hand_over(session: Session) -> None:
         REGISTRY.execute(
             "post_handoff",
             _ctx(session, project, user, bot=None),
-            {"to_bot": "scout", "summary": "s"},
+            {"to_bot": "planner", "summary": "s"},
         )
 
 
@@ -314,9 +314,9 @@ def test_the_tool_reports_unsupported_claims_back_to_their_author(session: Sessi
 
     result = REGISTRY.execute(
         "post_handoff",
-        _ctx(session, project, user, bot="librarian"),
+        _ctx(session, project, user, bot="researcher"),
         {
-            "to_bot": "scout",
+            "to_bot": "planner",
             "summary": "Collected the literature",
             "claims": [
                 {"statement": "a", "evidence_ref": "reference:1"},
@@ -339,13 +339,13 @@ def test_a_note_written_inside_a_run_remembers_it(session: Session) -> None:
         user_id=user.id,
         goal="Collect the literature",
         allowed_tools=["post_handoff"],
-        bot="librarian",
+        bot="researcher",
     )
 
     result = REGISTRY.execute(
         "post_handoff",
-        _ctx(session, project, user, bot="librarian", run=run),
-        {"to_bot": "scout", "summary": "done"},
+        _ctx(session, project, user, bot="researcher", run=run),
+        {"to_bot": "planner", "summary": "done"},
     )
 
     assert result["produced_by_run"] == str(run.id)
@@ -356,8 +356,8 @@ def test_a_chat_note_records_no_run(session: Session) -> None:
 
     result = REGISTRY.execute(
         "post_handoff",
-        _ctx(session, project, user, bot="librarian"),
-        {"to_bot": "scout", "summary": "done"},
+        _ctx(session, project, user, bot="researcher"),
+        {"to_bot": "planner", "summary": "done"},
     )
 
     assert result["produced_by_run"] is None
@@ -371,7 +371,7 @@ def test_reading_the_channel_needs_no_operator(session: Session) -> None:
 
     rows = REGISTRY.execute("read_handoffs", _ctx(session, project, user, bot=None), {})
 
-    assert [row["to_bot"] for row in rows] == ["scout"]
+    assert [row["to_bot"] for row in rows] == ["planner"]
 
 
 # --- Through the API ---------------------------------------------------------
@@ -403,23 +403,23 @@ def test_a_person_can_read_the_chain_not_only_the_next_operator(session: Session
     for the reader it is ultimately for, so the rows are a resource.
     """
     project, user = _project(session)
-    _post(session, project, user, from_bot="librarian", to_bot="scout", summary="a")
-    _post(session, project, user, from_bot="scout", to_bot="planner", summary="b")
+    _post(session, project, user, from_bot="researcher", to_bot="planner", summary="a")
+    _post(session, project, user, from_bot="planner", to_bot="runner", summary="b")
     session.commit()
 
     page = _list(session, project, user)
 
     assert {item.summary for item in page.items} == {"a", "b"}
-    assert {item.from_bot for item in page.items} == {"librarian", "scout"}
+    assert {item.from_bot for item in page.items} == {"researcher", "planner"}
 
 
 def test_the_api_filters_by_operator(session: Session) -> None:
     project, user = _project(session)
-    _post(session, project, user, from_bot="librarian", to_bot="scout", summary="a")
-    _post(session, project, user, from_bot="scout", to_bot="planner", summary="b")
+    _post(session, project, user, from_bot="researcher", to_bot="planner", summary="a")
+    _post(session, project, user, from_bot="planner", to_bot="runner", summary="b")
     session.commit()
 
-    page = _list(session, project, user, to_bot="planner")
+    page = _list(session, project, user, to_bot="runner")
 
     assert [item.summary for item in page.items] == ["b"]
 

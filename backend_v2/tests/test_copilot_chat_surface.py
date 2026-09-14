@@ -63,8 +63,8 @@ def test_agent_run_tools_are_never_offered_in_chat() -> None:
 def test_the_structure_and_diagnosis_tools_are_reachable_from_chat() -> None:
     """Named explicitly because their absence made two bots inert.
 
-    `structuralist` resolved its capabilities, passed the narrowing law and
-    appeared in the picker while having none of its tools; `medic` kept
+    `planner` resolved its capabilities, passed the narrowing law and
+    appeared in the picker while having none of its tools; `runner` kept
     `get_compute_status` and lost the tool that says *why* a job failed.
     """
     offered = _names()

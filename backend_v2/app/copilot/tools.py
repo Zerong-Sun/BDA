@@ -1500,11 +1500,11 @@ _register(
 def _review_compute_declaration(ctx: ToolContext, args: dict[str, Any]) -> Any:
     """What a plugin declares against what the cluster will give it.
 
-    Added because `steward`'s charter named a comparison no tool could make.
+    Added because `auditor`'s resource-review charter named a comparison no tool could make.
     `get_compute_status` returns a draft's free-form specification, while the
     numbers that reach LSF live on the plugin registry row and on the queue - so
     the reviewer was being asked to check four things it could not see, which is
-    the same defect the roster already fixed once in `archivist`.
+    the same defect the roster already fixed once in `archivist` (now part of `analyst`).
     """
     from ..compute import declarations
     from ..registry.models import ComputeNode, ModelPlugin

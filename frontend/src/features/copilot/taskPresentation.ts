@@ -1,5 +1,5 @@
 import type { AgentRun } from '../../lib/api/agentRuns'
-import { matchBot, type CopilotBot } from './bots/registry'
+import { matchBot, resolveBot, type CopilotBot } from './bots/registry'
 
 export type ServiceKind = 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation'
 
@@ -30,18 +30,35 @@ export function deliveryLabel(run: AgentRun, zh: boolean): string {
   return (labels[deliveryState(run)] ?? labels.review_required)[zh ? 1 : 0]
 }
 
-/** Operators that take guided tasks, in the roster's chain order. */
-export function taskOwners(bots: readonly CopilotBot[]): CopilotBot[] {
-  return bots.filter((bot) => Boolean(bot.task_service))
+/** One kind of guided task and the operator accountable for it. */
+export interface TaskOwner {
+  key: string
+  bot: CopilotBot
+  service: ServiceKind
 }
 
-export function ownerOf(kind: string, bots: readonly CopilotBot[]): CopilotBot | undefined {
-  return bots.find((bot) => bot.task_service === kind)
+/** Every (operator, recipe) an operator answers for, in the roster's chain order. */
+export function taskOwners(bots: readonly CopilotBot[]): TaskOwner[] {
+  return bots.flatMap((bot) => (bot.task_services ?? []).map((service) => ({ key: `${bot.id}:${service}`, bot, service: service as ServiceKind })))
 }
 
-/** A visible suggestion of who should own a goal. An operator the goal names outranks the keyword guess. */
-export function suggestAssignee(goal: string, owners: readonly CopilotBot[]): CopilotBot | undefined {
-  return matchBot(goal, owners) ?? ownerOf(suggestService(goal), owners)
+export function ownerOf(kind: string, owners: readonly TaskOwner[]): TaskOwner | undefined {
+  return owners.find((owner) => owner.service === kind)
+}
+
+/**
+ * A visible suggestion of who should own a goal and as which kind of task. An
+ * operator the goal names outranks the keyword guess; within that operator the
+ * guessed kind is kept when it owns it.
+ */
+export function suggestAssignee(goal: string, owners: readonly TaskOwner[]): TaskOwner | undefined {
+  const guess = suggestService(goal)
+  const named = matchBot(goal, [...new Map(owners.map((owner) => [owner.bot.id, owner.bot])).values()])
+  if (named) {
+    const own = owners.filter((owner) => owner.bot.id === named.id)
+    return own.find((owner) => owner.service === guess) ?? own[0]
+  }
+  return ownerOf(guess, owners)
 }
 
 export interface OwnerGroup {
@@ -52,14 +69,16 @@ export interface OwnerGroup {
 }
 
 /**
- * Tasks under the operator that answers for them, in roster order. Owners the
- * roster no longer lists keep their id; runs started without an owner come last.
+ * Tasks under the operator that answers for them, in roster order. A run
+ * recorded under a retired id groups under the operator that absorbed it; an id
+ * nothing resolves keeps its own group; runs started without an owner come last.
  */
 export function groupRunsByOwner(runs: readonly AgentRun[], bots: readonly CopilotBot[]): OwnerGroup[] {
   const groups = new Map<string | null, OwnerGroup>()
   for (const run of runs) {
-    const botId = run.bot ?? null
-    const group = groups.get(botId) ?? { key: botId ?? 'unassigned', botId, bot: bots.find((bot) => bot.id === botId), runs: [] }
+    const bot = resolveBot(run.bot, bots)
+    const botId = bot?.id ?? run.bot ?? null
+    const group = groups.get(botId) ?? { key: botId ?? 'unassigned', botId, bot, runs: [] }
     group.runs.push(run)
     groups.set(botId, group)
   }

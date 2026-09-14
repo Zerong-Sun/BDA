@@ -172,7 +172,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
             <SelectContent>
               <SelectItem value={AUTO_BOT}>{t.copilot.chat.botAuto}</SelectItem>
               {/* Grouped by stance, not by phase. A director is not the step
-                  before briefing and a reviewer is not the step after
+                  before research and a reviewer is not the step after
                   archiving; a single ordered list says they are, which is the
                   reading this roster exists to correct.
 
