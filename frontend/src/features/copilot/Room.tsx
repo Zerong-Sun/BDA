@@ -14,6 +14,7 @@ import { BotAvatar } from './BotAvatar'
 import { CopilotCitations } from './CopilotCitations'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { HandoffCard } from './CopilotChain'
+import { ownedService, parseMention } from './mentions'
 import { useCopilotReadOnly } from './commandAccess'
 import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { childTasksByParent, copilotRoomQueryKey, inReadingOrder, topLevelEntries, useCopilotRoom } from './roomFeed'
@@ -42,10 +43,18 @@ export function Room({
   pageContext,
   onOpenRun,
   onOpenBot,
+  onAssign,
 }: {
   pageContext?: string
   onOpenRun?: (runId: string) => void
   onOpenBot?: (botId: string) => void
+  /**
+   * Hand this work to an operator as a guided task. The room prepares it and
+   * nothing more: the plan, the writes and the budget are still reviewed in the
+   * composer, because starting a run spends money and a room message is not a
+   * place to approve that.
+   */
+  onAssign?: (goal: string, botId: string, service: string) => void
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
@@ -86,11 +95,21 @@ export function Room({
   // refetches when the turn ends, so both halves are echoed until then.
   const pending = loading ? messages.slice(-2) : []
 
+  // Who this message is addressed to, recomputed as it is typed so the room can
+  // show the addressee before it is sent rather than after.
+  const mention = parseMention(input, roster)
+  const addressee = mention?.bot
+  const unknownHandle = mention && !mention.bot ? mention.handle : null
+  const assignable = addressee ? ownedService(addressee) : undefined
+
   const handleSend = async () => {
     const trimmed = input.trim()
-    if (!trimmed || loading || readOnly) return
+    // A handle naming nobody is refused rather than quietly auto-matched: the
+    // person believes they addressed someone, and sending it elsewhere without
+    // saying so is the failure this check exists for.
+    if (!trimmed || loading || readOnly || unknownHandle) return
     setSessionInput(projectId, '')
-    await send(trimmed)
+    await send(trimmed, addressee ? { bot: addressee.id } : undefined)
   }
 
   return (
@@ -149,6 +168,32 @@ export function Room({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
+      {addressee || unknownHandle ? (
+        <p className="room-addressee" role="status">
+          {addressee ? (
+            <>
+              <span>{zh ? '发给' : 'To'} <strong>{zh ? addressee.title_zh : addressee.title}</strong></span>
+              {assignable && onAssign && !readOnly ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onAssign((mention?.body || input).trim(), addressee.id, assignable)}
+                  disabled={!(mention?.body || input).trim()}
+                >
+                  {zh ? '交给 TA 办' : 'Hand it to them'}
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <span>
+              {zh
+                ? `团队里没有叫「${unknownHandle}」的成员，改一下再发。`
+                : `No member is called “${unknownHandle}”. Change the name to send.`}
+            </span>
+          )}
+        </p>
+      ) : null}
       <div className="room-composer">
         <label htmlFor="room-input" className="sr-only">
           {zh ? '在研究室里发言' : 'Say something in the room'}
@@ -171,7 +216,7 @@ export function Room({
           variant="outline"
           size="icon"
           aria-label={zh ? '发送' : 'Send'}
-          disabled={readOnly || loading || !input.trim()}
+          disabled={readOnly || loading || !input.trim() || Boolean(unknownHandle)}
           onClick={() => void handleSend()}
         >
           {loading ? (

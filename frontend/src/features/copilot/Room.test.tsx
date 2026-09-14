@@ -1,5 +1,5 @@
-import { cleanup, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -34,6 +34,14 @@ const BOTS = [
     summary: 'Carry a run across its waits.', charter: 'Do not resubmit.', capabilities: ['project-read'],
     handoff: ['analyst'], reviews: [], directs: [], reviewed_by: ['auditor'], triggers: [],
     task_services: ['execution'], task_write_tools: {}, absorbs: [],
+  },
+  {
+    // A reviewer owns no recipe, which is what makes it the right operator to
+    // check that the room offers no task for one.
+    id: 'auditor', title: 'Auditor', title_zh: '复核', phase: 9, stance: 'review',
+    summary: 'Rule on claims against their evidence.', charter: 'Do not repair what you find.',
+    capabilities: ['review-audit'], handoff: ['conductor'], reviews: ['planner'], directs: [],
+    reviewed_by: [], triggers: [], task_services: [], task_write_tools: {}, absorbs: [],
   },
 ]
 
@@ -140,5 +148,52 @@ describe('Room', () => {
     renderWithProviders(<Room />)
 
     expect(await screen.findByRole('button', { name: /retry/i })).toBeInTheDocument()
+  })
+})
+
+/**
+ * Addressing a member is routing, so the assertions are about what happens to a
+ * message the person believes they addressed.
+ */
+describe('Room addressing', () => {
+  async function typed(text: string) {
+    stub([])
+    const onAssign = vi.fn()
+    renderWithProviders(<Room onAssign={onAssign} />)
+    // The composer renders before the project resolves, and the draft is kept
+    // per project - typing first would write it under the empty project key and
+    // lose it as soon as the real one arrives. Waiting for the loaded room is
+    // how a person reaches the composer too.
+    await screen.findByText(/appears here/i)
+    const input = await screen.findByLabelText('Say something in the room')
+    fireEvent.change(input, { target: { value: text } })
+    return { onAssign }
+  }
+
+  it('names the addressee before the message is sent', async () => {
+    await typed('@planner draft the route')
+
+    expect(await screen.findByText('Planner')).toBeInTheDocument()
+  })
+
+  it('refuses a handle that names nobody rather than sending it to somebody else', async () => {
+    await typed('@nobody draft the route')
+
+    expect(await screen.findByText(/No member is called/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('prepares a task for the operator that was addressed, carrying the work and not the address', async () => {
+    const { onAssign } = await typed('@planner draft the route')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand it to them' }))
+
+    expect(onAssign).toHaveBeenCalledWith('draft the route', 'planner', 'planning')
+  })
+
+  it('offers no task for an operator that owns no recipe', async () => {
+    await typed('@auditor check that claim')
+
+    expect(screen.queryByRole('button', { name: 'Hand it to them' })).not.toBeInTheDocument()
   })
 })

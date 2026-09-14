@@ -39,6 +39,7 @@ function BotProjectWorkspace() {
   const selectedEntities = useAppStore((s) => s.copilotSelectedEntityIds)
   const selectedId = useAppStore((s) => s.copilotSessions[projectId]?.bot ?? null)
   const setBot = useAppStore((s) => s.setCopilotSessionBot)
+  const setTaskDraft = useAppStore((s) => s.setCopilotTaskDraft)
   const selected = bots.data?.find((bot) => bot.id === selectedId)
   // `chat` was this page's conversation tab before the room existed. An old
   // link resolves to the room rather than landing silently on the default,
@@ -54,6 +55,22 @@ function BotProjectWorkspace() {
     setSearch(next)
   }
   const selectBot = (id: string | null) => { setBot(projectId, id); selectView('room') }
+  // Addressing someone in the room can prepare a task for them. It prepares
+  // only: the composer still reviews the plan, the writes and the budget,
+  // which is where starting a run has always been approved.
+  const assignFromRoom = (goal: string, bot: string, service: string) => {
+    const current = useAppStore.getState().copilotTaskDrafts[projectId]
+    setTaskDraft(projectId, {
+      goal,
+      maxTurns: current?.maxTurns ?? 24,
+      maxCost: current?.maxCost ?? '',
+      writes: [],
+      bot,
+      service,
+      preview: true,
+    })
+    selectView('tasks')
+  }
   const context = `route=/bots; project_id=${projectId}; name=${activeProject?.name ?? ''}; query=${search.toString()}; ${selectedEntities.map((id) => `entity=${encodeURIComponent(id)}`).join('; ')}`
   const name = (bot: { title: string; title_zh: string }) => zh ? bot.title_zh : bot.title
 
@@ -82,7 +99,12 @@ function BotProjectWorkspace() {
                 {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{selected.summary}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><Button type="button" size="sm" variant="outline" render={<Link to={botHref(selected.id, projectId)} />}>{zh ? '查看职责页' : 'Open responsibility page'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setBot(projectId, null)}>{zh ? '改为自动匹配' : 'Switch to auto-match'}</Button></div>
                 </div></div> : null}
-                <Room pageContext={context} onOpenRun={selectRun} onOpenBot={(id: string) => navigate(botHref(id, projectId))} />
+                <Room
+                  pageContext={context}
+                  onOpenRun={selectRun}
+                  onOpenBot={(id: string) => navigate(botHref(id, projectId))}
+                  onAssign={assignFromRoom}
+                />
               </TabsContent>
               <TabsContent value="handoffs"><CopilotChain onSelectOperator={(id) => navigate(botHref(id, projectId))} /></TabsContent>
             </Tabs>

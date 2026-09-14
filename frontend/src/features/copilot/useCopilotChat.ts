@@ -82,7 +82,13 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     (message) => message.content.trim().length > 0 && message.content !== legacyCopilotIntro,
   )
 
-  const send = async (input: string) => {
+  /**
+   * One turn. `options.bot` addresses a single message to one operator - the
+   * room's `@mention` - and is deliberately not stored: pinning the
+   * conversation to whoever was addressed once would re-route everything after
+   * it, which is not what naming somebody in a room means.
+   */
+  const send = async (input: string, options?: { bot?: string }) => {
     const trimmed = input.trim()
     if (!trimmed || !projectId || useAppStore.getState().copilotSessions[projectId]?.pending) return
     try { requireCopilotWrite() } catch { return }
@@ -105,7 +111,10 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     // describes the same routing, and a copy is what drifts: its `systemPrompt`
     // field was populated for all nine entries and read by nothing. Its
     // vocabulary now lives on the operators that own it.
-    const activeBot = bot ?? matchBot(trimmed, bots ?? [])?.id
+    // An address for this turn, then the operator the room is scoped to, then
+    // the served roster's own triggers. Each is a narrowing hint the server
+    // intersects with the project's capabilities; none of them can widen a turn.
+    const activeBot = options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
     const reviewIntent = detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
