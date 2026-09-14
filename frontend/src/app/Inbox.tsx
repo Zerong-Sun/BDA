@@ -12,6 +12,7 @@ import { Button } from '../components/ui/Button'
 import { BotAvatar } from '../features/copilot/BotAvatar'
 import { useCopilotReadOnly } from '../features/copilot/commandAccess'
 import { useCopilotHandoffs } from '../features/copilot/handoffs'
+import { useDecisionRequests } from '../features/copilot/decisionRequests'
 import { resolveBot, useCopilotBots, type CopilotBot } from '../features/copilot/bots/registry'
 import { botHref } from '../features/copilot/bots/workbenches'
 import { deliveryLabel, deliveryState } from '../features/copilot/taskPresentation'
@@ -46,6 +47,10 @@ function DecisionInbox() {
   const drafts = useQuery({ queryKey: ['cluster-drafts', projectId], queryFn: () => listClusterDrafts(projectId), enabled: Boolean(projectId) })
   const claims = useQuery({ queryKey: ['literature-claims', projectId, 'pending_review'], queryFn: () => listLiteratureClaims(projectId, 'pending_review'), enabled: Boolean(projectId) })
   const handoffs = useCopilotHandoffs(projectId || null)
+  // The only source here that is a question rather than an inference. The other
+  // five report a state a person may want to act on; this one is an operator
+  // saying it cannot proceed without a call that is not its to make.
+  const questions = useDecisionRequests(projectId || null, 'open')
   const roster = bots.data ?? []
   const project = encodeURIComponent(projectId)
 
@@ -57,8 +62,9 @@ function DecisionInbox() {
   const pendingDrafts = (drafts.data?.items ?? []).filter((draft) => draft.status === 'draft')
   const pendingClaims = claims.data?.items.length ?? 0
   const unsupported = (handoffs.data ?? []).filter((handoff) => (handoff.claims ?? []).some((claim) => claim.confidence === 'unsupported'))
-  const loaded = runs.isSuccess && drafts.isSuccess && claims.isSuccess && handoffs.isSuccess
-  const total = needInput.length + toReview.length + pendingDrafts.length + pendingClaims + unsupported.length
+  const loaded = runs.isSuccess && drafts.isSuccess && claims.isSuccess && handoffs.isSuccess && questions.isSuccess
+  const openQuestions = questions.data ?? []
+  const total = openQuestions.length + needInput.length + toReview.length + pendingDrafts.length + pendingClaims + unsupported.length
   const taskHref = (run: AgentRun) => {
     const owner = resolveBot(run.bot, roster)
     return owner ? `${botHref(owner.id, projectId)}&run=${encodeURIComponent(run.id)}` : `/bots?project=${project}&view=tasks&run=${encodeURIComponent(run.id)}`
@@ -85,6 +91,17 @@ function DecisionInbox() {
           {readOnly ? (zh ? ' 当前为只读模式，可以查看，确认需要研究员权限。' : ' You are in read-only mode: you can inspect these, but settling them needs researcher access.') : null}</p>
         {loaded && total === 0 ? <p role="status" className="inbox-clear">{zh ? '目前没有需要你决定的事项。' : 'Nothing needs your decision right now.'}</p> : null}
         <div className="inbox-grid">
+          <InboxSection label={zh ? 'Bot 在等你的判断' : 'A Bot is waiting on your call'} count={questions.isSuccess ? openQuestions.length : null} query={questions}
+            empty={zh ? '没有等待你判断的问题。' : 'No operator is waiting on a decision.'}>
+            {openQuestions.map((request) => {
+              const asked = resolveBot(request.asked_by, roster)
+              return <Link key={request.id} to={`/bots?project=${project}&view=room`} className="inbox-row">
+                <span className="inbox-row-main">{asked ? <BotAvatar id={asked.id} stance={asked.stance} /> : null}
+                  <span><small>{asked ? name(asked, zh) : request.asked_by} · {zh ? `${(request.options ?? []).length} 个选项` : `${(request.options ?? []).length} options`}</small>{request.question}</span></span>
+                <ArrowRightIcon aria-hidden="true" />
+              </Link>
+            })}
+          </InboxSection>
           <InboxSection label={zh ? '需要你补充信息' : 'Needs your input'} count={runs.isSuccess ? needInput.length : null} query={runs}
             empty={zh ? '没有等待补充信息的任务。' : 'No task is waiting for your input.'}>
             {needInput.map(taskRow)}

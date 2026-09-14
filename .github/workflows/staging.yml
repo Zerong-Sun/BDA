@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0064_public_integration
+            BDA_SCHEMA_REVISION=0066_copilot_decision_requests
           provenance: mode=max
           sbom: true
       - id: frontend

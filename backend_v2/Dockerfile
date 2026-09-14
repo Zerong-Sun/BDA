@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0064_public_integration
+ARG BDA_SCHEMA_REVISION=0066_copilot_decision_requests
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)

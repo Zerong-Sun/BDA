@@ -175,13 +175,14 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "id": "chain-messaging",
         "title": "Chain handover",
         "description": (
-            "Leave a structured handover for the next operator and read the ones "
-            "addressed to you. Copilot bookkeeping: it changes no research record, "
+            "Leave a structured handover for the next operator, read the ones "
+            "addressed to you, and ask the person to settle a choice you may not "
+            "settle yourself. Copilot bookkeeping: it changes no research record, "
             "which is why its write does not need the user to ask for it by name."
         ),
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["post_handoff", "read_handoffs"],
+        "chat_tools": ["post_handoff", "read_handoffs", "request_decision"],
     },
     {
         "id": "chain-orchestration",

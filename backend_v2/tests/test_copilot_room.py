@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
-from backend_v2.app.copilot import handoffs, room
+from backend_v2.app.copilot import decisions, handoffs, room
 from backend_v2.app.copilot.models import (
     CopilotAgentRun,
     CopilotConversation,
@@ -296,3 +296,23 @@ def test_limit_is_bounded_by_the_module_and_not_by_the_caller(session: Session) 
     entries, _ = room.events(session, project_id=project.id, limit=10_000)
 
     assert len(entries) == 3
+
+
+def test_a_question_put_to_a_person_appears_as_its_own_kind(session: Session) -> None:
+    """A decision request is not a message: it carries options, not prose."""
+    project, user = _project(session)
+    decisions.record(
+        session,
+        project_id=project.id,
+        user_id=user.id,
+        asked_by="planner",
+        question="Which hotspot set should the binder target?",
+        options=[{"label": "The CC' loop"}, {"label": "I126/L128/A132"}],
+    )
+
+    entry = room.events(session, project_id=project.id)[0][0]
+
+    assert entry["kind"] == "decision"
+    assert entry["bot"] == "planner"
+    assert [option["key"] for option in entry["decision"]["options"]] == ["a", "b"]
+    assert entry["decision"]["status"] == "open"

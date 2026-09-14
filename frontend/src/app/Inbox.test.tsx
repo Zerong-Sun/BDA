@@ -18,9 +18,15 @@ const run = (id: string, goal: string, botId: string | null, status: string, out
 })
 const claim = (confidence: string) => ({ statement: 's', evidence_ref: confidence === 'unsupported' ? '' : 'job:1', confidence })
 const handoff = (id: string, from: string, to: string, summary: string, confidence: string) => ({ id, project_id: 'project-inbox', from_bot: from, to_bot: to, summary, claims: [claim(confidence)], open_questions: [], refs: [], produced_by_run: null, created_at: '2026-09-14T00:00:00Z' })
+const question = (id: string, asked: string, text: string) => ({
+  id, project_id: 'project-inbox', run_id: null, asked_by: asked, question: text,
+  options: [{ key: 'a', label: 'A', rationale: '', evidence_refs: [] }, { key: 'b', label: 'B', rationale: '', evidence_refs: [] }],
+  recommended: null, status: 'open', answer: null, answer_note: null, answered_by: null,
+  answered_at: null, decision_entry_id: null, version: 1, created_at: '2026-09-14T00:00:00Z',
+})
 const draft = (id: string, name: string, status: string) => ({ id, project_id: 'project-inbox', name, backend: 'lsf', specification: {}, status, confirmed_job_id: null, version: 1, created_at: '2026-09-14T00:00:00Z', updated_at: '2026-09-14T00:00:00Z' })
 
-function handlers({ runs = [] as unknown[], drafts = [] as unknown[], claims = [] as unknown[], handoffs = [] as unknown[] } = {}) {
+function handlers({ runs = [] as unknown[], drafts = [] as unknown[], claims = [] as unknown[], handoffs = [] as unknown[], questions = [] as unknown[] } = {}) {
   server.use(
     http.get('/api/v2/copilot/bots', () => HttpResponse.json(roster)),
     http.get('/api/v2/copilot/projects/:projectId/agent-runs', () => HttpResponse.json({ items: runs, next_cursor: null })),
@@ -31,6 +37,12 @@ function handlers({ runs = [] as unknown[], drafts = [] as unknown[], claims = [
       return HttpResponse.json({ items: claims, next_cursor: null })
     }),
     http.get('/api/v2/copilot/projects/:projectId/handoffs', () => HttpResponse.json({ items: handoffs, next_cursor: null })),
+    http.get('/api/v2/copilot/projects/:projectId/decision-requests', ({ request }) => {
+      // Only open questions are waiting on a person; an answered one belongs to
+      // the record, and listing it here would never let the inbox reach zero.
+      expect(new URL(request.url).searchParams.get('status')).toBe('open')
+      return HttpResponse.json({ items: questions })
+    }),
   )
 }
 
@@ -50,6 +62,7 @@ describe('Decision inbox', () => {
       drafts: [draft('d1', 'AF3 MSA stage', 'draft'), draft('d2', 'Old submission', 'confirmed')],
       claims: [{ id: 'c1' }, { id: 'c2' }],
       handoffs: [handoff('h1', 'researcher', 'planner', 'Evidence for routing', 'unsupported'), handoff('h2', 'planner', 'runner', 'Draft ready', 'stated')],
+      questions: [question('q1', 'planner', 'Which hotspot set should the binder target?')],
     })
     renderWithProviders(<InboxPage />)
 
@@ -66,6 +79,12 @@ describe('Decision inbox', () => {
     expect(within(drafts).queryByText(/Old submission/)).not.toBeInTheDocument()
 
     expect(await within(screen.getByRole('region', { name: 'Literature claims to review' })).findByRole('link', { name: /2 extracted claims are waiting/ })).toHaveAttribute('href', '#/research?project=project-inbox&tab=evidence')
+
+    // The only source that is a question rather than an inference: it links to
+    // the room, because that is where the operator asked it.
+    const waiting = screen.getByRole('region', { name: 'A Bot is waiting on your call' })
+    expect(await within(waiting).findByRole('link', { name: /Which hotspot set/ })).toHaveAttribute('href', '#/bots?project=project-inbox&view=room')
+    expect(within(waiting).getByText(/2 options/)).toBeInTheDocument()
 
     const evidence = screen.getByRole('region', { name: 'Claims without evidence' })
     expect(await within(evidence).findByRole('link', { name: /Evidence for routing/ })).toHaveAttribute('href', '#/bots/planner?project=project-inbox')

@@ -1326,6 +1326,7 @@ function createStrictRoutes({ scenario, routeId }) {
   }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/room`, { limit: '100' }, () => ok({ items: [], next_cursor: null }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/decision-requests`, { status: 'open' }, () => ok({ items: [] }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/config`, {}, () => ok({
     project_id: PROJECT_ID,
     llm_provider_id: null,

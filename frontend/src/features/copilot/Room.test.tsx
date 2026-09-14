@@ -197,3 +197,81 @@ describe('Room addressing', () => {
     expect(screen.queryByRole('button', { name: 'Hand it to them' })).not.toBeInTheDocument()
   })
 })
+
+/**
+ * A question put to a person is the one entry the room can act on, so these
+ * assertions are about the substance a reader needs before acting: what each
+ * option costs, which one the operator would pick, and - the case that is easy
+ * to render away - an option offered with no reason at all.
+ */
+describe('Room decisions', () => {
+  const DECISION = {
+    id: 'd1', project_id: 'proj_test', run_id: null, asked_by: 'planner',
+    question: 'Which hotspot set should the binder target?',
+    options: [
+      { key: 'loop', label: "Target the CC' loop", rationale: 'Covers the native interface', evidence_refs: ['artifact:1'] },
+      { key: 'hot3', label: 'Target I126/L128/A132', rationale: '', evidence_refs: [] },
+    ],
+    recommended: 'loop', status: 'open', answer: null, answer_note: null,
+    answered_by: null, answered_at: null, decision_entry_id: null, version: 1,
+    created_at: '2026-09-14T08:20:00Z',
+  }
+
+  function decisionEntry(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: 'decision', id: 'd1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      decision: { ...DECISION, ...overrides },
+    }
+  }
+
+  it('shows each option with what it rests on, and says when one rests on nothing', async () => {
+    stub([decisionEntry()])
+    renderWithProviders(<Room />)
+
+    expect(await screen.findByText('Which hotspot set should the binder target?')).toBeInTheDocument()
+    expect(screen.getByText('Covers the native interface')).toBeInTheDocument()
+    expect(screen.getByText('No reason given')).toBeInTheDocument()
+    expect(screen.getByText('artifact:1')).toBeInTheDocument()
+    expect(screen.getByText('Suggested')).toBeInTheDocument()
+  })
+
+  it('sends the chosen option with the version it was read at', async () => {
+    stub([decisionEntry()])
+    let sent: { choice?: string; version?: string | null } = {}
+    server.use(
+      http.post('/api/v2/copilot/decision-requests/:id/answers', async ({ request }) => {
+        const body = (await request.json()) as { choice: string }
+        sent = { choice: body.choice, version: request.headers.get('If-Match') }
+        return HttpResponse.json({ ...DECISION, status: 'answered', answer: body.choice, version: 2 })
+      }),
+    )
+    renderWithProviders(<Room />)
+
+    fireEvent.click(await screen.findByRole('button', { name: "Choose: Target the CC' loop" }))
+
+    await vi.waitFor(() => expect(sent.choice).toBe('loop'))
+    expect(sent.version).toBe('W/"1"')
+  })
+
+  it('shows what was decided and offers no further choice once it is settled', async () => {
+    stub([decisionEntry({ status: 'answered', answer: 'hot3', version: 2 })])
+    renderWithProviders(<Room />)
+
+    expect(await screen.findByText('Decided: Target I126/L128/A132')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Choose:/ })).not.toBeInTheDocument()
+  })
+
+  it('explains a question settled by someone else rather than overwriting their call', async () => {
+    stub([decisionEntry()])
+    server.use(
+      http.post('/api/v2/copilot/decision-requests/:id/answers', () =>
+        HttpResponse.json({ detail: 'version_conflict' }, { status: 412 }),
+      ),
+    )
+    renderWithProviders(<Room />)
+
+    fireEvent.click(await screen.findByRole('button', { name: "Choose: Target the CC' loop" }))
+
+    expect(await screen.findByText(/settled by someone else/i)).toBeInTheDocument()
+  })
+})

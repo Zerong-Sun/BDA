@@ -18,6 +18,12 @@ A model asked to narrate the chain would produce something that reads better and
 is not the record; there is no code here that could emit such a line, which is
 the point.
 
+**A question stays where it was asked.** A decision request is one entry
+carrying its current state, like a task: it appears when the operator asked,
+and shows its answer once a person gave one. The decision inbox is where
+"still waiting on me" is answered, and duplicating that ordering here would
+give two surfaces two different ideas of what is outstanding.
+
 **One entry per task, not one per transition.** A run's status changes over its
 life, and emitting an event per change would need a history table that does not
 exist. The entry is the task, ordered by when it was started, carrying its
@@ -36,8 +42,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.pagination import decode_time_cursor, encode_time_cursor
+from .decisions import to_json_model as decision_to_json_model
 from .handoffs import to_json_model as handoff_to_json_model
-from .models import CopilotAgentRun, CopilotConversation, CopilotHandoff, CopilotMessage
+from .models import (
+    CopilotAgentRun,
+    CopilotConversation,
+    CopilotDecisionRequest,
+    CopilotHandoff,
+    CopilotMessage,
+)
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
@@ -137,6 +150,13 @@ def events(
         after,
     ).order_by(CopilotAgentRun.created_at.desc(), CopilotAgentRun.id.desc()).limit(size + 1)
 
+    decision_query = _keyset(
+        select(CopilotDecisionRequest).where(CopilotDecisionRequest.project_id == project_id),
+        CopilotDecisionRequest.created_at,
+        CopilotDecisionRequest.id,
+        after,
+    ).order_by(CopilotDecisionRequest.created_at.desc(), CopilotDecisionRequest.id.desc()).limit(size + 1)
+
     entries: list[dict[str, Any]] = []
     for message in session.scalars(message_query):
         entries.append(
@@ -156,6 +176,16 @@ def events(
                 "occurred_at": handoff.created_at,
                 "bot": handoff.from_bot,
                 "handoff": handoff_to_json_model(handoff),
+            }
+        )
+    for request in session.scalars(decision_query):
+        entries.append(
+            {
+                "kind": "decision",
+                "id": request.id,
+                "occurred_at": request.created_at,
+                "bot": request.asked_by,
+                "decision": decision_to_json_model(request),
             }
         )
     for run in session.scalars(run_query):

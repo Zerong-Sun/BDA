@@ -131,10 +131,17 @@ def test_the_only_writes_outside_the_intent_gate_are_copilot_bookkeeping() -> No
     that reads the user's words has nothing to protect. Pinning the membership
     here makes adding a second exemption a deliberate edit with this test in
     front of it, rather than a default a new spec falls into.
+
+    The second member was added with that edit. `request_decision` writes a
+    question for a person to answer: the row is copilot bookkeeping, no
+    research record moves, and the timeline entry is written later by
+    `decisions.answer`, which requires a `User` and is unreachable from any
+    tool. Asking somebody a question is also not an action taken on their
+    behalf, which is what the intent gate exists to stop.
     """
     exempt = REGISTRY.write_ids() - REGISTRY.user_intent_write_ids()
 
-    assert exempt == {"post_handoff"}
+    assert exempt == {"post_handoff", "request_decision"}
 
 
 def test_the_conservative_write_set_is_what_a_read_only_surface_gets() -> None:

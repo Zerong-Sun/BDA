@@ -465,9 +465,13 @@ def test_a_reviewer_holds_nothing_that_could_repair_what_it_finds(session: Sessi
         if bot.stance != "review":
             continue
         resolved = tools_for_capabilities(bots.capabilities_for_bot(bot.id, enabled))
-        # `post_handoff` is how a verdict is delivered, and changes no research
-        # record - see `registry.ToolSpec.intent`.
-        assert (resolved & writes) <= {"post_handoff"}, sorted(resolved & writes)
+        # Two, and the list is exhaustive on purpose. `post_handoff` is how a
+        # verdict is delivered; `request_decision` is how an operator puts a
+        # question to a person. Neither changes a research record - see
+        # `registry.ToolSpec.intent` - and neither is a repair: a reviewer that
+        # asks "which of these three?" has still not touched what it found, and
+        # a reviewer that could not ask could only ever rule.
+        assert (resolved & writes) <= {"post_handoff", "request_decision"}, sorted(resolved & writes)
 
 
 def test_a_director_holds_nothing_that_could_do_the_work(session: Session) -> None:
@@ -478,7 +482,10 @@ def test_a_director_holds_nothing_that_could_do_the_work(session: Session) -> No
         if bot.stance != "direct":
             continue
         resolved = tools_for_capabilities(bots.capabilities_for_bot(bot.id, enabled))
-        assert (resolved & writes) <= {"post_handoff"}, sorted(resolved & writes)
+        # Asking a person to decide is the director's job rather than a breach
+        # of it: escalation is the one thing a director may do that a producer
+        # cannot, and it still performs none of the work.
+        assert (resolved & writes) <= {"post_handoff", "request_decision"}, sorted(resolved & writes)
 
 
 # --- Resuming a delegated wait ----------------------------------------------

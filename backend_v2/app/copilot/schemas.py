@@ -172,6 +172,53 @@ class HandoffPage(BaseModel):
     items: list[HandoffResponse]
 
 
+class DecisionOption(BaseModel):
+    """One way forward, and what it rests on.
+
+    `rationale` may be empty and is not rejected when it is: an operator that
+    offers an option it cannot justify has said something the reader should
+    see, and dropping the option would hide the choice it actually made.
+    """
+
+    key: str
+    label: str
+    rationale: str = ""
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
+class DecisionRequestResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    #: The run that asked, when a durable task did. Answering does not resume
+    #: it: a question is not a scheduler.
+    run_id: uuid.UUID | None = None
+    asked_by: str
+    question: str
+    options: list[DecisionOption] = Field(default_factory=list)
+    recommended: str | None = None
+    status: str
+    answer: str | None = None
+    answer_note: str | None = None
+    answered_by: uuid.UUID | None = None
+    answered_at: datetime | None = None
+    #: The timeline entry the answer produced, attributed
+    #: `agent_proposed_human_confirmed`.
+    decision_entry_id: uuid.UUID | None = None
+    version: int
+    created_at: datetime
+
+
+class DecisionRequestPage(BaseModel):
+    items: list[DecisionRequestResponse]
+
+
+class DecisionAnswerCreate(BaseModel):
+    #: The key of the option chosen. Free text is not an answer here: the
+    #: options are what the operator undertook to act on.
+    choice: str = Field(min_length=1, max_length=80)
+    note: str = Field(default="", max_length=2000)
+
+
 class RoomTask(BaseModel):
     """A durable task as the room shows it: who owns it and where it stands."""
 
@@ -202,7 +249,7 @@ class RoomEvent(BaseModel):
     that an unsupported claim and a cited answer are the same kind of thing.
     """
 
-    kind: Literal["message", "handoff", "task"]
+    kind: Literal["message", "handoff", "task", "decision"]
     id: uuid.UUID
     occurred_at: datetime
     #: The operator this entry belongs to: the speaker, the sender of a
@@ -212,6 +259,7 @@ class RoomEvent(BaseModel):
     message: MessageResponse | None = None
     handoff: HandoffResponse | None = None
     task: RoomTask | None = None
+    decision: DecisionRequestResponse | None = None
 
 
 class RoomPage(BaseModel):

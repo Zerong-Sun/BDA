@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon } from '@phosphor-icons/react'
-import { useQueryClient } from '@tanstack/react-query'
-import type { RoomEvent } from '../../lib/api/generated'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { DecisionRequestResponse, RoomEvent } from '../../lib/api/generated'
+import { ApiError } from '../../lib/api/client'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
@@ -15,6 +16,7 @@ import { CopilotCitations } from './CopilotCitations'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { HandoffCard } from './CopilotChain'
 import { ownedService, parseMention } from './mentions'
+import { answerDecisionRequest, decisionRequestsQueryKey, withdrawDecisionRequest } from './decisionRequests'
 import { useCopilotReadOnly } from './commandAccess'
 import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { childTasksByParent, copilotRoomQueryKey, inReadingOrder, topLevelEntries, useCopilotRoom } from './roomFeed'
@@ -269,6 +271,10 @@ function RoomEntry({
     )
   }
 
+  if (entry.kind === 'decision' && entry.decision) {
+    return <DecisionCard decision={entry.decision} roster={roster} projectId={projectId} zh={zh} />
+  }
+
   if (entry.kind === 'task' && entry.task) {
     const task = entry.task
     const owner = resolveBot(task.bot, roster)
@@ -324,6 +330,133 @@ function RoomEntry({
           citations={(message.citations ?? []) as Array<Record<string, unknown>>}
           projectId={projectId}
         />
+      </div>
+    </article>
+  )
+}
+
+/**
+ * A question an operator may not settle itself.
+ *
+ * The options are the substance: each carries the reason the operator gave and
+ * the ids it rests on, and an option offered without a reason says so rather
+ * than looking like the others. That is the whole difference between asking a
+ * person to decide and asking them to approve.
+ *
+ * Answering writes a decision record attributed `agent_proposed_human_confirmed`
+ * - the server does that, not this card. A 412 here means somebody else settled
+ * it first, and the room reloads rather than overwriting their call.
+ */
+function DecisionCard({
+  decision,
+  roster,
+  projectId,
+  zh,
+}: {
+  decision: DecisionRequestResponse
+  roster: readonly CopilotBot[]
+  projectId: string
+  zh: boolean
+}) {
+  const queryClient = useQueryClient()
+  const readOnly = useCopilotReadOnly()
+  const [failed, setFailed] = useState<string | null>(null)
+  const settled = decision.status !== 'open'
+  // The generated types make every defaulted list optional; normalised here
+  // rather than at each use, as `CopilotChain` does for a handover's claims.
+  const options = decision.options ?? []
+  const chosen = options.find((option) => option.key === decision.answer)
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: copilotRoomQueryKey(projectId) })
+    void queryClient.invalidateQueries({ queryKey: decisionRequestsQueryKey(projectId, 'open') })
+    void queryClient.invalidateQueries({ queryKey: ['timeline', projectId] })
+  }
+  const explain = (error: unknown) => {
+    // 412 is not an overwrite prompt: somebody else settled this question, and
+    // the room reloads to show their call rather than replacing it. Detected on
+    // the status like every other mutation here, not by reading the message.
+    setFailed(
+      error instanceof ApiError && error.status === 412
+        ? zh ? '这个问题刚刚已被处理，请刷新后再看。' : 'This question was just settled by someone else; reload to see it.'
+        : zh ? '没能提交你的决定，请重试。' : 'Your decision could not be saved. Try again.',
+    )
+  }
+  const choose = useMutation({
+    mutationFn: (key: string) => answerDecisionRequest(decision.id, decision.version, key),
+    onSuccess: () => { setFailed(null); refresh() },
+    onError: explain,
+  })
+  const drop = useMutation({
+    mutationFn: () => withdrawDecisionRequest(decision.id, decision.version),
+    onSuccess: () => { setFailed(null); refresh() },
+    onError: explain,
+  })
+  const pending = choose.isPending || drop.isPending
+
+  return (
+    <article className="room-entry room-entry--decision">
+      <div className="room-entry-body">
+        <p className="room-entry-kind">
+          {zh ? '需要你决定' : 'Your decision'} · {speakerName(decision.asked_by, roster, zh)}
+        </p>
+        <p className="room-decision-question">{decision.question}</p>
+        <ul className="room-options">
+          {options.map((option) => (
+            <li key={option.key} className={option.key === decision.answer ? 'room-option room-option--chosen' : 'room-option'}>
+              <div className="min-w-0">
+                <p className="room-option-label">
+                  {option.label}
+                  {decision.recommended === option.key ? (
+                    <span className="room-option-tag">{zh ? '操作员建议' : 'Suggested'}</span>
+                  ) : null}
+                </p>
+                {option.rationale ? (
+                  <p className="room-option-reason">{option.rationale}</p>
+                ) : (
+                  <p className="room-option-reason room-option-reason--absent">
+                    {zh ? '没有给出理由' : 'No reason given'}
+                  </p>
+                )}
+                {(option.evidence_refs ?? []).length ? (
+                  <p className="room-option-refs">{(option.evidence_refs ?? []).join(' · ')}</p>
+                ) : null}
+              </div>
+              {!settled && !readOnly ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={`${zh ? '选择' : 'Choose'}: ${option.label}`}
+                  disabled={pending}
+                  onClick={() => choose.mutate(option.key)}
+                >
+                  {zh ? '选择' : 'Choose'}
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {settled ? (
+          <p className="room-decision-settled">
+            {decision.status === 'answered'
+              ? `${zh ? '已决定' : 'Decided'}: ${chosen?.label ?? decision.answer}`
+              : zh ? '这个问题已撤回。' : 'This question was withdrawn.'}
+          </p>
+        ) : readOnly ? (
+          <p className="room-decision-settled">
+            {zh ? '只读模式：决定需要研究员权限。' : 'Read-only mode: settling this needs researcher access.'}
+          </p>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => drop.mutate()}>
+            {zh ? '这个问题不用回答了' : 'No longer needs an answer'}
+          </Button>
+        )}
+        {failed ? (
+          <Alert variant="destructive" className="mt-2">
+            <AlertDescription>{failed}</AlertDescription>
+          </Alert>
+        ) : null}
       </div>
     </article>
   )

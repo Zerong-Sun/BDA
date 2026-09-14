@@ -19,7 +19,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, handoffs, mcp, room
+from . import agent_runs, decisions, handoffs, mcp, room
 from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
@@ -48,6 +48,9 @@ from .schemas import (
     CopilotConfigResponse,
     CopilotConfigTestResponse,
     CopilotConfigUpdate,
+    DecisionAnswerCreate,
+    DecisionRequestPage,
+    DecisionRequestResponse,
     HandoffPage,
     HandoffResponse,
     InterpretationCreate,
@@ -250,6 +253,90 @@ def list_handoffs(
         session, project_id=project_id, to_bot=to_bot, from_bot=from_bot, limit=limit
     )
     return HandoffPage(items=[HandoffResponse(**handoffs.to_json_model(row)) for row in rows])
+
+
+def _require_decision(session: Session, request_id: uuid.UUID, user: User):
+    """The question, checked against the caller's access to its project."""
+    row = decisions.require(session, request_id)
+    require_project(session, row.project_id, user)
+    return row
+
+
+@router.get("/projects/{project_id}/decision-requests", response_model=DecisionRequestPage)
+def list_decision_requests(
+    project_id: uuid.UUID,
+    status_filter: str | None = Query(default=None, alias="status", max_length=24),
+    limit: int = Query(default=decisions.DEFAULT_LIMIT, ge=1, le=decisions.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> DecisionRequestPage:
+    """The questions operators have put to a person in this project.
+
+    Answered ones are returned too, and by default: a question and its answer
+    are one record, and a list that dropped the answered half would make the
+    room's history disappear as soon as somebody acted on it.
+    """
+    require_project(session, project_id, user)
+    rows = decisions.requests(session, project_id=project_id, status=status_filter, limit=limit)
+    return DecisionRequestPage(
+        items=[DecisionRequestResponse(**decisions.to_json_model(row)) for row in rows]
+    )
+
+
+@router.post(
+    "/decision-requests/{request_id}/answers",
+    response_model=DecisionRequestResponse,
+    openapi_extra={"x-permission": "timeline.create"},
+)
+def answer_decision_request(
+    request_id: uuid.UUID,
+    payload: DecisionAnswerCreate,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionRequestResponse:
+    """Settle one question, which writes the decision record it produced.
+
+    `timeline.create` is the permission because that is what this does: the
+    answer is a decision entry attributed `agent_proposed_human_confirmed`, and
+    the permission should name the record being written rather than the surface
+    the click happened on.
+    """
+    row = _require_decision(session, request_id, user)
+    if parse_if_match(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the question before answering it.", status_code=412
+        )
+    project = require_project(session, row.project_id, user)
+    decisions.answer(
+        session, row, project=project, user=user, choice=payload.choice, note=payload.note
+    )
+    return DecisionRequestResponse(**decisions.to_json_model(row))
+
+
+@router.post(
+    "/decision-requests/{request_id}/withdrawals",
+    response_model=DecisionRequestResponse,
+    openapi_extra={"x-permission": "copilot.chat"},
+)
+def withdraw_decision_request(
+    request_id: uuid.UUID,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionRequestResponse:
+    """Close a question the work moved past, leaving it readable.
+
+    Not a delete, and not an answer: nothing is written to the record, which is
+    why this is a copilot command rather than a timeline write.
+    """
+    row = _require_decision(session, request_id, user)
+    if parse_if_match(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the question before withdrawing it.", status_code=412
+        )
+    decisions.withdraw(session, row)
+    return DecisionRequestResponse(**decisions.to_json_model(row))
 
 
 @router.get("/projects/{project_id}/room", response_model=RoomPage)

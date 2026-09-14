@@ -1601,3 +1601,84 @@ _register(ToolSpec(
     parameters={"type": "object", "properties": {"goal": {"type": "string", "minLength": 1, "maxLength": 5000}}, "required": ["goal"], "additionalProperties": False},
     capability="workflow-planning", execution_mode="read", requires="session", handler=_plan_workflow_route,
 ))
+
+
+def _request_decision(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import decisions
+
+    run = getattr(ctx, "agent_run", None)
+    row = decisions.record(
+        ctx.session,
+        project_id=_project_of(ctx),
+        user_id=_user_of(ctx),
+        asked_by=_bot_of(ctx),
+        question=_arg_str(args, "question"),
+        options=args.get("options"),
+        recommended=_arg_str(args, "recommended") or None,
+        run_id=getattr(run, "id", None),
+    )
+    return decisions.to_json(row)
+
+
+_DECISION_OPTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "key": {"type": "string", "maxLength": 80, "description": "Short id for this option; generated if omitted."},
+        "label": {"type": "string", "description": "The option, as the person will read it."},
+        "rationale": {
+            "type": "string",
+            "description": "Why this option, and what it costs. Recorded as absent when omitted.",
+        },
+        "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "maxItems": 20,
+            "description": "Ids this option rests on: an artifact, job, result, reference or goal.",
+        },
+    },
+    "required": ["label"],
+    "additionalProperties": False,
+}
+
+_register(
+    ToolSpec(
+        id="request_decision",
+        description=(
+            "Ask the person to settle one choice you may not settle yourself. "
+            "State the question, two to six options, and what each rests on. "
+            "Use it when the choice is irreversible or is a matter of value "
+            "rather than of method - spending cluster budget, putting material "
+            "on a bench, choosing which residues a design will target. Do not "
+            "use it for a question the record already answers, and do not use "
+            "it to ask permission for something you were already asked to do."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "options": {
+                    "type": "array",
+                    "items": _DECISION_OPTION_SCHEMA,
+                    "minItems": 2,
+                    "maxItems": 6,
+                },
+                "recommended": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "The key of the option you would pick, if you have one.",
+                },
+            },
+            "required": ["question", "options"],
+            "additionalProperties": False,
+        },
+        capability="chain-messaging",
+        execution_mode="draft",
+        requires="session",
+        # Copilot bookkeeping, like a handover: it changes no research record,
+        # and asking a person a question is not an action taken on their behalf.
+        intent="internal",
+        needs_operator=True,
+        audit=True,
+        handler=_request_decision,
+    )
+)

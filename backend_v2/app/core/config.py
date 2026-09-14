@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0064_public_integration"
+    schema_revision: str = "0066_copilot_decision_requests"
     worker_queues: str = ""
     required_worker_queues: str = ""
     scheduler_dispatch_paused: bool = False
