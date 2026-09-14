@@ -116,6 +116,23 @@ def _authorize_project_action(
     return project
 
 
+def project_access(session: Session, project_id: uuid.UUID, user: User) -> dict:
+    """The effective role and what it permits, computed as `_authorize_project_action` would.
+
+    Reading it requires read access, so a caller learns nothing about a project it
+    cannot see.
+    """
+    project = _require_project_access(session, project_id, user)
+    role = ProjectRepository(session).effective_project_role(project, user)
+    ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
+    rank = ranks[role] if role in ranks else -1
+    return {
+        "project_id": project.id,
+        "role": role or "none",
+        "permissions": {action: rank >= ranks[minimum] for action, minimum in PROJECT_PERMISSION_MINIMUMS.items()},
+    }
+
+
 def visible_project_ids(session: Session, user: User) -> list[uuid.UUID] | None:
     """Every project this user may read, or None for an administrator.
 

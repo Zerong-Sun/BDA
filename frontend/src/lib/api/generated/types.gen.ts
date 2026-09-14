@@ -5500,6 +5500,32 @@ export type PrimaryTargetUpdate = {
 };
 
 /**
+ * ProjectAccessResponse
+ *
+ * What the signed-in user may do in one project, so a client can narrow its UI.
+ *
+ * Derived from the same deny-first role the server authorizes every action with.
+ * The server still enforces each action; a client reading this can only hide a
+ * control it would otherwise show, never enable one the server would refuse.
+ */
+export type ProjectAccessResponse = {
+    /**
+     * Permissions
+     */
+    permissions: {
+        [key: string]: boolean;
+    };
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Role
+     */
+    role: string;
+};
+
+/**
  * ProjectCreate
  */
 export type ProjectCreate = {
@@ -49167,6 +49193,319 @@ export type PatchProjectApiV2ProjectsProjectIdPatchResponses = {
 };
 
 export type PatchProjectApiV2ProjectsProjectIdPatchResponse = PatchProjectApiV2ProjectsProjectIdPatchResponses[keyof PatchProjectApiV2ProjectsProjectIdPatchResponses];
+
+export type ProjectAccessApiV2ProjectsProjectIdAccessGetData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/api/v2/projects/{project_id}/access';
+};
+
+export type ProjectAccessApiV2ProjectsProjectIdAccessGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ProjectAccessApiV2ProjectsProjectIdAccessGetError = ProjectAccessApiV2ProjectsProjectIdAccessGetErrors[keyof ProjectAccessApiV2ProjectsProjectIdAccessGetErrors];
+
+export type ProjectAccessApiV2ProjectsProjectIdAccessGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectAccessResponse;
+};
+
+export type ProjectAccessApiV2ProjectsProjectIdAccessGetResponse = ProjectAccessApiV2ProjectsProjectIdAccessGetResponses[keyof ProjectAccessApiV2ProjectsProjectIdAccessGetResponses];
 
 export type ListCampaignsApiV2ProjectsProjectIdCampaignsGetData = {
     body?: never;

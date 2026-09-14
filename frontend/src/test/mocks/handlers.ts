@@ -28,6 +28,7 @@ export const handlers = [
       }),
   ),
   http.get('/api/v2/copilot/bots', () => HttpResponse.json([])),
+  http.get('/api/v2/projects/:projectId/access', ({ params }) => HttpResponse.json({ project_id: params.projectId, role: 'owner', permissions: { read: true, write: true, compute: true } })),
   http.get('/api/v2/copilot/projects/:projectId/config', () =>
     HttpResponse.json({
         settings: {

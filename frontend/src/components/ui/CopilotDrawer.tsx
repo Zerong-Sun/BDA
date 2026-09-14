@@ -3,12 +3,14 @@ import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/reac
 import { CopilotChat } from '../../features/copilot/CopilotChat'
 import { CopilotActions } from '../../features/copilot/CopilotActions'
 import { CopilotChain } from '../../features/copilot/CopilotChain'
-import { CopilotAgentRuns } from '../../features/copilot/CopilotAgentRuns'
 import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
 import { CopilotWorkspace } from '../../features/copilot/CopilotWorkspace'
 import { CopilotSettings } from '../../features/copilot/CopilotSettings'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
+import { managesProject, useProjectAccess } from '../../lib/hooks/useProjectAccess'
+import { currentRole } from '../../features/research/jsonHelpers'
+import { resolveBot, useCopilotBots } from '../../features/copilot/bots/registry'
 import { useAppStore } from '../../lib/store/appStore'
 import { Button } from './Button'
 import { ScrollArea } from './scroll-area'
@@ -31,6 +33,10 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   const { projectId } = useProjectContext()
   const setCopilotSessionBot = useAppStore((s) => s.setCopilotSessionBot)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Model configuration is a project manager's decision, as on the Research team page.
+  const access = useProjectAccess(projectId)
+  const canConfigure = managesProject(access.data) || currentRole() === 'admin'
+  const bots = useCopilotBots()
   // Chat, the chain record, runs and MCP grants are alternatives rather than
   // companions: a transcript and a conversation both want the whole drawer, and
   // showing them at once would leave neither readable. MCP sits here rather than
@@ -42,7 +48,10 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
   // buttons: arrow keys did not move between them, and four of them beside a
   // title and a close button wrapped in a 300px drawer. `Tabs` is already in the
   // repo and says the right thing to a screen reader without being told.
-  const [surface, setSurface] = useState<'tasks' | 'chat' | 'chain' | 'runs' | 'mcp'>('tasks')
+  //
+  // Named as on the Research team page. The separate run list is gone: every task
+  // is already listed, under its owner, in Tasks & deliverables.
+  const [surface, setSurface] = useState<'tasks' | 'chat' | 'chain' | 'mcp'>('tasks')
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -94,15 +103,17 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
         <SheetHeader className="flex-row items-center justify-between gap-2 border-b">
           <SheetTitle className="truncate text-sm">{t.copilot.drawer.toggleLabel}</SheetTitle>
           <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant={settingsOpen ? 'secondary' : 'ghost'}
-              size="sm"
-              aria-pressed={settingsOpen}
-              onClick={() => setSettingsOpen((value) => !value)}
-            >
-              {t.copilot.drawer.modelSettings}
-            </Button>
+            {canConfigure ? (
+              <Button
+                type="button"
+                variant={settingsOpen ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={settingsOpen}
+                onClick={() => setSettingsOpen((value) => !value)}
+              >
+                {t.copilot.drawer.modelSettings}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -123,14 +134,13 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           className="shrink-0 border-b px-2 pb-1"
         >
           <TabsList variant="line" className="w-full justify-start gap-0.5 overflow-x-auto">
-            <TabsTrigger value="tasks">{language === 'zh' ? '任务' : 'Tasks'}</TabsTrigger>
-            <TabsTrigger value="chat">{t.copilot.drawer.tabChat}</TabsTrigger>
-            <TabsTrigger value="chain">{t.copilot.chain.toggle}</TabsTrigger>
-            <TabsTrigger value="runs">{t.copilot.agentRuns.toggle}</TabsTrigger>
-            <TabsTrigger value="mcp">{t.copilot.mcp.toggle}</TabsTrigger>
+            <TabsTrigger value="tasks">{language === 'zh' ? '任务与交付' : 'Tasks & deliverables'}</TabsTrigger>
+            <TabsTrigger value="chat">{language === 'zh' ? '对话' : 'Conversation'}</TabsTrigger>
+            <TabsTrigger value="chain">{language === 'zh' ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
+            <TabsTrigger value="mcp">{language === 'zh' ? '外部接入' : 'External access'}</TabsTrigger>
           </TabsList>
         </Tabs>
-        {settingsOpen ? (
+        {settingsOpen && canConfigure ? (
           <ScrollArea className="h-[40%] shrink-0 border-b">
             <CopilotSettings />
           </ScrollArea>
@@ -141,10 +151,6 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           <ScrollArea className="min-h-0 flex-1">
             <CopilotMcpSessions />
           </ScrollArea>
-        ) : surface === 'runs' ? (
-          <ScrollArea className="min-h-0 flex-1">
-            <CopilotAgentRuns />
-          </ScrollArea>
         ) : surface === 'chain' ? (
           <ScrollArea className="min-h-0 flex-1">
             {/* Naming the successor moves the reader to it. Reading what was
@@ -152,7 +158,8 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
                 dropdown is the handoff protocol working on paper only. */}
             <CopilotChain
               onSelectOperator={(botId) => {
-                if (projectId) setCopilotSessionBot(projectId, botId)
+                // A handover recorded under a retired id names the operator that absorbed it.
+                if (projectId) setCopilotSessionBot(projectId, resolveBot(botId, bots.data ?? [])?.id ?? botId)
                 setSurface('chat')
               }}
             />

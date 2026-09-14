@@ -26,7 +26,7 @@ export function BotRoster({ projectId, activeBotId = null, autoActive = false, o
   const stanceLabel: Record<string, string> = { direct: zh ? '协调' : 'Coordinate', produce: zh ? '研究与产出' : 'Research & produce', review: zh ? '审阅' : 'Review' }
 
   return <aside className="bot-roster" aria-label={zh ? '研究 Bot 名录' : 'Research Bot roster'}>
-    <h2>{zh ? '研究团队' : 'Research team'}</h2>
+    <h2>{zh ? '团队成员' : 'Team members'}</h2>
     <p className="mb-4 text-xs text-text-muted">{zh ? '打开一个职责，查看它负责什么、手上有什么。' : 'Open a responsibility to see what it owns and holds.'}</p>
     <div className="bot-roster-scroll">
       <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={autoActive} onClick={onAuto}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '自动匹配' : 'Auto-match'}</strong><small>{zh ? '根据问题选择 Bot' : 'Match the question to a Bot'}</small></span></Button>

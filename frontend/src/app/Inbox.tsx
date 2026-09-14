@@ -34,6 +34,7 @@ export function InboxPage() {
 const INPUT_STATES = new Set(['needs_input', 'blocked'])
 const REVIEW_STATES = new Set(['completed', 'partial', 'review_required'])
 const REVIEW_LIMIT = 8
+const BACKEND_LABELS: Record<string, [string, string]> = { lsf: ['LSF cluster', 'LSF 集群'], docker: ['Docker', 'Docker'] }
 
 function DecisionInbox() {
   const { language } = useI18n()
@@ -51,7 +52,8 @@ function DecisionInbox() {
   // Only top-level tasks a person started; a delegated child reports through its parent.
   const settled = (runs.data ?? []).filter((run) => !run.parent_run_id && !isLive(run))
   const needInput = settled.filter((run) => INPUT_STATES.has(deliveryState(run)))
-  const toReview = settled.filter((run) => REVIEW_STATES.has(deliveryState(run))).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  // Saving a delivery as a decision record moves its review to the record; it is no longer waiting here.
+  const toReview = settled.filter((run) => REVIEW_STATES.has(deliveryState(run)) && !(run.outcome as Record<string, unknown> | undefined)?.decision_record_id).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   const pendingDrafts = (drafts.data?.items ?? []).filter((draft) => draft.status === 'draft')
   const pendingClaims = claims.data?.items.length ?? 0
   const unsupported = (handoffs.data ?? []).filter((handoff) => (handoff.claims ?? []).some((claim) => claim.confidence === 'unsupported'))
@@ -96,7 +98,7 @@ function DecisionInbox() {
             empty={zh ? '没有等待确认的计算草稿。' : 'No compute draft is waiting for confirmation.'}
             footer={pendingDrafts.length ? <span>{zh ? '确认会占用集群资源；确认前可请 Auditor 核对资源声明。' : 'Confirming spends cluster resources; ask Auditor to check the declared resources first.'}</span> : null}>
             {pendingDrafts.map((draft) => <Link key={draft.id} to={`/workflow?project=${project}`} className="inbox-row">
-              <span className="inbox-row-main"><span><small>{draft.backend}</small>{draft.name}</span></span><ArrowRightIcon aria-hidden="true" />
+              <span className="inbox-row-main"><span><small>{BACKEND_LABELS[draft.backend]?.[zh ? 1 : 0] ?? draft.backend}</small>{draft.name}</span></span><ArrowRightIcon aria-hidden="true" />
             </Link>)}
           </InboxSection>
           <InboxSection label={zh ? '文献断言待审核' : 'Literature claims to review'} count={claims.isSuccess ? pendingClaims : null} query={claims}

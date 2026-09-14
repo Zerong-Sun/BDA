@@ -275,7 +275,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
                 </div>
                 <div className="project-row-actions">
                   <Button type="button" render={<Link to={`/research${query}&tab=goals`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
-                  <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '与 Bot 协作' : 'Work with Bots'}</Button>
+                  <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
                   <Disclosure className="project-row-menu" title={language === 'zh' ? '更多操作' : 'More actions'}><div>
                     <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>{t.projectLibrary.manage}</Button>
                     <Button type="button" variant="ghost" size="sm" disabled={isDeleting || projectDelete.isPending} onClick={() => projectDelete.confirmAndDeleteProject(project)}>

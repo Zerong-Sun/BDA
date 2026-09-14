@@ -83,7 +83,7 @@ export function ResearchPage() {
           ) : null}
           {projectId ? (
             <div className="science-route-links">
-            <Button type="button" render={<Link to={`/bots?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '进入 Bot 工作区' : 'Open Bot workspace'}</Button>
+            <Button type="button" render={<Link to={`/bots?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
             <Button
               type="button"
               variant="outline"
@@ -95,7 +95,7 @@ export function ResearchPage() {
               }}
             >
               <ChatCircleIcon aria-hidden="true" />
-              {t.copilot.drawer.toggleLabel}: {tabConfig[tab].label}
+              {language === 'zh' ? `就「${tabConfig[tab].label}」提问` : `Ask about ${tabConfig[tab].label}`}
             </Button>
             </div>
           ) : null}

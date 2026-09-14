@@ -21,6 +21,9 @@ interface CopilotActionsProps {
   onNavigate?: () => void
 }
 
+// A stable reference, so re-renders do not read as a changed Accordion default.
+const QUICK_ACTIONS_OPEN = ['quick-actions']
+
 export function CopilotActions({ onNavigate }: CopilotActionsProps) {
   const { t, format, language } = useI18n()
   const navigate = useNavigate()
@@ -71,7 +74,7 @@ export function CopilotActions({ onNavigate }: CopilotActionsProps) {
   })
 
   return (
-    <Accordion className="border-b" defaultValue={['quick-actions']}>
+    <Accordion className="border-b" defaultValue={QUICK_ACTIONS_OPEN}>
       <AccordionItem value="quick-actions" className="border-0">
         <AccordionTrigger className="px-3 py-2 uppercase tracking-wide text-primary">
           {t.copilot.actions.quickActions}

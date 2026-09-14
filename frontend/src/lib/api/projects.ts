@@ -20,6 +20,7 @@ import {
   postProjectApiV2ProjectsPost,
   postProjectPromptDraftApiV2ProjectsPromptDraftsPost,
   postTargetApiV2ProjectsProjectIdTargetsPost,
+  projectAccessApiV2ProjectsProjectIdAccessGet,
   prepareStructureApiV2TargetsTargetIdStructureRevisionsPost,
   projectOverviewApiV2ProjectsProjectIdOverviewGet,
   projectResearchSummaryApiV2ProjectsProjectIdResearchSummaryGet,
@@ -27,7 +28,7 @@ import {
   reviewStructureApiV2TargetStructureRevisionsRevisionIdReviewPost,
   targetReadinessApiV2ProjectsProjectIdTargetReadinessGet,
 } from './generated/sdk.gen'
-import type { ProjectLibraryPage, ProjectPage } from './generated/types.gen'
+import type { ProjectAccessResponse, ProjectLibraryPage, ProjectPage } from './generated/types.gen'
 import {
   CandidateFunnelSchema,
   DeliveryPackageSchema,
@@ -402,3 +403,11 @@ export async function getCurrentWorkflowRunOrNull(projectId: string): Promise<Wo
 }
 
 export type { CandidateFunnel, DeliveryPackageData, ResultsSummary, Project, ProjectOverview, ProjectResearchSummary, ProjectTargetStructure, TargetReadiness, TargetStructureRevision }
+
+export type ProjectAccess = ProjectAccessResponse
+
+/** The caller's effective role in a project and what it permits; the server still authorizes each action. */
+export async function getProjectAccess(projectId: string): Promise<ProjectAccess> {
+  const { data } = await projectAccessApiV2ProjectsProjectIdAccessGet<true>({ path: { project_id: projectId }, throwOnError: true })
+  return data
+}
