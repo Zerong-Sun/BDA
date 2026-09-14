@@ -204,3 +204,29 @@ asks **who should own this**:
 Operators without a recipe (Scout, Structuralist, Medic, Archivist, Conductor,
 Steward, Auditor) keep working through conversation, handoffs and delegation.
 Per-bot pages, a decision inbox and role-based navigation are later steps.
+
+## Iteration 4 — a responsibility page per Bot
+
+Branch: `claude/bot-role-pages`, stacked on iteration 3.
+
+Choosing someone in the roster used to change the conversation's scope and
+nothing else, so the roster read as a setting. Each operator now has a page at
+`/bots/:botId?project=…`:
+
+- **Mandate and refusals** — the charter the operator works under.
+- **Guided tasks** — the recipe it owns and an *Assign a task* action that only
+  prepares the composer with this owner (plan, writes and budget are still
+  reviewed there). Operators without a recipe offer a scoped conversation.
+- **Tasks it holds** — runs whose `bot` is this operator, delegated child runs
+  marked, each opening inline at a durable `run=` URL.
+- **Handoffs** — records received and sent, using the Chain view's cards.
+- **Works with** — hands off to, reviewed by, reviews and directs, each linking to
+  that operator's page; **Workbenches** link to the pages its work lives on
+  (`features/copilot/bots/workbenches.ts`, the one frontend-owned mapping).
+- **Conversation** — the chat, scoped to this operator on entry.
+
+The roster is shared by the overview and every Bot page; named operators are
+links (`aria-current="page"`), Auto-match stays an action. The overview keeps
+Tasks, auto-match Conversation and Handoffs; a Bot-scoped chat there links to its
+page or switches back to auto-match. Owner headings in the task list link to the
+owner's page. No backend or API change.

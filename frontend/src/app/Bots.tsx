@@ -1,4 +1,4 @@
-import { useSearchParams, Link } from 'react-router'
+import { useNavigate, useSearchParams, Link } from 'react-router'
 import { ArrowRightIcon, GearIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
@@ -12,7 +12,9 @@ import { CopilotWorkspace } from '../features/copilot/CopilotWorkspace'
 import { CopilotChat } from '../features/copilot/CopilotChat'
 import { CopilotChain } from '../features/copilot/CopilotChain'
 import { CopilotSettings } from '../features/copilot/CopilotSettings'
-import { byStance, successorsOf, useCopilotBots } from '../features/copilot/bots/registry'
+import { useCopilotBots } from '../features/copilot/bots/registry'
+import { botHref } from '../features/copilot/bots/workbenches'
+import { BotRoster } from '../features/copilot/BotRoster'
 import { BotAvatar } from '../features/copilot/BotAvatar'
 import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
 
@@ -26,6 +28,7 @@ function BotProjectWorkspace() {
   const zh = language === 'zh'
   const { activeProject, projectId, projectsLoading, projectsError, projectsQueryError, refetchProjects } = useProjectContext()
   const [search, setSearch] = useSearchParams()
+  const navigate = useNavigate()
   const [settings, setSettings] = useState(false)
   const bots = useCopilotBots()
   const selectedEntities = useAppStore((s) => s.copilotSelectedEntityIds)
@@ -57,20 +60,7 @@ function BotProjectWorkspace() {
       {!activeProject ? <div className="science-empty"><BotAvatar id="director" stance="direct" /><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><p>{zh ? '任务、证据和对话会保存在同一个项目里。' : 'Tasks, evidence and conversations stay together in the same project.'}</p><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>
         {settings ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
         <div className="bot-workspace-grid">
-          <aside className="bot-roster" aria-label={zh ? '研究 Bot 名录' : 'Research Bot roster'}>
-            <h2>{zh ? '研究伙伴' : 'Research team'}</h2>
-            <p className="mb-4 text-xs text-text-muted">{zh ? '选择职责，开始对话。' : 'Choose a responsibility to start a conversation.'}</p>
-            <div className="bot-roster-scroll">
-            <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={view === 'chat' && !selectedId} onClick={() => selectBot(null)}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '自动匹配' : 'Auto-match'}</strong><small>{zh ? '根据问题选择 Bot' : 'Match the question to a Bot'}</small></span></Button>
-            <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>
-              {byStance(bots.data ?? []).map((group) => <div className="bot-roster-group" key={group.stance}>
-                <p className="bot-stance">{({ direct: zh ? '协调' : 'Coordinate', produce: zh ? '研究与产出' : 'Research & produce', review: zh ? '审阅' : 'Review' })[group.stance]}</p>
-                {group.bots.map((bot) => <Button variant="ghost" type="button" className="bot-roster-item" key={bot.id} aria-label={name(bot)} title={bot.summary} aria-pressed={view === 'chat' && selectedId === bot.id} onClick={() => selectBot(bot.id)}><BotAvatar id={bot.id} stance={bot.stance} /><span><strong>{name(bot)}</strong></span></Button>)}
-              </div>)}
-              {bots.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '暂无可用 Bot。可在模型设置中检查配置。' : 'No Bots available. Check model settings.'}</p> : null}
-            </ApiState>
-            </div>
-          </aside>
+          <BotRoster projectId={projectId} autoActive={view === 'chat' && !selectedId} onAuto={() => selectBot(null)} />
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
               <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? 'Bot 工作区视图' : 'Bot workspace views'}>
@@ -81,11 +71,11 @@ function BotProjectWorkspace() {
               <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} /></TabsContent>
               <TabsContent value="chat">
                 {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{selected.summary}</p>
-                  {successorsOf(selected, bots.data ?? []).length ? <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>{zh ? '可交接给' : 'Can hand off to'}</span>{successorsOf(selected, bots.data ?? []).map((bot) => <Button type="button" size="sm" variant="link" key={bot.id} onClick={() => selectBot(bot.id)}>{name(bot)}<ArrowRightIcon /></Button>)}</div> : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><Button type="button" size="sm" variant="outline" render={<Link to={botHref(selected.id, projectId)} />}>{zh ? '查看职责页' : 'Open responsibility page'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setBot(projectId, null)}>{zh ? '改为自动匹配' : 'Switch to auto-match'}</Button></div>
                 </div></div> : null}
                 <div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div>
               </TabsContent>
-              <TabsContent value="handoffs"><CopilotChain onSelectOperator={selectBot} /></TabsContent>
+              <TabsContent value="handoffs"><CopilotChain onSelectOperator={(id) => navigate(botHref(id, projectId))} /></TabsContent>
             </Tabs>
           </div>
           <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />

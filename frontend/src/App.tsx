@@ -50,6 +50,7 @@ const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: modu
 const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
 const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
 const BotsPage = lazy(() => import('./app/Bots').then((module) => ({ default: module.BotsPage })))
+const BotDetailPage = lazy(() => import('./app/BotDetail').then((module) => ({ default: module.BotDetailPage })))
 
 function RouteFallback() {
   return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
@@ -175,6 +176,7 @@ export default function App() {
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
                 <Route path="/bots" element={<BotsPage />} />
+                <Route path="/bots/:botId" element={<BotDetailPage />} />
                 {/* The page was always labelled "Projects"; only the URL said
                     otherwise. Kept as a redirect so existing links and
                     bookmarks still land, rather than 404ing on a rename. */}
