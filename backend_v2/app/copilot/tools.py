@@ -2061,3 +2061,83 @@ _register(
         handler=_analyse_sequence,
     )
 )
+
+
+def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..candidates.service import triage_candidate
+    from ..projects.models import Project
+    from .route_catalog import declared_tiers, route_by_id
+
+    route_id = _arg_str(args, "route_id")
+    route = route_by_id(route_id)
+    if route is None:
+        raise ValueError("route_not_found")
+    tiers = declared_tiers(route)
+    if not tiers:
+        # A route that sets no bar cannot be one a design "passes". Saying so
+        # is the answer; returning an empty verdict would read as a clean pass.
+        raise ValueError(f"route_declares_no_acceptance_tiers:{route_id}")
+
+    raw_ids = args.get("candidate_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        raise ValueError("candidate_ids_required")
+    if len(raw_ids) > 25:
+        # A tool result a person has to read; a hundred verdicts is a file, not
+        # an answer.
+        raise ValueError("too_many_candidates_at_once")
+
+    project = ctx.session.get(Project, _project_of(ctx))
+    if project is None:
+        raise ValueError("project_not_found")
+    verdicts = [
+        triage_candidate(ctx.session, project, uuid.UUID(str(identifier)), tiers)
+        for identifier in raw_ids
+    ]
+    return {
+        "route_id": route_id,
+        "route_label": route.label,
+        "tiers": tiers,
+        "tier_order": list(tiers),
+        "verdicts": verdicts,
+        "reading_note": (
+            "A criterion is pass, fail or missing. Missing means nothing has "
+            "measured it - not that the design failed - so a design with "
+            "missing criteria has not been rejected by this route."
+        ),
+    }
+
+
+_register(
+    ToolSpec(
+        id="triage_candidates",
+        description=(
+            "Judge named candidates against a design route's declared "
+            "acceptance tiers and say, per criterion, whether the recorded "
+            "metrics pass, fail, or were never measured. The thresholds are "
+            "the route's own; this applies them rather than inventing any. "
+            "A missing measurement is reported as missing and blocks a tier "
+            "without condemning the design. Up to 25 candidates per call."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "route_id": {
+                    "type": "string",
+                    "description": "A route from plan_workflow_route, e.g. de-novo-binder-pooled.",
+                },
+                "candidate_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 25,
+                },
+            },
+            "required": ["route_id", "candidate_ids"],
+            "additionalProperties": False,
+        },
+        capability="result-interpretation",
+        execution_mode="read",
+        requires="session",
+        handler=_triage_candidates,
+    )
+)

@@ -291,6 +291,35 @@ def recommended_parameters(
     return parameters, dropped
 
 
+def route_by_id(route_id: str) -> DesignRoute | None:
+    """One route by its id, or None.
+
+    The catalogue was only ever read as a list to choose from. Triage needs the
+    opposite direction - a route was chosen, what did it promise to accept? -
+    and looking that up by scanning the tuple at each call site would put the
+    same loop in three places.
+    """
+    return next((route for route in ROUTE_CATALOG if route.route_id == route_id), None)
+
+
+def declared_tiers(route: DesignRoute) -> dict[str, dict[str, str]]:
+    """The acceptance tiers this route declares, best first, or nothing.
+
+    Only some routes declare tiers: structure acquisition constrains an
+    ensemble size, not a binder's quality. Returning an empty mapping rather
+    than inventing defaults keeps "this route sets no bar" distinguishable from
+    "this design cleared the bar", which is exactly the distinction a triage
+    must not blur.
+    """
+    tiers = {
+        name: value
+        for name, value in (route.constraints or {}).items()
+        if name.startswith("tier_") and isinstance(value, dict)
+    }
+    # Best first: tier_b is the stricter of the two in this catalogue.
+    return dict(sorted(tiers.items(), reverse=True))
+
+
 def routes_for(*, has_structure: bool) -> tuple[DesignRoute, ...]:
     """Routes worth proposing, most recommended first.
 

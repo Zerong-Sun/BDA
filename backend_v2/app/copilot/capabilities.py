@@ -51,7 +51,11 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Interpret recorded candidate and experiment results without changing them",
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_project_candidates", "list_experiment_results"],
+        "chat_tools": [
+            "list_project_candidates",
+            "list_experiment_results",
+            "triage_candidates",
+        ],
     },
     {
         "id": "structure-analysis",
