@@ -481,6 +481,7 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "agent-orchestration",
         "structure-analysis",
         "structure-interaction",
+        "sequence-analysis",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -1215,6 +1216,9 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
         # No other bot holds this: a reviewer that could propose a hotspot set
         # would be repairing what it reviewed.
         "structure-interaction",
+        # Reading a sequence for liabilities is the same operator's work as
+        # reading a structure for residues: both answer "is this worth making".
+        "sequence-analysis",
         "workflow-planning",
         "compute-drafting",
         "chain-messaging",

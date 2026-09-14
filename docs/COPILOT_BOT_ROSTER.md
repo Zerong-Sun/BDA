@@ -518,3 +518,27 @@ operator 都能用，包括 conductor 与 auditor：**问一个问题既不是�
 判据沿用 `autopilot/gates.py` 已有的两条——是否不可逆、是价值问题还是经验问题——不另造分类。
 回答由人通过 `POST /copilot/decision-requests/{id}/answers` 写入，并落成一条
 `decided_by=agent_proposed_human_confirmed` 的 timeline 记录，记录里写明**未被选中的分支**。
+
+## `sequence-analysis` — 下单之前先看这条序列会不会坑你
+
+平台一直能算分子量与消光系数（浓度测量需要它们），但没有任何东西回答"这个构建体值不值得做"。
+一个带游离半胱氨酸、界面上压着 N-糖基化位点、或者有九残基疏水斑块的设计，
+会在台面上耗掉一个月——而仓库里搜不到 `pI`、liability、codon 任何一个词。
+
+单个只读工具 `analyse_sequence`，接受 `candidate_id` / `target_id` / `protein_id` **三选一**
+（候选物的序列就在 `properties["sequence"]`，与 `wetlab.service` 推上台面时读的是同一个键）。
+**工具不接受直接粘贴的序列**：`test_sequences_are_unreachable_through_any_tool` 禁止任何工具带
+`sequence` 参数，而理由比参数表更硬——工具调用的参数会被写进对话记录
+（`copilot_messages.tool_calls`、`copilot_agent_turns`），接受残基等于在那里留下第二份明文。
+服务层仍保留 `sequence=` 入口，供已经持有文本的调用方使用。
+
+- **位点**：N-X-S/T 糖基化（排除 N-P-X）、NG/NS 脱酰胺、D-G/S/T 异构化、Asp-Pro 断裂、
+  M/W 氧化、半胱氨酸配对（奇数即有游离）、RGD、Q/N 低复杂度段、疏水斑块（窗口与阈值随结果一起返回）；
+- **性质**：pI、pH 7.4 与 6.0 下的净电荷、GRAVY、芳香性、不稳定指数、分子量与消光系数
+  （后两者直接调用 `wetlab/kernels/calculators.py`，不另写一份）。
+
+两条纪律写进了代码而不是注释：位点一律 **1-based 闭区间**，因为这些数字会被直接抄进引物；
+以及**结果里永远没有序列本身**——`wetlab.models.Protein` 明写它的 `sequence` 是唯一的明文副本、
+API 只对外给 sha256，一个把明文回传给模型的工具会一行之内把这条约定作废。
+
+能力给 `planner`（它设计构建体）与 `analyst`（它解读结果），两者都是 produce，且这是只读能力。

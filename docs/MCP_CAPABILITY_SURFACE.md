@@ -20,7 +20,7 @@
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
 - **控制面丢失**：251 个 operation 中只有 121 个带 `x-permission`。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
-同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **44 个工具 / 19 个 capability**，按执行模式分为 read 30 / draft 11 / queue 3。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
+同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **45 个工具 / 20 个 capability**，按执行模式分为 read 31 / draft 11 / queue 3。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
 ## 2. 结论
 
@@ -49,7 +49,7 @@
 规则（本方案唯一的新增语义，且是减法）：
 
 - **MCP 会话必须绑定到一个已存在的 `copilot_agent_runs` 行。** `request_text = run.goal`，与 `agent_loop.py:179` 完全一致，不引入第三种意图来源。
-- **未绑定 run 的 MCP 会话只暴露 `execution_mode == "read"` 的 30 个工具**，`tools/list` 里根本不出现另外 14 个。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
+- **未绑定 run 的 MCP 会话只暴露 `execution_mode == "read"` 的 31 个工具**，`tools/list` 里根本不出现另外 14 个。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
 - `requires="session"` 的 5 个 draft 工具（`wetlab-authoring` 三个、`research-trace-authoring` 一个、`promote_candidate_to_bench`）**不经过 `actions` 服务，因而没有意图门**。在 MCP 上它们必须按 `execution_mode` 归入"需要 run 绑定"一档，否则会成为整条链上唯一没有用户授权的写路径。
 
 ### 3.2 身份与凭证
@@ -95,7 +95,7 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 
 | 会话形态 | `tools/list` 内容 | 授权依据 |
 | --- | --- | --- |
-| 只读会话（无 run 绑定） | 30 个 `read` 工具 ∩ `granted_capabilities` | 用户签发 + 项目成员资格 |
+| 只读会话（无 run 绑定） | 31 个 `read` 工具 ∩ `granted_capabilities` | 用户签发 + 项目成员资格 |
 | 绑定 run 的会话 | 上述 + 11 个 `draft` + 3 个 `queue`，仍 ∩ `granted_capabilities` | 追加 `run.goal` 的意图门 |
 
 `granted_capabilities` 取交集而非并集：`copilot_configs.enabled_skills` 是项目对 copilot 的授权上限，MCP 会话不得超过它。一个项目关掉了 `wetlab-authoring`，MCP 就拿不到它——不需要第二处开关。

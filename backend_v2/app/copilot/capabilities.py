@@ -87,6 +87,20 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ],
     },
     {
+        "id": "sequence-analysis",
+        "title": "Sequence analysis",
+        "description": (
+            "Read a designed or registered sequence at residue level: "
+            "glycosylation sequons, deamidation and isomerisation sites, "
+            "oxidation-prone and unpaired cysteines, hydrophobic patches, pI, "
+            "charge and extinction coefficient. Reports positions and numbers, "
+            "never a verdict, and never returns the sequence itself."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": ["analyse_sequence"],
+    },
+    {
         "id": "failure-diagnosis",
         "title": "Failure diagnosis",
         "description": (

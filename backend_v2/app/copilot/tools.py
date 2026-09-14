@@ -1914,3 +1914,61 @@ _register(
         handler=_request_residue_selection,
     )
 )
+
+
+def _analyse_sequence(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..sequences import service as sequences_service
+
+    def _uuid(field: str) -> uuid.UUID | None:
+        raw = _arg_str(args, field)
+        return uuid.UUID(raw) if raw else None
+
+    # Ids only. `test_sequences_are_unreachable_through_any_tool` forbids a
+    # `sequence` argument on any tool, and the reason is stronger than the
+    # parameter list: a tool call's arguments are persisted into the transcript
+    # (`copilot_messages.tool_calls`, `copilot_agent_turns`), so accepting
+    # residues here would write the second plaintext copy that
+    # `wetlab.models.Protein` exists to prevent. The service keeps its
+    # `sequence=` path for callers that already hold the text.
+    return sequences_service.analyse(
+        ctx.session,
+        _project_of(ctx),
+        candidate_id=_uuid("candidate_id"),
+        target_id=_uuid("target_id"),
+        protein_id=_uuid("protein_id"),
+        window=_arg_int(args, "patch_window", 9),
+        threshold=float(args.get("patch_threshold") or 1.5),
+    )
+
+
+_register(
+    ToolSpec(
+        id="analyse_sequence",
+        coerce_numeric_strings=True,
+        description=(
+            "What a sequence will do before anyone expresses it: glycosylation "
+            "sequons, deamidation and isomerisation sites, oxidation-prone "
+            "residues, unpaired cysteines, hydrophobic patches, pI, charge at "
+            "two pH values, molecular weight and extinction coefficient. Name "
+            "exactly one of candidate_id, target_id or protein_id - the "
+            "sequence is read from the record, never pasted in. Positions are "
+            "1-based. It reports measurements, not a verdict, and it does not "
+            "return the sequence: a construct's plaintext stays in the library."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "candidate_id": {"type": "string"},
+                "target_id": {"type": "string"},
+                "protein_id": {"type": "string"},
+                "patch_window": {"type": "integer", "minimum": 3, "maximum": 40, "default": 9},
+                "patch_threshold": {"type": "number", "minimum": 0, "maximum": 4.5, "default": 1.5},
+            },
+            "additionalProperties": False,
+        },
+        capability="sequence-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_analyse_sequence,
+    )
+)
