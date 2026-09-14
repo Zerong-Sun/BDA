@@ -104,7 +104,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["analyse_sequence"],
+        "chat_tools": ["analyse_sequence", "analyse_conservation"],
     },
     {
         "id": "failure-diagnosis",

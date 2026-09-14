@@ -543,6 +543,15 @@ operator 都能用，包括 conductor 与 auditor：**问一个问题既不是�
 以及**结果里永远没有序列本身**——`wetlab.models.Protein` 明写它的 `sequence` 是唯一的明文副本、
 API 只对外给 sha256，一个把明文回传给模型的工具会一行之内把这条约定作废。
 
+第二个只读工具 `analyse_conservation` 回答"哪些位点动不得"：读项目里已上传的比对文件
+（FASTA / a3m / Stockholm，**按 artifact id**，同样不接受粘贴的比对——粘进来的比对第一条就是查询序列本身），
+按查询序列的 1-based 编号给出每列的保守度、熵、gap 比例与有效深度，并返回最保守与最可变的若干位点。
+三个判断写在 `app/sequences/conservation.py` 里：**默认做 Henikoff 加权**，
+否则 500 条近乎相同的直系同源读起来处处高度保守；**gap 不算第二十一种残基**，
+它被排除在残基分布之外、单独报 `gap_fraction`，因为"90% 是 gap、10% 是色氨酸"不是保守的色氨酸；
+**结果里不含查询序列的残基字母**，逐位回传它等于把序列重新拼出来。
+有效深度低于 3 的列标 `shallow`——那种数字是算术，不是证据。
+
 能力给 `planner`（它设计构建体）与 `analyst`（它解读结果），两者都是 produce，且这是只读能力。
 
 ## `triage_candidates` — 把路线自己写下的门槛真正套到候选物上

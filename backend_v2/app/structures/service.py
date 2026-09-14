@@ -12,9 +12,9 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..artifacts.fetch import artifact_row, artifact_text
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
@@ -26,34 +26,26 @@ from . import kernels, molviewspec
 MAX_STRUCTURE_BYTES = 32 * 1024 * 1024
 
 
+# The lookup, the project check and the size cap live in `artifacts.fetch`:
+# this module and `sequences` both need them, and the project check is the one
+# thing standing between an artifact id and a cross-project read. These two
+# stay as names because three call sites here read artifacts, one of them two
+# at a time, and spelling the cap and the error code at each would be four
+# chances to use the wrong one.
 def _artifact(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> Artifact:
-    artifact = session.scalar(
-        select(Artifact).where(Artifact.id == artifact_id, Artifact.deleted_at.is_(None))
-    )
-    if artifact is None or artifact.project_id != project_id:
-        # Same answer for "no such artifact" and "belongs to another project":
-        # distinguishing them tells a caller which ids exist elsewhere.
-        raise DomainError(
-            "artifact_not_found",
-            "No such artifact in this project.",
-            status_code=404,
-        )
-    return artifact
+    return artifact_row(session, project_id, artifact_id)
 
 
 def _text(artifact: Artifact) -> str:
-    try:
-        body = ObjectStorage().read_bytes(artifact.object_key, max_bytes=MAX_STRUCTURE_BYTES)
-    except ValueError as error:
-        raise DomainError(
-            "structure_file_too_large",
-            f"That artifact is larger than {MAX_STRUCTURE_BYTES // (1024 * 1024)} MB.",
-            status_code=413,
-        ) from error
-    # Structure formats are ASCII by specification. Decoding with replacement
-    # rather than failing means one stray byte in a REMARK does not make the
-    # coordinates unreadable.
-    return body.decode("utf-8", errors="replace")
+    # `ObjectStorage` is constructed here, in this module, rather than inside
+    # the helper: this domain's tests patch the name on this module, and a read
+    # that resolved it somewhere else would quietly ignore their fake.
+    return artifact_text(
+        artifact,
+        max_bytes=MAX_STRUCTURE_BYTES,
+        too_large_code="structure_file_too_large",
+        storage=ObjectStorage(),
+    )
 
 
 def _run(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, work: Any) -> dict[str, Any]:

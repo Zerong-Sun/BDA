@@ -2063,6 +2063,54 @@ _register(
 )
 
 
+def _analyse_conservation(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..sequences import service as sequences_service
+
+    # An artifact id, not an alignment: the argument list is written into the
+    # transcript, and an alignment pasted there would carry the query sequence
+    # with it - the same rule that keeps `analyse_sequence` to ids.
+    return sequences_service.conservation_from_artifact(
+        ctx.session,
+        _project_of(ctx),
+        artifact_id=uuid.UUID(_arg_str(args, "artifact_id")),
+        weighting=_arg_str(args, "weighting") or "henikoff",
+        limit=_arg_int(args, "limit", 25),
+    )
+
+
+_register(
+    ToolSpec(
+        id="analyse_conservation",
+        coerce_numeric_strings=True,
+        description=(
+            "Which positions of a protein its homologues have not changed, read "
+            "from an alignment already uploaded to the project (FASTA, a3m or "
+            "Stockholm; the first sequence is taken as the query). Returns the "
+            "most conserved and most variable positions with per-column entropy, "
+            "gap fraction and effective depth. Redundancy is corrected with "
+            "Henikoff weights by default, because an alignment of near-identical "
+            "orthologues otherwise reads as conserved everywhere. Positions are "
+            "1-based in the query's numbering. Conservation is evidence about "
+            "what relatives tolerate, not a prediction that a substitution fails."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "weighting": {"type": "string", "enum": ["henikoff", "none"], "default": "henikoff"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 25},
+            },
+            "required": ["artifact_id"],
+            "additionalProperties": False,
+        },
+        capability="sequence-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_analyse_conservation,
+    )
+)
+
+
 def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
     from ..candidates.service import triage_candidate
     from ..projects.models import Project

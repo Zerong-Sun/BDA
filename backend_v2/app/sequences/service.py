@@ -29,11 +29,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..artifacts.fetch import artifact_row, artifact_text
 from ..candidates.models import Candidate
 from ..core.problem import DomainError
 from ..targets.models import Target
 from ..wetlab.models import Protein
-from . import codon, kernels
+from . import codon, conservation, kernels
+
+#: An alignment is text, but a deep metagenomic a3m is not small. The cap is a
+#: guard against a mis-typed artifact id pulling a genome into memory; the
+#: parser truncates by sequence count separately.
+MAX_ALIGNMENT_BYTES = 64 * 1024 * 1024
 
 
 def _digest(sequence: str) -> str:
@@ -132,6 +138,38 @@ def resolve(
         # The library's own digest, not a recomputed one: if they ever disagree
         # the row is what identifies the construct everywhere else.
         "sequence_sha256": protein.sequence_sha256,
+    }
+
+
+def conservation_from_artifact(
+    session: Session,
+    project_id: uuid.UUID,
+    *,
+    artifact_id: uuid.UUID,
+    weighting: str = "henikoff",
+    limit: int = 25,
+) -> dict[str, Any]:
+    """Per-position conservation for an alignment the project already holds.
+
+    An artifact id rather than pasted text, for the same reason the analysis
+    tool takes ids: a tool call's arguments are written into the transcript,
+    and an alignment pasted there would carry the query's sequence with it.
+    The result names the artifact it read, so a number can be traced back to
+    the file it came from.
+    """
+    artifact = artifact_row(session, project_id, artifact_id)
+    text = artifact_text(
+        artifact, max_bytes=MAX_ALIGNMENT_BYTES, too_large_code="alignment_file_too_large"
+    )
+    try:
+        result = conservation.summarise(text, weighting=weighting, limit=limit)
+    except conservation.AlignmentError as error:
+        raise DomainError("alignment_unreadable", str(error), status_code=422) from error
+    return {
+        "artifact_id": str(artifact.id),
+        "filename": artifact.filename,
+        "checksum_sha256": artifact.checksum_sha256,
+        **result,
     }
 
 
