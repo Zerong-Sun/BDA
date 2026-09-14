@@ -996,6 +996,15 @@ def _structure_handler(kind: str):
                 chain_b=_arg_str(args, "chain_b"),
                 cutoff_angstrom=float(args.get("cutoff_angstrom") or 4.5),
             )
+        if kind == "interface":
+            return structures.interface(
+                ctx.session,
+                project_id,
+                artifact_id,
+                chain_a=_arg_str(args, "chain_a"),
+                chain_b=_arg_str(args, "chain_b"),
+                cutoff_angstrom=float(args.get("cutoff_angstrom") or 4.5),
+            )
         residue = args.get("residue_seq")
         return structures.site(
             ctx.session,
@@ -1057,6 +1066,86 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_structure_handler("contacts"),
+    )
+)
+
+def _compare_structures(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..structures import service as structures
+
+    return structures.superpose(
+        ctx.session,
+        _project_of(ctx),
+        uuid.UUID(_arg_str(args, "reference_artifact_id")),
+        uuid.UUID(_arg_str(args, "mobile_artifact_id")),
+        reference_chain=_arg_str(args, "reference_chain"),
+        mobile_chain=_arg_str(args, "mobile_chain"),
+    )
+
+
+_register(
+    ToolSpec(
+        id="compare_structures",
+        description=(
+            "Fit one structure onto another and report how far off it lands: "
+            "RMSD over C-alpha atoms before and after the fit, the residues "
+            "that moved most, and a TM-score when the chain is long enough for "
+            "its formula. Residues are paired by author numbering, so the two "
+            "files must use the same numbering; a file missing a loop still "
+            "compares correctly. Use it for a design against its prediction, or "
+            "a prediction against a solved structure. The TM-score is evaluated "
+            "on this superposition and is not a TM-align result."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "reference_artifact_id": {"type": "string"},
+                "mobile_artifact_id": {"type": "string"},
+                "reference_chain": {"type": "string"},
+                "mobile_chain": {"type": "string"},
+            },
+            "required": [
+                "reference_artifact_id",
+                "mobile_artifact_id",
+                "reference_chain",
+                "mobile_chain",
+            ],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_compare_structures,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="measure_structure_interface",
+        coerce_numeric_strings=True,
+        description=(
+            "How much surface two chains bury and what the contact is made of: "
+            "buried area per side and the conventional interface area, per-residue "
+            "burial, hydrogen bonds, salt bridges and the hydrophobic fraction. "
+            "Use it to judge a complex that has not been scored by a design tool. "
+            "Hydrogens are absent from most of these files, so a hydrogen bond is "
+            "a donor/acceptor distance with no angle term, and the result says so. "
+            "Buried area is not an affinity."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "chain_a": {"type": "string"},
+                "chain_b": {"type": "string"},
+                "cutoff_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 4.5},
+            },
+            "required": ["artifact_id", "chain_a", "chain_b"],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_structure_handler("interface"),
     )
 )
 

@@ -21,14 +21,16 @@ computed from it would be wrong.
 
 from __future__ import annotations
 
+import copy
 import io
 import re
 import warnings
 from typing import Any
 
 import numpy as np
-from Bio.PDB import MMCIFParser, NeighborSearch, PDBParser
+from Bio.PDB import MMCIFParser, NeighborSearch, PDBParser, Superimposer
 from Bio.PDB.Polypeptide import protein_letters_3to1
+from Bio.PDB.SASA import ShrakeRupley
 
 #: Non-polymer residues that are solvent or cryoprotectant rather than ligand.
 #: Listing them keeps `analyse` from reporting three hundred waters as ligands;
@@ -44,6 +46,34 @@ MAX_CUTOFF_ANGSTROM = 12.0
 #: chain pair. Truncating silently would hide that, so the result says it was
 #: truncated and how many pairs were found.
 MAX_CONTACT_PAIRS = 400
+
+#: Fewest paired residues worth superposing. Three points define a rigid body;
+#: an RMSD over two is arithmetic with no meaning.
+MIN_SUPERPOSITION_PAIRS = 3
+
+#: Solvent probe radius for the SASA calculation, in angstroms. 1.4 is water and
+#: is what every published buried-surface-area number assumes; it is reported
+#: with the result because a different probe gives a different area for the
+#: same structure, and a number whose probe is unstated cannot be compared.
+SASA_PROBE_RADIUS = 1.4
+
+#: Heavy-atom distance below which a donor/acceptor pair is counted as a
+#: hydrogen bond. Most structures here are predicted or stripped of hydrogens,
+#: so the angle cannot be checked - see `interface`.
+HBOND_MAX_ANGSTROM = 3.5
+
+#: Charged-group distance for a salt bridge. 4.0 is the usual convention.
+SALT_BRIDGE_MAX_ANGSTROM = 4.0
+
+#: Side-chain atoms that carry formal charge at physiological pH.
+_ANIONIC_ATOMS = {("ASP", "OD1"), ("ASP", "OD2"), ("GLU", "OE1"), ("GLU", "OE2")}
+_CATIONIC_ATOMS = {
+    ("LYS", "NZ"), ("ARG", "NE"), ("ARG", "NH1"), ("ARG", "NH2"),
+    ("HIS", "ND1"), ("HIS", "NE2"),
+}
+
+#: Residues counted as hydrophobic when describing what an interface is made of.
+_HYDROPHOBIC = frozenset({"ALA", "VAL", "LEU", "ILE", "MET", "PHE", "TRP", "PRO", "TYR"})
 
 #: S-S distance for a disulfide. Real bonds sit near 2.05 A; 2.5 A is loose
 #: enough for a mediocre model and tight enough to exclude two cysteines that
@@ -478,3 +508,280 @@ def _find_centre(model: Any, *, chain: str | None, residue_seq: int | None, liga
             "name the chain and residue number of the one you mean."
         )
     return matches[0]
+
+
+def _polymer_residues(chain: Any) -> list[Any]:
+    return [
+        residue
+        for residue in chain
+        if residue.get_resname().strip().upper() not in SOLVENT_COMPONENTS
+    ]
+
+
+def _chain_copy(model: Any, chain_ids: tuple[str, ...]) -> Any:
+    """A detached copy of the model holding only these chains, solvent removed.
+
+    Copied rather than masked because SASA is computed *on an entity*: the area
+    of chain A alone is only meaningful if chain B is genuinely absent, and
+    hiding it in place would leave it occluding the surface it is meant to
+    expose.
+    """
+    clone = copy.deepcopy(model)
+    for chain in list(clone):
+        if chain.get_id() not in chain_ids:
+            clone.detach_child(chain.get_id())
+            continue
+        for residue in list(chain):
+            if residue.get_resname().strip().upper() in SOLVENT_COMPONENTS:
+                chain.detach_child(residue.get_id())
+    return clone
+
+
+def _residue_sasa(entity: Any) -> dict[tuple[str, Any], float]:
+    ShrakeRupley(probe_radius=SASA_PROBE_RADIUS).compute(entity, level="R")
+    return {
+        (chain.get_id(), residue.get_id()): float(residue.sasa)
+        for chain in entity
+        for residue in chain
+    }
+
+
+def interface(
+    text: str,
+    *,
+    chain_a: str,
+    chain_b: str,
+    cutoff_angstrom: float = 4.5,
+) -> dict[str, Any]:
+    """What an interface is made of, as measurements.
+
+    `contacts` answers which residues touch. This answers how much surface that
+    burial costs, how many of the contacts are polar, and what the interface is
+    made of - the quantities a person uses to say whether a predicted complex is
+    worth believing, and the ones BindCraft reports only *after* a design run.
+    Computing them here means a complex from any source can be judged, including
+    one that came out of a prediction nobody has scored yet.
+
+    Three caveats travel with the numbers rather than sitting in a wiki:
+
+    * **Hydrogens are not there.** Deposited structures usually omit them and
+      predictors place them inconsistently, so a hydrogen bond here is a
+      donor/acceptor heavy-atom pair within `HBOND_MAX_ANGSTROM`, with no angle
+      term. It is a proxy, and `hydrogen_bond_definition` says so in the result.
+    * **Buried area depends on the probe.** The radius used is returned.
+    * **Nothing here is an affinity.** Buried area correlates with binding
+      strength across many complexes and predicts it for none of them.
+    """
+    if chain_a == chain_b:
+        raise StructureFormatError("An interface is between two different chains.")
+    if not 0 < cutoff_angstrom <= MAX_CUTOFF_ANGSTROM:
+        raise StructureFormatError(
+            f"cutoff_angstrom must be greater than 0 and at most {MAX_CUTOFF_ANGSTROM}."
+        )
+    structure, _ = _parse(text)
+    model = list(structure)[0]
+    _chain_or_error(model, chain_a)
+    _chain_or_error(model, chain_b)
+
+    complex_sasa = _residue_sasa(_chain_copy(model, (chain_a, chain_b)))
+    alone_sasa = {
+        **_residue_sasa(_chain_copy(model, (chain_a,))),
+        **_residue_sasa(_chain_copy(model, (chain_b,))),
+    }
+
+    buried: dict[str, float] = {chain_a: 0.0, chain_b: 0.0}
+    per_residue: list[dict[str, Any]] = []
+    for chain_id in (chain_a, chain_b):
+        for residue in _polymer_residues(_chain_or_error(model, chain_id)):
+            key = (chain_id, residue.get_id())
+            delta = alone_sasa.get(key, 0.0) - complex_sasa.get(key, 0.0)
+            if delta <= 0.1:
+                continue
+            buried[chain_id] += delta
+            per_residue.append({**_residue_label(residue), "buried_area_a2": round(delta, 1)})
+    per_residue.sort(key=lambda item: item["buried_area_a2"], reverse=True)
+
+    polar = {"N", "O"}
+    bonds: list[dict[str, Any]] = []
+    bridges: list[dict[str, Any]] = []
+    left = _polymer_residues(_chain_or_error(model, chain_a))
+    right_atoms = [
+        atom for residue in _polymer_residues(_chain_or_error(model, chain_b))
+        for atom in _heavy_atoms(residue)
+    ]
+    if right_atoms:
+        search = NeighborSearch(right_atoms)
+        for residue in left:
+            left_name = residue.get_resname().strip().upper()
+            for atom in _heavy_atoms(residue):
+                for other in search.search(atom.coord, SALT_BRIDGE_MAX_ANGSTROM, level="A"):
+                    distance = float(atom - other)
+                    other_residue = other.get_parent()
+                    other_name = other_residue.get_resname().strip().upper()
+                    pair = {
+                        "a": _residue_label(residue),
+                        "b": _residue_label(other_residue),
+                        "atom_a": atom.get_id(),
+                        "atom_b": other.get_id(),
+                        "distance_angstrom": round(distance, 2),
+                    }
+                    charged = (
+                        ((left_name, atom.get_id()) in _ANIONIC_ATOMS
+                         and (other_name, other.get_id()) in _CATIONIC_ATOMS)
+                        or ((left_name, atom.get_id()) in _CATIONIC_ATOMS
+                            and (other_name, other.get_id()) in _ANIONIC_ATOMS)
+                    )
+                    if charged:
+                        bridges.append(pair)
+                    if (
+                        distance <= HBOND_MAX_ANGSTROM
+                        and atom.element in polar
+                        and other.element in polar
+                    ):
+                        bonds.append(pair)
+
+    interface_residues = [item for item in per_residue]
+    hydrophobic = sum(1 for item in interface_residues if item["name"].upper() in _HYDROPHOBIC)
+    return {
+        "chain_a": chain_a,
+        "chain_b": chain_b,
+        "cutoff_angstrom": cutoff_angstrom,
+        "probe_radius_angstrom": SASA_PROBE_RADIUS,
+        "buried_area_a2": {
+            chain_a: round(buried[chain_a], 1),
+            chain_b: round(buried[chain_b], 1),
+            "total": round(buried[chain_a] + buried[chain_b], 1),
+        },
+        # The conventional "interface area": half the total buried, because the
+        # two sides bury each other and reporting the sum double-counts it.
+        "interface_area_a2": round((buried[chain_a] + buried[chain_b]) / 2, 1),
+        "interface_residue_count": {
+            chain_a: sum(1 for item in interface_residues if item["chain"] == chain_a),
+            chain_b: sum(1 for item in interface_residues if item["chain"] == chain_b),
+        },
+        "hydrophobic_residue_fraction": (
+            round(hydrophobic / len(interface_residues), 3) if interface_residues else 0.0
+        ),
+        "hydrogen_bond_count": len(bonds),
+        "hydrogen_bond_definition": (
+            f"heavy-atom N/O donor-acceptor pair within {HBOND_MAX_ANGSTROM} A; "
+            "no angle term, because hydrogens are absent from most of these files"
+        ),
+        "salt_bridge_count": len(bridges),
+        "hydrogen_bonds": bonds[:MAX_CONTACT_PAIRS],
+        "salt_bridges": bridges[:MAX_CONTACT_PAIRS],
+        "interface_residues": interface_residues[:MAX_CONTACT_PAIRS],
+    }
+
+
+def _ca_by_number(model: Any, chain_id: str) -> dict[tuple[int, str], Any]:
+    """CA atoms of one chain, keyed by author numbering.
+
+    Keyed rather than listed because pairing is by residue number: two files of
+    the same construct agree on numbers even when one is missing loops, and
+    pairing by position in the list would silently compare residue 1 of one
+    file with residue 1 of the other after a gap has shifted everything.
+    """
+    chain = _chain_or_error(model, chain_id)
+    atoms: dict[tuple[int, str], Any] = {}
+    for residue in chain:
+        if residue.get_resname().strip().upper() in SOLVENT_COMPONENTS:
+            continue
+        if "CA" not in residue:
+            continue
+        _, seq, icode = residue.get_id()
+        atoms[(int(seq), icode.strip())] = residue["CA"]
+    return atoms
+
+
+def superpose(
+    reference_text: str,
+    mobile_text: str,
+    *,
+    reference_chain: str,
+    mobile_chain: str,
+) -> dict[str, Any]:
+    """Least-squares fit of one chain onto another, and how far off it lands.
+
+    The platform names RMSD thresholds it could not compute: the route
+    catalogue gates a design on `binder_ca_rmsd_angstrom < 1.5`, and nothing in
+    this repository could produce that number. This does, for the comparison
+    that actually gets made - a designed backbone against its prediction, or a
+    prediction against a solved structure.
+
+    Two decisions, both about honesty rather than accuracy:
+
+    **Residues are paired by author numbering, never by order.** Files of the
+    same construct agree on numbering; they disagree on how many residues they
+    contain, because one is missing a disordered loop. Pairing by order would
+    compare different residues and report a small, confident, wrong number.
+
+    **`tm_score_on_paired_residues` is not TM-align.** It is the TM-score
+    formula evaluated on this superposition, which is the fit that minimises
+    RMSD - not the one that maximises TM-score, and with no alignment search.
+    It answers "same fold?" for two models of one construct; it is not
+    comparable with a published TM-align score, and the key says so.
+    """
+    reference_structure, _ = _parse(reference_text)
+    mobile_structure, _ = _parse(mobile_text)
+    reference_model = list(reference_structure)[0]
+    mobile_model = list(mobile_structure)[0]
+
+    left = _ca_by_number(reference_model, reference_chain)
+    right = _ca_by_number(mobile_model, mobile_chain)
+    shared = sorted(set(left) & set(right))
+    if len(shared) < MIN_SUPERPOSITION_PAIRS:
+        raise StructureFormatError(
+            f"Only {len(shared)} residue numbers are present in both chains; "
+            f"at least {MIN_SUPERPOSITION_PAIRS} are needed to superpose. "
+            "Check that the two files use the same numbering."
+        )
+
+    fixed = [left[key] for key in shared]
+    moving = [right[key] for key in shared]
+    before = float(
+        np.sqrt(np.mean([np.sum((a.coord - b.coord) ** 2) for a, b in zip(fixed, moving, strict=True)]))
+    )
+
+    superimposer = Superimposer()
+    superimposer.set_atoms(fixed, moving)
+    if superimposer.rotran is None:  # pragma: no cover - set_atoms always fills it
+        raise StructureFormatError("The superposition could not be computed from these atoms.")
+    rotation, translation = superimposer.rotran
+    moved = [atom.coord @ rotation + translation for atom in moving]
+
+    deviations = [float(np.linalg.norm(atom.coord - position)) for atom, position in zip(fixed, moved, strict=True)]
+    rmsd = float(np.sqrt(np.mean(np.square(deviations))))
+
+    # TM-score normalisation: d0 for a reference of this length. Below 15
+    # residues the published formula is not defined, so the score is withheld
+    # rather than extrapolated.
+    length = len(shared)
+    tm_score = None
+    if length >= 15:
+        d0 = 1.24 * (length - 15) ** (1 / 3) - 1.8
+        if d0 > 0:
+            tm_score = round(sum(1 / (1 + (d / d0) ** 2) for d in deviations) / length, 4)
+
+    ranked: list[dict[str, Any]] = [
+        {"seq": key[0], "insertion_code": key[1] or None, "deviation_angstrom": round(value, 2)}
+        for key, value in zip(shared, deviations, strict=True)
+    ]
+    ranked.sort(key=lambda item: float(item["deviation_angstrom"]), reverse=True)
+    return {
+        "reference_chain": reference_chain,
+        "mobile_chain": mobile_chain,
+        "paired_residue_count": length,
+        "reference_residue_count": len(left),
+        "mobile_residue_count": len(right),
+        "rmsd_angstrom": round(rmsd, 3),
+        "rmsd_before_superposition_angstrom": round(before, 3),
+        "tm_score_on_paired_residues": tm_score,
+        "tm_score_note": (
+            "TM-score formula evaluated on the RMSD-minimising superposition of "
+            "residues paired by number. Not TM-align: no alignment search is "
+            "performed, so this is not comparable with a published TM-align score."
+        ),
+        "paired_residue_numbers": [key[0] for key in shared],
+        "largest_deviations": ranked[:20],
+    }

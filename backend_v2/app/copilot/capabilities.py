@@ -66,6 +66,8 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "chat_tools": [
             "analyse_structure",
             "list_structure_contacts",
+            "measure_structure_interface",
+            "compare_structures",
             "describe_structure_site",
         ],
     },

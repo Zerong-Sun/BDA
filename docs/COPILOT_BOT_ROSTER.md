@@ -178,12 +178,14 @@ and no module descriptor. Structures arrive as artifacts, which are already
 write-once and checksummed; a second table would only be somewhere for a copy to
 go stale.
 
-Three tools:
+Five tools:
 
 | Tool | Answers |
 | --- | --- |
 | `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, ligands and solvent counted separately, disulfides, and a pLDDT or B-factor summary |
 | `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
+| `measure_structure_interface` | How much surface two chains bury and what the contact is made of: buried area per side, the conventional interface area, per-residue burial, hydrogen bonds (donor/acceptor distance, no angle term - hydrogens are absent), salt bridges, hydrophobic fraction. Buried area is not an affinity |
+| `compare_structures` | Fit one structure onto another: C-alpha RMSD before and after the fit, the residues that moved most, and a TM-score where its formula is defined. Residues are paired by author numbering, so a file missing a loop still compares; the TM-score is evaluated on this superposition and is not TM-align |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
 `structuralist` pairs this with `project-read` and nothing else, and the pairing

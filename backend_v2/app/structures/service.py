@@ -93,6 +93,74 @@ def contacts(
     )
 
 
+def superpose(
+    session: Session,
+    project_id: uuid.UUID,
+    reference_artifact_id: uuid.UUID,
+    mobile_artifact_id: uuid.UUID,
+    *,
+    reference_chain: str,
+    mobile_chain: str,
+) -> dict[str, Any]:
+    """Fit one structure onto another and report how far off it lands.
+
+    The only call here that reads two artifacts, so it cannot use `_run`: both
+    have to be resolved and checked against the same project before either is
+    fetched. A comparison that silently crossed projects would be the one place
+    this domain leaked, and it would look like a number rather than an error.
+    """
+    reference = _artifact(session, project_id, reference_artifact_id)
+    mobile = _artifact(session, project_id, mobile_artifact_id)
+    try:
+        result = kernels.superpose(
+            _text(reference),
+            _text(mobile),
+            reference_chain=reference_chain,
+            mobile_chain=mobile_chain,
+        )
+    except kernels.StructureFormatError as error:
+        raise DomainError("structure_unreadable", str(error), status_code=422) from error
+    return {
+        "reference": {
+            "artifact_id": str(reference.id),
+            "filename": reference.filename,
+            "checksum_sha256": reference.checksum_sha256,
+        },
+        "mobile": {
+            "artifact_id": str(mobile.id),
+            "filename": mobile.filename,
+            "checksum_sha256": mobile.checksum_sha256,
+        },
+        **result,
+    }
+
+
+def interface(
+    session: Session,
+    project_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    *,
+    chain_a: str,
+    chain_b: str,
+    cutoff_angstrom: float = 4.5,
+) -> dict[str, Any]:
+    """How much surface two chains bury, and what the contact is made of.
+
+    `contacts` says which residues touch; this says what that costs. Kept
+    beside it rather than folded into it because the two have different
+    expense: a contact list is a neighbour search, and this parses the model
+    three times to compute solvent accessibility with and without each partner.
+    """
+    return _run(
+        session,
+        project_id,
+        artifact_id,
+        lambda text: kernels.interface(
+            text, chain_a=chain_a, chain_b=chain_b, cutoff_angstrom=cutoff_angstrom
+        ),
+    )
+
+
 def site(
     session: Session,
     project_id: uuid.UUID,
