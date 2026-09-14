@@ -141,7 +141,7 @@ export function ExperimentsPage() {
 
       {showCampaigns ? <div className="mb-6"><CampaignPanel /></div> : null}
 
-      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={false} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={overview?.target_readiness?.ready_for_workflow !== true} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
       <ActiveProjectPanel
         project={activeProject}
         projectQuery={query}

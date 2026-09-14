@@ -1,5 +1,15 @@
 # Bot-first science workspace
 
+状态：活跃
+
+最后核验：2026-09-14（Asia/Shanghai）
+
+权威范围：Bot 优先工作区的诊断、设计、实现清单与验收记录。
+
+数据来源：`codex/bot-first-science-workspace` 分支的前端代码、浏览器验收脚本与公开 PD1 演示包。
+
+替代关系：不取代 [前端架构与 API 契约](FRONTEND_V2.md)；Bot 名册与职责边界以 [Copilot Bot Roster](COPILOT_BOT_ROSTER.md) 为准。
+
 Status: implemented and reviewed · 2026-09-14
 
 Branch: `codex/bot-first-science-workspace`
