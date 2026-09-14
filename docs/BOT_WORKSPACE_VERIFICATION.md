@@ -1,5 +1,15 @@
 # Bot workspace verification — 2026-09-14
 
+状态：活跃
+
+最后核验：2026-09-14（Asia/Shanghai）
+
+权威范围：Bot 工作区六维审计的缺陷复现与修复核验清单。
+
+数据来源：实际界面路径、现有后端契约、Vitest 与浏览器验收结果。
+
+替代关系：是 [Bot 优先工作区](BOT_FIRST_WORKSPACE.md) 的核验附录，不单独定义产品行为。
+
 Scope: the public-data frontend redesign on `codex/bot-first-science-workspace`.
 Audit the user's six dimensions against actual UI paths and existing backend contracts.
 

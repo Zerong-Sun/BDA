@@ -209,7 +209,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
               </div>
             </Disclosure>
           ) : <Alert><AlertDescription>{w.reviewEmpty}</AlertDescription></Alert>}
-          <Disclosure className="science-document" title={language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
+          <Disclosure className="science-document" defaultOpen title={language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0">
