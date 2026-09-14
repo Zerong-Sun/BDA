@@ -28,6 +28,12 @@ export interface CopilotProjectSession {
   /** Unsent text and source selection live only in this signed-in browser session. */
   input?: string
   selectedEntityIds?: string[]
+  /**
+   * What the selected ids are called, where the page that selected them knew.
+   * Only for showing the person what their next message carries - the server
+   * resolves ids itself and never reads these.
+   */
+  selectedEntityLabels?: Record<string, string>
   conversationId: string | null
   messages: CopilotChatMessage[]
   /**
@@ -124,7 +130,7 @@ interface AppState {
   setCopilotTaskDraft: (projectId: string, draft: CopilotTaskDraft) => void
   resetCopilotSession: (projectId: string) => void
   setCopilotDraft: (draft: string) => void
-  setCopilotSelectedEntityIds: (entityIds: string[], projectId?: string) => void
+  setCopilotSelectedEntityIds: (entityIds: string[], projectId?: string, labels?: Record<string, string>) => void
   resetCopilotMessages: () => void
   setCopilotOpen: (open: boolean) => void
   setSettingsOpen: (open: boolean) => void
@@ -233,13 +239,18 @@ export const useAppStore = create<AppState>()(
         },
       })),
       setCopilotDraft: (copilotDraft) => set({ copilotDraft }),
-      setCopilotSelectedEntityIds: (copilotSelectedEntityIds, projectId) => set((state) => {
+      setCopilotSelectedEntityIds: (copilotSelectedEntityIds, projectId, labels) => set((state) => {
         const scope = projectId ?? state.activeProjectId
         if (!scope) return state.activeProjectId ? {} : { copilotSelectedEntityIds }
         const current = state.copilotSessions[scope] ?? { conversationId: null, messages: [], bot: null }
+        // Labels are kept only for ids still selected, so removing one cannot
+        // leave its name behind to be shown against a later selection.
+        const selectedEntityLabels = labels
+          ? Object.fromEntries(copilotSelectedEntityIds.filter((id) => labels[id]).map((id) => [id, labels[id]]))
+          : undefined
         return { ...(scope === state.activeProjectId ? { copilotSelectedEntityIds } : {}), copilotSessions: {
           ...state.copilotSessions,
-          [scope]: { ...current, selectedEntityIds: copilotSelectedEntityIds },
+          [scope]: { ...current, selectedEntityIds: copilotSelectedEntityIds, selectedEntityLabels },
         } }
       }),
       resetCopilotMessages: () => set({ copilotMessages: defaultCopilotMessages }),

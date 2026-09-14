@@ -35,7 +35,11 @@ export function StructureComparison({ structures, projectId }: { structures: Res
     const items = compare && right ? [left, right] : [left]
     const state = useAppStore.getState()
     state.setActiveProjectId(projectId)
-    state.setCopilotSelectedEntityIds(items.map((item) => item.artifact_id))
+    state.setCopilotSelectedEntityIds(
+      items.map((item) => item.artifact_id),
+      projectId,
+      Object.fromEntries(items.map((item) => [item.artifact_id, `${item.pdb_id ? `${item.pdb_id} · ` : ''}${workspaceText(item.name, language)}`])),
+    )
     state.setCopilotDraft(zh
       ? `请根据项目已有证据解释以下结构：${items.map((item) => `${workspaceText(item.name, language)} (${item.pdb_id || item.artifact_id})`).join('、')}。引用结构和文献来源，区分观察、推断与信息缺口。并排展示不代表结构已经对齐。`
       : `Explain these structures using existing project evidence: ${items.map((item) => `${workspaceText(item.name, language)} (${item.pdb_id || item.artifact_id})`).join('; ')}. Cite structure and literature sources. Distinguish observations, inference and gaps. Side-by-side views do not imply structural alignment.`)

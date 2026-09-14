@@ -76,7 +76,7 @@ function AskCopilotButton({ entityId, entityType, label }: { entityId: string; e
   const setOpen = useAppStore((state) => state.setCopilotOpen)
   const setSelected = useAppStore((state) => state.setCopilotSelectedEntityIds)
   const ask = () => {
-    setSelected([entityId])
+    setSelected([entityId], undefined, { [entityId]: label })
     setDraft(language === 'zh'
       ? `请仅依据 Research workspace 分析所选${entityType}“${label}”（实体 ID：${entityId}），给出实体级引用、证据等级、审核状态和信息缺口。`
       : `Analyze the selected ${entityType} "${label}" (entity ID: ${entityId}) using only Research workspace evidence. Include entity-level citations, evidence grade, review status, and gaps.`)

@@ -275,3 +275,45 @@ describe('Room decisions', () => {
     expect(await screen.findByText(/settled by someone else/i)).toBeInTheDocument()
   })
 })
+
+describe('Room attachments', () => {
+  afterEach(() => {
+    useAppStore.setState({ copilotSessions: {}, copilotSelectedEntityIds: [] })
+  })
+
+  it('shows what the next message carries, by name, and lets it be taken out', async () => {
+    stub([])
+    useAppStore.getState().setCopilotSelectedEntityIds(['art-1', 'art-2'], 'proj_test', { 'art-1': '4ZQK · PD-1/PD-L1' })
+
+    renderWithProviders(<Room />)
+
+    const group = await screen.findByRole('group', { name: 'Attached to your next message' })
+    expect(group).toHaveTextContent('4ZQK · PD-1/PD-L1')
+    // No label was known for this one; it is shown as its id rather than hidden.
+    expect(group).toHaveTextContent('art-2')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove 4ZQK · PD-1/PD-L1' }))
+
+    expect(useAppStore.getState().copilotSessions.proj_test?.selectedEntityIds).toEqual(['art-2'])
+    expect(useAppStore.getState().copilotSelectedEntityIds).toEqual(['art-2'])
+    expect(screen.queryByText('4ZQK · PD-1/PD-L1')).not.toBeInTheDocument()
+  })
+
+  it('drops a removed item’s label so it cannot reappear against a later selection', () => {
+    useAppStore.setState({ activeProjectId: 'proj_test' })
+    const store = useAppStore.getState()
+    store.setCopilotSelectedEntityIds(['art-1'], 'proj_test', { 'art-1': 'Old name' })
+    store.setCopilotSelectedEntityIds([], 'proj_test', { 'art-1': 'Old name' })
+
+    expect(useAppStore.getState().copilotSessions.proj_test?.selectedEntityLabels).toEqual({})
+  })
+
+  it('shows no attachment row when nothing is attached', async () => {
+    stub([])
+
+    renderWithProviders(<Room />)
+
+    expect(await screen.findByLabelText('Say something in the room')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Attached to your next message' })).not.toBeInTheDocument()
+  })
+})

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PaperPlaneTiltIcon, SpinnerGapIcon } from '@phosphor-icons/react'
+import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { DecisionRequestResponse, RoomEvent } from '../../lib/api/generated'
 import { ApiError } from '../../lib/api/client'
@@ -73,6 +73,13 @@ export function Room({
   )
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
   const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
+  // What the next message carries. Pages that ask the team about something -
+  // a structure, a finding - select it; until now that selection travelled
+  // with the message invisibly, so a person could not tell what the team
+  // would be looking at, or take something back out.
+  const attachedIds = useAppStore((state) => state.copilotSessions[projectId]?.selectedEntityIds) ?? NO_IDS
+  const attachedLabels = useAppStore((state) => state.copilotSessions[projectId]?.selectedEntityLabels) ?? NO_LABELS
+  const setAttached = useAppStore((state) => state.setCopilotSelectedEntityIds)
   const endRef = useRef<HTMLDivElement | null>(null)
 
   // A finished turn has rows the feed has not read yet. Keyed on the fall of
@@ -196,6 +203,36 @@ export function Room({
           )}
         </p>
       ) : null}
+      {attachedIds.length ? (
+        <div
+          className="room-attachments"
+          role="group"
+          aria-label={zh ? '随下一条消息附带' : 'Attached to your next message'}
+        >
+          <span className="room-attachments-label">{zh ? '附带' : 'Attached'}</span>
+          {attachedIds.map((id) => {
+            // An id with no label is shown as the id: hiding it would make the
+            // message carry something the person cannot see.
+            const label = attachedLabels[id] ?? id
+            return (
+              <span key={id} className="room-attachment" title={id}>
+                <span className="room-attachment-name">{label}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="room-attachment-remove"
+                  aria-label={`${zh ? '移除' : 'Remove'} ${label}`}
+                  disabled={loading}
+                  onClick={() => setAttached(attachedIds.filter((item) => item !== id), projectId, attachedLabels)}
+                >
+                  <XIcon aria-hidden="true" />
+                </Button>
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
       <div className="room-composer">
         <label htmlFor="room-input" className="sr-only">
           {zh ? '在研究室里发言' : 'Say something in the room'}
@@ -238,6 +275,11 @@ export function Room({
     </div>
   )
 }
+
+// Stable empties, so the store selectors above do not hand back a new array
+// or object on every render.
+const NO_IDS: readonly string[] = []
+const NO_LABELS: Readonly<Record<string, string>> = {}
 
 function speakerName(botId: string | null | undefined, roster: readonly CopilotBot[], zh: boolean): string {
   const bot = resolveBot(botId, roster)
