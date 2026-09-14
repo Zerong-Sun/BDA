@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router'
 import clsx from 'clsx'
-import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, QuestionIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
@@ -22,8 +22,12 @@ import {
   SelectValue,
 } from './select'
 
+// Ordered by who acts: the project, what waits on you, the team that works on
+// it, and the research record. The stage workbenches follow; on desktop they sit
+// behind one menu, on small screens every route stays a link for reachability.
 const mobileRoutes = [
   { to: '/projects', key: 'projects' as const },
+  { to: '/inbox', key: 'inbox' as const },
   { to: '/bots', key: 'bots' as const },
   { to: '/research', key: 'research' as const },
   { to: '/workflow', key: 'workflow' as const },
@@ -34,12 +38,16 @@ const mobileRoutes = [
   { to: '/faq', key: 'faq' as const },
 ]
 
+const primaryRoutes = ['/projects', '/inbox', '/bots', '/research']
+
 export function Topbar() {
   const navigate = useNavigate()
   const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, setTourMenuOpen, activityOpen, setActivityOpen } = useAppStore()
   const { t, language } = useI18n()
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
+  const zh = language === 'zh'
+  const navLabel = (key: (typeof mobileRoutes)[number]['key']) => key === 'inbox' ? (zh ? '待我决定' : 'Decisions') : key === 'bots' ? (zh ? '研究团队' : 'Research team') : t.nav[key]
 
   return (
     <>
@@ -161,17 +169,29 @@ export function Topbar() {
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-2 shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
-                !['/projects', '/bots', '/research'].includes(route.to) && 'md:hidden',
+                !primaryRoutes.includes(route.to) && 'md:hidden',
                 isActive
                   ? 'bg-accent/15 text-accent'
                   : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
               )
             }
           >
-            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : null}
-            {route.key === 'bots' ? (language === 'zh' ? 'Bot 工作区' : 'Bots') : t.nav[route.key]}
+            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/inbox' ? <ListChecksIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : null}
+            {navLabel(route.key)}
           </NavLink>
         ))}
+        <div className="hidden items-stretch md:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" />}><WrenchIcon aria-hidden="true" />{zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuGroup>
+                {mobileRoutes.filter((route) => !primaryRoutes.includes(route.to) && route.to !== '/faq').map((route) => (
+                  <DropdownMenuItem key={route.to} onClick={() => navigate(`${route.to}${projectQuery}`)}>{navLabel(route.key)}</DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </nav>
       <BackendHealthBanner />
     </>

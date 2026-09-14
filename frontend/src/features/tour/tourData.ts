@@ -66,8 +66,8 @@ export const TOUR_SECTIONS: TourSection[] = [
         { title: 'Project library', body: 'Search, filter, sort, open, and manage research projects here. Destructive actions are explained but never run by this tour.' },
         { title: '项目库', body: '在这里搜索、筛选、排序、打开和管理研究项目。导览只说明破坏性操作，不会实际执行。' }),
       step('projects', 'main-navigation', '/projects', 'main-navigation', 'button',
-        { title: 'Main navigation', body: 'Research, Workflow, Candidates, Results, and FAQ form the complete product loop. Each has its own tour chapter.' },
-        { title: '主导航', body: '研究、工作流、候选物、结果与 FAQ 组成完整产品闭环，每一部分都有独立导览章节。' }),
+        { title: 'Main navigation', body: 'Decisions, Research team and Research are where you work; Workflow, Candidates, Lab and Results sit under Workbenches. Each has its own tour chapter.' },
+        { title: '主导航', body: '待我决定、研究团队和研究是日常入口；工作流、候选物、实验台与结果收在“工作台”里，每一部分都有独立导览章节。' }),
     ],
   },
   {

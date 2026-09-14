@@ -230,3 +230,35 @@ links (`aria-current="page"`), Auto-match stays an action. The overview keeps
 Tasks, auto-match Conversation and Handoffs; a Bot-scoped chat there links to its
 page or switches back to auto-match. Owner headings in the task list link to the
 owner's page. No backend or API change.
+
+## Iteration 5 — what waits on a person, and navigation by role
+
+Branch: `claude/decision-inbox`, stacked on the six-operator roster.
+
+Bots prepare, draft and claim; a few things only a person may settle, and they
+were spread over the task list, the workflow inspector, the literature panel and
+the handoff record. `/inbox` (**待我决定 / Decisions**) gathers them per project
+and links to where each decision is made. It decides nothing itself and adds no
+endpoint:
+
+- **Needs your input** — top-level tasks whose delivery is `needs_input` or
+  `blocked`, opening at the owner's page (`/bots/:owner?run=…`); runs recorded
+  under a retired id open at the operator that absorbed it.
+- **Ready for your review** — `completed`, `partial` or `review_required`
+  deliveries, newest first, capped with a link to the full task list.
+- **Compute drafts to confirm** — drafts still in `draft`, linking to Workflow,
+  with the reminder that Auditor can check declared resources first.
+- **Literature claims to review** — the count of `pending` extracted claims,
+  linking to Research → Literature & evidence.
+- **Claims without evidence** — handovers carrying an `unsupported` claim,
+  linking to the recipient's page.
+
+Each source loads, fails and retries on its own; the all-clear message appears
+only when every source has been read. Live runs and delegated child runs are
+excluded, because a child reports through its parent.
+
+The main navigation now reads by who acts: **Projects · Decisions · Research
+team · Research**. Workflow, Candidates, Lab, Results and Timeline sit under a
+**Workbenches** menu on desktop; on small screens every route remains a link.
+The Bots overview is titled **Research team**. There is no count badge in the
+top bar, so no route issues extra requests on arrival.

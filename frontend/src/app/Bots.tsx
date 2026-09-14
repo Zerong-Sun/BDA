@@ -51,7 +51,7 @@ function BotProjectWorkspace() {
   return <section className="bot-page" data-tour-id="bot-workspace">
     <header className="science-page-header">
       <div><p className="science-eyebrow">{zh ? 'AI FOR SCIENCE / 研究协作' : 'AI FOR SCIENCE / COLLABORATION'}</p>
-        <h1>{zh ? '你的 Bot 工作区' : 'Your Bot workspace'}</h1>
+        <h1>{zh ? '研究团队' : 'Research team'}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
       {projectId ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
