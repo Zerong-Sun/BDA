@@ -65,7 +65,7 @@ describe('project-scoped Bot context', () => {
 
   it('removes drafts on project deletion and clears all drafts on sign out', () => {
     const state = useAppStore.getState()
-    const draft = { goal: 'Review evidence', bot: null, preview: false, writes: [], maxTurns: 24, maxCost: '' }
+    const draft = { goal: 'Review evidence', bot: null, service: null, preview: false, writes: [], maxTurns: 24, maxCost: '' }
     state.setCopilotTaskDraft('project-a', draft)
     state.setCopilotTaskDraft('project-b', draft)
     state.clearProjectState('project-a')

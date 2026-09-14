@@ -121,8 +121,8 @@ export function ResearchPage() {
           {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
         </div> : null}
         {projectId && group === 'evidence' && researchAgentOpen ? <CopilotWorkspace key={projectId} initialService="literature" initialGoal={language === 'zh'
-          ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，调用文献检索并等待完成，读取可获取的正文或摘要，汇报带引用的发现，列出信息缺口和实验方案建议。不审核结论、不提交计算任务。请使用中文汇报。'
-          : 'Research this project: read its brief, search literature, wait for retrieval, read available full text or abstracts, and report cited findings. Identify evidence gaps and propose experiments. Do not approve conclusions or submit compute jobs.'} /> : null}
+          ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，调用文献检索并等待完成，读取可获取的正文或摘要，保存带引用的待审核研究笔记，列出信息缺口和实验方案建议。只保存草案，不审核结论、不提交计算任务。请使用中文汇报。'
+          : 'Research this project: read its brief, search literature, wait for retrieval, read available full text or abstracts, and save cited pending-review knowledge notes. Identify evidence gaps and propose experiments. Save drafts only; do not approve conclusions or submit compute jobs.'} /> : null}
         <TabsContent value={group}>
           {!projectId ? (
             <Frame>

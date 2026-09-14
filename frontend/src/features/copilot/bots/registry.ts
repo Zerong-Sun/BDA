@@ -43,7 +43,7 @@ export function useCopilotBots() {
  *
  * One case is not that kind of tie: a token that is a strict substring of
  * another token the same message matched. "literature review" hits
- * `librarian`'s phrase and `auditor`'s bare "review" at once - one phrase
+ * `researcher`'s phrase and `auditor`'s bare "review" at once - one phrase
  * matched twice, not two operators named - and calling it ambiguous would make
  * both unroutable by the word that names them. So a match is discarded when
  * some other match contains it, and whatever survives decides.
@@ -97,7 +97,7 @@ export type Stance = (typeof STANCE_ORDER)[number]
  * Grouping by phase put the director at the top and the reviewer at the bottom
  * of one flat list, which reads as "step -1" and "step 9" - positions in a
  * sequence that neither of them occupies. A director is not the step before
- * briefing and a reviewer is not the step after archiving; they sit beside the
+ * research and a reviewer is not the step after the record; they sit beside the
  * chain, and the picker should say so.
  */
 export function byStance(bots: readonly CopilotBot[]): { stance: Stance; bots: CopilotBot[] }[] {
@@ -120,4 +120,16 @@ export function reviewersOf(bot: CopilotBot, bots: readonly CopilotBot[]): Copil
     const next = byId.get(id)
     return next ? [next] : []
   })
+}
+
+/**
+ * The current operator for an id, including a retired id it absorbed.
+ *
+ * Runs and handoffs are recorded under the id the operator had at the time, and
+ * the roster was merged since. Resolving here lets history group and link under
+ * the operator that now answers for it without rewriting what was recorded.
+ */
+export function resolveBot(id: string | null | undefined, bots: readonly CopilotBot[]): CopilotBot | undefined {
+  if (!id) return undefined
+  return bots.find((bot) => bot.id === id) ?? bots.find((bot) => (bot.absorbs ?? []).includes(id))
 }

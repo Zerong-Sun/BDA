@@ -1604,6 +1604,13 @@
       },
       "BotResponse": {
         "properties": {
+          "absorbs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Absorbs",
+            "type": "array"
+          },
           "capabilities": {
             "items": {
               "type": "string"
@@ -1659,23 +1666,22 @@
             "title": "Summary",
             "type": "string"
           },
-          "task_service": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Service"
-          },
-          "task_write_tools": {
+          "task_services": {
             "items": {
               "type": "string"
             },
-            "title": "Task Write Tools",
+            "title": "Task Services",
             "type": "array"
+          },
+          "task_write_tools": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Task Write Tools",
+            "type": "object"
           },
           "title": {
             "title": "Title",

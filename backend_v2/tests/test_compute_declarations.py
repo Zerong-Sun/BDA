@@ -1,9 +1,9 @@
 """What a plugin declares, against what the queue will actually give it.
 
-`steward` reviews resource declarations, and until this module existed its
+`auditor` reviews resource declarations, and until this module existed its
 charter named four numbers no tool could show it: the slot count, the per-host
 span, the thread budget, and the GPU. That is the same defect the roster fixed
-once in `archivist` - an operator instructed to do something the platform does
+once in `analyst` - an operator instructed to do something the platform does
 not expose - and it is the one these tests exist to keep fixed.
 
 The rule that earns its place is the queue's own GPU request. `#BSUB` carrying
@@ -180,7 +180,7 @@ def test_a_sound_declaration_is_reported_as_sound() -> None:
 
 
 def test_every_finding_carries_the_two_things_that_disagree() -> None:
-    """`steward`'s charter requires reporting the pair, not the conclusion."""
+    """`auditor`'s charter requires reporting the pair, not the conclusion."""
     result = _review(resources={"cpus": 8}, queue="2v100-32-e5")
 
     assert result["findings"]

@@ -26,7 +26,7 @@ export function ScienceWelcome() {
       <div className="science-team-roles">
         {[
           ['director', 'direct', zh ? '明确问题' : 'Frame the question'],
-          ['librarian', 'produce', zh ? '整理证据' : 'Gather evidence'],
+          ['researcher', 'produce', zh ? '整理证据' : 'Gather evidence'],
           ['auditor', 'review', zh ? '审阅判断' : 'Review the findings'],
         ].map(([id, stance, label], index) => <div key={id}><BotAvatar id={id} stance={stance} /><span className="font-mono text-xs">0{index + 1}</span><span>{label}</span></div>)}
       </div>

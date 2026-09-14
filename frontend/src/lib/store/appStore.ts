@@ -46,6 +46,8 @@ export interface CopilotTaskDraft {
   goal: string
   /** Roster id of the operator the task is assigned to; null follows the suggestion. */
   bot: string | null
+  /** Which of that operator's recipes; null takes its first. */
+  service: string | null
   preview: boolean
   writes: string[]
   maxTurns: number

@@ -1339,9 +1339,9 @@ function createStrictRoutes({ scenario, routeId }) {
   // The bot roster is a server-side declaration, not project data, so it is the
   // same in every scenario - including `empty`, where a project with no data
   // still has the same operators available to it. Four entries rather than all
-  // twelve: one per stance, because the picker groups by stance and a stub
+  // six: one per stance, because the picker groups by stance and a stub
   // carrying only producers would pass a test the real roster fails, plus the
-  // librarian, which owns the one stubbed task service so the task composer has
+  // researcher, which owns the one stubbed task service so the task composer has
   // someone to assign work to. A full copy would be a second roster to keep in
   // step with `copilot/bots.py`.
   add('GET', '/api/v2/copilot/bots', {}, () => ok([
@@ -1356,45 +1356,48 @@ function createStrictRoutes({ scenario, routeId }) {
       capabilities: ['project-read', 'chain-orchestration', 'chain-messaging'],
       handoff: ['auditor'],
       reviews: [],
-      directs: ['structuralist', 'planner'],
+      directs: ['researcher', 'planner'],
       reviewed_by: [],
       triggers: ['delegate', '调度'],
-      task_service: null,
-      task_write_tools: [],
+      task_services: [],
+      task_write_tools: {},
+      absorbs: [],
     },
     {
-      id: 'structuralist',
-      title: 'Structuralist',
-      title_zh: '结构与残基',
-      phase: 3,
+      id: 'planner',
+      title: 'Planner',
+      title_zh: '方案设计',
+      phase: 2,
       stance: 'produce',
-      summary: 'Read structures at residue level: chains, gaps, contacts, sites and confidence.',
-      charter: 'You report geometry as measurement. Never infer function from geometry.',
-      capabilities: ['project-read', 'structure-analysis', 'chain-messaging'],
-      handoff: ['planner'],
+      summary: 'Read the structures, choose the route and draft the compute that implements it.',
+      charter: 'You report geometry as measurement and stop at a draft. Never infer function from geometry.',
+      capabilities: ['project-read', 'structure-analysis', 'workflow-planning', 'chain-messaging'],
+      handoff: ['runner'],
       reviews: [],
       directs: [],
       reviewed_by: ['auditor'],
       triggers: ['structure', 'residue'],
-      task_service: null,
-      task_write_tools: [],
+      task_services: ['planning'],
+      task_write_tools: { planning: [] },
+      absorbs: ['structuralist'],
     },
     {
-      id: 'librarian',
-      title: 'Librarian',
-      title_zh: '文献整理',
+      id: 'researcher',
+      title: 'Researcher',
+      title_zh: '研究员',
       phase: 1,
       stance: 'produce',
-      summary: 'Find, ingest and organise literature with retrievable provenance.',
+      summary: 'Turn an intent into a falsifiable question and gather the literature and target evidence behind it.',
       charter: 'Never summarise a paper you have not retrieved.',
-      capabilities: ['research-read', 'literature-search', 'chain-messaging'],
-      handoff: ['structuralist'],
+      capabilities: ['research-read', 'literature-search', 'knowledge-authoring', 'chain-messaging'],
+      handoff: ['planner'],
       reviews: [],
       directs: [],
       reviewed_by: ['auditor'],
       triggers: ['literature', '文献'],
-      task_service: 'literature',
-      task_write_tools: ['start_literature_search'],
+      task_services: ['brief', 'literature'],
+      task_write_tools: { brief: [], literature: ['start_literature_search', 'create_knowledge_draft'] },
+      absorbs: ['briefing', 'librarian', 'scout'],
     },
     {
       id: 'auditor',
@@ -1406,12 +1409,13 @@ function createStrictRoutes({ scenario, routeId }) {
       charter: 'You judge claims; you never repair them.',
       capabilities: ['project-read', 'review-audit', 'chain-messaging'],
       handoff: ['conductor'],
-      reviews: ['structuralist'],
+      reviews: ['researcher', 'planner'],
       directs: [],
       reviewed_by: [],
       triggers: ['review', '复核'],
-      task_service: null,
-      task_write_tools: [],
+      task_services: [],
+      task_write_tools: {},
+      absorbs: [],
     },
   ]))
   add('GET', '/api/v2/compute-drafts', { limit: '200', project_id: PROJECT_ID }, () => ok({

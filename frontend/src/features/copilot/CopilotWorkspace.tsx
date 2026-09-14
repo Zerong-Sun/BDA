@@ -46,9 +46,9 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const queryClient = useQueryClient()
   const draft = useAppStore((s) => ignoreDraft ? '' : s.copilotDraft)
   const readOnly = useCopilotReadOnly()
-  const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, bot: null, preview: Boolean(initialService), writes: [], maxTurns: 24, maxCost: '' })
+  const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, bot: null, service: null, preview: Boolean(initialService), writes: [], maxTurns: 24, maxCost: '' })
   const savedDraft = useAppStore((s) => s.copilotTaskDrafts[projectId])
-  const { goal, bot: chosenBot, preview, writes, maxTurns, maxCost } = rememberDraft ? savedDraft ?? localDraft : localDraft
+  const { goal, bot: chosenBot, service: chosenService, preview, writes, maxTurns, maxCost } = rememberDraft ? savedDraft ?? localDraft : localDraft
   const updateDraft = (patch: Partial<CopilotTaskDraft>) => {
     if (rememberDraft) {
       const state = useAppStore.getState()
@@ -69,12 +69,14 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   // Work is assigned to an operator; the recipe follows from whoever owns it.
   // An explicit choice wins, then the kind of work the page asked for, then a
   // visible suggestion from the goal text.
-  const assignee = owners.find((bot) => bot.id === chosenBot)
+  const chosen = owners.filter((owner) => owner.bot.id === chosenBot)
+  const assignee = chosen.find((owner) => owner.service === chosenService) ?? chosen[0]
     ?? (initialService ? ownerOf(initialService, owners) : undefined)
     ?? suggestAssignee(goal, owners)
-  const kind = assignee?.task_service as ServiceKind | undefined
+  const kind: ServiceKind | undefined = assignee?.service
   const service = services.data?.find((s) => s.id === kind)
-  const reviewers = assignee ? reviewersOf(assignee, bots.data ?? []) : []
+  const reviewers = assignee ? reviewersOf(assignee.bot, bots.data ?? []) : []
+  const ownerWrites = assignee ? assignee.bot.task_write_tools?.[assignee.service] ?? [] : []
   const qualified = kind ? readiness.data?.eligible_services?.includes(kind) ?? false : false
   const validTurns = Number.isInteger(maxTurns) && maxTurns >= 1 && maxTurns <= 200
   const validCost = maxCost.trim() === '' || (Number.isInteger(Number(maxCost)) && Number(maxCost) >= 0 && Number(maxCost) <= 1000000)
@@ -82,7 +84,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     queryClient.setQueryData(['copilot-task-readiness', projectId], data)
     void queryClient.invalidateQueries({ queryKey: ['copilot-config', projectId] })
   } })
-  const start = useMutation({ mutationFn: () => { requireCopilotWrite(); if (!assignee || !kind) throw new Error(zh ? '请先选择任务负责人。' : 'Choose who owns this task first.'); return startAgentRun({ project_id: projectId, goal: goal.trim(), bot: assignee.id, service_kind: kind,
+  const start = useMutation({ mutationFn: () => { requireCopilotWrite(); if (!assignee || !kind) throw new Error(zh ? '请先选择任务负责人。' : 'Choose who owns this task first.'); return startAgentRun({ project_id: projectId, goal: goal.trim(), bot: assignee.bot.id, service_kind: kind,
     authorized_writes: writes, max_turns: maxTurns, max_cost_usd_cents: maxCost.trim() === '' ? null : Number(maxCost) }) },
     onSuccess: ({ run }) => {
       // A durable task may start after the user has moved to another project
@@ -92,7 +94,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     },
   })
   const error = start.error ?? assess.error ?? services.error ?? readiness.error ?? runs.error
-  const requestTask = (text: string) => { updateDraft({ goal: text, bot: suggestAssignee(text, owners)?.id ?? null, writes: [], preview: true }); setChat(false); setQuestion(null) }
+  const requestTask = (text: string) => { { const suggested = suggestAssignee(text, owners); updateDraft({ goal: text, bot: suggested?.bot.id ?? null, service: suggested?.service ?? null, writes: [], preview: true }) }; setChat(false); setQuestion(null) }
   if (!projectId) return <div className="space-y-3 p-4"><p>{zh ? '先创建或选择项目，助手就能围绕你的目标开展工作。' : 'Create or choose a project to work toward a research goal.'}</p>
     <Button type="button" render={<Link to="/projects" />}>{zh ? '创建或选择项目' : 'Choose a project'}</Button>
     <Button type="button" variant="outline" render={<Link to="/tools" />}>{zh ? '直接使用实验工具' : 'Open experiment tools'}</Button></div>
@@ -108,22 +110,23 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       <p className="task-services-label">{zh ? '交给谁负责' : 'Who should own this?'}</p>
       <div className="task-services" role="group" aria-label={zh ? '任务负责人' : 'Task owner'}>
         {owners.map((owner) => {
-          const owned = services.data?.find((s) => s.id === owner.task_service)
-          return <Button type="button" variant={chosenBot === owner.id ? 'secondary' : 'outline'} key={owner.id} className="task-service h-auto justify-start whitespace-normal text-left" aria-pressed={chosenBot === owner.id} onClick={() => { updateDraft({ bot: owner.id, writes: [], preview: true }) }}><BotAvatar id={owner.id} stance={owner.stance} /><span className="task-owner-text"><strong>{name(owner)}</strong><small>{owned ? (zh ? owned.title_zh : owned.title) : owner.summary}</small></span><ArrowRightIcon className="task-service-arrow" aria-hidden="true" /></Button>
+          const owned = services.data?.find((s) => s.id === owner.service)
+          const pressed = assignee?.key === owner.key && chosenBot === owner.bot.id
+          return <Button type="button" variant={pressed ? 'secondary' : 'outline'} key={owner.key} className="task-service h-auto justify-start whitespace-normal text-left" aria-pressed={pressed} onClick={() => { updateDraft({ bot: owner.bot.id, service: owner.service, writes: [], preview: true }) }}><BotAvatar id={owner.bot.id} stance={owner.bot.stance} /><span className="task-owner-text"><strong>{name(owner.bot)}</strong><small>{owned ? (zh ? owned.title_zh : owned.title) : owner.service}</small></span><ArrowRightIcon className="task-service-arrow" aria-hidden="true" /></Button>
         })}
       </div>
       {bots.isError ? <p role="status" className="text-sm text-text-secondary">{zh ? '无法加载负责人名录，暂时不能分派任务。' : 'The task owner roster could not be loaded, so work cannot be assigned yet.'}</p> : null}
       {bots.data && owners.length === 0 ? <p role="status" className="text-sm text-text-secondary">{zh ? '当前名录中没有承接托管任务的 Bot，可以先开始对话。' : 'No operator in the roster takes guided tasks. Start a conversation instead.'}</p> : null}
     </form>
     {preview && assignee && service ? <section aria-label={zh ? '任务计划' : 'Task plan'} className="space-y-3 rounded-lg border border-border p-3">
-      <div className="task-plan-owner"><BotAvatar id={assignee.id} stance={assignee.stance} /><div className="min-w-0">
-        <h4 className="font-semibold">{zh ? `${name(assignee)} 负责：${service.title_zh}` : `${name(assignee)} owns: ${service.title}`}</h4>
-        <p className="text-xs text-text-secondary">{assignee.summary}</p>
+      <div className="task-plan-owner"><BotAvatar id={assignee.bot.id} stance={assignee.bot.stance} /><div className="min-w-0">
+        <h4 className="font-semibold">{zh ? `${name(assignee.bot)} 负责：${service.title_zh}` : `${name(assignee.bot)} owns: ${service.title}`}</h4>
+        <p className="text-xs text-text-secondary">{assignee.bot.summary}</p>
         {reviewers.length ? <p className="text-xs text-text-secondary">{zh ? `复核：${reviewers.map(name).join('、')}` : `Reviewed by ${reviewers.map(name).join(', ')}`}</p> : null}
       </div></div>
       <p className="text-sm">{zh ? service.deliverable_zh : service.deliverable}</p>
       <ol className="list-decimal space-y-1 pl-5 text-sm">{service.steps.map((s, i) => <li key={i}>{String(zh ? s.title_zh : s.title)}</li>)}</ol>
-      {(assignee.task_write_tools ?? []).map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
+      {ownerWrites.map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
         {tool === 'start_literature_search' ? (zh ? '允许发起外部文献检索并摄取结果' : 'Allow external literature search and ingestion') : (zh ? '允许保存待审核研究笔记' : 'Allow saving research notes for review')}</label>)}
       <p className="text-xs text-text-secondary">{writes.length ? (zh ? '将在本项目内执行以上勾选操作。' : 'Checked actions will run in this project.') : (zh ? '当前只读取已有资料并生成答复。' : 'Reads existing data and prepares an answer.')} {zh ? '工作流运行仍需检查并确认提交。' : 'Workflow execution still requires review and confirmation.'}</p>
       <Disclosure title={zh ? '高级参数与直接编辑' : 'Advanced options and direct editing'}>

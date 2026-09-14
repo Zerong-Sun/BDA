@@ -924,6 +924,10 @@ export type BliAnalysisRequest = {
  */
 export type BotResponse = {
     /**
+     * Absorbs
+     */
+    absorbs?: Array<string>;
+    /**
      * Capabilities
      */
     capabilities?: Array<string>;
@@ -964,13 +968,15 @@ export type BotResponse = {
      */
     summary: string;
     /**
-     * Task Service
+     * Task Services
      */
-    task_service?: string | null;
+    task_services?: Array<string>;
     /**
      * Task Write Tools
      */
-    task_write_tools?: Array<string>;
+    task_write_tools?: {
+        [key: string]: Array<string>;
+    };
     /**
      * Title
      */
