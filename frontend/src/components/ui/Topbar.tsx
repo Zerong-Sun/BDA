@@ -2,6 +2,8 @@ import { NavLink, useNavigate } from 'react-router'
 import clsx from 'clsx'
 import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
+import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, type AppRoute } from '../../lib/nav/routes'
+import { CommandPalette } from './CommandPalette'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { projectText } from '../../lib/i18n/projectText'
@@ -22,23 +24,11 @@ import {
   SelectValue,
 } from './select'
 
-// Ordered by who acts: the project, what waits on you, the team that works on
-// it, and the research record. The stage workbenches follow; on desktop they sit
-// behind one menu, on small screens every route stays a link for reachability.
-const mobileRoutes = [
-  { to: '/projects', key: 'projects' as const },
-  { to: '/inbox', key: 'inbox' as const },
-  { to: '/bots', key: 'bots' as const },
-  { to: '/research', key: 'research' as const },
-  { to: '/workflow', key: 'workflow' as const },
-  { to: '/candidates', key: 'candidates' as const },
-  { to: '/lab', key: 'lab' as const },
-  { to: '/results', key: 'results' as const },
-  { to: '/timeline', key: 'timeline' as const },
-  { to: '/faq', key: 'faq' as const },
-]
-
-const primaryRoutes = ['/projects', '/inbox', '/bots', '/research']
+// The route list moved to `lib/nav/routes.ts` when the command palette began
+// needing the same one: two copies of "which routes exist and what they are
+// called" drift silently, because renaming one of them breaks nothing.
+const mobileRoutes = APP_ROUTES
+const primaryRoutes = PRIMARY_ROUTES
 
 export function Topbar() {
   const navigate = useNavigate()
@@ -47,7 +37,7 @@ export function Topbar() {
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
   const zh = language === 'zh'
-  const navLabel = (key: (typeof mobileRoutes)[number]['key']) => key === 'inbox' ? (zh ? '待我决定' : 'Decisions') : key === 'bots' ? (zh ? '研究团队' : 'Research team') : t.nav[key]
+  const navLabel = (key: AppRoute['key']) => routeLabel(key, zh, (item) => t.nav[item])
 
   return (
     <>
@@ -138,6 +128,7 @@ export function Topbar() {
           >
             <ChatCircleIcon className="h-4 w-4" />
           </Button>
+          <CommandPalette />
           <Button type="button" variant="ghost" size="sm" render={<NavLink to="/tools" />}>{language === 'zh' ? '工具箱' : 'Toolbox'}</Button>
           <ActivityIndicatorButton />
           <Button

@@ -58,7 +58,11 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        {children}
+        {/* The `Command` root is what provides cmdk's store. Without it every
+            child - input, list, item - throws on mount reading `subscribe`
+            from an undefined context, so a dialog that omitted it could not be
+            used at all. It was missing from this vendored copy. */}
+        <Command>{children}</Command>
       </DialogContent>
     </Dialog>
   )
