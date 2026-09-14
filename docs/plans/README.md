@@ -6,6 +6,6 @@
 | --- | --- |
 | [自动/手动双模运行规划](DUAL_MODE_OPERATION_PLAN.md) | 保留未完成的里程碑，未标记为已交付或取消。现有实现以 [Autopilot 边界](../AUTOPILOT_CAMPAIGNS.md)和 [Copilot 服务指南](../COPILOT_SERVICE_GUIDE.md)为准。 |
 | [研究室与结构位点选择规划](BOT_ROOM_PLAN.md) | P0–P4 已于 2026-09-14 实现；本文保留为当时的设计论证与分期依据。实现后的行为以 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md) 的 iteration 7 为准。 |
-| [前端使用逻辑：诊断与分期](FRONTEND_USAGE_PLAN.md) | U1 全局跳转、U2 工作面进 URL 已于 2026-09-15 实现，行为见 [前端 v2 说明](../FRONTEND_V2.md) 第 8 节；U5 带上下文找团队部分实现（研究室显示并可移除随消息附带的资料）；U3 推送优先、U4 乐观写入、U6 画布键盘操作未开始。 |
+| [前端使用逻辑：诊断与分期](FRONTEND_USAGE_PLAN.md) | U1 全局跳转、U2 工作面进 URL 已于 2026-09-15 实现，行为见 [前端 v2 说明](../FRONTEND_V2.md) 第 8 节；U5 带上下文找团队部分实现（研究室显示并可移除随消息附带的资料）；U6 画布键盘选择已实现；U3 推送优先、U4 乐观写入未开始。 |
 
 实施完成或方案被替代时，将实际行为写入活跃文档，再把对应阶段规划移入有日期的归档目录。

@@ -1077,6 +1077,7 @@ export function WorkflowPage() {
                 initialEdges={defaultWorkflowEdges}
                 readOnly
                 onNodeSelected={setSelectedNodeId}
+                selectedNodeId={selectedNodeId}
               />
             ) : workflowRunId ? (
               <>
@@ -1117,6 +1118,7 @@ export function WorkflowPage() {
                   onConnectionRequested={requestConnection}
                   onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
                   onEdgeSelected={setSelectedEdgeId}
+                  selectedNodeId={selectedNodeId}
                   onNodeSelected={(nodeId) => {
                     setSelectedEdgeId(null)
                     setSelectedNodeId(nodeId)
