@@ -44,6 +44,7 @@ from ..core.config import get_settings
 from ..core.database import set_request_rls_context
 from ..core.problem import DomainError
 from . import citations as citation_policy
+from . import mcp_ui
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .capabilities import (
     normalize_capabilities,
@@ -306,6 +307,12 @@ def read_resource(session: Session, grant: CopilotMcpSession, uri: str) -> dict[
     citation record: the authoritative row lives behind `/api/v2`, and returning
     a near-miss found by scanning a capped list would be worse than saying so.
     """
+    if uri == mcp_ui.UI_RESOURCE_URI:
+        # The app page is static and carries no project data: it renders what a
+        # tool result already returned. No capability check, because there is
+        # nothing here to disclose.
+        return mcp_ui.contents()
+
     try:
         source, kind, identifier = citation_policy.parse_uri(uri)
     except ValueError as exc:
@@ -482,13 +489,33 @@ def tool_listing(specs: list[ToolSpec]) -> list[dict[str, Any]]:
 
     `inputSchema` is `ToolSpec.parameters` unchanged - the same JSON Schema the
     internal loop hands its provider. Two consumers, one declaration.
+
+    A tool that renders through the picker carries `_meta.ui.resourceUri`, which
+    is how the MCP Apps extension links a tool to its interface. The link is
+    additive: a host that does not implement the extension ignores `_meta` and
+    still gets the tool and its data, which is why the tool result carries the
+    scene itself rather than only a reference to the page.
     """
-    return [
-        {
+    listing = []
+    for spec in specs:
+        entry: dict[str, Any] = {
             "name": spec.id,
             "description": spec.description,
             "inputSchema": spec.parameters,
             "annotations": {"readOnlyHint": spec.execution_mode == "read"},
         }
-        for spec in specs
-    ]
+        if spec.id in mcp_ui.UI_TOOLS:
+            entry["_meta"] = mcp_ui.tool_meta()
+        listing.append(entry)
+    return listing
+
+
+def resource_listing() -> list[dict[str, Any]]:
+    """What `resources/list` returns.
+
+    Only the app page. The citations a tool result hands out are addressed but
+    not enumerated - listing every project entity here would be a second read
+    surface with no capability gate in front of it - while the picker has to be
+    discoverable, because a host that cannot find it cannot render it.
+    """
+    return [mcp_ui.descriptor()]

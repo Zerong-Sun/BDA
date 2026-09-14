@@ -70,6 +70,23 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ],
     },
     {
+        "id": "structure-interaction",
+        "title": "Structure interaction",
+        "description": (
+            "Show a structure with named residues picked out, propose a hotspot "
+            "set for review, and ask a person to choose residues on the model. "
+            "Proposing is not choosing: a set an operator wrote stays pending "
+            "until a person confirms it."
+        ),
+        "async_execution": False,
+        "execution_mode": "draft",
+        "chat_tools": [
+            "render_structure_view",
+            "propose_hotspot_set",
+            "request_residue_selection",
+        ],
+    },
+    {
         "id": "failure-diagnosis",
         "title": "Failure diagnosis",
         "description": (

@@ -265,6 +265,7 @@ BOTS: tuple[BotSpec, ...] = (
             "project-read",
             "research-read",
             "structure-analysis",
+            "structure-interaction",
             "workflow-planning",
             "compute-drafting",
             "chain-messaging",

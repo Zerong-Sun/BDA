@@ -13,8 +13,13 @@ from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
 from ..projects.service import require_project
+from . import hotspots
 from .repository import TargetRepository
 from .schemas import (
+    HotspotSetCreate,
+    HotspotSetPage,
+    HotspotSetRejection,
+    HotspotSetResponse,
     PrimaryTargetUpdate,
     TargetPage,
     TargetResponse,
@@ -308,3 +313,120 @@ def review_structure(
     review_structure_revision(revision, target, payload, _version(if_match))
     response.headers["ETag"] = f'W/"{revision.version}"'
     return TargetStructureRevisionResponse.model_validate(revision)
+
+
+
+# --- Hotspot sets ------------------------------------------------------------
+#
+# Which residues a design targets, as an object rather than a sentence. The
+# split below is the whole point: an operator proposes through its tool and can
+# never confirm, a person confirms here and only a confirmed set may reach a
+# job.
+
+
+def _hotspot_set(session: Session, hotspot_set_id: uuid.UUID, user: User):
+    row = hotspots.require(session, hotspot_set_id)
+    require_project(session, row.project_id, user)
+    return row
+
+
+@router.get("/projects/{project_id}/hotspot-sets", response_model=HotspotSetPage)
+def list_hotspot_sets(
+    project_id: uuid.UUID,
+    target_id: uuid.UUID | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status", max_length=24),
+    limit: int = Query(default=hotspots.DEFAULT_LIMIT, ge=1, le=hotspots.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> HotspotSetPage:
+    """Hotspot sets in this project, newest first.
+
+    Proposed, confirmed and rejected are all returned: a set that was considered
+    and refused is part of the record, and a list that hid it would make the
+    same proposal look new the second time.
+    """
+    require_project(session, project_id, user)
+    rows = hotspots.sets(
+        session, project_id=project_id, target_id=target_id, status=status_filter, limit=limit
+    )
+    return HotspotSetPage(items=[HotspotSetResponse.model_validate(row) for row in rows])
+
+
+@router.post(
+    "/targets/{target_id}/hotspot-sets",
+    response_model=HotspotSetResponse,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={"x-permission": "target.update"},
+)
+def create_hotspot_set(
+    target_id: uuid.UUID,
+    payload: HotspotSetCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> HotspotSetResponse:
+    """A set a person picked, confirmed on arrival.
+
+    There is no `origin` field on the payload. A client that could send one
+    could mint a confirmed set on an operator's behalf, which is exactly what
+    the column exists to distinguish.
+    """
+    target = TargetRepository(session).get(target_id)
+    if target is None:
+        raise DomainError("target_not_found", "Target was not found", status_code=404)
+    require_project(session, target.project_id, user)
+    row = hotspots.record(
+        session,
+        project_id=target.project_id,
+        target_id=target.id,
+        user_id=user.id,
+        label=payload.label,
+        residues=[residue.model_dump(exclude_none=True) for residue in payload.residues],
+        origin="human",
+        structure_artifact_id=payload.structure_artifact_id,
+        rationale=payload.rationale,
+        evidence_refs=payload.evidence_refs,
+    )
+    return HotspotSetResponse.model_validate(row)
+
+
+@router.post(
+    "/hotspot-sets/{hotspot_set_id}/confirmations",
+    response_model=HotspotSetResponse,
+    openapi_extra={"x-permission": "target.update"},
+)
+def confirm_hotspot_set(
+    hotspot_set_id: uuid.UUID,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> HotspotSetResponse:
+    """A person takes responsibility for this set; only then can a job use it."""
+    row = _hotspot_set(session, hotspot_set_id, user)
+    if _version(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the hotspot set before confirming it.", status_code=412
+        )
+    hotspots.confirm(session, row, user=user)
+    return HotspotSetResponse.model_validate(row)
+
+
+@router.post(
+    "/hotspot-sets/{hotspot_set_id}/rejections",
+    response_model=HotspotSetResponse,
+    openapi_extra={"x-permission": "target.update"},
+)
+def reject_hotspot_set(
+    hotspot_set_id: uuid.UUID,
+    payload: HotspotSetRejection,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> HotspotSetResponse:
+    """Refuse a proposal, keeping it and the reason in the record."""
+    row = _hotspot_set(session, hotspot_set_id, user)
+    if _version(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the hotspot set before rejecting it.", status_code=412
+        )
+    hotspots.reject(session, row, user=user, reason=payload.reason)
+    return HotspotSetResponse.model_validate(row)

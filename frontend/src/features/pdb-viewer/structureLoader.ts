@@ -2,7 +2,7 @@ import type { PluginContext } from 'molstar/lib/mol-plugin/context'
 import type { StructureRepresentationBuiltInProps } from 'molstar/lib/mol-plugin-state/helpers/structure-representation-params'
 import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder'
 import { Script } from 'molstar/lib/mol-script/script'
-import { StructureSelection } from 'molstar/lib/mol-model/structure'
+import { StructureElement, StructureProperties, StructureSelection } from 'molstar/lib/mol-model/structure'
 import { Color } from 'molstar/lib/mol-util/color'
 import { apiAuthorizationHeaders } from '../../lib/api/client'
 import {
@@ -197,4 +197,39 @@ export async function loadStructureFromAuthenticatedUrl(
   await viewer.loadStructureFromData(text, format, {
     dataLabel: filename,
   })
+}
+
+
+/**
+ * Report the residue a person clicks in the viewer.
+ *
+ * The viewer could already be *told* which residues to highlight; it could not
+ * be *asked*. That asymmetry is why picking a binding site was a sentence typed
+ * into a chat box and then retyped into a parameter field.
+ *
+ * Residues are reported in the author numbering (`auth_asym_id` /
+ * `auth_seq_id`) because that is what the viewer displays, what a person reads
+ * off a paper, and what the design tools take on their command lines. Using the
+ * canonical numbering here would silently move every residue in the files where
+ * the two differ.
+ *
+ * Returns its own unsubscribe. A click outside the structure clears the loci
+ * and is ignored rather than reported as a selection of nothing.
+ */
+export function subscribeResiduePicks(
+  plugin: PluginContext,
+  onPick: (residue: HighlightedResidue) => void,
+): () => void {
+  const subscription = plugin.behaviors.interaction.click.subscribe((event) => {
+    const loci = event?.current?.loci
+    if (!loci || !StructureElement.Loci.is(loci) || StructureElement.Loci.isEmpty(loci)) return
+    const location = StructureElement.Loci.getFirstLocation(loci)
+    if (!location) return
+    const chainId = StructureProperties.chain.auth_asym_id(location)
+    const seq = StructureProperties.residue.auth_seq_id(location)
+    if (!chainId || typeof seq !== 'number') return
+    const name = StructureProperties.atom.label_comp_id(location)
+    onPick({ chainId, seq, label: name ? `${chainId}${seq} ${name}` : `${chainId}${seq}` })
+  })
+  return () => subscription.unsubscribe()
 }

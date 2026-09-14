@@ -480,6 +480,7 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "compute-drafting",
         "agent-orchestration",
         "structure-analysis",
+        "structure-interaction",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -1210,6 +1211,10 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
         "project-read",
         "research-read",
         "structure-analysis",
+        # Reading residues and pointing at them are the same operator's work.
+        # No other bot holds this: a reviewer that could propose a hotspot set
+        # would be repairing what it reviewed.
+        "structure-interaction",
         "workflow-planning",
         "compute-drafting",
         "chain-messaging",

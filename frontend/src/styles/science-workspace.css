@@ -393,3 +393,18 @@ body { line-height: 1.6; }
 .room-option-reason--absent { font-style: italic; color: var(--text-muted); }
 .room-option-refs { font-family: var(--font-mono); font-size: .6875rem; color: var(--text-muted); margin-top: .2rem; overflow-wrap: anywhere; }
 .room-decision-settled { font-size: .8125rem; color: var(--text-secondary); margin-top: .5rem; }
+
+/* --- hotspot sets -------------------------------------------------------- */
+.hotspot-panel { display: grid; gap: .875rem; }
+.hotspot-panel-header { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: .75rem; }
+.hotspot-panel-header h3 { font-size: 1rem; font-weight: 550; }
+.hotspot-panel-header p { font-size: .8125rem; color: var(--text-secondary); max-width: 42rem; margin-top: .25rem; }
+.hotspot-picked { font-family: var(--font-mono); font-size: .8125rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.hotspot-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.hotspot-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .75rem; align-items: start; border: 1px solid var(--border-soft); border-radius: 10px; padding: .75rem .875rem; }
+.hotspot-row-label { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .875rem; font-weight: 500; }
+.hotspot-origin { font-family: var(--font-mono); font-size: .6875rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.hotspot-residues { font-family: var(--font-mono); font-size: .8125rem; margin-top: .3rem; overflow-wrap: anywhere; }
+.hotspot-rationale { font-size: .8125rem; color: var(--text-secondary); margin-top: .3rem; }
+.hotspot-refs { font-family: var(--font-mono); font-size: .6875rem; color: var(--text-muted); margin-top: .3rem; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .hotspot-row { grid-template-columns: minmax(0,1fr); } }

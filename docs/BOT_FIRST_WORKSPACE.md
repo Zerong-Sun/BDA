@@ -262,3 +262,119 @@ team · Research**. Workflow, Candidates, Lab, Results and Timeline sit under a
 **Workbenches** menu on desktop; on small screens every route remains a link.
 The Bots overview is titled **Research team**. There is no count badge in the
 top bar, so no route issues extra requests on arrival.
+
+## Iteration 7 — one room, one place to decide, and residues you can point at
+
+Branch: `claude/bot-interaction-decision-display-fb5506`, stacked on the
+six-operator roster and the decision inbox. Five steps, each separately
+mergeable; the plan they follow is
+[研究室与结构位点选择规划](plans/BOT_ROOM_PLAN.md).
+
+### The room
+
+Everything the team did was recorded - a turn in `copilot_messages`, a handover
+in `copilot_handoffs`, a task in `copilot_agent_runs` - in three tabs a reader
+had to interleave by eye. `GET /copilot/projects/{id}/room` merges them on a
+keyset cursor `(occurred_at, id)`, and the Bots page opens on it.
+
+- `copilot_messages.bot` records which operator produced a message. The hint
+  was written into the *user* row's context, so a transcript with several
+  operators could not be replayed. Nullable and not backfilled: absence means
+  unattributed, never a default bot.
+- The room **reads and never writes**, so an entry cannot disagree with the
+  record behind it, and **no code in it can emit a line of dialogue nobody
+  wrote**. The only operator-to-operator traffic that exists is a handover row
+  and a delegated child run; both are rendered as what they are, the child
+  nested under the task that opened it.
+- One entry per task rather than per transition: a per-transition feed needs a
+  history table that does not exist, and inventing one would fabricate events.
+- Messages now come from the server, so a reload no longer empties the
+  conversation; the store backs only the turn in flight.
+
+### Addressing a member
+
+`@planner`, `@Planner`, `@方案设计` and a retired `@structuralist` all resolve,
+the last to the operator that absorbed it. The mention narrows **one turn** and
+is not stored - pinning the conversation to whoever was addressed once would
+silently re-route everything after it. A handle that names nobody is refused
+with the reason rather than falling back to auto-match. "Hand it to them"
+prepares a guided task for an addressed owner and prepares only: plan, writes
+and budget are still reviewed in the composer.
+
+### A question a person must answer
+
+`copilot_decision_requests` holds a question, two to six options, and what each
+option rests on. An option with no rationale is recorded as having none rather
+than dropped.
+
+`request_decision` is a tool; **answering is not**. `decisions.answer` requires
+a `User` and is reachable only from `POST /copilot/decision-requests/{id}/answers`
+behind `require_command`. The answer writes a timeline entry attributed
+`agent_proposed_human_confirmed` and names the branches not taken. `/inbox`
+gains it as a sixth source - the only one that is a question rather than an
+inference.
+
+### Pointing at residues
+
+A new capability `structure-interaction`, held by `planner` alone:
+
+| Tool | Mode | What it does |
+| --- | --- | --- |
+| `render_structure_view` | read | A [MolViewSpec](https://molstar.org/mol-view-spec-docs/) scene with named residues picked out. Shows; concludes nothing |
+| `propose_hotspot_set` | draft | Records a `proposed` set: residues, reason, evidence. Cannot confirm |
+| `request_residue_selection` | draft | Opens a decision request whose options are residue sets |
+
+`target_hotspot_sets.origin` carries the same three states as a timeline
+entry's `decided_by`. Confirming is a REST call behind `require_command`,
+unreachable from any tool. The viewer gained the other half of its interface:
+it could be told which residues to highlight and could not be asked, so
+`subscribeResiduePicks` reports clicks in author numbering and the Research →
+structures view records what a person picks.
+
+**No off-the-shelf MCP server was adopted for this.** The existing molecular
+MCP servers drive a desktop PyMOL or ChimeraX and return screenshots: not in
+the browser, no project scope or RLS, and nothing they select can land in a
+row. What was adopted is two standards - MolViewSpec for the scene and the MCP
+Apps extension for the interface - with `ui://bda/structure-picker` served from
+this project's own registry. The page is self-contained (its CSP declaration
+asks for nothing), and it can propose but not confirm: its only request is
+`ui/message`.
+
+### Residues reach the job
+
+`hotspotConstrainedParameters` pins a confirmed set onto the fields that take
+it - RFdiffusion's `ppi.hotspot_res`, BindCraft's `target_hotspot_residues` -
+as `constrained`, the same badge the cluster's thread count carries. Only
+confirmed sets: badging a proposal would put a person's authority behind a
+model's draft. This closes a path whose two ends have existed since those
+plugins were registered and whose middle was a person retyping residues out of
+a chat message.
+
+### Contract changes made deliberately
+
+Four pinned expectations moved, each with its argument recorded in the test:
+
+- a reviewer and a director may hold `request_decision` as well as
+  `post_handoff` - asking is neither repairing what you found nor doing the work;
+- the intent-gate exemption names three tools, all of which write a question
+  rather than a research record;
+- `resources/list` returns the app page instead of nothing - a host that cannot
+  discover it cannot render it, and the page carries no project data;
+- `planner` gains `structure-interaction` in the served roster.
+
+### Verification
+
+The six-dimension audit, its twelve repaired defects and the evidence table are
+in [Bot workspace verification](BOT_WORKSPACE_VERIFICATION.md#iteration-7-verification--research-room-decision-requests-hotspot-sets).
+In short: backend suite green with 83 new test functions, frontend 129 files /
+772 tests, browser matrix 74/74, 8/8 PostgreSQL migration paths including
+`downgrade base`, coverage 86.48% against the 85% gate, and OpenAPI and the
+generated SDK regenerating idempotently.
+
+Two defects there are worth carrying forward as lessons rather than entries.
+`0002_full_domains` builds its tables from the *live* ORM metadata, so **any**
+new column on one of those tables is created at revision 0002 on a fresh
+database and its own migration must be guarded - the PostgreSQL upgrade-path
+test is the only gate that catches it. And the MCP Apps page was first written
+from a summary of the extension rather than the specification, which produced
+two wrong message shapes that no local test could have found.

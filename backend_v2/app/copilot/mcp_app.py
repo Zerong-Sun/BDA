@@ -115,10 +115,10 @@ def _dispatch(session: Session, grant: Any, method: str, params: dict[str, Any],
     if method == "tools/call":
         return _call(session, grant, params, request_id)
     if method == "resources/list":
-        # Deliberately empty, and not an error. The resources this server serves
-        # are the citations a tool result hands out; enumerating the project's
-        # every entity would be a second, unfenced read surface.
-        return _result(request_id, {"resources": []})
+        # The app page only. The citations a tool result hands out are addressed
+        # but not enumerated: listing the project's every entity would be a
+        # second, unfenced read surface.
+        return _result(request_id, {"resources": mcp.resource_listing()})
     if method == "resources/read":
         return _read_resource(session, grant, params, request_id)
     return _error(request_id, METHOD_NOT_FOUND, f"Unsupported method: {method}")
@@ -132,17 +132,17 @@ def _read_resource(session: Session, grant: Any, params: dict[str, Any], request
         found = mcp.read_resource(session, grant, uri)
     except DomainError as exc:
         return _error(request_id, INVALID_PARAMS, exc.detail, _domain_error_payload(exc))
+    # Two shapes, because two kinds of resource: a citation resolves to data and
+    # is serialised here, while the app page is already text. Serialising the
+    # page as JSON would hand the host a quoted string where it expects HTML.
+    text = (
+        found["text"]
+        if "text" in found
+        else json.dumps(found["payload"], ensure_ascii=False, default=str)
+    )
     return _result(
         request_id,
-        {
-            "contents": [
-                {
-                    "uri": found["uri"],
-                    "mimeType": found["mimeType"],
-                    "text": json.dumps(found["payload"], ensure_ascii=False, default=str),
-                }
-            ]
-        },
+        {"contents": [{"uri": found["uri"], "mimeType": found["mimeType"], "text": text}]},
     )
 
 

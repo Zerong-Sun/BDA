@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-14（Asia/Shanghai；名册由 12 个合并为 6 个：researcher、planner、runner、analyst 吸收原有产出型 bot，auditor 吸收 steward；退役 id 仅用于读取历史）
+最后核验：2026-09-14（Asia/Shanghai；名册由 12 个合并为 6 个：researcher、planner、runner、analyst 吸收原有产出型 bot，auditor 吸收 steward；退役 id 仅用于读取历史。本轮新增 `structure-interaction` 能力（planner 独有）与 `request_decision` 工具（随 `chain-messaging` 授予全员））
 
 权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
 
@@ -64,7 +64,7 @@ stated in a charter; the argument and its rules are in
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
 | 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
-| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
+| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
 | 3 | `runner` | 执行与排障 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
 | 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
 | — | `auditor` | 复核 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
@@ -489,3 +489,32 @@ Gates run for this change, on `bda-public/main`:
 The flow matrix is unchanged because `structures` declares no table: a structure
 reaches it as an artifact, which is already write-once and checksummed, and a
 second table would only be somewhere for a derived residue list to go stale.
+
+## `structure-interaction` — 指着结构说话，以及把选择交回给人
+
+`structure-analysis` 回答「那里有什么」，本能力回答「我说的是哪一块，以及这该由谁定」。
+三个工具，分工是设计本身：
+
+| 工具 | 模式 | 语义 |
+| --- | --- | --- |
+| `render_structure_view` | read | 返回一份 [MolViewSpec](https://molstar.org/mol-view-spec-docs/) 场景（`.mvsj` 树），把指定残基挑出来。**只展示，不下结论**：传进去的残基是操作员已经量过的那些 |
+| `propose_hotspot_set` | draft | 写一条 `proposed` 的位点集合（残基 + 理由 + 证据引用）。**不能确认** |
+| `request_residue_selection` | draft | 用候选集合开一条决策请求，由人在选项之间做选择 |
+
+**确认不是工具。** `target_hotspot_sets.origin` 用的是与 `project_timeline_entries.decided_by`
+完全相同的三态词汇：操作员提出记为 `agent`/`proposed`，人自己选的记为 `human`/`confirmed`，
+人接受了操作员的提案则变成 `agent_proposed_human_confirmed`。确认走
+`POST /hotspot-sets/{id}/confirmations`（`require_command`），任何工具都到不了它——
+而**只有已确认的集合**会被工作流节点表单固定为 `constrained` 参数
+（RFdiffusion 的 `ppi.hotspot_res`、BindCraft 的 `target_hotspot_residues`）。
+
+能力只给 `planner`：它在合并后拥有残基级的结构阅读，指着结构说话是同一件事的延伸。
+reviewer 拿到它就等于能修自己审的东西。
+
+## `request_decision` — 把一个只有人能定的选择交出去
+
+随 `chain-messaging` 授予（与 `post_handoff`、`read_handoffs` 同一能力），因此每个会交接的
+operator 都能用，包括 conductor 与 auditor：**问一个问题既不是修复自己发现的问题，也不是替人做事**。
+判据沿用 `autopilot/gates.py` 已有的两条——是否不可逆、是价值问题还是经验问题——不另造分类。
+回答由人通过 `POST /copilot/decision-requests/{id}/answers` 写入，并落成一条
+`decided_by=agent_proposed_human_confirmed` 的 timeline 记录，记录里写明**未被选中的分支**。

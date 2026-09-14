@@ -112,3 +112,53 @@ class TargetStructureImportAccepted(BaseModel):
     operation_id: uuid.UUID
     target_id: uuid.UUID
     status: str = "pending"
+
+
+class HotspotResidue(BaseModel):
+    """One residue in the author numbering a person reads off the viewer."""
+
+    chain: str = Field(min_length=1, max_length=4)
+    seq: int
+    #: The residue name when the caller knows it. "A164" and "A164 ARG" read
+    #: differently to somebody checking the set against a structure.
+    name: str | None = Field(default=None, max_length=8)
+
+
+class HotspotSetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    target_id: uuid.UUID
+    structure_artifact_id: uuid.UUID | None
+    label: str
+    residues: list[HotspotResidue] = Field(default_factory=list)
+    rationale: str = ""
+    evidence_refs: list[str] = Field(default_factory=list)
+    #: "agent" (proposed), "human" (chosen), or "agent_proposed_human_confirmed".
+    #: The same vocabulary as a timeline entry's `decided_by`.
+    origin: str
+    status: str
+    created_by: uuid.UUID
+    confirmed_by: uuid.UUID | None = None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class HotspotSetPage(BaseModel):
+    items: list[HotspotSetResponse]
+
+
+class HotspotSetCreate(BaseModel):
+    """A set a person chose. An operator's proposal comes through its tool."""
+
+    label: str = Field(min_length=1, max_length=200)
+    residues: list[HotspotResidue] = Field(min_length=1, max_length=40)
+    structure_artifact_id: uuid.UUID | None = None
+    rationale: str = Field(default="", max_length=2000)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+
+
+class HotspotSetRejection(BaseModel):
+    reason: str = Field(default="", max_length=2000)

@@ -29,6 +29,9 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { StructureComparison } from './StructureComparison'
+import { HotspotSetPanel } from './HotspotSetPanel'
+import { useProjectTargetStructure } from '../../lib/hooks/useProjectTargetStructure'
+import { structureSourceFromTarget } from '../pdb-viewer/types'
 import { GenerateSimilarResearchPanel } from './GenerateSimilarResearchPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { LiteraturePanel } from './LiteraturePanel'
@@ -102,6 +105,9 @@ function ReferenceUrl({ url, label }: { url: string; label: string }) {
 
 export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   const { activeProject, projectId } = useProjectContext()
+  // The project's target and its current coordinates: the hotspot panel picks
+  // residues on them, and reviews the sets recorded against them.
+  const targetStructure = useProjectTargetStructure(projectId)
   const { language, t, format } = useI18n()
   const w = t.research.workspace
   const [search, setSearch] = useState('')
@@ -293,7 +299,17 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
         </>
       ) : null}
 
-      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><FrameHeader className="px-0 py-0"><FrameTitle>{w.structuresTitle}</FrameTitle><FrameDescription>{w.structuresDescription}</FrameDescription></FrameHeader><StructureComparison key={projectId} structures={workspace.structures} projectId={projectId} /></FramePanel></Frame><OperationBlock title={w.structureOperations}><TargetIntelligencePanel /></OperationBlock></> : null}
+      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><FrameHeader className="px-0 py-0"><FrameTitle>{w.structuresTitle}</FrameTitle><FrameDescription>{w.structuresDescription}</FrameDescription></FrameHeader><StructureComparison key={projectId} structures={workspace.structures} projectId={projectId} /></FramePanel></Frame>
+        {/* Which residues a design targets: an operator's proposal waiting for a
+            person, and the person's own picks taken off the structure itself. */}
+        <Frame variant="ghost"><FramePanel>
+          <HotspotSetPanel
+            projectId={projectId}
+            targetId={targetStructure.data?.target.id ?? null}
+            source={targetStructure.data ? structureSourceFromTarget(targetStructure.data, projectId) : null}
+          />
+        </FramePanel></Frame>
+        <OperationBlock title={w.structureOperations}><TargetIntelligencePanel /></OperationBlock></> : null}
 
       {view === 'data' ? (
         <section className="grid min-h-0 gap-4">

@@ -202,7 +202,10 @@ def events(
     entries.sort(key=lambda entry: (_aware(entry["occurred_at"]), entry["id"]), reverse=True)
     page = entries[:size]
     next_cursor = (
-        encode_time_cursor(page[-1]["occurred_at"], page[-1]["id"])
+        # Normalised for the same reason the sort is: a cursor built from a
+        # naive value would be compared against `timestamptz` on the next page
+        # and read in the session's timezone rather than in UTC.
+        encode_time_cursor(_aware(page[-1]["occurred_at"]), page[-1]["id"])
         if len(entries) > size and page
         else None
     )

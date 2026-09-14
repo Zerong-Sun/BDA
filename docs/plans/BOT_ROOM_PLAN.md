@@ -2,7 +2,7 @@
 
 # 研究室：一个群聊入口、可见的交接、以及在结构上选位点
 
-状态：规划（P0–P4 全部未实现；不得当作已有能力引用）
+状态：P0–P4 已实现于 `claude/bot-interaction-decision-display-fb5506`（2026-09-14）。实现后的行为以 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md) 的 iteration 7 为准；本文保留为当时的设计论证与分期依据。
 
 最后核验：2026-09-14（Asia/Shanghai；对照 `codex/bot-first-science-workspace` 合并点 `8007e022`，该点已合入六人名册、职责页、决策收件箱与按角色的权限门）
 

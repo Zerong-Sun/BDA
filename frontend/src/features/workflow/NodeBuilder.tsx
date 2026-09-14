@@ -5,7 +5,9 @@ import { DefaultNodeIcon, nodeIconMap, type NodeIconName } from './nodeIcons'
 import { nodeTemplates, type NodeTemplate } from './workflowTypes'
 import { createMethodPlugin, listMethodPlugins, listModelPlugins } from '../../lib/api/registry'
 import { ParameterSchemaForm } from '../plugins'
-import { clusterConstrainedParameters } from '../plugins/parameterOrigin'
+import { clusterConstrainedParameters, hotspotConstrainedParameters } from '../plugins/parameterOrigin'
+import { residueArgument, useHotspotSets } from '../research/hotspotSets'
+import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import {
   defaultsFromFields,
   fieldsFromParameterSchema,
@@ -288,10 +290,24 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
   // A plugin that declares slots pins its own thread count: `-n`, `span[ptile]` and the
   // number the tool is told to use all come from `resources.cpus`, and a form that let one
   // drift alone would produce the mismatch the cluster treats as a violation.
+  // The residues a person confirmed for this project's target. Only confirmed
+  // sets: a proposal is an operator's suggestion, and pinning it here would put
+  // the person's authority behind a draft nobody accepted.
+  const { projectId } = useProjectContext()
+  const confirmedHotspots = useHotspotSets(projectId || null, 'confirmed')
+  const hotspotResidues = useMemo(() => {
+    const newest = confirmedHotspots.data?.[0]
+    return newest ? residueArgument(newest.residues ?? []) : undefined
+  }, [confirmedHotspots.data])
   const constrainedParameters = useMemo(() => {
     const plugin = plugins.find((item) => item.id === template.pluginId)
-    return clusterConstrainedParameters(plugin?.resources, parameterFields)
-  }, [plugins, template.pluginId, parameterFields])
+    return {
+      ...clusterConstrainedParameters(plugin?.resources, parameterFields),
+      // The design's target, from the record rather than retyped. A node form
+      // that let this drift would submit a job against residues nobody signed.
+      ...hotspotConstrainedParameters(hotspotResidues, parameterFields),
+    }
+  }, [plugins, template.pluginId, parameterFields, hotspotResidues])
 
   const selectTemplate = (item: NodeTemplate) => {
     setSelected(item.id)

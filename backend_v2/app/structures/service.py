@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
-from . import kernels
+from . import kernels, molviewspec
 
 #: A structure is coordinates, not a trajectory. A 3000-residue complex in
 #: mmCIF is a few MB; the cap is a guard against a mis-typed artifact id
@@ -115,3 +115,51 @@ def site(
             radius_angstrom=radius_angstrom,
         ),
     )
+
+
+def view(
+    session: Session,
+    project_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    *,
+    residues: list[dict[str, Any]] | None = None,
+    title: str = "",
+    label: str = "",
+) -> dict[str, Any]:
+    """A MolViewSpec scene of this artifact, with the given residues picked out.
+
+    The one place a structure becomes something a person can be shown rather
+    than told about. It stays a read: the scene is derived from the artifact
+    every time, so there is no stored copy to go stale against the coordinates.
+
+    The URL inside the scene is a presigned GET with the storage layer's default
+    lifetime, which is why the result says how long it lasts. A scene pasted
+    into a document a week later should fail visibly rather than render an
+    empty viewer.
+    """
+    artifact = _artifact(session, project_id, artifact_id)
+    text = _text(artifact)
+    try:
+        fmt = kernels.detect_format(text)
+    except kernels.StructureFormatError as error:
+        raise DomainError("structure_unreadable", str(error), status_code=422) from error
+    try:
+        built = molviewspec.scene(
+            url=ObjectStorage().download_url(artifact.object_key),
+            fmt=fmt,
+            highlights=residues or [],
+            title=title or artifact.filename,
+            label=label,
+        )
+    except molviewspec.SceneError as error:
+        raise DomainError("structure_scene_invalid", str(error), status_code=422) from error
+    return {
+        "artifact_id": str(artifact.id),
+        "filename": artifact.filename,
+        "checksum_sha256": artifact.checksum_sha256,
+        "format": fmt,
+        "highlighted": list(residues or []),
+        "scene_format": f"molviewspec/{molviewspec.MVS_VERSION}",
+        "scene": built,
+        "url_ttl_seconds": 900,
+    }
