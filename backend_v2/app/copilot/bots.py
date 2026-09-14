@@ -43,7 +43,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..core.problem import DomainError
-from .capabilities import COPILOT_CAPABILITIES, capabilities_for_turn, capability_ids
+from .capabilities import COPILOT_CAPABILITIES, capabilities_for_turn, capability_ids, tools_for_capabilities
+from .task_contracts import SERVICES
 
 #: What an operator is *for*, orthogonal to what it may touch.
 #:
@@ -116,6 +117,13 @@ class BotSpec:
     #: Bilingual routing hints for a client that wants to suggest a bot. Never
     #: consulted server-side when resolving capabilities.
     triggers: tuple[str, ...] = field(default_factory=tuple)
+    #: The guided task recipe (`task_contracts.SERVICES`) this operator is
+    #: accountable for, if any. A person assigns a task to an operator, not to a
+    #: recipe: the recipe says what the deliverable must contain, the bot says
+    #: who answers for it. Each recipe has exactly one owner, so "who is doing
+    #: this" never has two answers. Grants nothing - a run still resolves
+    #: `bot.capabilities & recipe.capabilities & project.enabled`.
+    task_service: str | None = None
 
 
 #: Written in chain order. The chain is a loop: `medic` returns to `planner`,
@@ -175,6 +183,7 @@ BOTS: tuple[BotSpec, ...] = (
         phase=0,
         stance="produce",
         summary="Turn an intent into a stated, falsifiable research question with success criteria.",
+        task_service="brief",
         charter=(
             "You draft the question, not the answer. Read the project's existing "
             "goals, knowledge and research entities first, then state: the "
@@ -198,6 +207,7 @@ BOTS: tuple[BotSpec, ...] = (
         phase=1,
         stance="produce",
         summary="Find, ingest and organise literature with retrievable provenance.",
+        task_service="literature",
         charter=(
             "You handle literature and its provenance. Search only when the user "
             "asks for a search, and report a queued search as queued - it is not "
@@ -287,6 +297,7 @@ BOTS: tuple[BotSpec, ...] = (
         phase=4,
         stance="produce",
         summary="Choose the route and draft the compute that implements it.",
+        task_service="planning",
         charter=(
             "You choose the route and draft the compute, and you stop there. "
             "Read the workflow's current state before proposing anything. Give "
@@ -324,6 +335,7 @@ BOTS: tuple[BotSpec, ...] = (
         phase=5,
         stance="produce",
         summary="Carry a confirmed run across its waits and report each step's outcome.",
+        task_service="execution",
         charter=(
             "You carry a confirmed run across its waits. You do not submit, "
             "confirm or apply anything yourself - the run advances because the "
@@ -388,6 +400,7 @@ BOTS: tuple[BotSpec, ...] = (
         phase=7,
         stance="produce",
         summary="Interpret recorded computational and bench results without inventing any.",
+        task_service="interpretation",
         charter=(
             "You interpret what was recorded. Every number you quote carries its "
             "unit and the analysis version that produced it. Never invent a "
@@ -588,6 +601,22 @@ def _validate_roster() -> None:
         if bot.stance == "direct" and not bot.directs:
             raise ValueError(f"direct bot {bot.id} names nobody to direct")
 
+        if bot.task_service is not None:
+            recipe = SERVICES.get(bot.task_service)
+            if recipe is None:
+                raise ValueError(f"bot {bot.id} owns unknown task service {bot.task_service!r}")
+            if bot.stance != "produce":
+                raise ValueError(
+                    f"bot {bot.id} is {bot.stance} and owns task service {bot.task_service}; "
+                    "a guided task delivers work, and only a producer delivers"
+                )
+            reachable = tools_for_capabilities(set(bot.capabilities) & set(recipe["capabilities"]))
+            unreachable = sorted({tool for step in recipe["steps"] for tool in step["tools"]} - reachable)
+            if unreachable:
+                raise ValueError(
+                    f"bot {bot.id} owns task service {bot.task_service} but cannot reach its steps: {unreachable}"
+                )
+
         for target in sorted(set(bot.reviews) | set(bot.directs)):
             other = _BY_ID.get(target)
             if other is None:
@@ -599,6 +628,17 @@ def _validate_roster() -> None:
                     f"bot {bot.id} names {target}, which is {other.stance}; "
                     "review and delegation must terminate on a producer"
                 )
+
+
+    owners: dict[str, list[str]] = {}
+    for bot in BOTS:
+        if bot.task_service is not None:
+            owners.setdefault(bot.task_service, []).append(bot.id)
+    for kind in SERVICES:
+        if len(owners.get(kind, [])) != 1:
+            raise ValueError(
+                f"task service {kind} must have exactly one owning bot, found {owners.get(kind, [])}"
+            )
 
 
 _validate_roster()
@@ -650,6 +690,24 @@ def may_direct(director_id: str, target_id: str) -> bool:
     """
     director = _BY_ID.get(director_id)
     return bool(director and director.stance == "direct" and target_id in director.directs)
+
+
+def owner_of_service(kind: str) -> BotSpec | None:
+    return next((bot for bot in BOTS if bot.task_service == kind), None)
+
+
+def task_write_tools(bot: BotSpec) -> list[str]:
+    """The recipe's optional writes this owner can actually be granted.
+
+    A recipe lists every write it could ever offer; its owner may hold only some
+    of them (the librarian searches but does not author notes). Offering the
+    rest would be a checkbox the server is certain to refuse.
+    """
+    recipe = SERVICES.get(bot.task_service or "")
+    if recipe is None:
+        return []
+    reachable = tools_for_capabilities(set(bot.capabilities) & set(recipe["capabilities"]))
+    return [tool for tool in recipe["write_tools"] if tool in reachable]
 
 
 def capabilities_for_bot(bot_id: str, enabled_capabilities: set[str]) -> set[str]:

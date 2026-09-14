@@ -1659,6 +1659,24 @@
             "title": "Summary",
             "type": "string"
           },
+          "task_service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Service"
+          },
+          "task_write_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Write Tools",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"

@@ -27,6 +27,7 @@ export const handlers = [
         retention_days: 30,
       }),
   ),
+  http.get('/api/v2/copilot/bots', () => HttpResponse.json([])),
   http.get('/api/v2/copilot/projects/:projectId/config', () =>
     HttpResponse.json({
         settings: {

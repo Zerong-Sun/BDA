@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowRightIcon, BooksIcon, ChartLineUpIcon, CompassIcon, FlaskIcon, ListChecksIcon, SparkleIcon } from '@phosphor-icons/react'
+import { ArrowRightIcon, SparkleIcon } from '@phosphor-icons/react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,9 +14,9 @@ import { useAppStore, type CopilotTaskDraft } from '../../lib/store/appStore'
 import { assessTaskReadiness, getTaskReadiness, isLive, listAgentRuns, listTaskServices, startAgentRun } from '../../lib/api/agentRuns'
 import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
-import { deliveryLabel, isQuestion, suggestService, type ServiceKind } from './taskPresentation'
-
-const serviceIcons = { brief: CompassIcon, literature: BooksIcon, planning: FlaskIcon, execution: ListChecksIcon, interpretation: ChartLineUpIcon }
+import { BotAvatar } from './BotAvatar'
+import { reviewersOf, useCopilotBots, type CopilotBot } from './bots/registry'
+import { deliveryLabel, groupRunsByOwner, isQuestion, ownerOf, suggestAssignee, taskOwners, type ServiceKind } from './taskPresentation'
 
 interface WorkspaceProps {
   pageContext?: string
@@ -45,9 +45,9 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const queryClient = useQueryClient()
   const draft = useAppStore((s) => ignoreDraft ? '' : s.copilotDraft)
   const readOnly = useCopilotReadOnly()
-  const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, selected: initialService ?? null, preview: Boolean(initialService), writes: [], maxTurns: 24, maxCost: '' })
+  const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, bot: null, preview: Boolean(initialService), writes: [], maxTurns: 24, maxCost: '' })
   const savedDraft = useAppStore((s) => s.copilotTaskDrafts[projectId])
-  const { goal, selected, preview, writes, maxTurns, maxCost } = rememberDraft ? savedDraft ?? localDraft : localDraft
+  const { goal, bot: chosenBot, preview, writes, maxTurns, maxCost } = rememberDraft ? savedDraft ?? localDraft : localDraft
   const updateDraft = (patch: Partial<CopilotTaskDraft>) => {
     if (rememberDraft) {
       const state = useAppStore.getState()
@@ -62,16 +62,26 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const services = useQuery({ queryKey: ['copilot-task-services'], queryFn: listTaskServices, enabled: Boolean(projectId) })
   const readiness = useQuery({ queryKey: ['copilot-task-readiness', projectId], queryFn: () => getTaskReadiness(projectId), enabled: Boolean(projectId) })
   const runs = useQuery({ queryKey: ['agent-runs', projectId], queryFn: () => listAgentRuns(projectId), enabled: Boolean(projectId), refetchInterval: (q) => q.state.data?.some(isLive) ? 4000 : false })
-  const kind = selected ?? suggestService(goal)
+  const bots = useCopilotBots()
+  const owners = taskOwners(bots.data ?? [])
+  const name = (bot: CopilotBot) => zh ? bot.title_zh : bot.title
+  // Work is assigned to an operator; the recipe follows from whoever owns it.
+  // An explicit choice wins, then the kind of work the page asked for, then a
+  // visible suggestion from the goal text.
+  const assignee = owners.find((bot) => bot.id === chosenBot)
+    ?? (initialService ? ownerOf(initialService, owners) : undefined)
+    ?? suggestAssignee(goal, owners)
+  const kind = assignee?.task_service as ServiceKind | undefined
   const service = services.data?.find((s) => s.id === kind)
-  const qualified = readiness.data?.eligible_services?.includes(kind) ?? false
+  const reviewers = assignee ? reviewersOf(assignee, bots.data ?? []) : []
+  const qualified = kind ? readiness.data?.eligible_services?.includes(kind) ?? false : false
   const validTurns = Number.isInteger(maxTurns) && maxTurns >= 1 && maxTurns <= 200
   const validCost = maxCost.trim() === '' || (Number.isInteger(Number(maxCost)) && Number(maxCost) >= 0 && Number(maxCost) <= 1000000)
   const assess = useMutation({ mutationFn: () => { requireCopilotWrite(); return assessTaskReadiness(projectId) }, onSuccess: (data) => {
     queryClient.setQueryData(['copilot-task-readiness', projectId], data)
     void queryClient.invalidateQueries({ queryKey: ['copilot-config', projectId] })
   } })
-  const start = useMutation({ mutationFn: () => { requireCopilotWrite(); return startAgentRun({ project_id: projectId, goal: goal.trim(), service_kind: kind,
+  const start = useMutation({ mutationFn: () => { requireCopilotWrite(); if (!assignee || !kind) throw new Error(zh ? '请先选择任务负责人。' : 'Choose who owns this task first.'); return startAgentRun({ project_id: projectId, goal: goal.trim(), bot: assignee.id, service_kind: kind,
     authorized_writes: writes, max_turns: maxTurns, max_cost_usd_cents: maxCost.trim() === '' ? null : Number(maxCost) }) },
     onSuccess: ({ run }) => {
       // A durable task may start after the user has moved to another project
@@ -81,7 +91,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     },
   })
   const error = start.error ?? assess.error ?? services.error ?? readiness.error ?? runs.error
-  const requestTask = (text: string) => { updateDraft({ goal: text, selected: suggestService(text), writes: [], preview: true }); setChat(false); setQuestion(null) }
+  const requestTask = (text: string) => { updateDraft({ goal: text, bot: suggestAssignee(text, owners)?.id ?? null, writes: [], preview: true }); setChat(false); setQuestion(null) }
   if (!projectId) return <div className="space-y-3 p-4"><p>{zh ? '先创建或选择项目，助手就能围绕你的目标开展工作。' : 'Create or choose a project to work toward a research goal.'}</p>
     <Button type="button" render={<Link to="/projects" />}>{zh ? '创建或选择项目' : 'Choose a project'}</Button>
     <Button type="button" variant="outline" render={<Link to="/tools" />}>{zh ? '直接使用实验工具' : 'Open experiment tools'}</Button></div>
@@ -91,22 +101,28 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     {readOnly ? <p role="status" className="text-sm text-text-secondary">{zh ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
     <div className="task-introduction"><span className="task-introduction-icon" aria-hidden="true"><SparkleIcon weight="duotone" /></span><h3 className="font-semibold">{zh ? '你希望完成什么？' : 'What would you like to accomplish?'}</h3>
       <p className="mt-1 text-sm text-text-secondary">{zh ? '说明目标，助手会准备步骤、跟进结果，并在需要你判断时停下来。' : 'Describe your goal. The assistant prepares steps, tracks results and pauses for your input.'}</p></div>
-    <form className="task-composer space-y-3" onSubmit={(e) => { e.preventDefault(); if (!selected && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
+    <form className="task-composer space-y-3" onSubmit={(e) => { e.preventDefault(); if (!chosenBot && !initialService && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
       <div className="task-input-surface"><Textarea aria-label={zh ? '希望完成的工作' : 'Task goal'} value={goal} onChange={(e) => { updateDraft({ goal: e.target.value, preview: false, writes: [] }) }} placeholder={zh ? '例如：调研这个靶点的证据，比较方法并准备下一步方案' : 'For example: research this target and compare the available methods'} />
       <div className="task-input-footer"><span>{zh ? '先查看计划，再决定开始。' : 'Review the plan before starting.'}</span>{!preview ? <Button type="submit" disabled={!goal.trim()}>{zh ? '继续' : 'Continue'}<ArrowRightIcon aria-hidden="true" /></Button> : null}</div></div>
-      <p className="task-services-label">{zh ? '选择一个研究方向' : 'Choose a starting point'}</p>
-      <div className="task-services" aria-label={zh ? '服务类型' : 'Service type'}>
-        {services.data?.map((s) => {
-          const ServiceIcon = serviceIcons[s.id as keyof typeof serviceIcons] ?? SparkleIcon
-          return <Button type="button" variant={selected === s.id ? 'secondary' : 'outline'} key={s.id} className="task-service h-auto justify-start whitespace-normal text-left" aria-pressed={selected === s.id} onClick={() => { updateDraft({ selected: s.id as ServiceKind, writes: [], preview: true }) }}><span className="task-service-icon" aria-hidden="true"><ServiceIcon /></span><span>{zh ? s.title_zh : s.title}</span><ArrowRightIcon className="task-service-arrow" aria-hidden="true" /></Button>
+      <p className="task-services-label">{zh ? '交给谁负责' : 'Who should own this?'}</p>
+      <div className="task-services" role="group" aria-label={zh ? '任务负责人' : 'Task owner'}>
+        {owners.map((owner) => {
+          const owned = services.data?.find((s) => s.id === owner.task_service)
+          return <Button type="button" variant={chosenBot === owner.id ? 'secondary' : 'outline'} key={owner.id} className="task-service h-auto justify-start whitespace-normal text-left" aria-pressed={chosenBot === owner.id} onClick={() => { updateDraft({ bot: owner.id, writes: [], preview: true }) }}><BotAvatar id={owner.id} stance={owner.stance} /><span className="task-owner-text"><strong>{name(owner)}</strong><small>{owned ? (zh ? owned.title_zh : owned.title) : owner.summary}</small></span><ArrowRightIcon className="task-service-arrow" aria-hidden="true" /></Button>
         })}
       </div>
+      {bots.isError ? <p role="status" className="text-sm text-text-secondary">{zh ? '无法加载负责人名录，暂时不能分派任务。' : 'The task owner roster could not be loaded, so work cannot be assigned yet.'}</p> : null}
+      {bots.data && owners.length === 0 ? <p role="status" className="text-sm text-text-secondary">{zh ? '当前名录中没有承接托管任务的 Bot，可以先开始对话。' : 'No operator in the roster takes guided tasks. Start a conversation instead.'}</p> : null}
     </form>
-    {preview && service ? <section aria-label={zh ? '任务计划' : 'Task plan'} className="space-y-3 rounded-lg border border-border p-3">
-      <h4 className="font-semibold">{zh ? service.title_zh : service.title}</h4>
+    {preview && assignee && service ? <section aria-label={zh ? '任务计划' : 'Task plan'} className="space-y-3 rounded-lg border border-border p-3">
+      <div className="task-plan-owner"><BotAvatar id={assignee.id} stance={assignee.stance} /><div className="min-w-0">
+        <h4 className="font-semibold">{zh ? `${name(assignee)} 负责：${service.title_zh}` : `${name(assignee)} owns: ${service.title}`}</h4>
+        <p className="text-xs text-text-secondary">{assignee.summary}</p>
+        {reviewers.length ? <p className="text-xs text-text-secondary">{zh ? `复核：${reviewers.map(name).join('、')}` : `Reviewed by ${reviewers.map(name).join(', ')}`}</p> : null}
+      </div></div>
       <p className="text-sm">{zh ? service.deliverable_zh : service.deliverable}</p>
       <ol className="list-decimal space-y-1 pl-5 text-sm">{service.steps.map((s, i) => <li key={i}>{String(zh ? s.title_zh : s.title)}</li>)}</ol>
-      {service.write_tools.map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
+      {(assignee.task_write_tools ?? []).map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
         {tool === 'start_literature_search' ? (zh ? '允许发起外部文献检索并摄取结果' : 'Allow external literature search and ingestion') : (zh ? '允许保存待审核研究笔记' : 'Allow saving research notes for review')}</label>)}
       <p className="text-xs text-text-secondary">{writes.length ? (zh ? '将在本项目内执行以上勾选操作。' : 'Checked actions will run in this project.') : (zh ? '当前只读取已有资料并生成答复。' : 'Reads existing data and prepares an answer.')} {zh ? '工作流运行仍需检查并确认提交。' : 'Workflow execution still requires review and confirmation.'}</p>
       <Disclosure title={zh ? '高级参数与直接编辑' : 'Advanced options and direct editing'}>
@@ -121,15 +137,21 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
         {readiness.data?.checked_at ? <p>{Object.entries(readiness.data.checks ?? {}).map(([name, passed]) => `${name}: ${passed ? '✓' : '×'}`).join(' · ')}</p> : null}</div> : null}
       {!validTurns ? <p id={`${fieldId}-turns-error`} role="alert" className="text-sm text-destructive">{zh ? '轮数必须为 1–200 的整数。' : 'Turn limit must be a whole number from 1 to 200.'}</p> : null}
       {!validCost ? <p id={`${fieldId}-cost-error`} role="alert" className="text-sm text-destructive">{zh ? '费用额度须为 0–1,000,000 美分的整数，或留空。' : 'Budget must be a whole number from 0 to 1,000,000 cents, or left empty.'}</p> : null}
-      <Button type="button" disabled={!qualified || !goal.trim() || start.isPending || readOnly || !validTurns || !validCost} onClick={() => start.mutate()}>{start.isPending ? (zh ? '启动中…' : 'Starting…') : (zh ? '按以上计划开始' : 'Start this plan')}</Button>
+      <Button type="button" disabled={!assignee || !qualified || !goal.trim() || start.isPending || readOnly || !validTurns || !validCost} onClick={() => start.mutate()}>{start.isPending ? (zh ? '启动中…' : 'Starting…') : (zh ? '按以上计划开始' : 'Start this plan')}</Button>
     </section> : null}
-    {preview && !service && !services.isError ? <p role="status" className="text-sm text-text-secondary">{services.isLoading ? (zh ? '加载可用服务…' : 'Loading available services…') : (zh ? '此服务暂不可用，请选择其他服务或开始对话。' : 'This service is unavailable. Choose another service or start a conversation.')}</p> : null}
-    {services.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}
+    {preview && !(assignee && service) && !services.isError && !bots.isError ? <p role="status" className="text-sm text-text-secondary">{services.isLoading || bots.isLoading ? (zh ? '加载负责人与任务类型…' : 'Loading task owners…') : (zh ? '暂时没有负责人承接这项任务，请选择其他负责人或开始对话。' : 'No owner is available for this task. Choose another owner or start a conversation.')}</p> : null}
+    {services.isError || bots.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (bots.isError) void bots.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p> : null}
     <Button type="button" variant="ghost" onClick={() => setChat(true)}>{zh ? '询问或解释一个问题' : 'Ask or explain a question'}</Button>
-    <section className="task-deliveries space-y-2"><h4 className="font-semibold">{zh ? '我的任务与交付物' : 'Tasks and deliverables'}</h4>
+    <section className="task-deliveries space-y-2"><h4 className="font-semibold">{zh ? '任务与交付物（按负责人）' : 'Tasks and deliverables by owner'}</h4>
       {runs.isLoading ? <p role="status">{zh ? '加载任务…' : 'Loading tasks…'}</p> : null}
-      {runs.data?.filter((r) => !r.parent_run_id).map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
+      {groupRunsByOwner(runs.data?.filter((r) => !r.parent_run_id) ?? [], bots.data ?? []).map((group) => {
+        const label = group.bot ? name(group.bot) : group.botId ?? (zh ? '未指定负责人' : 'No assigned owner')
+        return <div key={group.key} role="group" aria-label={label} className="space-y-2">
+          <p className="task-owner-heading">{group.bot ? <BotAvatar id={group.bot.id} stance={group.bot.stance} /> : null}<span>{label}</span><span className="text-text-muted">{group.runs.length}</span></p>
+          {group.runs.map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
+        </div>
+      })}
       {runs.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '启动后，进度和产物会保存在这里。' : 'Task progress and deliverables will stay here.'}</p> : null}
     </section>
   </div>

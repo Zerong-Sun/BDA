@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ServiceKind } from '../../features/copilot/taskPresentation'
 import {
   adjacentTourStep,
   firstTourStep,
@@ -45,7 +44,8 @@ export interface CopilotProjectSession {
 
 export interface CopilotTaskDraft {
   goal: string
-  selected: ServiceKind | null
+  /** Roster id of the operator the task is assigned to; null follows the suggestion. */
+  bot: string | null
   preview: boolean
   writes: string[]
   maxTurns: number

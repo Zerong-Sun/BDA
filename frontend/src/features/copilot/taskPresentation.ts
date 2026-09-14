@@ -1,4 +1,5 @@
 import type { AgentRun } from '../../lib/api/agentRuns'
+import { matchBot, type CopilotBot } from './bots/registry'
 
 export type ServiceKind = 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation'
 
@@ -27,4 +28,41 @@ export function deliveryLabel(run: AgentRun, zh: boolean): string {
     review_required: ['Needs review', '需要审核'], cancelled: ['Cancelled', '已取消'],
   }
   return (labels[deliveryState(run)] ?? labels.review_required)[zh ? 1 : 0]
+}
+
+/** Operators that take guided tasks, in the roster's chain order. */
+export function taskOwners(bots: readonly CopilotBot[]): CopilotBot[] {
+  return bots.filter((bot) => Boolean(bot.task_service))
+}
+
+export function ownerOf(kind: string, bots: readonly CopilotBot[]): CopilotBot | undefined {
+  return bots.find((bot) => bot.task_service === kind)
+}
+
+/** A visible suggestion of who should own a goal. An operator the goal names outranks the keyword guess. */
+export function suggestAssignee(goal: string, owners: readonly CopilotBot[]): CopilotBot | undefined {
+  return matchBot(goal, owners) ?? ownerOf(suggestService(goal), owners)
+}
+
+export interface OwnerGroup {
+  key: string
+  botId: string | null
+  bot: CopilotBot | undefined
+  runs: AgentRun[]
+}
+
+/**
+ * Tasks under the operator that answers for them, in roster order. Owners the
+ * roster no longer lists keep their id; runs started without an owner come last.
+ */
+export function groupRunsByOwner(runs: readonly AgentRun[], bots: readonly CopilotBot[]): OwnerGroup[] {
+  const groups = new Map<string | null, OwnerGroup>()
+  for (const run of runs) {
+    const botId = run.bot ?? null
+    const group = groups.get(botId) ?? { key: botId ?? 'unassigned', botId, bot: bots.find((bot) => bot.id === botId), runs: [] }
+    group.runs.push(run)
+    groups.set(botId, group)
+  }
+  const rank = (group: OwnerGroup) => group.botId === null ? bots.length + 1 : group.bot ? bots.indexOf(group.bot) : bots.length
+  return [...groups.values()].sort((a, b) => rank(a) - rank(b))
 }

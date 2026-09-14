@@ -323,6 +323,29 @@ which is the conservative set and includes `post_handoff`. The narrower
 `user_intent_write_ids()` — the set the chat intent gate filters — is the one
 that excludes it, and it has to be asked for by name.
 
+## Guided task ownership
+
+A guided task is assigned to an operator, not to a recipe. Each recipe in
+`task_contracts.SERVICES` has exactly one owner, declared as `task_service` on
+the bot and checked at import:
+
+| Recipe | Owner |
+| --- | --- |
+| `brief` | `briefing` |
+| `literature` | `librarian` |
+| `planning` | `planner` |
+| `execution` | `runner` |
+| `interpretation` | `analyst` |
+
+The owner must be a producer and must be able to call every step of its recipe
+through `bot.capabilities ∩ recipe.capabilities`. `/copilot/bots` serves
+`task_service` and `task_write_tools` — the recipe's optional writes the owner
+can be granted, so the librarian is offered external search but not note
+authoring, which belongs to `archivist`. Starting a recipe with a bot that does
+not own it is refused with `copilot_task_owner_mismatch`; a run with no bot keeps
+the previous recipe-only behaviour. Operators without a recipe still work
+through conversation, handoffs and delegation.
+
 ## Surfaces
 
 One declaration, three surfaces, no duplication:

@@ -29,7 +29,7 @@ let failTask = false
 const task = {
   id: 'task-browser', project_id: 'proj_browser', goal: 'Review the synthetic QA sources', status: 'succeeded',
   parent_run_id: null, allowed_tools: [], version: 1, turn_count: 2, max_turns: 24, cost_usd_cents: 0,
-  task_contract: { version: 1, service_kind: 'literature' },
+  bot: 'librarian', task_contract: { version: 1, service_kind: 'literature' },
   outcome: { status: 'needs_input', summary: 'Synthetic QA delivery: source review needs your input.', missing: ['Confirm the source selection.'], next_action: 'Review the project materials.', steps: [] },
 }
 const writes = []
@@ -182,8 +182,10 @@ try {
   await page.getByRole('heading', { name: 'What would you like to accomplish?' }).waitFor()
   if (catalog) {
     assert.equal(await page.locator('.bot-roster-item').count(), catalog.bots.length + 1)
-    assert.equal(await page.getByLabel('Service type', { exact: true }).getByRole('button').count(), catalog.services.length)
-    checks.push(`Actual FastAPI catalog renders all ${catalog.bots.length} Bots and ${catalog.services.length} services`)
+    const owners = catalog.bots.filter((bot) => bot.task_service)
+    assert.equal(owners.length, catalog.services.length)
+    assert.equal(await page.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button').count(), owners.length)
+    checks.push(`Actual FastAPI catalog renders all ${catalog.bots.length} Bots and one task owner for each of ${catalog.services.length} services`)
   }
   await screenshot(page, 'bots-en-light')
   await page.setViewportSize({ width: 390, height: 1000 })
@@ -207,8 +209,8 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 })
   checks.push('Localized filters display labels after selection; last mobile Bot remains keyboard-accessible')
   await page.getByLabel('Task goal', { exact: true }).fill('Research the existing project sources')
-  await page.getByRole('button', { name: 'Research the evidence', exact: true }).click()
-  await page.getByRole('checkbox', { name: 'Allow saving research notes for review' }).check()
+  await page.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Librarian/ }).click()
+  await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).check()
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).focus()
   await page.keyboard.press('ArrowRight')
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Conversation')
@@ -217,7 +219,7 @@ try {
   assert.equal(await page.getByLabel('Ask the Copilot a question', { exact: true }).inputValue(), drafted)
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
   assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
-  assert.ok(await page.getByRole('checkbox', { name: 'Allow saving research notes for review' }).isChecked())
+  assert.ok(await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).isChecked())
   await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
   await page.getByRole('region', { name: 'Project brief' }).waitFor()
   await page.goBack()
@@ -301,10 +303,12 @@ try {
   const errorPage = await newPage()
   await errorPage.goto(`${origin}/#/bots?project=proj_browser`)
   await errorPage.getByText('Roster unavailable for this test').waitFor()
+  await errorPage.getByText('The task owner roster could not be loaded, so work cannot be assigned yet.', { exact: true }).waitFor()
   failRoster = false
   await errorPage.getByRole('button', { name: 'Retry', exact: true }).click()
   await errorPage.getByRole('button', { name: 'Conductor', exact: true }).waitFor()
-  checks.push('Roster failure is recoverable through Retry')
+  await errorPage.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Librarian/ }).waitFor()
+  checks.push('Roster failure is explained once in the task composer and recovers task owners through Retry')
   failTask = true
   const taskError = await newPage()
   await taskError.goto(`${origin}/#/bots?project=proj_browser&view=tasks&run=task-browser`)

@@ -964,6 +964,14 @@ export type BotResponse = {
      */
     summary: string;
     /**
+     * Task Service
+     */
+    task_service?: string | null;
+    /**
+     * Task Write Tools
+     */
+    task_write_tools?: Array<string>;
+    /**
      * Title
      */
     title: string;
