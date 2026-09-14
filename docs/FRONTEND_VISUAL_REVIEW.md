@@ -1,5 +1,15 @@
 # Frontend visual review — 2026-09-14
 
+状态：活跃
+
+最后核验：2026-09-14（Asia/Shanghai）
+
+权威范围：Bot 优先工作区的视觉层级复审与修复清单。
+
+数据来源：渲染后的生产页面截图与本地 Bigo V2 视觉系统。
+
+替代关系：是 [Bot 优先工作区](BOT_FIRST_WORKSPACE.md) 的视觉附录，不取代 [前端架构与 API 契约](FRONTEND_V2.md)。
+
 The functional Bot-first workspace was clearer than the original, but its visual
 hierarchy still resembled an administrative form. This follow-up reviews the
 rendered production pages and adapts the local Bigo V2 system to an application.
