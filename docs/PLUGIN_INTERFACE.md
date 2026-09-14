@@ -301,8 +301,17 @@ def parse(ctx: ParseContext) -> ParsedOutputs:
 ```
 
 Import it in `parsers/__init__.py` and set `"output_parser": "my_model"`.
+Forgetting the import is the quiet failure: the decorator never runs, the name
+resolves to `manifest_metadata`, and the plugin appears to work while reading
+nothing.
+
 `backend_v2/app/compute/parsers/proteinmpnn.py` is a worked example that reads
-ProteinMPNN's FASTA score headers.
+ProteinMPNN's FASTA score headers. `alphafold3.py` is the fuller one: it reads
+AF3's per-seed `*_summary_confidences.json`, keeps every seed as its own metric
+row rather than averaging them, skips the duplicate summary AF3 writes at the
+job root, and records the numbers as `assessor="independent_model"` because a
+predictor scoring somebody else's design is not that design model's own
+confidence.
 
 ## 5. Adding a compute backend
 
