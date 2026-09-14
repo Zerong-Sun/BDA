@@ -51,6 +51,7 @@ const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: 
 const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
 const BotsPage = lazy(() => import('./app/Bots').then((module) => ({ default: module.BotsPage })))
 const BotDetailPage = lazy(() => import('./app/BotDetail').then((module) => ({ default: module.BotDetailPage })))
+const InboxPage = lazy(() => import('./app/Inbox').then((module) => ({ default: module.InboxPage })))
 
 function RouteFallback() {
   return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
@@ -175,6 +176,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
+                <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/bots" element={<BotsPage />} />
                 <Route path="/bots/:botId" element={<BotDetailPage />} />
                 {/* The page was always labelled "Projects"; only the URL said

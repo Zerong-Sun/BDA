@@ -76,6 +76,7 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     else if (path === '/api/v2/copilot/bots' && failRoster) reply = { status: 422, body: { status: 422, title: 'Roster unavailable', detail: 'Roster unavailable for this test' } }
     else if (path === '/api/v2/copilot/bots' && catalog) reply = { status: 200, body: catalog.bots }
     else if (path === '/api/v2/copilot/task-services' && catalog) reply = { status: 200, body: catalog.services }
+    else if (path.endsWith('/literature/claims')) reply = { status: 200, body: { items: [], next_cursor: null } }
     else if (path.includes('/handoffs')) reply = { status: 200, body: { items: [], next_cursor: null } }
     else reply = await base.resolve(method, url.href, { body: request.postDataJSON() })
     await route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.body) })
@@ -181,7 +182,7 @@ try {
   await page.getByRole('tab', { name: 'Conversation', exact: true }).click()
   await page.locator('.bot-chat-surface').waitFor()
   await screenshot(page, 'bot-planner-en-light')
-  await page.getByRole('link', { name: 'Research team', exact: true }).click()
+  await page.locator('.science-page-header').getByRole('link', { name: 'Research team', exact: true }).click()
   await page.getByRole('tab', { name: 'Bot handoffs', exact: true }).click()
   await screenshot(page, 'bots-handoffs-en-light')
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
@@ -334,6 +335,27 @@ try {
   await detail.goto(`${origin}/#/bots/ghost?project=proj_browser`)
   await detail.getByText('This Bot is not in the roster', { exact: true }).waitFor()
   checks.push('A retired Bot id opens its successor; each Bot page holds its tasks at durable URLs, links its workbenches, and assigning only prepares the composer')
+
+  const inbox = await newPage()
+  const writesBeforeInbox = writes.length
+  await inbox.goto(`${origin}/#/inbox?project=proj_browser`)
+  await inbox.getByRole('heading', { level: 1, name: 'Needs your decision', exact: true }).waitFor()
+  const needsInput = inbox.getByRole('region', { name: 'Needs your input', exact: true })
+  const heldTask = needsInput.getByRole('link', { name: /Review the synthetic QA sources/ })
+  await heldTask.waitFor()
+  // Recorded under the retired `librarian` id; it opens at the operator that absorbed it.
+  assert.ok((await heldTask.getAttribute('href')).includes('/bots/researcher?project=proj_browser&run=task-browser'))
+  await screenshot(inbox, 'inbox-en-light')
+  for (const width of [390, 1024]) {
+    await inbox.setViewportSize({ width, height: 1000 })
+    await noOverflow(inbox, `Decisions ${width}`)
+  }
+  await inbox.setViewportSize({ width: 1440, height: 1000 })
+  await inbox.getByRole('button', { name: 'Workbenches', exact: true }).click()
+  await inbox.getByRole('menuitem', { name: 'Workflow', exact: true }).waitFor()
+  await inbox.keyboard.press('Escape')
+  assert.equal(writes.length, writesBeforeInbox, 'The decision inbox must only read')
+  checks.push('Decisions gathers what waits on a person, links each to where it is decided, and only reads; workbenches sit behind one menu')
 
   failRoster = true
   const errorPage = await newPage()
