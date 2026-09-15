@@ -423,14 +423,14 @@ class CopilotActionService:
         sources = {"europe_pmc": "europe_pmc_patents", "epo_ops": "epo_ops_patents"}
         if database not in sources:
             raise ValueError("patent_database_unknown")
-        payload = LiteratureSearchCreate(
-            query=query,
-            sources=[sources[database]],
-            limit=limit,
-            fetch_full_text=False,
-            extract_claims=False,
-            jurisdictions=list(jurisdictions),
-        )
+        payload = LiteratureSearchCreate.model_validate({
+            "query": query,
+            "sources": [sources[database]],
+            "limit": limit,
+            "fetch_full_text": False,
+            "extract_claims": False,
+            "jurisdictions": list(jurisdictions),
+        })
 
         def execute() -> dict[str, Any]:
             row = create_literature_search(

@@ -18,7 +18,7 @@ from backend_v2.app.core.database import SessionFactory, set_request_rls_context
 from backend_v2.app.identity.models import User
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.registry.plugin_manifest import PluginManifestCatalog
-from backend_v2.app.registry.schemas import PluginDeploymentCreate
+from backend_v2.app.registry.schemas import PluginDeploymentCreate, PluginSiteOverrides
 from backend_v2.app.registry.service import deploy_plugin_manifest
 from backend_v2.app.registry.site_runtime import resolve_plugin_runtime
 from backend_v2.app.registry.tasks import _model_plugin_errors
@@ -40,7 +40,7 @@ def main() -> int:
         manifest_id=manifest.manifest_id,
         plugin_version=manifest.plugin_version,
         checksum=manifest.checksum_sha256,
-        site_overrides={"runtime_root": args.runtime_root},
+        site_overrides=PluginSiteOverrides(runtime_root=args.runtime_root),
     )
     with SessionFactory() as s:
         if not args.apply:
@@ -100,6 +100,8 @@ def main() -> int:
         s.commit()
         for old_id, before in legacy.items():
             p = s.get(ModelPlugin, uuid.UUID(old_id))
+            if p is None:
+                raise RuntimeError("Legacy deployment disappeared unexpectedly")
             s.refresh(p)
             after = {
                 "version": p.version,
