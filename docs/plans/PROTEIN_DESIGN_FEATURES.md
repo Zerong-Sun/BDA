@@ -13,8 +13,8 @@
 | 5 | 候选分诊（阈值判定，三态 pass/fail/missing） | 已实现 | `app/candidates/triage.py`；工具 `triage_candidates` |
 | 6 | 密码子优化与构建体设计 | 已实现 | `app/sequences/{codon,codon_usage,schemas,api}.py`；`scripts/build_codon_usage.py`；仅 HTTP |
 | 7 | 保守性分析（从比对计算每个位点的保守度，标注不可动残基） | 已实现（输入限于已上传的比对文件） | `app/sequences/conservation.py`；工具 `analyse_conservation` |
-| 8 | 序列/结构资源 MCP（把项目的序列与结构以 MCP resource 暴露给外部模型） | 未开始 | 预计 `app/copilot/mcp*.py` |
-| 9 | 集群作业 MCP（在授权会话内查询与提交集群作业） | 未开始 | 预计 `app/copilot/mcp*.py` + `app/compute/` |
+| 8 | 序列/结构资源 MCP（把项目的序列与结构以 MCP resource 暴露给外部模型） | **不做**（见下） | 现状：`app/copilot/mcp.py: resource_listing/read_resource` |
+| 9 | 集群作业 MCP（在授权会话内查询集群作业） | 已具备，无需新增 | 现有注册表工具经同一个 MCP transport 暴露 |
 
 ## 两条贯穿始终的规则
 
@@ -36,3 +36,30 @@ MSA 输出，AlphaFold3 插件也只把 MSA 当作运行中的一个阶段。所
 
 **仍未做**：让 AlphaFold3 流程把它算出的 MSA 落成 artifact（需要改插件的 output port 与 collect
 解析），以及按 target 自动找到对应比对。在那之前，这项能力要求人先上传比对文件。
+
+## 第 8 项为什么不做
+
+原始设想是"把项目的序列与结构做成 MCP resource"。查过现状后结论是**不做**，两条理由都写在现有代码里：
+
+1. `mcp.py: resource_listing()` 只返回 UI 页面，并且注明了原因——把项目实体逐条列出来，等于开出
+   第二个**没有能力门**的读取面。现在的设计是：资源**可寻址、不可枚举**，
+   `resources/read` 认 `bda://{research|project|literature}/{kind}/{id}`，并在读之前检查
+   `research-read` / `project-read`。artifact 已经在 `PROJECT_ROUTES` 里（`/api/v2/artifacts/{id}`）。
+2. 序列资源会直接违反贯穿本清单的那条规则：`Protein.sequence` 是唯一的明文副本。把残基做成
+   resource 内容，等于给外部模型发一份明文。
+
+外部模型需要结构时，已有路径是**工具**：`render_structure_view`、`measure_structure_interface`、
+`compare_structures` 按 artifact id 在服务端算完再回结果，而不是把坐标整体交出去。
+
+## 第 9 项为什么不用新增
+
+"集群作业 MCP"在这套架构里不需要是新东西：MCP 是注册表的第二个传输层，
+`mcp.available_tools` 直接从 `REGISTRY.all()` 里选，所以作业相关工具天然在 MCP 上可见——
+`get_compute_status`（project-read / failure-diagnosis）、`diagnose_compute_failure`（failure-diagnosis）、
+`review_compute_declaration`（review-audit）都是只读工具，一个授权会话有对应 capability 就能调。
+再写一套 MCP 专用作业工具，就是 `registry.py` 开篇要消灭的"第四处声明"。
+
+两条边界是有意保留的，并由测试钉住（`tests/test_copilot_mcp.py`）：
+未绑定 run 的会话**拿不到** `create_compute_draft`——草稿会占集群时间，而没有 run 的会话没有授权依据；
+`await_compute_job` 需要挂起一次 run，MCP 客户端不能挂起，所以它从不出现在 MCP 列表里。
+**提交作业本身不是工具**：它花钱，走 draft → 人确认 → 提交这条既有路径。
