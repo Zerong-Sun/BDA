@@ -505,3 +505,126 @@ def test_computational_experiment_review_receives_the_run_packet(monkeypatch) ->
     assert "reproducible direction from reproducible magnitude" in system
     assert "pipeline failure from a scientific result" in system
     assert "4083234" in captured["messages"][1]["content"]
+
+
+def test_reasoning_content_is_passed_back_to_a_thinking_model(monkeypatch) -> None:
+    """DeepSeek refuses a follow-up round that drops `reasoning_content`.
+
+    Its message is explicit - "The `reasoning_content` in the thinking mode must
+    be passed back to the API" - so a turn that uses a tool dies at round two on
+    every thinking-mode model unless the field is carried through.
+    """
+    sent: list[list[dict[str, Any]]] = []
+    responses = iter(
+        [
+            {
+                "content": "",
+                "reasoning_content": "The goals are needed first.",
+                "tool_calls": [
+                    {"id": "call-1", "type": "function", "function": {"name": "search_research", "arguments": "{}"}}
+                ],
+            },
+            {"content": "No goals are recorded."},
+        ]
+    )
+
+    def complete(_provider, conversation, **_kwargs):
+        sent.append([dict(item) for item in conversation])
+        return next(responses)
+
+    monkeypatch.setattr(research_agent, "completion_message", complete)
+    context = SimpleNamespace(
+        search_research=lambda query, limit, allowed_kinds: [],
+        citation_for_item=lambda value: {},
+    )
+
+    research_agent.complete_research_turn(
+        cast(Any, SimpleNamespace()),
+        [{"role": "user", "content": "What is recorded?"}],
+        cast(Any, context),
+        initial_citations=[],
+        initial_tool_calls=[],
+    )
+
+    assistant = next(item for item in sent[-1] if item.get("role") == "assistant")
+    assert assistant["reasoning_content"] == "The goals are needed first."
+
+
+def test_a_provider_without_reasoning_content_gains_no_such_field(monkeypatch) -> None:
+    sent: list[list[dict[str, Any]]] = []
+    responses = iter(
+        [
+            {
+                "content": "checking",
+                "tool_calls": [
+                    {"id": "call-1", "type": "function", "function": {"name": "search_research", "arguments": "{}"}}
+                ],
+            },
+            {"content": "Nothing found."},
+        ]
+    )
+
+    def complete(_provider, conversation, **_kwargs):
+        sent.append([dict(item) for item in conversation])
+        return next(responses)
+
+    monkeypatch.setattr(research_agent, "completion_message", complete)
+    context = SimpleNamespace(search_research=lambda query, limit, allowed_kinds: [], citation_for_item=lambda v: {})
+
+    research_agent.complete_research_turn(
+        cast(Any, SimpleNamespace()),
+        [{"role": "user", "content": "What is recorded?"}],
+        cast(Any, context),
+        initial_citations=[],
+        initial_tool_calls=[],
+    )
+
+    assistant = next(item for item in sent[-1] if item.get("role") == "assistant")
+    assert "reasoning_content" not in assistant
+
+
+def test_every_tool_call_is_answered_even_when_the_budget_runs_out_mid_batch(monkeypatch) -> None:
+    """An assistant message with N tool calls must be followed by N tool replies.
+
+    The budget check breaks out of the batch, so the calls it skipped used to get
+    no reply at all and the next request was malformed - the API rejects the
+    whole conversation ("insufficient tool messages following tool_calls
+    message"), which loses the turn rather than the one call that did not run.
+    """
+    sent: list[list[dict[str, Any]]] = []
+    responses = iter(
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {"id": "call-1", "type": "function", "function": {"name": "search_research", "arguments": "{}"}},
+                    {"id": "call-2", "type": "function", "function": {"name": "search_research", "arguments": "{}"}},
+                    {"id": "call-3", "type": "function", "function": {"name": "search_research", "arguments": "{}"}},
+                ],
+            },
+            {"content": "Answered with what was covered."},
+        ]
+    )
+
+    def complete(_provider, conversation, **_kwargs):
+        sent.append([dict(item) for item in conversation])
+        return next(responses)
+
+    monkeypatch.setattr(research_agent, "completion_message", complete)
+    context = SimpleNamespace(search_research=lambda query, limit, allowed_kinds: [], citation_for_item=lambda v: {})
+
+    research_agent.complete_research_turn(
+        cast(Any, SimpleNamespace()),
+        [{"role": "user", "content": "Search three things"}],
+        cast(Any, context),
+        initial_citations=[],
+        initial_tool_calls=[],
+        max_tool_calls=1,
+    )
+
+    conversation = sent[-1]
+    requested = {call["id"] for item in conversation if item.get("role") == "assistant" for call in item.get("tool_calls") or []}
+    replied = {item["tool_call_id"] for item in conversation if item.get("role") == "tool"}
+    assert requested == replied == {"call-1", "call-2", "call-3"}
+    skipped = [item for item in conversation if item.get("role") == "tool" and "budget_exhausted" in item["content"]]
+    assert len(skipped) == 2

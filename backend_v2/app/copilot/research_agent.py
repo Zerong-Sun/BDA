@@ -256,13 +256,22 @@ def complete_research_turn(
             if not isinstance(content, str) or not content.strip():
                 content = "Research tool-call limit reached; the remaining workspace scope was not covered."
             return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True)
-        conversation.append(
-            {
-                "role": "assistant",
-                "content": message.get("content"),
-                "tool_calls": requested,
-            }
-        )
+        assistant_turn: dict[str, Any] = {
+            "role": "assistant",
+            "content": message.get("content"),
+            "tool_calls": requested,
+        }
+        # Thinking-mode models return their reasoning alongside the tool calls
+        # and require it back on the next round: DeepSeek refuses the follow-up
+        # with "The `reasoning_content` in the thinking mode must be passed back
+        # to the API", which made every tool-using turn on such a model fail at
+        # the second round. Copied through only when the provider sent it, so
+        # providers that do not use the field see no change.
+        reasoning = message.get("reasoning_content")
+        if isinstance(reasoning, str) and reasoning:
+            assistant_turn["reasoning_content"] = reasoning
+        conversation.append(assistant_turn)
+        answered: set[str] = set()
         for request in requested:
             if len(call_log) - len(initial_tool_calls) >= max_tool_calls:
                 break
@@ -305,6 +314,25 @@ def complete_research_turn(
                     "tool_call_id": call_id,
                     "name": name,
                     "content": json.dumps(result, ensure_ascii=False, default=str),
+                }
+            )
+            answered.add(call_id)
+        # Every tool call gets a reply, including the ones the budget cut off.
+        # The loop above breaks mid-batch when the limit lands inside a batch,
+        # which used to leave an assistant message carrying N tool calls followed
+        # by fewer than N tool messages - a conversation the API rejects outright
+        # ("insufficient tool messages following tool_calls message"), losing the
+        # whole turn rather than the one call that did not run.
+        for request in requested:
+            call_id = str(request.get("id") or "")
+            if not call_id or call_id in answered:
+                continue
+            conversation.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "name": str((request.get("function") or {}).get("name") or ""),
+                    "content": json.dumps({"error": "tool_call_budget_exhausted"}, ensure_ascii=False),
                 }
             )
     raise RuntimeError("research_tool_loop_exhausted")
