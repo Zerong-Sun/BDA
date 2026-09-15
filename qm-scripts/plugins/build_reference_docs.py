@@ -39,9 +39,13 @@ def fields(schema):
 def base(key): return key.split('-authoring-')[0]
 def rows(snapshot,key):
     return [r for r in snapshot['models'] if r['plugin_key']==key]+[dict(r,plugin_version=r['specification'].get('version','unknown'),parameter_schema=r['specification'].get('parameter_schema',{})) for r in snapshot['methods'] if r['plugin_key']==key]
+def source_label(source):
+    if source.get('classification') == 'private':
+        return source['id'] + '（私有审计快照，SHA-256 `' + source['sha256'] + '`）'
+    return '[' + source['id'] + '](' + (source.get('url') or '../../../' + source['path']) + ')'
 def refs(p,ids):
     sm={x['id']:x for x in p['sources']}
-    return ', '.join(f"[{i}]({sm[i].get('url') or '../../../'+sm[i].get('path','')})" for i in ids)
+    return ', '.join(source_label(sm[i]) for i in ids)
 def validate(snapshot,catalog,profiles):
     errors=[]; stats=[]
     keys={r['plugin_key'] for r in snapshot['models']+snapshot['methods']}
@@ -73,6 +77,9 @@ def validate(snapshot,catalog,profiles):
                     for mode in x.get('modes',[]):
                         if mode not in modeids:errors.append(f'{key}/{x["key"]}: unknown mode {mode}')
         for source in p['sources']:
+            if source.get('classification') == 'private':
+                if not re.fullmatch(r'[0-9a-f]{64}',source.get('sha256','')): errors.append(f'{key}: invalid private source checksum')
+                continue
             if not source.get('url') and not (ROOT/source.get('path','__missing__')).is_file(): errors.append(f'{key}: missing source path {source}')
         stats.append({'plugin_key':key,'profile':p['slug'],'versions':len(rows(snapshot,key)),'required_parameters':len(required),'documented_parameters':len(present),'missing_parameters':sorted(missing),'modes':len(p['modes']),'outputs':len(p['outputs']),'gaps':len(p['gaps'])})
     return errors,stats
@@ -104,25 +111,31 @@ def render(p,key,versions,catalog):
     if not p['outputs']: lines += ['| 无已定义科学输出 | 空 demo schema | 不适用 | 不得参与候选评分 | 当前注册声明 |']
     lines+=['','保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。','','## 已知缺口与后续验收','']+[f'- {g}' for g in p['gaps']]+['','## 易错点','']+[f'- {s}' for s in p['pitfalls']]+['','## 来源与版本','']
     for s in p['sources']:
-        dest=s.get('url') or '../../../'+s.get('path','')
-        lines += [f"- [{s['id']}]({dest})：{s.get('scope','参数/功能依据')}；commit `{s.get('commit','未固定/本地快照')}`；读取 {s.get('retrieved_on','2026-09-15')}。"]
+        lines += [f"- {source_label(s)}：{s.get('scope','参数/功能依据')}；commit `{s.get('commit','未固定/本地快照')}`；读取 {s.get('retrieved_on','2026-09-15')}。"]
     return '\n'.join(lines)+'\n'
 
 def main():
-    ap=argparse.ArgumentParser();g=ap.add_mutually_exclusive_group(required=True);g.add_argument('--write',action='store_true');g.add_argument('--check',action='store_true');a=ap.parse_args()
-    snapshot=json.loads(SNAP.read_text());catalog=json.loads(CAT.read_text());profiles={}
+    ap=argparse.ArgumentParser();g=ap.add_mutually_exclusive_group(required=True);g.add_argument('--write',action='store_true');g.add_argument('--check',action='store_true');ap.add_argument('--snapshot',type=Path,default=SNAP);ap.add_argument('--catalog',type=Path,default=CAT);a=ap.parse_args()
+    snapshot_path=a.snapshot;catalog_path=a.catalog
+    snapshot=json.loads(snapshot_path.read_text());catalog=json.loads(catalog_path.read_text());profiles={}
     for path in sorted((DOCS/'profiles').glob('*.json')):
         p=json.loads(path.read_text());profiles[p['plugin_key']]=p
     errors,stats=validate(snapshot,catalog,profiles)
+    expected_hash=hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+    for profile in profiles.values():
+        for source in profile['sources']:
+            if source.get('classification') == 'private' and source.get('sha256') != expected_hash:
+                errors.append('Private audit snapshot checksum does not match documented provenance')
     if errors:
         print('\n'.join(errors));return 1
     files={}; index=['# BDA 插件说明总览','', '盘点日期：2026-09-15。19 个模型键（含 3 个 authoring 草稿），23 条模型版本记录，另有 4 个方法插件；合计 23 个独立插件键。','', '[统一解释与使用规范](STANDARD.md) · [审计与审阅记录](REVIEW.md)','', '覆盖表统计当前 library/BDA 已知字段；上游未接入功能和科学证据不足逐页列出。运行状态以当前声明指纹匹配为准。','','| 插件 | 版本数 | 必须解释字段 | 已解释字段（含上游扩展） | 模式 | 输出定义 | 待解决缺口 |','|---|---:|---:|---:|---:|---:|---:|']
+    index[1:1] = ['', '状态：活跃', '', '最后核验：2026-09-16（整合验证）', '', '权威范围：插件配置、参数解释与已记录的验证边界。', '', '数据来源：版本化插件声明、参数定义及本文列出的来源。', '', '替代关系：补充插件接口文档；配置覆盖不代表真实运行通过。']
     for item in stats:
         key=item['plugin_key'];p=profiles[base(key)];slug=p['slug'] if base(key)==key else key.lower()
         files[ROOT/'qm-scripts/plugins'/slug/'REFERENCE.md']=render(p,key,rows(snapshot,key),catalog)
         index.append('| ['+key+'](../../qm-scripts/plugins/'+slug+'/REFERENCE.md) | '+' | '.join(str(item[k]) for k in ['versions','required_parameters','documented_parameters','modes','outputs','gaps'])+' |')
     uniqueprofiles=set(item['profile'] for item in stats)
-    report={'schema_version':1,'captured_on':snapshot['captured_on'],'registry_sha256':hashlib.sha256(SNAP.read_bytes()).hexdigest(),'catalog_sha256':hashlib.sha256(CAT.read_bytes()).hexdigest(),'plugin_keys':len(stats),'model_versions':len(snapshot['models']),'method_plugins':len(snapshot['methods']),'unique_profiles':len(uniqueprofiles),'unique_documented_parameters':sum(len(p['parameters']) for p in profiles.values()),'current_runtime_proofs':sum(r.get('runtime_validation_current',False) for r in snapshot['models']),'coverage_errors':errors,'plugins':stats}
+    report={'schema_version':1,'captured_on':snapshot['captured_on'],'registry_sha256':hashlib.sha256(snapshot_path.read_bytes()).hexdigest(),'catalog_sha256':hashlib.sha256(catalog_path.read_bytes()).hexdigest(),'plugin_keys':len(stats),'model_versions':len(snapshot['models']),'method_plugins':len(snapshot['methods']),'unique_profiles':len(uniqueprofiles),'unique_documented_parameters':sum(len(p['parameters']) for p in profiles.values()),'current_runtime_proofs':sum(r.get('runtime_validation_current',False) for r in snapshot['models']),'coverage_errors':errors,'plugins':stats}
     files[DOCS/'INDEX.md']='\n'.join(index)+'\n';files[DOCS/'coverage.json']=json.dumps(report,ensure_ascii=False,indent=2)+'\n'
     if a.write:
         for path,content in files.items():path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)

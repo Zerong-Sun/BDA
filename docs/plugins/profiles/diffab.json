@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "live",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "catalog",

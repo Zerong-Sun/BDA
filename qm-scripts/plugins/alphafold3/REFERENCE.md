@@ -34,7 +34,7 @@
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### AF3复合物 (`complex`)
 
@@ -54,7 +54,7 @@ JSON定义蛋白/核酸/配体及成键关系。BDA 接入：`declared`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 仅数据准备 (`data_pipeline`)
 
@@ -75,7 +75,7 @@ JSON定义蛋白/核酸/配体及成键关系。BDA 接入：`declared`。
 
 限制：官方能力存在，但当前BDA command未传这两个开关
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 预处理输入推理 (`inference_prepared`)
 
@@ -96,7 +96,7 @@ JSON定义蛋白/核酸/配体及成键关系。BDA 接入：`declared`。
 
 限制：当前BDA command未传此阶段选择
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 显式空MSA对照 (`empty_msa`)
 
@@ -114,7 +114,7 @@ JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表。B
 
 限制：必须在输入JSON声明；缺省/null与空字符串含义不同；无同源MSA输入不意味着特征中不存在query行
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 给定模板对照 (`templates`)
 
@@ -132,7 +132,7 @@ JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表。B
 
 限制：templates是模板特征，不等同AF2 initial_guess或固定坐标约束
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -158,7 +158,7 @@ JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表。B
 
 约束与版本差异：{"bda_variants": [], "library_help": "Strictly increasing order of token sizes for which to cache compilations. For any input with more tokens than the largest bucket size, a new bucket is created for exactly that number of tokens.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `compress_large_output_files`
 
@@ -172,7 +172,7 @@ JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表。B
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "If True, compresses the output mmCIF and confidences JSON files (the two largest files) using zstandard. Note that embeddings and distogram, if saved, are already stored in a compressed format.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `conformer_max_iterations`
 
@@ -186,7 +186,7 @@ JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表。B
 
 约束与版本差异：{"bda_variants": [], "library_help": "Optional override for maximum number of iterations to run for RDKit conformer search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `db_dir`
 
@@ -200,7 +200,7 @@ AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工�
 
 约束与版本差异：{"bda_variants": [{"default": "/root/public_databases", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Path to the directory containing the databases. Can be specified multiple times to search multiple directories in order.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `fix_standalone_glycans`
 
@@ -214,7 +214,7 @@ AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "AlphaFold 3 model training and evaluation filtered out leaving atoms from glycan ligands even if they were not bonded to anything (\"standalone\" glycans). Setting this flag to True fixes this undesirable behavior, but moves away from the regime where AlphaFold 3 was trained and evaluated.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `flash_attention_implementation`
 
@@ -228,7 +228,7 @@ AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工�
 
 约束与版本差异：{"bda_variants": [], "default_source": "固定上游run_alphafold.py，纠正catalog提取漏值", "library_extracted_default": null, "library_help": "", "library_required": false, "upstream_enum": ["triton", "cudnn", "xla"]}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `force_output_dir`
 
@@ -242,7 +242,7 @@ AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to force the output directory to be used even if it already exists and is non-empty. Useful to set this to True to run the data pipeline and the inference separately, but use the same output directory.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `gpu_device`
 
@@ -256,7 +256,7 @@ AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Optional override for the GPU device to use for inference, uses zero-based indexing. Defaults to the 0th GPU on the system. Useful on multi-GPU systems to pin each run to a specific GPU. Note that if GPUs are already pre-filtered by the environment (e.g. by using CUDA_VISIBLE_DEVICES), this flag refers to the GPU index after the filtering has been done.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmalign_binary_path`
 
@@ -270,7 +270,7 @@ hmmalign搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Hmmalign binary.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmbuild_binary_path`
 
@@ -284,7 +284,7 @@ hmmbuild搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Hmmbuild binary.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmsearch_binary_path`
 
@@ -298,7 +298,7 @@ hmmsearch搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Hmmsearch binary.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `input_dir`
 
@@ -312,7 +312,7 @@ hmmsearch搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the directory containing input JSON files.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jackhmmer_binary_path`
 
@@ -326,7 +326,7 @@ jackhmmer搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Jackhmmer binary.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jackhmmer_max_parallel_shards`
 
@@ -340,7 +340,7 @@ jackhmmer搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Maximum number of shards to search against in parallel. If unset, one Jackhmmer instance will be run per shard. Only applicable if the database is sharded.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jackhmmer_n_cpu`
 
@@ -354,7 +354,7 @@ jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Number of CPUs to use for Jackhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jax_compilation_cache_dir`
 
@@ -368,7 +368,7 @@ jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to a directory for the JAX compilation cache.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `json_path`
 
@@ -382,7 +382,7 @@ jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Path to the input JSON file.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_template_date`
 
@@ -396,7 +396,7 @@ jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Maximum template release date to consider. Format: YYYY-MM-DD. All templates released after this date will be ignored. Controls also whether to allow use of model coordinates for a chemical component from the CCD if RDKit conformer generation fails and the component does not have ideal coordinates set. Only for components that have been released before this date the model coordinates can be used as a fallback.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mgnify_database_path`
 
@@ -410,7 +410,7 @@ mgnify数据库文件/索引路径；核对对应版本、发布日期及工具�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Mgnify database path, used for protein MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mgnify_z_value`
 
@@ -424,7 +424,7 @@ mgnify数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `model_dir`
 
@@ -438,7 +438,7 @@ AF3模型权重目录；固定上游commit不证明本地checkpoint相同。
 
 约束与版本差异：{"bda_variants": [{"default": "/root/models", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Path to the model to use for inference.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `model_seeds`
 
@@ -452,7 +452,7 @@ AF3模型权重目录；固定上游commit不证明本地checkpoint相同。
 
 约束与版本差异：{"bda_variants": [{"default": "1", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [af3-adapter](../../../backend_v2/app/compute/input_adapters/af3_fold_input.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [af3-adapter](../../../backend_v2/app/compute/input_adapters/af3_fold_input.py)
 
 ### `nhmmer_binary_path`
 
@@ -466,7 +466,7 @@ nhmmer搜索/比对程序的可执行文件路径；须检查版本与执行权�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Nhmmer binary.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `nhmmer_max_parallel_shards`
 
@@ -480,7 +480,7 @@ nhmmer搜索/比对程序的可执行文件路径；须检查版本与执行权�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Maximum number of shards to search against in parallel. If unset, one Nhmmer instance will be run per shard. Only applicable if the database is sharded.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `nhmmer_n_cpu`
 
@@ -494,7 +494,7 @@ nhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与L
 
 约束与版本差异：{"bda_variants": [], "library_help": "Number of CPUs to use for Nhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `non_commercial_ack`
 
@@ -508,7 +508,7 @@ BDA记录的权重许可确认字段，不是官方模型CLI参数；不能据�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `ntrna_database_path`
 
@@ -522,7 +522,7 @@ ntrna数据库文件/索引路径；核对对应版本、发布日期及工具�
 
 约束与版本差异：{"bda_variants": [], "library_help": "NT-RNA database path, used for RNA MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ntrna_z_value`
 
@@ -536,7 +536,7 @@ ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_diffusion_samples`
 
@@ -550,7 +550,7 @@ ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Number of diffusion samples to generate.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_recycles`
 
@@ -564,7 +564,7 @@ ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [{"default": 10, "enabled": true, "enum": null, "maximum": 48, "minimum": 1, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Number of recycles to use during inference.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_seeds`
 
@@ -578,7 +578,7 @@ ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Number of seeds to use for inference. If set, only a single seed must be provided in the input JSON. AlphaFold 3 will then generate random seeds in sequence, starting from the single seed specified in the input JSON. The full input JSON produced by AlphaFold 3 will include the generated random seeds. If not set, AlphaFold 3 will use the seeds as provided in the input JSON.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_dir`
 
@@ -592,7 +592,7 @@ ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序�
 
 约束与版本差异：{"bda_variants": [{"default": "outputs/alphafold3", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Path to a directory where the results will be saved.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pdb_database_path`
 
@@ -606,7 +606,7 @@ pdb数据库文件/索引路径；核对对应版本、发布日期及工具要�
 
 约束与版本差异：{"bda_variants": [], "library_help": "PDB database directory with mmCIF files path, used for template search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `resolve_msa_overlaps`
 
@@ -620,7 +620,7 @@ pdb数据库文件/索引路径；核对对应版本、发布日期及工具要�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to deduplicate unpaired MSA against paired MSA. The default behaviour matches the method described in the AlphaFold 3 paper. Set this to false if providing custom paired MSA using the unpaired MSA field to keep it exactly as is as deduplication against the paired MSA could break the manually crafted pairing between MSA sequences.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `rfam_database_path`
 
@@ -634,7 +634,7 @@ rfam数据库文件/索引路径；核对对应版本、发布日期及工具要
 
 约束与版本差异：{"bda_variants": [], "library_help": "Rfam database path, used for RNA MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `rfam_z_value`
 
@@ -648,7 +648,7 @@ rfam数据库规模，用于分片搜索E-value计算；蛋白数据库按序列
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `rna_central_database_path`
 
@@ -662,7 +662,7 @@ rna_central数据库文件/索引路径；核对对应版本、发布日期及�
 
 约束与版本差异：{"bda_variants": [], "library_help": "RNAcentral database path, used for RNA MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `rna_central_z_value`
 
@@ -676,7 +676,7 @@ rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `run_data_pipeline`
 
@@ -690,7 +690,7 @@ rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Whether to run the data pipeline on the fold inputs.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `run_inference`
 
@@ -704,7 +704,7 @@ rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold 3", "version": "3.0"}], "library_help": "Whether to run inference on the fold inputs.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `save_distogram`
 
@@ -718,7 +718,7 @@ rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to save the final distogram in the output. Note that the distogram is a large float16 array: num_tokens * num_tokens * 64.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `save_embeddings`
 
@@ -732,7 +732,7 @@ rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to save the final trunk single and pair embeddings in the output. Note that the embeddings are large float16 arrays: num_tokens * 384 + num_tokens * num_tokens * 128.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `seqres_database_path`
 
@@ -746,7 +746,7 @@ seqres数据库文件/索引路径；核对对应版本、发布日期及工具�
 
 约束与版本差异：{"bda_variants": [], "library_help": "PDB sequence database path, used for template search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `small_bfd_database_path`
 
@@ -760,7 +760,7 @@ small_bfd数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Small BFD database path, used for protein MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `small_bfd_z_value`
 
@@ -774,7 +774,7 @@ small_bfd数据库规模，用于分片搜索E-value计算；蛋白数据库按�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniprot_cluster_annot_database_path`
 
@@ -788,7 +788,7 @@ uniprot_cluster_annot数据库文件/索引路径；核对对应版本、发布�
 
 约束与版本差异：{"bda_variants": [], "library_help": "UniProt database path, used for protein paired MSA search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniprot_cluster_annot_z_value`
 
@@ -802,7 +802,7 @@ uniprot_cluster_annot数据库规模，用于分片搜索E-value计算；蛋白�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniref90_database_path`
 
@@ -816,7 +816,7 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "UniRef90 database path, used for MSA search. The MSA obtained by searching it is used to construct the profile for template search.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniref90_z_value`
 
@@ -830,7 +830,7 @@ uniref90数据库规模，用于分片搜索E-value计算；蛋白数据库按�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -982,12 +982,12 @@ uniref90数据库规模，用于分片搜索E-value计算；蛋白数据库按�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| *_data.json | 完整已解析输入，含MSA/模板与seed | 结构化JSON | 空字符串、null、缺省不同；保存原始/去重/非query行数，Neff需另算。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| ranking_score | AF3内部模型排序综合分数 | 模型定义分数 | 含置信度、无序及碰撞项；不是能量。 | [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| *_data.json | 完整已解析输入，含MSA/模板与seed | 结构化JSON | 空字符串、null、缺省不同；保存原始/去重/非query行数，Neff需另算。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| ranking_score | AF3内部模型排序综合分数 | 模型定义分数 | 含置信度、无序及碰撞项；不是能量。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -1012,12 +1012,12 @@ uniref90数据库规模，用于分片搜索E-value计算；蛋白数据库按�
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/alphafold3/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交library的alphafold3参数提取，默认值不是BDA默认值；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
 - [af3-adapter](../../../backend_v2/app/compute/input_adapters/af3_fold_input.py)：FASTA转AF3 JSON；list[int]种子、显式JSON优先及蛋白实体限制；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py)：run_alphafold.py；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
-- [upstream-1](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
-- [upstream-2](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/input.md)：docs/input.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
-- [upstream-3](https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/output.md)：docs/output.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：run_alphafold.py；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
+- upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：docs/input.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。
+- upstream-3（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：docs/output.md；上游源码快照，不证明QM安装代码完全相同；commit `b2f3d45fbfcacc5183bd5345d15df93571b8437f`；读取 2026-09-15。

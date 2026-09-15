@@ -35,7 +35,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### TMalign 重比对 (`tmalign`)
 
@@ -55,7 +55,7 @@
 
 限制：输出 evalue 列在该模式不再是统计 E-value；当前预筛设置可能遗漏远缘结构
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### createdb (`createdb`)
 
@@ -73,7 +73,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### easy-cluster (`cluster`)
 
@@ -91,7 +91,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 多链结构搜索/聚类 (`multimer`)
 
@@ -109,7 +109,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -133,7 +133,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `evalue`
 
@@ -147,7 +147,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `alignment_type`
 
@@ -161,7 +161,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_seqs`
 
@@ -175,7 +175,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `threads`
 
@@ -189,7 +189,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `coverage`
 
@@ -203,7 +203,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `cov_mode`
 
@@ -217,7 +217,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `sensitivity`
 
@@ -231,7 +231,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -335,13 +335,13 @@
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| query,target | 输入和命中数据库记录 ID；不是序列 | 无量纲 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| fident | 比对位点中的序列一致性比例 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| alntmscore | 按较短对齐跨度归一化的 TM-score；固定实现使用 min(qEndPos−qStartPos, dbEndPos−dbStartPos)，不等同于无缺口比对残基对数或全长归一化 | 0–1 | 不是全长相似性或专利自由实施判断；历史上游版本有该字段问题，应以固定版本输出核验 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [convertalis](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/src/strucclustutils/structureconvertalis.cpp) |
-| evalue | 默认结构局部搜索的统计显著性；TMalign 模式此列为两种归一化 TM-score 的平均；上游 alignment-type=3 LoLalign 时该列为归一化 LoLscore，部署支持待核验 | 依 alignment_type | 越小并不在所有模式都越好；必须保存 alignment_type | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| prob | Foldseek 估计的同源性概率 | 0–1 | 是同源性模型输出，不是受体结合概率 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| qtmscore,ttmscore | 分别按查询/目标全长归一化的 TM-score | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| foldseek_hits.m8 | 按 format_output 指定顺序生成的结果表 | 按列定义 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| query,target | 输入和命中数据库记录 ID；不是序列 | 无量纲 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| fident | 比对位点中的序列一致性比例 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| alntmscore | 按较短对齐跨度归一化的 TM-score；固定实现使用 min(qEndPos−qStartPos, dbEndPos−dbStartPos)，不等同于无缺口比对残基对数或全长归一化 | 0–1 | 不是全长相似性或专利自由实施判断；历史上游版本有该字段问题，应以固定版本输出核验 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [convertalis](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/src/strucclustutils/structureconvertalis.cpp) |
+| evalue | 默认结构局部搜索的统计显著性；TMalign 模式此列为两种归一化 TM-score 的平均；上游 alignment-type=3 LoLalign 时该列为归一化 LoLscore，部署支持待核验 | 依 alignment_type | 越小并不在所有模式都越好；必须保存 alignment_type | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| prob | Foldseek 估计的同源性概率 | 0–1 | 是同源性模型输出，不是受体结合概率 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| qtmscore,ttmscore | 分别按查询/目标全长归一化的 TM-score | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| foldseek_hits.m8 | 按 format_output 指定顺序生成的结果表 | 按列定义 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -358,6 +358,6 @@
 
 ## 来源与版本
 
-- [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
+- bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
 - [upstream](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md)：功能与参数定义；commit `e1a766e82d6e3049471fcbd647852f162960a182`；读取 2026-09-15。
 - [convertalis](https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/src/strucclustutils/structureconvertalis.cpp)：alntmscore 实际归一化实现；commit `e1a766e82d6e3049471fcbd647852f162960a182`；读取 2026-09-15。

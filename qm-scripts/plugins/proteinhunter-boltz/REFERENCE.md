@@ -37,7 +37,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 小分子靶标设计 (`small_molecule_binder`)
 
@@ -59,7 +59,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 核酸靶标设计 (`nucleic_binder`)
 
@@ -81,7 +81,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 无靶标设计 (`unconditional`)
 
@@ -105,7 +105,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 环化链设计配置 (`cyclic`)
 
@@ -126,7 +126,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：需额外核对实际成键与几何；仅有标记不是闭环验证
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 小分子affinity评估 (`affinity`)
 
@@ -144,7 +144,7 @@ Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不
 
 限制：command只提供boltz2_conf.ckpt，不可把通用Boltz-2亲和力能力赋予本入口
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定支架序列条件 (`scaffold_conditioned`)
 
@@ -162,7 +162,7 @@ BDA不暴露seq；官方起始序列支持与固定支架条件设计须区分�
 
 限制：BDA command没有seq；官方pipeline读取a.seq为初始化，但不保证固定支架或固定序列；旧runbook关于上游完全不读seq的说法与固定源码冲突
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -188,7 +188,7 @@ BDA不暴露seq；官方起始序列支持与固定支架条件设计须区分�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [parameter-env](../../../backend_v2/app/compute/scripts.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py), upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `contact_residues`
 
@@ -202,7 +202,7 @@ BDA不暴露seq；官方起始序列支持与固定支架条件设计须区分�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `cyclic`
 
@@ -216,7 +216,7 @@ BDA不暴露seq；官方起始序列支持与固定支架条件设计须区分�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [parameter-env](../../../backend_v2/app/compute/scripts.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py), upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `diffuse_steps`
 
@@ -230,7 +230,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": 100, "enabled": true, "enum": null, "maximum": 1000, "minimum": 1, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `high_iptm_threshold`
 
@@ -244,7 +244,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": 0.8, "enabled": true, "enum": null, "maximum": 1.0, "minimum": 0.0, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `high_plddt_threshold`
 
@@ -258,7 +258,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": 0.8, "enabled": true, "enum": null, "maximum": 1.0, "minimum": 0.0, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ligand_ccd`
 
@@ -272,7 +272,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ligand_smiles`
 
@@ -286,7 +286,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_protein_length`
 
@@ -300,7 +300,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": 120, "enabled": true, "enum": null, "maximum": 2000, "minimum": 4, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `min_protein_length`
 
@@ -314,7 +314,7 @@ Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官�
 
 约束与版本差异：{"bda_variants": [{"default": 60, "enabled": true, "enum": null, "maximum": 2000, "minimum": 4, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mode`
 
@@ -328,7 +328,7 @@ Protein-Hunter binder模式针对提供靶标生成链A；unconditional模式不
 
 约束与版本差异：{"bda_variants": [{"default": "binder", "enabled": true, "enum": ["binder", "unconditional"], "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_mode`
 
@@ -342,7 +342,7 @@ Protein-Hunter目标MSA路径：single或mmseqs；single并非MMseqs搜索完成
 
 约束与版本差异：{"bda_variants": [{"default": "single", "enabled": true, "enum": ["single", "mmseqs"], "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `nucleic_seq`
 
@@ -356,7 +356,7 @@ DNA/RNA靶标序列；不是要表达的设计蛋白DNA构建。
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `nucleic_type`
 
@@ -370,7 +370,7 @@ DNA/RNA靶标序列；不是要表达的设计蛋白DNA构建。
 
 约束与版本差异：{"bda_variants": [{"default": "dna", "enabled": true, "enum": ["dna", "rna"], "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_cycles`
 
@@ -384,7 +384,7 @@ Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能�
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_designs`
 
@@ -398,7 +398,7 @@ Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能�
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": 10000, "minimum": 1, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `omit_aa`
 
@@ -412,7 +412,7 @@ Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能�
 
 约束与版本差异：{"bda_variants": [{"default": "C", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `percent_x`
 
@@ -426,7 +426,7 @@ Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能�
 
 约束与版本差异：{"bda_variants": [{"default": 90, "enabled": true, "enum": null, "maximum": 100, "minimum": 0, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `protein_seqs`
 
@@ -440,7 +440,7 @@ Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `recycling_steps`
 
@@ -454,7 +454,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": 20, "minimum": 0, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `seq`
 
@@ -468,7 +468,7 @@ BDA当前schema限定空值且command不传。官方d4bd951 pipeline实际读取
 
 约束与版本差异：{"bda_variants": [{"default": null, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `temperature`
 
@@ -482,7 +482,7 @@ LigandMPNN序列采样温度；BDA默认1.0与上游该commit的0.1不同，必�
 
 约束与版本差异：{"bda_variants": [{"default": 1.0, "enabled": true, "enum": null, "maximum": 10.0, "minimum": 0.0, "plugin_key": "proteinhunter_boltz", "version": "d4bd951-qm-c18-20260416-sampling"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -612,12 +612,12 @@ LigandMPNN序列采样温度；BDA默认1.0与上游该commit的0.1不同，必�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| summary_all_runs.csv / summary_high_iptm.csv | 所有轨迹及内部阈值通过集合 | 混合字段 | 每轮可能换序列；只有与当前候选SHA一致轮次属于该候选。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| 0_protein_hunter_design / high_iptm_pdb / high_iptm_yaml | 设计轨迹、筛选后的结构与配套YAML | 结构+参数 | 内部high confidence不是独立验证；没有affinity JSON不能声称算了亲和力。 | [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| summary_all_runs.csv / summary_high_iptm.csv | 所有轨迹及内部阈值通过集合 | 混合字段 | 每轮可能换序列；只有与当前候选SHA一致轮次属于该候选。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| 0_protein_hunter_design / high_iptm_pdb / high_iptm_yaml | 设计轨迹、筛选后的结构与配套YAML | 结构+参数 | 内部high confidence不是独立验证；没有affinity JSON不能声称算了亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -645,9 +645,9 @@ LigandMPNN序列采样温度；BDA默认1.0与上游该commit的0.1不同，必�
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/proteinhunter-boltz/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py)：boltz_ph/design.py；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。
-- [upstream-1](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。
-- [upstream-2](https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py)：boltz_ph/pipeline.py；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：boltz_ph/design.py；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。
+- upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：boltz_ph/pipeline.py；上游源码快照，不证明QM安装代码完全相同；commit `d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c`；读取 2026-09-15。

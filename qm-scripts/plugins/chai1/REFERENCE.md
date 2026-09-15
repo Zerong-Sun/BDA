@@ -35,7 +35,7 @@ Chai多分子结构预测，可用ESM、MSA、模板及约束；当前BDA注册d
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 多分子复合物 (`complex`)
 
@@ -55,7 +55,7 @@ FASTA不同实体定义蛋白、核酸或ligand。BDA 接入：`configuration_on
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 远端MSA (`msa_server`)
 
@@ -75,7 +75,7 @@ MMseqs服务产生目标MSA。BDA 接入：`configuration_only`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 本地MSA (`local_msa`)
 
@@ -95,7 +95,7 @@ MMseqs服务产生目标MSA。BDA 接入：`configuration_only`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 接触/成键约束 (`restraints`)
 
@@ -115,7 +115,7 @@ MMseqs服务产生目标MSA。BDA 接入：`configuration_only`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 模板特征 (`templates`)
 
@@ -135,7 +135,7 @@ MMseqs服务产生目标MSA。BDA 接入：`configuration_only`。
 
 限制：Chai BDA插件disabled；template_cif_folder未映射到实际命令
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -161,7 +161,7 @@ Chai接触约束CSV文件；链ID及带氨基酸字母的一起始位置需匹�
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [upstream-2](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/examples/restraints/README.md)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `device`
 
@@ -175,7 +175,7 @@ PyTorch设备字符串，例如cuda:0；按调度器可见设备编号。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `downloads_dir`
 
@@ -189,7 +189,7 @@ BDA旧Chai缓存目录字段；command未导出CHAI_DOWNLOADS_DIR，当前无生
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `fasta_file`
 
@@ -203,7 +203,7 @@ Chai特殊FASTA输入，实体header指定protein/ligand/RNA等；普通氨基�
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `fasta_names_as_cif_chains`
 
@@ -217,7 +217,7 @@ Chai特殊FASTA输入，实体header指定protein/ligand/RNA等；普通氨基�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `input_fasta`
 
@@ -231,7 +231,7 @@ BDA Chai输入FASTA端口/参数；需核对staging路径是否绑定进command�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `low_memory`
 
@@ -245,7 +245,7 @@ BDA Chai输入FASTA端口/参数；需核对staging路径是否绑定进command�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `msa_directory`
 
@@ -259,7 +259,7 @@ Chai本地预计算MSA目录，需采用Chai指定格式和序列hash命名；�
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_server_url`
 
@@ -273,7 +273,7 @@ Chai本地预计算MSA目录，需采用Chai指定格式和序列hash命名；�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_diffn_samples`
 
@@ -287,7 +287,7 @@ Chai本地预计算MSA目录，需采用Chai指定格式和序列hash命名；�
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_diffn_timesteps`
 
@@ -301,7 +301,7 @@ Chai扩散去噪时间步数，非MD时间。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_samples`
 
@@ -315,7 +315,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [{"default": 5, "enabled": false, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_trunk_recycles`
 
@@ -329,7 +329,7 @@ Chai主干网络回收次数。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_trunk_samples`
 
@@ -343,7 +343,7 @@ Chai主干网络回收次数。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_dir`
 
@@ -357,7 +357,7 @@ Chai主干网络回收次数。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_folder`
 
@@ -371,7 +371,7 @@ BDA输出目录草稿；Chai command使用BDA_OUTPUT_DIR，不读取这个字段
 
 约束与版本差异：{"bda_variants": [{"default": "outputs/chai1", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `recycle_msa_subsample`
 
@@ -385,7 +385,7 @@ BDA输出目录草稿；Chai command使用BDA_OUTPUT_DIR，不读取这个字段
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `restraints_json`
 
@@ -399,7 +399,7 @@ BDA约束文件别名映射Chai --constraint-path；此commit的接触约束是C
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [upstream-2](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/examples/restraints/README.md)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `seed`
 
@@ -413,7 +413,7 @@ BDA约束文件别名映射Chai --constraint-path；此commit的接触约束是C
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `template_cif_folder`
 
@@ -427,7 +427,7 @@ BDA旧Chai字段声称自定义模板目录，但command没有使用；不能视
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `template_hits_path`
 
@@ -441,7 +441,7 @@ Chai模板命中数据文件；模板残基映射必须与查询序列一致。
 
 约束与版本差异：{"bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `use_esm_embeddings`
 
@@ -455,7 +455,7 @@ Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `use_msa_server`
 
@@ -469,7 +469,7 @@ Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `use_templates_server`
 
@@ -483,7 +483,7 @@ Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Chai-1", "version": "0.6.1"}], "library_help": "", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -613,11 +613,11 @@ Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | Python返回0–1；mmCIF B-factor写入时×100 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | run_inference返回对象中含PAE/PDE/pLDDT张量；默认scores.npz不等于保存了完整PAE，需显式持久化。 | [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pred.model_idx_<i>.cif / scores.model_idx_<i>.npz | 每样本结构和ranking字段 | 混合字段 | NPZ不是JSON；当前BDA confidence_json端口名称不能替代实际格式检查。 | [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | Python返回0–1；mmCIF B-factor写入时×100 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | run_inference返回对象中含PAE/PDE/pLDDT张量；默认scores.npz不等于保存了完整PAE，需显式持久化。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pred.model_idx_<i>.cif / scores.model_idx_<i>.npz | 每样本结构和ranking字段 | 混合字段 | NPZ不是JSON；当前BDA confidence_json端口名称不能替代实际格式检查。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -643,11 +643,11 @@ Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需�
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/chai1/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交library的chai1参数提取，默认值不是BDA默认值；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py)：chai_lab/chai1.py；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
-- [upstream-1](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
-- [upstream-2](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/examples/restraints/README.md)：examples/restraints/README.md；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
-- [upstream-3](https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/pyproject.toml)：pyproject.toml；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：chai_lab/chai1.py；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
+- upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：examples/restraints/README.md；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。
+- upstream-3（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：pyproject.toml；上游源码快照，不证明QM安装代码完全相同；commit `c544fb183e865c4950909444db860a9d50604f66`；读取 2026-09-15。

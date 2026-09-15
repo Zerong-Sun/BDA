@@ -36,7 +36,7 @@ AF2反向传播生成蛋白结合支架，经ProteinMPNN改序列、AF2复核和
 
 限制：library生成JSON已实现；live仅传文件路径，不自动接入界面同名标量；算法改变的是优化策略，不生成可解释为Kd的分数；本次未运行GPU任务；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 三阶段：logits→softmax→one-hot (`3stage`)
 
@@ -59,7 +59,7 @@ AF2反向传播生成蛋白结合支架，经ProteinMPNN改序列、AF2复核和
 
 限制：library生成JSON已实现；live仅传文件路径，不自动接入界面同名标量；算法改变的是优化策略，不生成可解释为Kd的分数；本次未运行GPU任务；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 四阶段并分段筛查 (`4stage`)
 
@@ -83,7 +83,7 @@ AF2反向传播生成蛋白结合支架，经ProteinMPNN改序列、AF2复核和
 
 限制：library生成JSON已实现；live仅传文件路径，不自动接入界面同名标量；算法改变的是优化策略，不生成可解释为Kd的分数；本次未运行GPU任务；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 半贪心突变优化 (`greedy`)
 
@@ -105,7 +105,7 @@ AF2反向传播生成蛋白结合支架，经ProteinMPNN改序列、AF2复核和
 
 限制：library生成JSON已实现；live仅传文件路径，不自动接入界面同名标量；算法改变的是优化策略，不生成可解释为Kd的分数；本次未运行GPU任务；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### MCMC序列搜索 (`mcmc`)
 
@@ -127,7 +127,7 @@ AF2反向传播生成蛋白结合支架，经ProteinMPNN改序列、AF2复核和
 
 限制：library生成JSON已实现；live仅传文件路径，不自动接入界面同名标量；算法改变的是优化策略，不生成可解释为Kd的分数；本次未运行GPU任务；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 仅生成初始设计轨迹 (`hallucination_only`)
 
@@ -4220,7 +4220,7 @@ target JSON文件入口；live从settings端口选择排序第一项，JSON中�
 
 约束与版本差异：["文件需可解析且与固定版本键一致；端口绑定不等于已执行。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
 
 ### `filters`
 
@@ -4234,7 +4234,7 @@ target JSON文件入口；live从settings端口选择排序第一项，JSON中�
 
 约束与版本差异：["文件需可解析且与固定版本键一致；端口绑定不等于已执行。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
 
 ### `advanced`
 
@@ -4248,7 +4248,7 @@ target JSON文件入口；live从settings端口选择排序第一项，JSON中�
 
 约束与版本差异：["文件需可解析且与固定版本键一致；端口绑定不等于已执行。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -4417,7 +4417,7 @@ target JSON文件入口；live从settings端口选择排序第一项，JSON中�
 | Trajectory statistics / PDB | AF2设计原始轨迹及其自评 | 序列、Å坐标、模型分数 | 不能与MPNN当前候选的复核记录混属同一序列；逐条存sequence SHA。 | [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py) |
 | MPNN statistics / PDB | 每条MPNN序列及复合物、单独binder复核统计 | 按指标 | 保留所有模型身份和缺失状态；是否接受单独记录。 | [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py), [bc-generic](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/generic_utils.py) |
 | Accepted / final_design_stats.csv | 满足已启用规则的设计及排序统计 | 设计集合 | 不是实验验证；按序列映射结构，不把其他轨迹评分归给当前候选。 | [bc-main](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/bindcraft.py) |
-| run_manifest（BDA声明端口） | BDA宣称需要的运行清单 | JSON/清单 | 上游未保证产生同名BDA清单，live无output_parser，必须另行核验产物契约。 | [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| run_manifest（BDA声明端口） | BDA宣称需要的运行清单 | JSON/清单 | 上游未保证产生同名BDA清单，live无output_parser，必须另行核验产物契约。 | live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 | MPNN_score | ProteinMPNN返回的序列评分（通常平均负对数似然）；较低表示模型更偏好该序列，不能解释为结合能。 | 模型分数 | 同名filter参数设置阈值；这里只说明运行输出，缺失不可当0。 | [bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py) |
 | MPNN_seq_recovery | MPNN序列相对原轨迹序列的一致比例；保真程度不是性能提升。 | 0–1比例 | 同名filter参数设置阈值；这里只说明运行输出，缺失不可当0。 | [bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py) |
 | pLDDT | AF2复合物复核日志中的pLDDT，ColabDesign binder协议指标；保存其评价掩码，不能当作实验结构准确度。 | 0–1 | 同名filter参数设置阈值；这里只说明运行输出，缺失不可当0。 | [bc-af](https://github.com/martinpacesa/BindCraft/blob/b971db42ba6e091afab63ccb30ae02215150a990/functions/colabdesign_utils.py) |
@@ -4478,7 +4478,7 @@ target JSON文件入口；live从settings端口选择排序第一项，JSON中�
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
 - [catalog](../../../qm-scripts/library/catalog.json)：历史参数库的类型和默认值，不等同运行时有效设置；commit `None`；读取 2026-09-15。
 - [renderer](../../../qm-scripts/library/qm_job.py)：手工配置生成器的参数映射，区别于live ModelPlugin命令；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/bindcraft/README.md)：旧运行手册的状态记录；不是安装或运行成功证明；commit `None`；读取 2026-09-15。

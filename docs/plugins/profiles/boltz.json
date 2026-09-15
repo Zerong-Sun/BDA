@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "registry",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "runbook",
@@ -35,26 +36,29 @@
     {
       "id": "upstream-0",
       "url": "https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/boltz/src/boltz/main.py",
       "commit": "b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc",
       "scope": "src/boltz/main.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-1",
       "url": "https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/boltz/README.md",
       "commit": "b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc",
       "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-2",
       "url": "https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/docs/prediction.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/boltz/docs/prediction.md",
       "commit": "b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc",
       "scope": "docs/prediction.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     }
   ],
   "modes": [

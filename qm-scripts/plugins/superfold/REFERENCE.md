@@ -37,7 +37,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### PDB坐标条件预测 (`initial_guess`)
 
@@ -59,7 +59,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 多权重/种子重复 (`ensemble`)
 
@@ -82,7 +82,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### AF-Multimer权重 (`af_multimer_weights`)
 
@@ -100,7 +100,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 限制：--type/--version历史参数已失效，当前上游固定monomer_ptm/monomer代码；多链输入不等于Multimer权重
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -126,7 +126,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `initial_guess`
 
@@ -140,7 +140,7 @@ FASTA输入及伪MSA特征。BDA 接入：`declared`。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `max_recycles`
 
@@ -154,7 +154,7 @@ superfold最多回收循环数。
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mock_msa_depth`
 
@@ -168,7 +168,7 @@ superfold复制/伪MSA深度；默认1表示单序列特征，不是检索得到
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `models`
 
@@ -182,7 +182,7 @@ superfold复制/伪MSA深度；默认1表示单序列特征，不是检索得到
 
 约束与版本差异：{"bda_variants": [{"default": "all", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `nstruct`
 
@@ -196,7 +196,7 @@ superfold每套权重生成的结构数，总输出还要乘选中权重与输�
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_ensemble`
 
@@ -210,7 +210,7 @@ AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_pae`
 
@@ -224,7 +224,7 @@ AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `output_summary`
 
@@ -238,7 +238,7 @@ AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `overwrite`
 
@@ -252,7 +252,7 @@ AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `recycle_tol`
 
@@ -266,7 +266,7 @@ AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。
 
 约束与版本差异：{"bda_variants": [{"default": 0.0, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `reference_pdb`
 
@@ -280,7 +280,7 @@ superfold用于对齐/RMSD的参考结构，不自动等同initial_guess的输�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `seed_start`
 
@@ -294,7 +294,7 @@ superfold生成种子序列的起始整数。
 
 约束与版本差异：{"bda_variants": [{"default": 0, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "superfold", "version": "qm-20260803"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -427,12 +427,12 @@ superfold生成种子序列的起始整数。
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | 0–100 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM | monomer_ptm权重的整体拓扑置信度 | 0–1 | 固定源码强制monomer_ptm；ipTM仅在不可达的multimer分支，不是此入口可生成输出，多链initial_guess也不改变该限制。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| mean_pae_interaction | 跨链PAE汇总 | Å | 单体NaN为N/A，不应存零或算通过；跨链亦须说明initial_guess。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| reports.txt / *_prediction_results.json | 逐模型/种子置信度与回收信息 | 混合字段 | 不要只保留最优模型；已装包装字段以实际输出核验。 | [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | 0–100 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM | monomer_ptm权重的整体拓扑置信度 | 0–1 | 固定源码强制monomer_ptm；ipTM仅在不可达的multimer分支，不是此入口可生成输出，多链initial_guess也不改变该限制。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| mean_pae_interaction | 跨链PAE汇总 | Å | 单体NaN为N/A，不应存零或算通过；跨链亦须说明initial_guess。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| reports.txt / *_prediction_results.json | 逐模型/种子置信度与回收信息 | 混合字段 | 不要只保留最优模型；已装包装字段以实际输出核验。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -457,8 +457,8 @@ superfold生成种子序列的起始整数。
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/superfold/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py)：run_superfold.py；上游源码快照，不证明QM安装代码完全相同；commit `021d2d1d0501cf67c83039d18225ed3eab0bcefa`；读取 2026-09-15。
-- [upstream-1](https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `021d2d1d0501cf67c83039d18225ed3eab0bcefa`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：run_superfold.py；上游源码快照，不证明QM安装代码完全相同；commit `021d2d1d0501cf67c83039d18225ed3eab0bcefa`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `021d2d1d0501cf67c83039d18225ed3eab0bcefa`；读取 2026-09-15。

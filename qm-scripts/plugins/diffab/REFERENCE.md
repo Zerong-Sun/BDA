@@ -40,7 +40,7 @@
 
 限制：BDA disabled且无这些config入口；不能用当前python run.py执行这些模式；同一个num_samples按variant重复，不保证全任务总数等于该值；生成结构不等于已Relax或验证结合；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-single](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_single.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-single](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_single.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 多CDR同时共设计 (`codesign_multiple`)
 
@@ -66,7 +66,7 @@
 
 限制：BDA disabled且无这些config入口；不能用当前python run.py执行这些模式；同一个num_samples按variant重复，不保证全任务总数等于该值；生成结构不等于已Relax或验证结合；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-multi](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_multicdrs.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-multi](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_multicdrs.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 已有CDR局部优化 (`abopt`)
 
@@ -101,7 +101,7 @@
 
 限制：BDA disabled且无这些config入口；不能用当前python run.py执行这些模式；同一个num_samples按variant重复，不保证全任务总数等于该值；生成结构不等于已Relax或验证结合；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-opt](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/abopt_singlecdr.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-opt](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/abopt_singlecdr.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定骨架序列设计 (`fixbb`)
 
@@ -127,7 +127,7 @@
 
 限制：BDA disabled且无这些config入口；不能用当前python run.py执行这些模式；同一个num_samples按variant重复，不保证全任务总数等于该值；生成结构不等于已Relax或验证结合；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-fixbb](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/fixbb.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-fixbb](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/fixbb.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定序列结构预测 (`strpred`)
 
@@ -153,7 +153,7 @@
 
 限制：BDA disabled且无这些config入口；不能用当前python run.py执行这些模式；同一个num_samples按variant重复，不保证全任务总数等于该值；生成结构不等于已Relax或验证结合；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-strpred](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/strpred.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-strpred](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/strpred.yml), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 无复合物时先对接框架 (`dock_then_design`)
 
@@ -176,7 +176,7 @@
 
 限制：抗原PDB单独不足以完成受控框架设计；BDA没有antibody/config/HDOCK映射，epitope字段也未绑定到此入口；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py), [da-readme](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py), [da-readme](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -202,7 +202,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `epitope_residues`
 
@@ -216,7 +216,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `cdr_loops`
 
@@ -230,7 +230,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `num_designs`
 
@@ -244,7 +244,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。", "BDA声明min=1", "BDA声明max=100000"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `sampling_steps`
 
@@ -258,7 +258,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。", "BDA声明min=1", "BDA声明max=1000"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `seed`
 
@@ -272,7 +272,7 @@
 
 约束与版本差异：["插件disabled；python run.py没有参数映射或input_adapter。", "BDA声明min=0"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py)
 
 ### `pdb_path`
 
@@ -580,7 +580,7 @@ design_dock.py必需的抗原PDB路径，与抗体框架一起先做HDOCK对接�
 
 约束与版本差异：["上游required=True，未定义用户可用默认路径。", "不替代antibody框架与config/checkpoint。"]
 
-依据：[da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[da-dock](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -702,8 +702,8 @@ design_dock.py必需的抗原PDB路径，与抗体框架一起先做HDOCK对接�
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
 | variant/sample PDB | 按CDR选择/优化深度保存的生成复合物结构 | Å坐标 | 核对设计区域与保留区域；不是运行过Rosetta Relax的证明。 | [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py) |
-| metadata.json | 任务、结构/设计信息与原配置路径等元数据；源码仅记录配置路径，不自动复制 YAML 配置 | 元数据 | 另行保存实际解析后的配置及原 YAML，不能把路径字符串当作已归档配置内容 | [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| score_table（BDA声明） | 可选生成/评价统计 | 方法相关 | 采样流程未自动保证亲和力或Rosetta能量输出；额外评价需单独运行并注明方法。 | [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [da-readme](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/README.md) |
+| metadata.json | 任务、结构/设计信息与原配置路径等元数据；源码仅记录配置路径，不自动复制 YAML 配置 | 元数据 | 另行保存实际解析后的配置及原 YAML，不能把路径字符串当作已归档配置内容 | [da-runner](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| score_table（BDA声明） | 可选生成/评价统计 | 方法相关 | 采样流程未自动保证亲和力或Rosetta能量输出；额外评价需单独运行并注明方法。 | live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [da-readme](https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/README.md) |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -724,7 +724,7 @@ design_dock.py必需的抗原PDB路径，与抗体框架一起先做HDOCK对接�
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
 - [catalog](../../../qm-scripts/library/catalog.json)：历史参数库的类型和默认值，不等同运行时有效设置；commit `None`；读取 2026-09-15。
 - [renderer](../../../qm-scripts/library/qm_job.py)：手工配置生成器的参数映射，区别于live ModelPlugin命令；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/diffab/README.md)：旧运行手册的状态记录；不是安装或运行成功证明；commit `None`；读取 2026-09-15。

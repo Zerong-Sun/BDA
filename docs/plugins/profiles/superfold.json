@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "registry",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "runbook",
@@ -28,18 +29,20 @@
     {
       "id": "upstream-0",
       "url": "https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/superfold/run_superfold.py",
       "commit": "021d2d1d0501cf67c83039d18225ed3eab0bcefa",
       "scope": "run_superfold.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-1",
       "url": "https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/superfold/README.md",
       "commit": "021d2d1d0501cf67c83039d18225ed3eab0bcefa",
       "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     }
   ],
   "modes": [

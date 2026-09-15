@@ -35,7 +35,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 指定 pH 质子化 (`ph`)
 
@@ -55,7 +55,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 自定义 PB 网格/介质/盐条件 (`custom_pb`)
 
@@ -76,7 +76,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -100,7 +100,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `with_ph`
 
@@ -114,7 +114,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `keep_chain`
 
@@ -128,7 +128,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pdie`
 
@@ -142,7 +142,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `sdie`
 
@@ -156,7 +156,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -260,23 +260,23 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| *.pqr | 原子坐标及电荷、半径；核对原子/残基变化和质子化 | Å；电荷 e；半径 Å | 保留原始值；不作为结合亲和力证据 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| *.in | PDB2PQR 自动生成的 APBS 配置：网格点数/中心/边长、介电常数、温度及离子定义 | 各键单独定义 | 必须随势场一起保留，不能仅保存 DX；实际值由该次生成文件读取 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| *.pqr | 原子坐标及电荷、半径；核对原子/残基变化和质子化 | Å；电荷 e；半径 Å | 保留原始值；不作为结合亲和力证据 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| *.in | PDB2PQR 自动生成的 APBS 配置：网格点数/中心/边长、介电常数、温度及离子定义 | 各键单独定义 | 必须随势场一起保留，不能仅保存 DX；实际值由该次生成文件读取 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 | *.dx | 空间静电势网格；write pot 使用 kBT/e | kBT/e | 不是总结合自由能；比较时统一网格、温度、介质和盐条件 | [potential](https://apbs.readthedocs.io/en/latest/using/input/old/elec/write.html) |
-| apbs.log | 求解日志和可能的能量/收敛条目 | 字段依 APBS 版本 | 日志能量需注明计算条件与对应计算块，不从势场颜色推导亲和力 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: dime | 有限差分网格每维点数；需满足所用多重网格层级约束 | 整数三元组 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: cglen / fglen | 粗/细网格三维物理边长；决定覆盖范围与网格间距 | Å 三元组 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: cgcent / fgcent | 粗/细网格中心，可由分子 mol 编号或显式坐标指定 | Å 或 mol 选择 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: pdie / sdie | 溶质/溶剂相对介电常数；与力场和溶剂假设共同影响势场 | 无量纲 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: temp | 计算温度；决定 kBT/e 的实际电势换算 | K | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: ion charge / conc / radius | 移动离子电荷数、体相浓度及离子半径；逐离子物种记录 | e / M / Å | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: bcfl / lpbe / npbe | 边界条件以及线性/非线性 Poisson–Boltzmann 方程选择 | 枚举 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: srfm / srad / swin / chgm | 介电表面定义、溶剂探针半径、表面平滑窗口及原子电荷网格分配方式 | 枚举 / Å / Å / 枚举 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: method mg-auto / mg-para | 自动聚焦/并行聚焦网格计算方式，生成器可能根据内存估计选择 | 枚举 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: mol | 本计算块使用 READ 部分中哪一个 PQR 分子 | 从 1 开始的分子编号 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: sdens | 用于部分表面模型的球面离散点密度；是否使用由 srfm 决定 | 点/Å² | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: calcenergy / calcforce | 是否以及以 total/comps 等形式输出能量/力的控制；取值和单位需查实际日志 | 枚举 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| generated .in: write pot dx / print elecEnergy | 势场文件类型/输出前缀和电势能计算块组合表达式 | 输出控制 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| apbs.log | 求解日志和可能的能量/收敛条目 | 字段依 APBS 版本 | 日志能量需注明计算条件与对应计算块，不从势场颜色推导亲和力 | [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: dime | 有限差分网格每维点数；需满足所用多重网格层级约束 | 整数三元组 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: cglen / fglen | 粗/细网格三维物理边长；决定覆盖范围与网格间距 | Å 三元组 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: cgcent / fgcent | 粗/细网格中心，可由分子 mol 编号或显式坐标指定 | Å 或 mol 选择 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: pdie / sdie | 溶质/溶剂相对介电常数；与力场和溶剂假设共同影响势场 | 无量纲 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: temp | 计算温度；决定 kBT/e 的实际电势换算 | K | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: ion charge / conc / radius | 移动离子电荷数、体相浓度及离子半径；逐离子物种记录 | e / M / Å | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: bcfl / lpbe / npbe | 边界条件以及线性/非线性 Poisson–Boltzmann 方程选择 | 枚举 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: srfm / srad / swin / chgm | 介电表面定义、溶剂探针半径、表面平滑窗口及原子电荷网格分配方式 | 枚举 / Å / Å / 枚举 | 从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。 | [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: method mg-auto / mg-para | 自动聚焦/并行聚焦网格计算方式，生成器可能根据内存估计选择 | 枚举 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: mol | 本计算块使用 READ 部分中哪一个 PQR 分子 | 从 1 开始的分子编号 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: sdens | 用于部分表面模型的球面离散点密度；是否使用由 srfm 决定 | 点/Å² | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: calcenergy / calcforce | 是否以及以 total/comps 等形式输出能量/力的控制；取值和单位需查实际日志 | 枚举 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| generated .in: write pot dx / print elecEnergy | 势场文件类型/输出前缀和电势能计算块组合表达式 | 输出控制 | 保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。 | [inputgen](https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -292,7 +292,7 @@ PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE �
 
 ## 来源与版本
 
-- [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
+- bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
 - [upstream](https://pdb2pqr.readthedocs.io/en/latest/using/index.html)：功能与参数定义；commit `未固定/本地快照`；读取 2026-09-15。
 - [potential](https://apbs.readthedocs.io/en/latest/using/input/old/elec/write.html)：功能与参数定义；commit `未固定/本地快照`；读取 2026-09-15。
 - [apbs_input](https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html)：APBS ELEC 物理参数、网格与边界定义；commit `未固定/本地快照`；读取 2026-09-15。

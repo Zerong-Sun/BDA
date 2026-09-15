@@ -32,7 +32,7 @@
 
 限制：缺少原始指标来源、单位/对数转换、评分公式和权重；不能当作 Kd 或 ΔΔG。
 
-依据：[bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -119,5 +119,5 @@
 
 ## 来源与版本
 
-- [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
+- bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
 - [upstream](../../../backend_v2/app/registry/models.py)：本地方法注册模型；没有可归属的上游 GitHub 算法；commit `未固定/本地快照`；读取 2026-09-15。

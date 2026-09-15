@@ -43,6 +43,8 @@
 - [后端架构与服务边界](BACKEND_V2.md)
 - [计算后端与目标配置](COMPUTE_TARGETS.md)
 - [插件接口](PLUGIN_INTERFACE.md)
+- [插件参数手册](plugins/INDEX.md)
+- [Rosetta 参数](rosetta/PARAMETERS.md)与[科学模式](rosetta/SCIENTIFIC_MODES.md)
 - [QM 集群操作规则](QM_CLUSTER_OPERATION_RULES.md)
 - [RFdiffusion 工作流提交](RFDIFFUSION_WORKFLOW_SUBMISSION.md)
 - [Staging 发布与恢复](STAGING_RELEASE_AND_RECOVERY.md)
@@ -57,6 +59,8 @@
 私有研究决策、运行证据和含私有路径的旧记录继续保存在私有恢复归档中，不纳入公开软件文档。
 
 ## 验证记录
+
+- [2026-09-16 分支整合与复核](CONSOLIDATION_REVIEW_2026-09-16.md)
 
 - [分支整合六维复核与修复](INTEGRATION_SIX_DIMENSION_REVIEW.md)
 

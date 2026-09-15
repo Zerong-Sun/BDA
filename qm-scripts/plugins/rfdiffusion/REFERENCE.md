@@ -36,7 +36,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 限制：模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。
 
-依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 靶标与 hotspot 条件 binder (`binder`)
 
@@ -58,7 +58,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 限制：热点是生成条件，不保证接触全部热点或实验结合；需独立复合物预测、界面评分和功能测试。
 
-依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定 motif scaffolding (`motif`)
 
@@ -79,7 +79,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 限制：ActiveSite 权重针对小 motif；是否必要依 motif 大小选择，站点相对权重路径需核实。
 
-依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 部分扩散与 provide_seq (`partial`)
 
@@ -102,7 +102,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 限制：0 < partial_T <= T；RFD1 的单位是步数。T=200 的 partial_T=80 不能直接照搬到 T=50，README 等效例为20。；provide_seq 按整个映射的零起始、闭区间；不要用输入 PDB 残基号直接代替。
 
-依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 对称寡聚体与对称 motif (`symmetry`)
 
@@ -123,7 +123,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 限制：BDA 转发 symmetry，但未提供官方示例的 --config-name symmetry；不可把单一字段当作完整经过验证的对称流程。
 
-依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 二级结构/接触拓扑条件 (`fold_conditioned`)
 
@@ -211,7 +211,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 input_pdb 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 input_pdb 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
 
 ### `inference.num_designs`
 
@@ -225,7 +225,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 num_designs 的声明：{\"type\":\"integer\",\"default\":100,\"min\":1,\"max\":100000}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 num_designs 的声明：{\"type\":\"integer\",\"default\":100,\"min\":1,\"max\":100000}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
 
 ### `inference.design_startnum`
 
@@ -253,7 +253,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 ckpt_override_path 的声明：{\"type\":\"enum\",\"default\":\"\",\"options\":[\"\",\"models/ActiveSite_ckpt.pt\",\"models/Complex_beta_ckpt.pt\"]}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 ckpt_override_path 的声明：{\"type\":\"enum\",\"default\":\"\",\"options\":[\"\",\"models/ActiveSite_ckpt.pt\",\"models/Complex_beta_ckpt.pt\"]}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
 
 ### `inference.symmetry`
 
@@ -267,7 +267,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 symmetry 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 symmetry 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
 
 ### `inference.recenter`
 
@@ -323,7 +323,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 output_prefix 的声明：{\"type\":\"string\",\"default\":\"outputs/rfdiffusion/design\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 output_prefix 的声明：{\"type\":\"string\",\"default\":\"outputs/rfdiffusion/design\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [symmetry](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [entrypoint](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py)
 
 ### `inference.write_trajectory`
 
@@ -533,7 +533,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 contigs 的声明：{\"type\":\"string\",\"default\":\"[A1-150/0 70-100]\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 contigs 的声明：{\"type\":\"string\",\"default\":\"[A1-150/0 70-100]\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `contigmap.inpaint_seq`
 
@@ -547,7 +547,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 inpaint_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 inpaint_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `contigmap.inpaint_str`
 
@@ -561,7 +561,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 inpaint_str 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 inpaint_str 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `contigmap.inpaint_str_helix`
 
@@ -617,7 +617,7 @@ RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 provide_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 provide_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `contigmap.length`
 
@@ -1135,7 +1135,7 @@ top-k 邻接图配置的等变模块边特征通道数；属于 checkpoint 架�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 diffuser_t 的声明：{\"type\":\"integer\",\"default\":50,\"min\":1,\"max\":200}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 diffuser_t 的声明：{\"type\":\"integer\",\"default\":50,\"min\":1,\"max\":200}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `diffuser.b_0`
 
@@ -1219,7 +1219,7 @@ top-k 邻接图配置的等变模块边特征通道数；属于 checkpoint 架�
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 partial_t 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0,\"max\":50}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 partial_t 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0,\"max\":50}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [runner](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py), [contigs](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `diffuser.so3_schedule_type`
 
@@ -1303,7 +1303,7 @@ SO(3) 扩散 sigma 的最大值。
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 noise_scale_ca 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 noise_scale_ca 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `denoiser.final_noise_scale_ca`
 
@@ -1345,7 +1345,7 @@ CA 噪声倍率调度类型，默认恒定。
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 noise_scale_frame 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 noise_scale_frame 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `denoiser.final_noise_scale_frame`
 
@@ -1387,7 +1387,7 @@ CA 噪声倍率调度类型，默认恒定。
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 hotspot_res 的声明：{\"type\":\"string\",\"default\":\"[A59,A83,A91]\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 hotspot_res 的声明：{\"type\":\"string\",\"default\":\"[A59,A83,A91]\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `potentials.guiding_potentials`
 
@@ -1401,7 +1401,7 @@ CA 噪声倍率调度类型，默认恒定。
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 guiding_potentials 的声明：{\"type\":\"json\",\"default\":\"[]\"}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 guiding_potentials 的声明：{\"type\":\"json\",\"default\":\"[]\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [parameter_env](../../../backend_v2/app/compute/scripts.py)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter_env](../../../backend_v2/app/compute/scripts.py)
 
 ### `potentials.guide_scale`
 
@@ -1415,7 +1415,7 @@ CA 噪声倍率调度类型，默认恒定。
 
 约束与版本差异：["默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。", "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。", "BDA RFdiffusion@1.1.0 字段 guide_scale 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":20}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 guide_scale 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":20}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml), [library](../../../qm-scripts/library/catalog.json), [potentials](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py), [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `potentials.guide_decay`
 
@@ -1863,7 +1863,7 @@ BDA 模板家族标签（custom/monellin/brazzein/thaumatin/mabinlin）；实际
 
 约束与版本差异：["必须实际绑定模板 PDB 并提供 contigs，不能只选模板名。", "BDA RFdiffusion@1.1.0 字段 scaffold 的声明：{\"type\":\"enum\",\"default\":\"custom\",\"options\":[\"custom\",\"monellin\",\"brazzein\",\"thaumatin\",\"mabinlin\"]}；仅记录声明，不等于命令已执行该值。", "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 scaffold 的声明：{\"type\":\"enum\",\"default\":\"custom\",\"options\":[\"custom\",\"monellin\",\"brazzein\",\"thaumatin\",\"mabinlin\"]}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -2044,7 +2044,7 @@ BDA 模板家族标签（custom/monellin/brazzein/thaumatin/mabinlin）；实际
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交库参数清单；不是 BDA command 已转发的证据；commit `未固定/本地快照`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/rfdiffusion/README.md)：旧集群 runbook；历史记录与当前声明证明边界；commit `未固定/本地快照`；读取 2026-09-15。
 - [readme](https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md)：官方模式、contig、hotspot、partial/provide_seq、symmetry 与 RFpeptides；commit `2d0c003df46b9db41d119321f15403dec3716cd9`；读取 2026-09-15。

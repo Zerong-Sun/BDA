@@ -35,7 +35,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 按残基编号叠合 (`index`)
 
@@ -56,7 +56,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 寡聚复合体比对 (`complex`)
 
@@ -77,7 +77,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 柔性结构比对 (`flexible`)
 
@@ -97,7 +97,7 @@
 
 限制：此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -121,7 +121,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `outfmt`
 
@@ -135,7 +135,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mm`
 
@@ -149,7 +149,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ter`
 
@@ -163,7 +163,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `a`
 
@@ -177,7 +177,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `chain1`
 
@@ -191,7 +191,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `chain2`
 
@@ -205,7 +205,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `m`
 
@@ -219,7 +219,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `o`
 
@@ -233,7 +233,7 @@
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -334,12 +334,12 @@
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| TM1,TM2 | 按两个结构各自长度归一化的 TM-score；务必保留两种归一化 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| RMSD | 参与比对的代表原子（蛋白通常 Cα）叠合偏差 | Å | 不同残基对应和覆盖下不能直接比较；不是原子接触距离 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| Lali,L1,L2 | 比对长度和两结构参与读取的长度 | 残基数 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| ID1,ID2,IDali | 分别相对各结构及比对长度的序列一致性；具体列名读版本表头 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| usalign_tmscores.tsv | 批量结果；保存表头与查询/参考文件映射 | 按列定义 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| query.list | 本次参与批量比较的结构文件名列表 | 文件名 | 生成控制文件，不是序列 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| TM1,TM2 | 按两个结构各自长度归一化的 TM-score；务必保留两种归一化 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| RMSD | 参与比对的代表原子（蛋白通常 Cα）叠合偏差 | Å | 不同残基对应和覆盖下不能直接比较；不是原子接触距离 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| Lali,L1,L2 | 比对长度和两结构参与读取的长度 | 残基数 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| ID1,ID2,IDali | 分别相对各结构及比对长度的序列一致性；具体列名读版本表头 | 0–1 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| usalign_tmscores.tsv | 批量结果；保存表头与查询/参考文件映射 | 按列定义 | 保留原始值；不作为结合亲和力证据 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| query.list | 本次参与批量比较的结构文件名列表 | 文件名 | 生成控制文件，不是序列 | [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -355,5 +355,5 @@
 
 ## 来源与版本
 
-- [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
+- bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
 - [upstream](https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp)：功能与参数定义；commit `fcb0f9d921415a2095bc509975db7fc1e968af1d`；读取 2026-09-15。

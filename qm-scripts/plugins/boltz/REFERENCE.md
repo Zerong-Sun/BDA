@@ -34,7 +34,7 @@ Boltz结构预测与Boltz-2单小分子亲和力头分开说明，同时审计ba
 
 限制：当前BDA command未传--model，界面选择不保证切换
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### Boltz-2结构预测 (`boltz2_structure`)
 
@@ -55,7 +55,7 @@ Boltz结构预测与Boltz-2单小分子亲和力头分开说明，同时审计ba
 
 限制：当前predict_affinity默认true产生非官方--affinity，需修复或验证包装兼容性
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 显式单序列 (`single_sequence`)
 
@@ -75,7 +75,7 @@ Boltz结构预测与Boltz-2单小分子亲和力头分开说明，同时审计ba
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 本地MSA (`local_msa`)
 
@@ -95,7 +95,7 @@ YAML指向a3m/带配对key的CSV。BDA 接入：`configuration_only`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 远端MSA (`msa_server`)
 
@@ -115,7 +115,7 @@ YAML指向a3m/带配对key的CSV。BDA 接入：`configuration_only`。
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 小分子亲和力头 (`affinity`)
 
@@ -133,7 +133,7 @@ Boltz-2对单个小分子和蛋白目标预测affinity。BDA 接入：`unverifie
 
 限制：不支持蛋白-蛋白亲和力；RNA/DNA/cofactor目标预测不可靠；仅一个小分子，最多128个按RDKit RemoveHs后计数的原子；训练范围约56原子内更可靠；BDA predict_affinity→--affinity未匹配官方CLI
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### YAML限定草稿 (`guarded_yaml_draft`)
 
@@ -153,7 +153,7 @@ Boltz-2对单个小分子和蛋白目标预测affinity。BDA 接入：`unverifie
 
 限制：Boltz-authoring-6810138a只修正YAML目录staging；继承原affinity/参数消费缺口
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -179,7 +179,7 @@ Boltz-2对单个小分子和蛋白目标预测affinity。BDA 接入：`unverifie
 
 约束与版本差异：{"bda_variants": [], "library_help": "The accelerator to use for prediction. Default is gpu.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `affinity_checkpoint`
 
@@ -193,7 +193,7 @@ Boltz-2独立亲和力模型权重路径，与结构置信度checkpoint分开。
 
 约束与版本差异：{"bda_variants": [], "library_help": "An optional checkpoint, will use the provided Boltz-1 model by default.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `affinity_mw_correction`
 
@@ -207,7 +207,7 @@ Boltz-2独立亲和力模型权重路径，与结构置信度checkpoint分开。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to add the Molecular Weight correction to the affinity value head.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `api_key_header`
 
@@ -221,7 +221,7 @@ MSA服务器API认证的请求头名称；与basic认证二选一。
 
 约束与版本差异：{"bda_variants": [], "library_help": "Custom header key for API key authentication (default: X-API-Key).", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `api_key_value`
 
@@ -235,7 +235,7 @@ MSA服务器API凭据值，属于秘密，不应写入公开示例或结果报�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Custom header value for API key authentication.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `cache`
 
@@ -249,7 +249,7 @@ Boltz缓存目录；catalog记录的get_cache_path是函数默认表达式，不
 
 约束与版本差异：{"bda_variants": [], "library_help": "The directory where to download the data and model. Default is ~/.boltz, or $BOLTZ_CACHE if set.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `checkpoint`
 
@@ -263,7 +263,7 @@ Boltz缓存目录；catalog记录的get_cache_path是函数默认表达式，不
 
 约束与版本差异：{"bda_variants": [], "library_help": "An optional checkpoint, will use the provided Boltz-1 model by default.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `devices`
 
@@ -277,7 +277,7 @@ Lightning可使用的设备数量/配置，具体类型以安装版本CLI为准�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of devices to use for prediction. Default is 1.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `diffusion_samples`
 
@@ -291,7 +291,7 @@ Boltz每个输入生成的结构扩散样本数；BDA的num_samples是当前消�
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "Boltz", "version": "2.x"}, {"default": 1, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "The number of diffusion samples to use for prediction. Default is 1.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `diffusion_samples_affinity`
 
@@ -305,7 +305,7 @@ Boltz每个输入生成的结构扩散样本数；BDA的num_samples是当前消�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of diffusion samples to use for affinity prediction. Default is 5.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `input_path`
 
@@ -319,7 +319,7 @@ Boltz YAML/FASTA文件或目录；受体-配体的实体、链ID及MSA需在输�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz", "version": "2.x"}, {"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "YAML input file or directory.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_msa_seqs`
 
@@ -333,7 +333,7 @@ MSA最大序列数上限；这是截断限制，不是本次实际读取或去�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The maximum number of MSA sequences to use for prediction. Default is 8192.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_parallel_samples`
 
@@ -347,7 +347,7 @@ MSA最大序列数上限；这是截断限制，不是本次实际读取或去�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The maximum number of samples to predict in parallel. Default is None.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `method`
 
@@ -361,7 +361,7 @@ MSA最大序列数上限；这是截断限制，不是本次实际读取或去�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The method to use for prediction. Default is None.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `model`
 
@@ -375,7 +375,7 @@ Boltz代次boltz1/boltz2；affinity能力仅Boltz-2路径，当前BDAcommand未�
 
 约束与版本差异：{"bda_variants": [{"default": "boltz2", "enabled": true, "enum": ["boltz2", "boltz1"], "maximum": null, "minimum": null, "plugin_key": "Boltz", "version": "2.x"}, {"default": "boltz2", "enabled": true, "enum": ["boltz2", "boltz1"], "maximum": null, "minimum": null, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "The model to use for prediction. Default is boltz2.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_pairing_strategy`
 
@@ -389,7 +389,7 @@ Boltz代次boltz1/boltz2；affinity能力仅Boltz-2路径，当前BDAcommand未�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Pairing strategy to use. Used only if --use_msa_server is set. Options are 'greedy' and 'complete'", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_server_password`
 
@@ -403,7 +403,7 @@ MSA服务器basic认证密码，禁止写入共享报告或明文示例。
 
 约束与版本差异：{"bda_variants": [], "library_help": "MSA server password for basic auth. Used only if --use_msa_server is set. Can also be set via BOLTZ_MSA_PASSWORD environment variable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_server_url`
 
@@ -417,7 +417,7 @@ MSA服务器basic认证密码，禁止写入共享报告或明文示例。
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz", "version": "2.x"}, {"default": "", "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "MSA server url. Used only if --use_msa_server is set. ", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `msa_server_username`
 
@@ -431,7 +431,7 @@ MSA服务器basic认证用户名；与API key认证不可同时使用。
 
 约束与版本差异：{"bda_variants": [], "library_help": "MSA server username for basic auth. Used only if --use_msa_server is set. Can also be set via BOLTZ_MSA_USERNAME environment variable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `no_kernels`
 
@@ -445,7 +445,7 @@ MSA服务器basic认证用户名；与API key认证不可同时使用。
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to disable the kernels. Default False", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `num_samples`
 
@@ -459,7 +459,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [{"default": 5, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "Boltz", "version": "2.x"}, {"default": 5, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_subsampled_msa`
 
@@ -473,7 +473,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of MSA sequences to subsample. Default is 1024.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_workers`
 
@@ -487,7 +487,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of dataloader workers to use for prediction. Default is 2.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `out_dir`
 
@@ -501,7 +501,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [], "library_help": "The path where to save the predictions.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_format`
 
@@ -515,7 +515,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_variants": [], "library_help": "The output format to use for the predictions. Default is mmcif.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `override`
 
@@ -529,7 +529,7 @@ BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samp
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to override existing found predictions. Default is False.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `predict_affinity`
 
@@ -543,7 +543,7 @@ BDA历史布尔字段映射--affinity；固定Boltz源码无此开关，正确�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz", "version": "2.x"}, {"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `preprocessing_threads`
 
@@ -557,7 +557,7 @@ BDA历史布尔字段映射--affinity；固定Boltz源码无此开关，正确�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of threads to use for preprocessing. Default is 1.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `recycling_steps`
 
@@ -571,7 +571,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": 20, "minimum": 1, "plugin_key": "Boltz", "version": "2.x"}, {"default": 3, "enabled": true, "enum": null, "maximum": 20, "minimum": 1, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "The number of recycling steps to use for prediction. Default is 3.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `sampling_steps`
 
@@ -585,7 +585,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of sampling steps to use for prediction. Default is 200.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `sampling_steps_affinity`
 
@@ -599,7 +599,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The number of sampling steps to use for affinity prediction. Default is 200.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `seed`
 
@@ -613,7 +613,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Seed to use for random number generator. Default is None (no seeding).", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `step_scale`
 
@@ -627,7 +627,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_variants": [], "library_help": "The step size is related to the temperature at which the diffusion process samples the distribution. The lower the higher the diversity among samples (recommended between 1 and 2). Default is 1.638 for Boltz-1 and 1.5 for Boltz-2. If not provided, the default step size will be used.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `subsample_msa`
 
@@ -641,7 +641,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to subsample the MSA. Default is True.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `use_msa_server`
 
@@ -655,7 +655,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz", "version": "2.x"}, {"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "Boltz-authoring-6810138a", "version": "2.x-draft.1"}], "library_help": "Whether to use the MMSeqs2 server for MSA generation. Default is False.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `use_potentials`
 
@@ -669,7 +669,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to use potentials for steering. Default is False.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `write_embeddings`
 
@@ -683,7 +683,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": " to dump the s and z embeddings into a npz file. Default is False.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `write_full_pae`
 
@@ -697,7 +697,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to dump the pae into a npz file. Default is True.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `write_full_pde`
 
@@ -711,7 +711,7 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [], "library_help": "Whether to dump the pde into a npz file. Default is False.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -834,13 +834,13 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| affinity_pred_value | Boltz-2亲和力回归头 | log10(IC50/μM) | 值越低预测越强；用于活性小分子间比较，不是Kd、ΔG或蛋白-蛋白亲和力。 | [upstream-2](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/docs/prediction.md) |
-| affinity_probability_binary | 小分子结合/非结合二分类头 | 0–1 | 用于区分binder与decoy，与回归头目标不同；必须有真实affinity JSON。 | [upstream-2](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/docs/prediction.md) |
-| PDE | 模型预测距离误差 | Å | 与PAE不同；write_full_pde控制完整矩阵。 | [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| affinity_pred_value | Boltz-2亲和力回归头 | log10(IC50/μM) | 值越低预测越强；用于活性小分子间比较，不是Kd、ΔG或蛋白-蛋白亲和力。 | upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| affinity_probability_binary | 小分子结合/非结合二分类头 | 0–1 | 用于区分binder与decoy，与回归头目标不同；必须有真实affinity JSON。 | upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PDE | 模型预测距离误差 | Å | 与PAE不同；write_full_pde控制完整矩阵。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -865,10 +865,10 @@ Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时�
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/boltz/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交library的boltz参数提取，默认值不是BDA默认值；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/src/boltz/main.py)：src/boltz/main.py；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
-- [upstream-1](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
-- [upstream-2](https://github.com/jwohlwend/boltz/blob/b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc/docs/prediction.md)：docs/prediction.md；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：src/boltz/main.py；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。
+- upstream-2（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：docs/prediction.md；上游源码快照，不证明QM安装代码完全相同；commit `b1ebfc46ecf57f5414e0d1a6f9027bbb122c53bc`；读取 2026-09-15。

@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "registry",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "runbook",
@@ -28,26 +29,29 @@
     {
       "id": "upstream-0",
       "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/boltz_ph/design.py",
       "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
       "scope": "boltz_ph/design.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-1",
       "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/README.md",
       "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
       "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-2",
       "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/boltz_ph/pipeline.py",
       "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
       "scope": "boltz_ph/pipeline.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     }
   ],
   "modes": [

@@ -39,7 +39,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 限制：模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。
 
-依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定位置和跨链 tied 设计 (`fixed_tied`)
 
@@ -61,7 +61,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 限制：command 有参数入口；fixed_positions 端口有明确 staging，其他 artifact_ref 路径需 preview 检查实际解析，不能假定 UI 资产ID可作为文件路径。；固定和 tied 条件冲突、链号错误必须提前检查。
 
-依据：[fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
+依据：[fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
 
 ### 可溶蛋白专用权重 (`soluble`)
 
@@ -82,7 +82,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 限制：官方 soluble 权重列出 v_48_010、v_48_020；并非所有 UI model_name 都有 soluble 版本。；不保证表达可溶性，也不能据此断言 vanilla 权重一定产生表面疏水聚集。
 
-依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### CA-only 逆折叠 (`ca_only`)
 
@@ -104,7 +104,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 限制：BDA 先运行 parse_multiple_chains.py，未显式传 CA-only 解析选项；需核实预解析与模型输入兼容。；官方 CA+soluble 路径会退出，不能视为合法组合。
 
-依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 已有序列评分 (`score`)
 
@@ -191,7 +191,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 限制：BDA 只转发全局 omit_aas；多数 bias/PSSM fields 虽可见但 command 不读取。
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -216,7 +216,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 backbone_noise 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 backbone_noise 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `batch_size`
 
@@ -230,7 +230,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "正整数且不大于 num_seq_per_target；建议整除以免静默少样本。", "BDA ProteinMPNN@1.0.0 字段 batch_size 的声明：{\"type\":\"integer\",\"default\":1,\"min\":1,\"max\":1024}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 batch_size 的声明：{\"type\":\"integer\",\"default\":1,\"min\":1,\"max\":1024}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `bias_AA_jsonl`
 
@@ -244,7 +244,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 bias_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 bias_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `bias_by_res_jsonl`
 
@@ -258,7 +258,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 bias_by_res_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 bias_by_res_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ca_only`
 
@@ -272,7 +272,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 ca_only 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 ca_only 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [parameter_env](../../../backend_v2/app/compute/scripts.py)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter_env](../../../backend_v2/app/compute/scripts.py)
 
 ### `chain_id_jsonl`
 
@@ -286,7 +286,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 chain_id_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 chain_id_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `conditional_probs_only`
 
@@ -328,7 +328,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 fixed_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 fixed_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jsonl_path`
 
@@ -342,7 +342,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 jsonl_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 jsonl_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_length`
 
@@ -370,7 +370,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 model_name 的声明：{\"type\":\"enum\",\"default\":\"v_48_020\",\"options\":[\"v_48_002\",\"v_48_010\",\"v_48_020\",\"v_48_030\"]}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 model_name 的声明：{\"type\":\"enum\",\"default\":\"v_48_020\",\"options\":[\"v_48_002\",\"v_48_010\",\"v_48_020\",\"v_48_030\"]}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_seq_per_target`
 
@@ -384,7 +384,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "选择 batch_size 的正整数倍；每个温度独立产生该数量。", "BDA ProteinMPNN@1.0.0 字段 num_seq_per_target 的声明：{\"type\":\"integer\",\"default\":8,\"min\":1,\"max\":10000}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 num_seq_per_target 的声明：{\"type\":\"integer\",\"default\":8,\"min\":1,\"max\":10000}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `omit_AA_jsonl`
 
@@ -398,7 +398,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 omit_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 omit_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `omit_AAs`
 
@@ -412,7 +412,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 omit_aas 的声明：{\"type\":\"string\",\"default\":\"X\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 omit_aas 的声明：{\"type\":\"string\",\"default\":\"X\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `out_folder`
 
@@ -426,7 +426,7 @@ ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算�
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 out_folder 的声明：{\"type\":\"string\",\"default\":\"outputs/proteinmpnn\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 out_folder 的声明：{\"type\":\"string\",\"default\":\"outputs/proteinmpnn\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `path_to_fasta`
 
@@ -468,7 +468,7 @@ score_only 模式要评估的序列 FASTA；多链按字母顺序以 / 分隔并
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 pdb_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pdb_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pdb_path_chains`
 
@@ -482,7 +482,7 @@ score_only 模式要评估的序列 FASTA；多链按字母顺序以 / 分隔并
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 pdb_path_chains 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pdb_path_chains 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pssm_bias_flag`
 
@@ -510,7 +510,7 @@ score_only 模式要评估的序列 FASTA；多链按字母顺序以 / 分隔并
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 pssm_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pssm_log_odds_flag`
 
@@ -538,7 +538,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 pssm_multi 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_multi 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pssm_threshold`
 
@@ -552,7 +552,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。", "BDA ProteinMPNN@1.0.0 字段 pssm_threshold 的声明：{\"type\":\"number\",\"default\":0.0}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_threshold 的声明：{\"type\":\"number\",\"default\":0.0}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [utils](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `sampling_temp`
 
@@ -566,7 +566,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "必须正数；1.0.1 schema 是单数 number，不能表示多个温度；UI 允许0但上游除以温度不应设0。", "BDA ProteinMPNN@1.0.0 字段 sampling_temp 的声明：{\"type\":\"string\",\"default\":\"0.1\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN@1.0.1 字段 sampling_temp 的声明：{\"type\":\"number\",\"default\":0.0001,\"minimum\":0.0,\"maximum\":1.0}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 sampling_temp 的声明：{\"type\":\"string\",\"default\":\"0.1\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `save_probs`
 
@@ -622,7 +622,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 seed 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 seed 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `suppress_print`
 
@@ -650,7 +650,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 tied_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 tied_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [fixed](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py), [ties](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `unconditional_probs_only`
 
@@ -678,7 +678,7 @@ PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_
 
 约束与版本差异：["BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。", "BDA ProteinMPNN@1.0.0 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN@1.0.1 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":true}；仅记录声明，不等于命令已执行该值。", "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [parameter_env](../../../backend_v2/app/compute/scripts.py)
+依据：[cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py), [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md), [library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter_env](../../../backend_v2/app/compute/scripts.py)
 
 ### `seqs_per_struct`
 
@@ -692,7 +692,7 @@ BDA 1.0.1 中表示每个结构序列数的旧包装字段；实际 command 仅�
 
 约束与版本差异：["这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。", "BDA ProteinMPNN@1.0.1 字段 seqs_per_struct 的声明：{\"type\":\"integer\",\"default\":8,\"minimum\":1,\"maximum\":64}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
 
 ### `relax_cycles`
 
@@ -706,7 +706,7 @@ BDA 1.0.1 的旧包装 relax 轮数字段；官方 ProteinMPNN CLI 不做 Rosett
 
 约束与版本差异：["这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。", "BDA ProteinMPNN@1.0.1 字段 relax_cycles 的声明：{\"type\":\"integer\",\"default\":0,\"minimum\":0,\"maximum\":10}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
 
 ### `fixed_positions`
 
@@ -720,7 +720,7 @@ BDA 1.0.1 的字符串属性；与名为 fixed_positions 的文件输入端口�
 
 约束与版本差异：["这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。", "BDA ProteinMPNN@1.0.1 字段 fixed_positions 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [cli](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -1010,7 +1010,7 @@ BDA 1.0.1 的字符串属性；与名为 fixed_positions 的文件输入端口�
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交库参数清单；不是 BDA command 已转发的证据；commit `未固定/本地快照`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/proteinmpnn/README.md)：旧集群 runbook；历史记录与当前声明证明边界；commit `未固定/本地快照`；读取 2026-09-15。
 - [readme](https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md)：采样、评分、概率模式、权重种类与 FASTA 指标；commit `8907e6671bfbfc92303b5f79c4b5e6ce47cdef57`；读取 2026-09-15。

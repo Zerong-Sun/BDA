@@ -206,6 +206,7 @@ def build():
         "",
         "详细模式和科学限制见 [SCIENTIFIC_MODES.md](SCIENTIFIC_MODES.md)。",
     ]
+    lines[1:1] = ['', '状态：活跃', '', '最后核验：2026-09-16（整合验证）', '', '权威范围：插件配置、参数解释与已记录的验证边界。', '', '数据来源：版本化插件声明、参数定义及本文列出的来源。', '', '替代关系：补充插件接口文档；配置覆盖不代表真实运行通过。']
     return {
         HERE / "options.json": json.dumps(spec, ensure_ascii=False, indent=2) + "\n",
         ROOT / "backend_v2/plugin_manifests/rosetta-2024.09-bda.1.json": json.dumps(

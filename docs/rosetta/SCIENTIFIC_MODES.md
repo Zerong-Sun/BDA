@@ -1,5 +1,15 @@
 # BDA Rosetta 模式与参数的科学语义
 
+状态：活跃
+
+最后核验：2026-09-16（整合验证）
+
+权威范围：插件配置、参数解释与已记录的验证边界。
+
+数据来源：版本化插件声明、参数定义及本文列出的来源。
+
+替代关系：补充插件接口文档；配置覆盖不代表真实运行通过。
+
 审查日期：2026-09-14。当前插件完整45参数见 [PARAMETERS.md](PARAMETERS.md)；本文还审计旧library的47项历史参数，后者不是新插件表单开放清单。本文界定常用任务模式、输入和解释范围，**不是全部 Rosetta 应用或所有 flags 的覆盖声明**。界面能生成文件不代表本机/集群已安装对应程序，也不代表计算已执行。每次结果应绑定实际 executable、Rosetta/database 版本、权重、输入与 XML/flags 哈希。
 
 本次只读审查起点为 `qm-scripts/library/catalog.json` 的 Rosetta 条目：实际47个参数、声明 `parameter_count=36`、36条help为空；这是扩展前快照，不代表扩展后的字段数。快照 SHA256：`09aa9ebd0b7d216e3eb54627ba5f02b2a8f6cac2cb026885729ece7a0fe61d78`。本文未修改catalog、manifest或运行代码。

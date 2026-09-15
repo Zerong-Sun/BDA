@@ -6,9 +6,10 @@
   "sources": [
     {
       "id": "live",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "scope": "当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "library",

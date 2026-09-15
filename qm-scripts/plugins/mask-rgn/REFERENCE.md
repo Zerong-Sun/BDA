@@ -39,7 +39,7 @@
 
 限制：BDA disabled且无输入端口/参数传递，配置不能提交为已验证任务；位置语法仅见示例，未获parser实现确认；不能由模型名断言结构预测/结合能力；parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。
 
-依据：[catalog](../../../qm-scripts/library/catalog.json), [mask-example](../../../qm-scripts/library/examples/02-sequence-design/maskrgn.json), [mask-builder](../../../qm-scripts/library/build_catalog.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[catalog](../../../qm-scripts/library/catalog.json), [mask-example](../../../qm-scripts/library/examples/02-sequence-design/maskrgn.json), [mask-builder](../../../qm-scripts/library/build_catalog.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 关联位置/同源寡聚体配置 (`tied_design_config`)
 
@@ -149,7 +149,7 @@
 
 约束与版本差异：["仅据历史catalog/config声明解释，源码缺失，未证实此键在当前入口被读取。", "library按Hydra key=value生成不等于模型安装或计算通过。", "BDA同名字段存在但命令未传递；BDA默认=\"\""]
 
-依据：[catalog](../../../qm-scripts/library/catalog.json), [mask-builder](../../../qm-scripts/library/build_catalog.py), [renderer](../../../qm-scripts/library/qm_job.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[catalog](../../../qm-scripts/library/catalog.json), [mask-builder](../../../qm-scripts/library/build_catalog.py), [renderer](../../../qm-scripts/library/qm_job.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `steps`
 
@@ -793,7 +793,7 @@ IPA相关模块dropout配置；模块是否存在/如何使用未取得源码，
 
 约束与版本差异：["BDA disabled且command只有python -m maskrgnn_clean.inference，无kwargs或Hydra覆盖。", "BDA声明options=['maskrgnn_demo']"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json)
 
 ### `num_samples`
 
@@ -807,7 +807,7 @@ BDA拟要求输出序列数；历史library键为sample_num，当前命令未作
 
 约束与版本差异：["BDA disabled且command只有python -m maskrgnn_clean.inference，无kwargs或Hydra覆盖。", "BDA声明min=1", "BDA声明max=100000"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json)
 
 ### `mask_ratio`
 
@@ -821,7 +821,7 @@ BDA拟表示未显式选位置时的掩码比例；library只有mask_prior.min_m
 
 约束与版本差异：["BDA disabled且command只有python -m maskrgnn_clean.inference，无kwargs或Hydra覆盖。", "BDA声明min=0", "BDA声明max=1"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json)
 
 ### `temperature`
 
@@ -835,7 +835,7 @@ BDA拟控制序列采样分布温度；历史键为temp，未实现映射和边�
 
 约束与版本差异：["BDA disabled且command只有python -m maskrgnn_clean.inference，无kwargs或Hydra覆盖。", "BDA声明min=0", "BDA声明max=5"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json)
 
 ### `random_seed`
 
@@ -849,7 +849,7 @@ BDA声明随机种子，旧帮助说0自动生成；未获得实际入口实现�
 
 约束与版本差异：["BDA disabled且command只有python -m maskrgnn_clean.inference，无kwargs或Hydra覆盖。", "BDA声明min=0"]
 
-依据：[live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json)
+依据：live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -966,9 +966,9 @@ BDA声明随机种子，旧帮助说0自动生成；未获得实际入口实现�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| sequence_set（声明） | 预期采样序列集合 | AA序列 | 未验证文件格式、字母合法性、样本数或固定位置规则；非已产生结果。 | [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [mask-example](../../../qm-scripts/library/examples/02-sequence-design/maskrgn.json) |
-| score_table（声明） | 预期模型采样统计 | 未确定 | 没有具体模型分数字段/公式/单位，不能命名pLDDT、ΔG或实验性质。 | [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| embedding（声明） | 可选嵌入/潜变量产物 | 未确定维度 | model.embedding=true不证明推理导出该文件；当前无输出parser。 | [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [catalog](../../../qm-scripts/library/catalog.json) |
+| sequence_set（声明） | 预期采样序列集合 | AA序列 | 未验证文件格式、字母合法性、样本数或固定位置规则；非已产生结果。 | live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [mask-example](../../../qm-scripts/library/examples/02-sequence-design/maskrgn.json) |
+| score_table（声明） | 预期模型采样统计 | 未确定 | 没有具体模型分数字段/公式/单位，不能命名pLDDT、ΔG或实验性质。 | live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| embedding（声明） | 可选嵌入/潜变量产物 | 未确定维度 | model.embedding=true不证明推理导出该文件；当前无输出parser。 | live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [catalog](../../../qm-scripts/library/catalog.json) |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -990,7 +990,7 @@ BDA声明随机种子，旧帮助说0自动生成；未获得实际入口实现�
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status；commit `None`；读取 2026-09-15。
 - [catalog](../../../qm-scripts/library/catalog.json)：历史参数库的类型和默认值，不等同运行时有效设置；commit `None`；读取 2026-09-15。
 - [renderer](../../../qm-scripts/library/qm_job.py)：手工配置生成器的参数映射，区别于live ModelPlugin命令；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/mask-rgn/README.md)：旧运行手册的状态记录；不是安装或运行成功证明；commit `None`；读取 2026-09-15。

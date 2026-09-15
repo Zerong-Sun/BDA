@@ -131,7 +131,7 @@ export const en: TranslationDict = {
   pipeline: {
     eyebrow: 'Design loop',
     stepOf: 'Step {index} of {total}',
-    currentBadge: 'Current project stage',
+    currentBadge: 'You are here',
     lockedHint: 'Finish the current step to unlock this stage.',
     nextStep: 'Next step',
     continueTo: 'Continue to {stage}',

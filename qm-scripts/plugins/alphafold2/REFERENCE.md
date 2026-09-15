@@ -35,7 +35,7 @@
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 单体pTM (`monomer_ptm`)
 
@@ -55,7 +55,7 @@
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### CASP14 ensemble (`monomer_casp14`)
 
@@ -75,7 +75,7 @@
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 官方AF2-Multimer (`multimer`)
 
@@ -96,7 +96,7 @@
 
 限制：结构置信度不是实验结合/活性证据
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### BDA predict.py初始坐标包装 (`initial_guess_wrapper`)
 
@@ -119,7 +119,7 @@
 
 限制：本快照包装命令及容器身份不同于官方入口，未取得实际predict.py源码；ensemble_predictions未出现在command
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -145,7 +145,7 @@
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Run multiple JAX model evaluations to obtain a timing that excludes the compilation time, which should be more indicative of the time required for inferencing many proteins.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `bfd_database_path`
 
@@ -159,7 +159,7 @@ bfd数据库文件/索引路径；核对对应版本、发布日期及工具要�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the BFD database for use by HHblits.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `data_dir`
 
@@ -173,7 +173,7 @@ AF2支持数据及模型参数根目录；必须与其余数据库路径配套�
 
 约束与版本差异：{"bda_variants": [{"default": "/data/alphafold", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Path to directory of supporting data.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `db_preset`
 
@@ -187,7 +187,7 @@ MSA数据库方案：full_dbs与reduced_dbs使用不同数据库集合，不是�
 
 约束与版本差异：{"bda_variants": [{"default": "reduced_dbs", "enabled": false, "enum": ["full_dbs", "reduced_dbs"], "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}, {"default": "reduced_dbs", "enabled": true, "enum": ["reduced_dbs", "full_dbs"], "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.2"}], "library_help": "Choose preset MSA database configuration - smaller genetic database config (reduced_dbs) or full genetic database config  (full_dbs)", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `ensemble_predictions`
 
@@ -201,7 +201,7 @@ BDA AF2 initial-guess包装声明的每输入种子数；command不消费此键�
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": 100, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.2"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `fasta_paths`
 
@@ -215,7 +215,7 @@ BDA AF2 initial-guess包装声明的每输入种子数；command不消费此键�
 
 约束与版本差异：{"bda_variants": [{"default": "", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Paths to FASTA files, each containing a prediction target that will be folded one after another. If a FASTA file contains multiple sequences, then it will be folded as a multimer. Paths should be separated by commas. All FASTA paths must have a unique basename as the basename is used to name the output directories for each prediction.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hhblits_binary_path`
 
@@ -229,7 +229,7 @@ hhblits搜索/比对程序的可执行文件路径；须检查版本与执行权
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the HHblits executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hhsearch_binary_path`
 
@@ -243,7 +243,7 @@ hhsearch搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the HHsearch executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hhsearch_n_cpu`
 
@@ -257,7 +257,7 @@ hhsearch搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [{"default": 8, "enabled": false, "enum": null, "maximum": 256, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Number of CPUs to use for HHsearch. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmbuild_binary_path`
 
@@ -271,7 +271,7 @@ hmmbuild搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the hmmbuild executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmsearch_binary_path`
 
@@ -285,7 +285,7 @@ hmmsearch搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the hmmsearch executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `hmmsearch_n_cpu`
 
@@ -299,7 +299,7 @@ hmmsearch搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [{"default": 8, "enabled": false, "enum": null, "maximum": 256, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Number of CPUs to use for HMMsearch. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `initial_guess`
 
@@ -313,7 +313,7 @@ hmmsearch搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": true, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.2"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `jackhmmer_binary_path`
 
@@ -327,7 +327,7 @@ jackhmmer搜索/比对程序的可执行文件路径；须检查版本与执行�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the JackHMMER executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `jackhmmer_n_cpu`
 
@@ -341,7 +341,7 @@ jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需�
 
 约束与版本差异：{"bda_variants": [{"default": 8, "enabled": false, "enum": null, "maximum": 256, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Number of CPUs to use for Jackhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `kalign_binary_path`
 
@@ -355,7 +355,7 @@ kalign搜索/比对程序的可执行文件路径；须检查版本与执行权�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Kalign executable.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `max_template_date`
 
@@ -369,7 +369,7 @@ kalign搜索/比对程序的可执行文件路径；须检查版本与执行权�
 
 约束与版本差异：{"bda_variants": [{"default": "2026-01-01", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Maximum template release date to consider. Important if folding historical test sets.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `mgnify_database_path`
 
@@ -383,7 +383,7 @@ mgnify数据库文件/索引路径；核对对应版本、发布日期及工具�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the MGnify database for use by JackHMMER.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `model_preset`
 
@@ -397,7 +397,7 @@ AF2权重/推理配置：monomer、monomer_casp14、monomer_ptm或multimer；多
 
 约束与版本差异：{"bda_variants": [{"default": "multimer", "enabled": false, "enum": ["monomer", "monomer_casp14", "monomer_ptm", "multimer"], "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Choose preset model configuration - the monomer model, the monomer model with extra ensembling, monomer model with pTM head, or multimer model", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `models`
 
@@ -411,7 +411,7 @@ AF2权重/推理配置：monomer、monomer_casp14、monomer_ptm或multimer；多
 
 约束与版本差异：{"bda_variants": [{"default": 1, "enabled": true, "enum": null, "maximum": 5, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.2"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `models_to_relax`
 
@@ -425,7 +425,7 @@ AF2输出Amber几何优化范围all/best/none；relax不计算结合自由能，
 
 约束与版本差异：{"bda_variants": [{"default": "best", "enabled": false, "enum": ["all", "best", "none"], "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "The models to run the final relaxation step on. If `all`, all models are relaxed, which may be time consuming. If `best`, only the most confident model is relaxed. If `none`, relaxation is not run. Turning off relaxation might result in predictions with distracting stereochemical violations but might help in case you are having issues with the relaxation stage.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `num_multimer_predictions_per_model`
 
@@ -439,7 +439,7 @@ AF2输出Amber几何优化范围all/best/none；relax不计算结合自由能，
 
 约束与版本差异：{"bda_variants": [{"default": 5, "enabled": false, "enum": null, "maximum": 20, "minimum": 1, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "How many predictions (each with a different random seed) will be generated per model. E.g. if this is 2 and there are 5 models then there will be 10 predictions per input. Note: this FLAG only applies if model_preset=multimer", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `obsolete_pdbs_path`
 
@@ -453,7 +453,7 @@ AF2输出Amber几何优化范围all/best/none；relax不计算结合自由能，
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to file containing a mapping from obsolete PDB IDs to the PDB IDs of their replacements.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_dir`
 
@@ -467,7 +467,7 @@ AF2输出Amber几何优化范围all/best/none；relax不计算结合自由能，
 
 约束与版本差异：{"bda_variants": [{"default": "outputs/alphafold", "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Path to a directory that will store the results.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pdb70_database_path`
 
@@ -481,7 +481,7 @@ pdb70数据库文件/索引路径；核对对应版本、发布日期及工具�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the PDB70 database for use by HHsearch.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `pdb_seqres_database_path`
 
@@ -495,7 +495,7 @@ pdb_seqres数据库文件/索引路径；核对对应版本、发布日期及工
 
 约束与版本差异：{"bda_variants": [], "library_help": "Full filepath to the PDB seqres database file (not just the directory) for use by hmmsearch.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `random_seed`
 
@@ -509,7 +509,7 @@ pdb_seqres数据库文件/索引路径；核对对应版本、发布日期及工
 
 约束与版本差异：{"bda_variants": [{"default": 0, "enabled": false, "enum": null, "maximum": null, "minimum": 0, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "The random seed for the data pipeline. By default, this is randomly generated. Note that even if this is set, Alphafold may still not be deterministic, because processes like GPU inference are nondeterministic.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `recycles`
 
@@ -523,7 +523,7 @@ BDA predict.py包装的循环数，映射-recycles；不是官方run_alphafold.p
 
 约束与版本差异：{"bda_variants": [{"default": 3, "enabled": true, "enum": null, "maximum": 20, "minimum": 0, "plugin_key": "AlphaFold2", "version": "2.3.2"}], "library_help": "", "library_required": false}
 
-依据：[registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `small_bfd_database_path`
 
@@ -537,7 +537,7 @@ small_bfd数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the small version of BFD used with the \"reduced_dbs\" preset.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `template_mmcif_dir`
 
@@ -551,7 +551,7 @@ small_bfd数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to a directory with template mmCIF structures, each named <pdb_id>.cif", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniprot_database_path`
 
@@ -565,7 +565,7 @@ uniprot数据库文件/索引路径；核对对应版本、发布日期及工具
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Uniprot database for use by JackHMMer.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniref30_database_path`
 
@@ -579,7 +579,7 @@ uniref30数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the UniRef30 database for use by HHblits.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `uniref90_database_path`
 
@@ -593,7 +593,7 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_variants": [], "library_help": "Path to the Uniref90 database for use by JackHMMER.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)
+依据：[library](../../../qm-scripts/library/catalog.json), upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `use_gpu_relax`
 
@@ -607,7 +607,7 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": true, "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Whether to relax on GPU. Relax on GPU can be much faster than CPU, so it is recommended to enable if possible. GPUs must be available if this setting is enabled.", "library_required": true}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ### `use_precomputed_msas`
 
@@ -621,7 +621,7 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 约束与版本差异：{"bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容", "bda_variants": [{"default": false, "enabled": false, "enum": null, "maximum": null, "minimum": null, "plugin_key": "AlphaFold2", "version": "2.3.0"}], "library_help": "Whether to read MSAs that have been written to disk instead of running the MSA tools. The MSA files are looked up in the output directory, so it must stay the same between multiple runs that are to reuse the MSAs. WARNING: This will not check if the sequence, database or configuration have changed.", "library_required": false}
 
-依据：[library](../../../qm-scripts/library/catalog.json), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [parameter-env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [parameter-env](../../../backend_v2/app/compute/scripts.py)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -861,10 +861,10 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 | 输出 | 定义 | 单位/尺度 | 解释与限制 | 依据 |
 |---|---|---|---|---|
-| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
-| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py), [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json) |
+| predicted_structure / complex | 预测原子坐标及链/残基映射 | Å | 坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pLDDT | 局部结构置信度 | 通常0–100；Boltz/Protein-Hunter原始汇总常0–1 | 逐文件核对尺度，不是概率或亲和力。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| pTM / ipTM | 整体折叠/多链相对构象置信度 | 0–1 | 单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
+| PAE | 对齐后的相对位置预测误差矩阵 | Å | 保留链映射、非对角块和聚合定义；不能单独证明结合位点。 | upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`） |
 
 保留所有额外原始列；动态 XML/模型/配置新增字段须附定义、单位、版本和来源，未解释前不纳入筛选。
 
@@ -889,9 +889,9 @@ uniref90数据库文件/索引路径；核对对应版本、发布日期及工�
 
 ## 来源与版本
 
-- [registry](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
+- registry（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明；commit `None`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/alphafold2/README.md)：2026-08-30历史QM运行手册；与当前声明不同处需单列；commit `None`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交library的alphafold2参数提取，默认值不是BDA默认值；commit `c77e5d2a8961d1a353632c462914ff0a32a950f6`；读取 2026-09-15。
 - [parameter-env](../../../backend_v2/app/compute/scripts.py)：parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释；commit `None`；读取 2026-09-15。
-- [upstream-0](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py)：run_alphafold.py；上游源码快照，不证明QM安装代码完全相同；commit `c77e5d2a8961d1a353632c462914ff0a32a950f6`；读取 2026-09-15。
-- [upstream-1](https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/README.md)：README.md；上游源码快照，不证明QM安装代码完全相同；commit `c77e5d2a8961d1a353632c462914ff0a32a950f6`；读取 2026-09-15。
+- upstream-0（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：run_alphafold.py；上游源码快照，不证明QM安装代码完全相同；commit `c77e5d2a8961d1a353632c462914ff0a32a950f6`；读取 2026-09-15。
+- upstream-1（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：README.md；上游源码快照，不证明QM安装代码完全相同；commit `c77e5d2a8961d1a353632c462914ff0a32a950f6`；读取 2026-09-15。

@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "registry",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "runbook",
@@ -35,34 +36,38 @@
     {
       "id": "upstream-0",
       "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/chai_lab/chai1.py",
       "commit": "c544fb183e865c4950909444db860a9d50604f66",
       "scope": "chai_lab/chai1.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-1",
       "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/README.md",
       "commit": "c544fb183e865c4950909444db860a9d50604f66",
       "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-2",
       "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/examples/restraints/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/examples/restraints/README.md",
       "commit": "c544fb183e865c4950909444db860a9d50604f66",
       "scope": "examples/restraints/README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-3",
       "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/pyproject.toml",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/pyproject.toml",
       "commit": "c544fb183e865c4950909444db860a9d50604f66",
       "scope": "pyproject.toml；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     }
   ],
   "modes": [

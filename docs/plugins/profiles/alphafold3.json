@@ -6,10 +6,11 @@
   "sources": [
     {
       "id": "registry",
-      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
       "commit": null,
       "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "runbook",
@@ -42,34 +43,38 @@
     {
       "id": "upstream-0",
       "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/alphafold3/run_alphafold.py",
       "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
       "scope": "run_alphafold.py；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-1",
       "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/README.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/alphafold3/README.md",
       "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
       "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-2",
       "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/input.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/alphafold3/docs/input.md",
       "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
       "scope": "docs/input.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     },
     {
       "id": "upstream-3",
       "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/output.md",
-      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/alphafold3/docs/output.md",
       "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
       "scope": "docs/output.md；上游源码快照，不证明QM安装代码完全相同",
-      "retrieved_on": "2026-09-15"
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
     }
   ],
   "modes": [

@@ -36,7 +36,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。
 
-依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 蛋白靶标/hotspot 条件 (`binder`)
 
@@ -62,7 +62,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：design_spec 文件是 BDA 可声明输入，但所有嵌套条件必须匹配站点安装版本。；hotspot 近接是模型偏好，不能证明实验结合、受体激活或 ΔG。
 
-依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 固定序号 motif 原子条件 (`indexed_motif`)
 
@@ -91,7 +91,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：live 标记曾有10样本原子几何 smoke evidence，但没有在此审计证明当前完整声明的 fingerprint 匹配，不外推到其他条件模式。
 
-依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 不固定序号的 motif 几何 (`unindexed_motif`)
 
@@ -121,7 +121,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：unindexed 的位置变化必须读取输出映射，不能按原位置序号直接算错误的 RMSD。；站点旧输入方言可能使用不同键名；当前 dialect2 的 unindex/contig 不自动等同旧接口。
 
-依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), [examples](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/demo.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), [examples](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/demo.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 以 Å 噪声作部分扩散 (`partial`)
 
@@ -146,7 +146,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：partial_t 为 Å 噪声标准差，绝不是 RFD1 的 diffuser.partial_T 步数。；实际逆扩散步数由噪声截断调度决定；num_timesteps 不等于部分扩散实际步数。；2 Å 是官方渐增探索起点示例，不是通过阈值；当前源码 ge=0，建议范围不是硬上限。
 
-依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parser](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 配体与氢键/埋藏条件 (`small_molecule`)
 
@@ -233,7 +233,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：BDA command 未转发 inference_sampler.kind；仅上传 symmetry JSON 不能声称完整模式已接通。；当前官方文档仅C/D；对称 motif 需预先对称化，不可照搬 RFD1 tetrahedral。
 
-依据：[symmetry](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/symmetry.md), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[symmetry](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/symmetry.md), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### 高级采样与诊断 (`expert_sampling`)
 
@@ -254,7 +254,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 限制：当前 BDA 只转发6个作业 fields 和 inputs/out_dir；其他 CLI 配置未暴露，不能直接在任务参数中填了就认为生效。
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 使用方法
 
@@ -279,7 +279,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "实际 BDA 绑定 design_spec 端口；JSON 内的 input 路径不会在 command 中重写。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `out_dir`
 
@@ -293,7 +293,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "当前上游为必填 ???；library 的 ./output 是本地设置。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `n_batches`
 
@@ -307,7 +307,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "BDA RFdiffusion3@foundry-2025-12-01 字段 n_batches 的声明：{\"type\":\"integer\",\"default\":1}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `diffusion_batch_size`
 
@@ -321,7 +321,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "BDA/library=5；当前官方 config=8。正整数，按显存调整，不能把5当模型固有常数。", "BDA RFdiffusion3@foundry-2025-12-01 字段 diffusion_batch_size 的声明：{\"type\":\"integer\",\"default\":5}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `ckpt_path`
 
@@ -335,7 +335,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "BDA RFdiffusion3@foundry-2025-12-01 字段 ckpt_path 的声明：{\"type\":\"string\",\"default\":\"rfd3\"}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `seed`
 
@@ -349,7 +349,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "BDA RFdiffusion3@foundry-2025-12-01 字段 seed 的声明：{\"type\":\"integer\",\"default\":0}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md)
 
 ### `low_memory_mode`
 
@@ -363,7 +363,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "library=null；当前官方与BDA字段默认false；环境层必须把false导出为空，避免 shell ${var:+...} 将非空 false 当 true。", "BDA RFdiffusion3@foundry-2025-12-01 字段 low_memory_mode 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parameter_env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parameter_env](../../../backend_v2/app/compute/scripts.py)
 
 ### `dump_trajectories`
 
@@ -377,7 +377,7 @@ RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 des
 
 约束与版本差异：["library 默认值来自站点登记，未证明等于当前固定 commit 默认值。", "library=null；当前官方与BDA字段默认false；环境层必须把false导出为空，避免 shell ${var:+...} 将非空 false 当 true。", "BDA RFdiffusion3@foundry-2025-12-01 字段 dump_trajectories 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"]
 
-依据：[library](../../../qm-scripts/library/catalog.json), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parameter_env](../../../backend_v2/app/compute/scripts.py)
+依据：[library](../../../qm-scripts/library/catalog.json), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [base_config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [parameter_env](../../../backend_v2/app/compute/scripts.py)
 
 ### `specification.input`
 
@@ -741,7 +741,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `json_keys_subset`
 
@@ -755,7 +755,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `skip_existing`
 
@@ -769,7 +769,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `global_prefix`
 
@@ -783,7 +783,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `prevalidate_inputs`
 
@@ -797,7 +797,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.kind`
 
@@ -811,7 +811,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.num_timesteps`
 
@@ -825,7 +825,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.n_recycle`
 
@@ -839,7 +839,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.step_scale`
 
@@ -853,7 +853,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.noise_scale`
 
@@ -867,7 +867,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.p`
 
@@ -881,7 +881,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.gamma_0`
 
@@ -895,7 +895,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.gamma_min`
 
@@ -909,7 +909,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.center_option`
 
@@ -923,7 +923,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.s_trans`
 
@@ -937,7 +937,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.allow_realignment`
 
@@ -951,7 +951,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.s_jitter_origin`
 
@@ -965,7 +965,7 @@ CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变�
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.cfg_features`
 
@@ -979,7 +979,7 @@ classifier-free guidance 对照步中清零的条件特征列表。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.use_classifier_free_guidance`
 
@@ -993,7 +993,7 @@ classifier-free guidance 对照步中清零的条件特征列表。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.cfg_t_max`
 
@@ -1007,7 +1007,7 @@ classifier-free guidance 对照步中清零的条件特征列表。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.cfg_scale`
 
@@ -1021,7 +1021,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `inference_sampler.inference_noise_scaling_factor`
 
@@ -1035,7 +1035,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `cleanup_guideposts`
 
@@ -1049,7 +1049,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `cleanup_virtual_atoms`
 
@@ -1063,7 +1063,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `read_sequence_from_sequence_head`
 
@@ -1077,7 +1077,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `output_full_json`
 
@@ -1091,7 +1091,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `dump_prediction_metadata_json`
 
@@ -1105,7 +1105,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `align_trajectory_structures`
 
@@ -1119,7 +1119,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ### `compile_model`
 
@@ -1133,7 +1133,7 @@ classifier-free guidance强度倍率。
 
 约束与版本差异：["当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"]
 
-依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)
+依据：[config](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml), [input](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md), live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -1279,7 +1279,7 @@ classifier-free guidance强度倍率。
 
 ## 来源与版本
 
-- [live](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
+- live（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签；commit `未固定/本地快照`；读取 2026-09-15。
 - [library](../../../qm-scripts/library/catalog.json)：手工提交库参数清单；不是 BDA command 已转发的证据；commit `未固定/本地快照`；读取 2026-09-15。
 - [runbook](../../../qm-scripts/plugins/rfdiffusion3/README.md)：旧集群 runbook；历史记录与当前声明证明边界；commit `未固定/本地快照`；读取 2026-09-15。
 - [readme](https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/README.md)：RFD3 任务、输出与官方使用入口；commit `b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c`；读取 2026-09-15。

@@ -810,7 +810,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `parser:protocol`
 
@@ -824,7 +824,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `parser:script_vars`
 
@@ -838,7 +838,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `score:weights`
 
@@ -852,7 +852,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `resfile`
 
@@ -866,7 +866,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `constraints:cst_fa_file`
 
@@ -880,7 +880,7 @@ Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `out:path:all`
 
@@ -894,7 +894,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `out:file:scorefile`
 
@@ -908,7 +908,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `out:suffix`
 
@@ -922,7 +922,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `beta`
 
@@ -936,7 +936,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `overwrite`
 
@@ -950,7 +950,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `renumber_pdb`
 
@@ -964,7 +964,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `per_chain_renumbering`
 
@@ -978,7 +978,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `constant_seed`
 
@@ -992,7 +992,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `jran`
 
@@ -1006,7 +1006,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax:constrain_relax_to_start_coords`
 
@@ -1020,7 +1020,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax:ramp_constraints`
 
@@ -1034,7 +1034,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax:script`
 
@@ -1048,7 +1048,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax:default_repeats`
 
@@ -1062,7 +1062,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `packing:repack_only`
 
@@ -1076,7 +1076,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `mute`
 
@@ -1090,7 +1090,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `unmute`
 
@@ -1104,7 +1104,7 @@ Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `database`
 
@@ -1118,7 +1118,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `in:file:extra_res_fa`
 
@@ -1132,7 +1132,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `ddg:iterations`
 
@@ -1146,7 +1146,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `ddg:dump_pdbs`
 
@@ -1160,7 +1160,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `ddg:cartesian`
 
@@ -1174,7 +1174,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:partners`
 
@@ -1188,7 +1188,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking_local_refine`
 
@@ -1202,7 +1202,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:randomize1`
 
@@ -1216,7 +1216,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:randomize2`
 
@@ -1230,7 +1230,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:spin`
 
@@ -1244,7 +1244,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:dock_pert`
 
@@ -1258,7 +1258,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:docking_centroid_inner_cycles`
 
@@ -1272,7 +1272,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:sc_min`
 
@@ -1286,7 +1286,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:norepack1`
 
@@ -1300,7 +1300,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `docking:norepack2`
 
@@ -1314,7 +1314,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `in:file:native`
 
@@ -1328,7 +1328,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax_constrain_to_start_coords`
 
@@ -1342,7 +1342,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `relax_ramp_constraints`
 
@@ -1356,7 +1356,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `cst_fa_file`
 
@@ -1370,7 +1370,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `out_suffix`
 
@@ -1384,7 +1384,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `protocol`
 
@@ -1398,7 +1398,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `score_function`
 
@@ -1412,7 +1412,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ### `compute_sap`
 
@@ -1426,7 +1426,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 约束与版本差异：按所选版本检查；上游扩展键不自动进入 BDA 命令
 
-依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json), [workbench](../../../qm-scripts/plugins/rosetta/options.json)
+依据：[rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list), bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）, [workbench](../../../qm-scripts/plugins/rosetta/options.json)
 
 ## 当前 BDA 输入默认与生成声明
 
@@ -1876,7 +1876,7 @@ Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索�
 
 ## 来源与版本
 
-- [bda](../../../private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json)：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
+- bda（私有审计快照，SHA-256 `c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4`）：本次实时 BDA 声明；不是上游功能或运行成功证明；commit `未固定/本地快照`；读取 2026-09-15。
 - [upstream](https://docs.rosettacommons.org/docs/latest/)：功能与参数定义；commit `未固定/本地快照`；读取 2026-09-15。
 - [rosetta_options](https://docs.rosettacommons.org/docs/latest/full-options-list)：功能与参数定义；commit `未固定/本地快照`；读取 2026-09-15。
 - [workbench](../../../qm-scripts/plugins/rosetta/options.json)：功能与参数定义；commit `未固定/本地快照`；读取 2026-09-15。
