@@ -85,3 +85,50 @@ describe('ProjectReviewPanel', () => {
     expect(screen.getByRole('textbox', { name: 'Short title' })).toHaveFocus()
   })
 })
+
+describe('an over-long finding', () => {
+  const longStatement = 'A'.repeat(900)
+  const withLong: NormalizedResearchWorkspace = {
+    ...workspace,
+    review_sections: [{
+      track: 'design_strategy',
+      items: [
+        {
+          id: 'finding-long',
+          finding_type: 'design_strategy',
+          title: localized('A very long finding'),
+          content: localized(longStatement),
+          evidence: {},
+          version: 1,
+          created_at: '2026-07-26T00:00:00Z',
+          updated_at: '2026-07-26T00:00:00Z',
+        },
+        {
+          id: 'finding-short',
+          finding_type: 'design_strategy',
+          title: localized('A short finding'),
+          content: localized('Two sentences, and decisive.'),
+          evidence: {},
+          version: 1,
+          created_at: '2026-07-26T00:00:00Z',
+          updated_at: '2026-07-26T00:00:00Z',
+        },
+      ],
+    }],
+  }
+
+  it('collapses behind a disclosure rather than being cut off, and leaves short ones inline', async () => {
+    renderWithProviders(<ProjectReviewPanel workspace={withLong} showDocument={false} />)
+
+    // The long one is offered as a disclosure naming its length; the short one is not.
+    expect(await screen.findByRole('button', { name: 'Show the full statement (900 characters)' }))
+      .toBeInTheDocument()
+    expect(screen.getByText('Two sentences, and decisive.')).toBeInTheDocument()
+
+    // Collapsed, not truncated: no ellipsis-style cut of the statement is rendered.
+    expect(screen.queryByText(longStatement)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show the full statement (900 characters)' }))
+    expect(await screen.findByText(longStatement)).toBeInTheDocument()
+  })
+})

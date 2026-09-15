@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { Textarea } from '../../components/ui/textarea'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { upsertProjectResearchFinding, type ResearchFindingUpsertPayload } from '../../lib/api/projects'
 import { type NormalizedResearchWorkspace, workspaceText } from '../../lib/api/researchWorkspace'
 import type { ProjectReviewSection } from '../../lib/schemas/research'
@@ -61,7 +62,7 @@ import { text } from './jsonHelpers'
 import { firstSentenceForTitle } from './parseReviewFinding'
 import { ReviewMarkdown } from './ReviewMarkdown'
 import { isReviewTrack, REVIEW_SECTION_ORDER, reviewSectionLabel } from './reviewTracks'
-import { localizeToken } from './researchUi'
+import { localizeToken, shouldTruncateReviewStatement } from './researchUi'
 
 interface AddNoteState {
   track: string
@@ -337,7 +338,20 @@ export function ProjectReviewPanel({
                         </Badge>
                         {text(item.evidence.review_status) ? <Badge variant="secondary" size="xs">{localizeToken(text(item.evidence.review_status), t.research.enums)}</Badge> : null}
                       </div>
-                      <div className="mt-2"><ReviewMarkdown>{statement}</ReviewMarkdown></div>
+                      {/* A few findings run to thousands of characters and bury the short,
+                          decisive ones under them. `shouldTruncateReviewStatement` already
+                          encoded where that line falls (720 characters or 12 lines) and was
+                          tested but never wired to anything; this is the surface it was
+                          written for. Collapsed, never truncated - the whole statement is
+                          one click away, because a review finding cut off mid-sentence is
+                          worse than a long one. */}
+                      {shouldTruncateReviewStatement(statement) ? (
+                        <Disclosure className="mt-2" title={format(r.longStatement, { count: statement.length })}>
+                          <ReviewMarkdown>{statement}</ReviewMarkdown>
+                        </Disclosure>
+                      ) : (
+                        <div className="mt-2"><ReviewMarkdown>{statement}</ReviewMarkdown></div>
+                      )}
                       {text(item.evidence.uncertainty) ? (
                         <Alert className="mt-2" variant="warning">
                           <WarningIcon aria-hidden="true" />
