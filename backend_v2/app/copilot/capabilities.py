@@ -138,12 +138,15 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "id": "patent-search",
         "title": "Patent search",
         "description": (
-            "Queue an audited Europe PMC patent search (CN, US, EP, WO, JP, KR) and "
-            "summarise the patents already saved: offices, stages, applicants, classes "
-            "and an estimated term. No legal status and no freedom-to-operate opinion."
+            "Queue an audited patent search of Europe PMC (CN, US, EP, WO, JP, KR) or EPO "
+            "OPS (worldwide, with families), look up saved patents' families and INPADOC "
+            "legal events through EPO OPS, and summarise the patents already saved: "
+            "offices, stages, applicants, classes, families, an estimated term and the "
+            "latest event per country. Events are not a status, and none of it is a "
+            "freedom-to-operate opinion."
         ),
         "execution_mode": "queue",
-        "chat_tools": ["start_patent_search", "summarise_patent_landscape"],
+        "chat_tools": ["start_patent_search", "start_patent_legal_status_lookup", "summarise_patent_landscape"],
         "requires_explicit_request": True,
     },
     {

@@ -4886,6 +4886,10 @@ export type LiteratureSearchCreate = {
      */
     fetch_full_text?: boolean;
     /**
+     * Jurisdictions
+     */
+    jurisdictions?: Array<'CN' | 'US' | 'EP' | 'WO' | 'JP' | 'KR'>;
+    /**
      * Limit
      */
     limit?: number;
@@ -4896,7 +4900,7 @@ export type LiteratureSearchCreate = {
     /**
      * Sources
      */
-    sources?: Array<'europe_pmc' | 'europe_pmc_patents'>;
+    sources?: Array<'europe_pmc' | 'europe_pmc_patents' | 'epo_ops_patents'>;
 };
 
 /**
@@ -4956,6 +4960,10 @@ export type LiteratureSearchResponse = {
      * Id
      */
     id: string;
+    /**
+     * Jurisdictions
+     */
+    jurisdictions?: Array<string>;
     /**
      * Project Id
      */

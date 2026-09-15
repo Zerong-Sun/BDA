@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class LiteratureIngest(BaseModel):
@@ -157,7 +157,11 @@ class SubscriptionUpdate(BaseModel):
 #: `europe_pmc_patents` is Europe PMC's patent index (`SRC:PAT`): CN, US, EP, WO,
 #: JP and KR publications, searched and saved through the same audited path as
 #: papers so a cited patent carries the same retrieval trace a cited paper does.
-LiteratureSource = Literal["europe_pmc", "europe_pmc_patents"]
+#: `epo_ops_patents` is EPO Open Patent Services: the DOCDB worldwide collection,
+#: with a patent family id on every record. It needs a configured credential.
+LiteratureSource = Literal["europe_pmc", "europe_pmc_patents", "epo_ops_patents"]
+PATENT_SEARCH_SOURCES: frozenset[str] = frozenset({"europe_pmc_patents", "epo_ops_patents"})
+PatentJurisdiction = Literal["CN", "US", "EP", "WO", "JP", "KR"]
 
 
 def _default_literature_sources() -> list[LiteratureSource]:
@@ -170,6 +174,19 @@ class LiteratureSearchCreate(BaseModel):
     limit: int = Field(default=10, ge=1, le=25)
     fetch_full_text: bool = True
     extract_claims: bool = True
+    #: Offices a patent search is restricted to. Stored apart from the query and
+    #: applied after it is translated, so a rewrite of the words cannot drop it.
+    jurisdictions: list[PatentJurisdiction] = Field(default_factory=list, max_length=6)
+
+    @model_validator(mode="after")
+    def _a_patent_search_is_one_source(self) -> LiteratureSearchCreate:
+        patent_sources = PATENT_SEARCH_SOURCES.intersection(self.sources)
+        if patent_sources and len(set(self.sources)) > 1:
+            raise ValueError("A patent search names exactly one source.")
+        if self.jurisdictions and not patent_sources:
+            raise ValueError("Jurisdictions restrict a patent search only.")
+        self.jurisdictions = list(dict.fromkeys(self.jurisdictions))
+        return self
 
 
 class LiteratureSearchResponse(BaseModel):
@@ -178,6 +195,7 @@ class LiteratureSearchResponse(BaseModel):
     project_id: uuid.UUID
     query: str
     sources: list[str]
+    jurisdictions: list[str] = Field(default_factory=list)
     requested_limit: int
     fetch_full_text: bool
     extract_claims: bool

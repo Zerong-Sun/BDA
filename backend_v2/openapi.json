@@ -8295,6 +8295,22 @@
             "title": "Fetch Full Text",
             "type": "boolean"
           },
+          "jurisdictions": {
+            "items": {
+              "enum": [
+                "CN",
+                "US",
+                "EP",
+                "WO",
+                "JP",
+                "KR"
+              ],
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Jurisdictions",
+            "type": "array"
+          },
           "limit": {
             "default": 10,
             "maximum": 25.0,
@@ -8312,7 +8328,8 @@
             "items": {
               "enum": [
                 "europe_pmc",
-                "europe_pmc_patents"
+                "europe_pmc_patents",
+                "epo_ops_patents"
               ],
               "type": "string"
             },
@@ -8421,6 +8438,13 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "jurisdictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Jurisdictions",
+            "type": "array"
           },
           "project_id": {
             "format": "uuid",

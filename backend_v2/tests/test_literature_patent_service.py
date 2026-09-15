@@ -158,3 +158,150 @@ def test_an_unknown_office_is_a_422_not_an_empty_landscape(session: Session) -> 
 
     assert error.value.status_code == 422
     assert error.value.error_code == "patent_jurisdiction_unknown"
+
+
+def _owner(session: Session, project_id: uuid.UUID) -> tuple[Project, User]:
+    project = session.get(Project, project_id)
+    assert project is not None
+    user = session.get(User, project.owner_id)
+    assert user is not None
+    return project, user
+
+
+def _with(document: LiteratureDocument, session: Session, **metadata) -> LiteratureDocument:
+    patent = {**(document.metadata_json or {}).get("patent", {}), **metadata.pop("patent", {})}
+    document.metadata_json = {**(document.metadata_json or {}), "patent": patent, **metadata}
+    session.flush()
+    return document
+
+
+LOOKED_UP = {
+    "status": "completed",
+    "family_id": "30117379",
+    "application": "EP03741154",
+    "matched_publication": True,
+    "event_count": 5,
+    "family_publications": 65,
+    "retrieved_at": "2026-09-15T12:00:00+00:00",
+    "retrieval_trace_id": "trace-legal",
+    "by_country": [
+        {"country": "DE", "events": 2, "positive": 1, "negative": 0, "latest_flagged_event": {"code": "PGFP"}},
+        {"country": "EP", "events": 3, "positive": 2, "negative": 1, "latest_flagged_event": {"code": "27O"}},
+    ],
+}
+
+
+def test_a_publication_saved_by_both_indexes_is_counted_once_keeping_the_richer_copy(session: Session) -> None:
+    project_id = _project(session)
+    _patent(session, project_id, "EP1537878", country="EP", kind="B1", stage="granted")
+    ops = _with(
+        _patent(session, project_id, "EP1537878", country="EP", kind="B1", stage="granted", source=patent_service.OPS_PATENT_SOURCE),
+        session,
+        patent={"family_id": "30117379"},
+    )
+
+    result = patent_service.project_landscape(session, project_id)
+
+    assert result["records_matched"] == 1
+    assert result["duplicate_copies_merged"] == 1
+    assert result["records"][0]["document_id"] == str(ops.id)
+    assert result["databases"] == ["EPO Open Patent Services (DOCDB)"]
+    assert patent_service.publication_key({"publication_number": "EP1537878B1", "kind_code": "B1"}) == "EP1537878B1"
+
+
+def test_families_are_counted_by_id_and_a_record_without_one_is_not_its_own_family(session: Session) -> None:
+    project_id = _project(session)
+    for number in ("US9000010B2", "EP3000010B1"):
+        _with(
+            _patent(session, project_id, number, country=number[:2], kind=number[-2:], stage="granted", source=patent_service.OPS_PATENT_SOURCE),
+            session,
+            patent={"family_id": "F-1"},
+        )
+    _patent(session, project_id, "CN1000010A", country="CN", kind="A", stage="application")
+
+    families = patent_service.project_landscape(session, project_id)["families"]
+
+    assert families["distinct"] == 1
+    assert families["publications_without_family_id"] == 1
+
+
+def test_legal_events_are_shown_per_country_and_only_for_a_completed_lookup(session: Session) -> None:
+    project_id = _project(session)
+    looked_up = _with(
+        _patent(session, project_id, "EP1537878", country="EP", kind="B1", stage="granted"),
+        session,
+        patent_legal_status=LOOKED_UP,
+    )
+    failed = _with(
+        _patent(session, project_id, "US7595048", country="US", kind="B2", stage="granted"),
+        session,
+        patent_legal_status={"status": "failed", "error": "epo_ops.family_legal_failed", "retrieval_trace_id": "t-2"},
+    )
+    untouched = _patent(session, project_id, "WO2004004771", country="WO", kind="A1", stage="pct_application")
+
+    result = patent_service.project_landscape(session, project_id)
+    records = {record["document_id"]: record for record in result["records"]}
+
+    assert result["legal_events"]["looked_up"] == 1
+    assert result["legal_events"]["lookup_gaps"] == 1
+    assert result["legal_events"]["not_looked_up"] == 1
+    assert result["legal_events"]["limits"], "events never arrive without their limits"
+    view = records[str(looked_up.id)]["legal_events"]
+    assert [row["country"] for row in view["countries"]] == ["DE", "EP"]
+    assert view["retrieval_trace_id"] == "trace-legal"
+    assert "positive" not in view["countries"][0], "only the latest flagged event per country is shown"
+    assert records[str(failed.id)]["legal_events"] == {
+        "status": "failed",
+        "error": "epo_ops.family_legal_failed",
+        "retrieval_trace_id": "t-2",
+    }
+    assert records[str(untouched.id)]["legal_events"] is None
+    # A family id learned by a lookup counts, even on a Europe PMC record.
+    assert records[str(looked_up.id)]["family_id"] == "30117379"
+    assert result["families"]["distinct"] == 1
+
+
+def test_a_legal_status_lookup_is_queued_for_this_projects_saved_patents(session: Session, monkeypatch) -> None:
+    from backend_v2.app.compute.models import OutboxEvent
+    from backend_v2.app.platform.models import Operation
+
+    monkeypatch.setattr(patent_service, "credential_available", lambda reference: True)
+    project_id = _project(session)
+    project, user = _owner(session, project_id)
+    document = _patent(session, project_id, "EP1537878", country="EP", kind="B1", stage="granted")
+
+    result = patent_service.create_legal_status_lookup(session, project, [document.id, document.id], user)
+
+    assert result["status"] == "pending" and result["documents"] == 1
+    operation = session.get(Operation, uuid.UUID(result["operation_id"]))
+    assert operation is not None
+    assert operation.kind == patent_service.LEGAL_STATUS_TOPIC
+    assert operation.resource_id == uuid.UUID(result["lookup_id"])
+    event = session.get(OutboxEvent, operation.id)
+    assert event is not None
+    assert event.payload["document_ids"] == [str(document.id)]
+    assert event.payload["requested_by"] == str(user.id)
+    assert event.payload["project_id"] == str(project.id)
+
+
+def test_a_lookup_that_could_only_fail_is_refused_before_it_is_queued(session: Session, monkeypatch) -> None:
+    project_id = _project(session)
+    other_project = _project(session)
+    project, user = _owner(session, project_id)
+    patent = _patent(session, project_id, "EP1537878", country="EP", kind="B1", stage="granted")
+    paper = _patent(session, project_id, "38000002", country="", kind="", stage="", source="europe_pmc")
+    foreign = _patent(session, other_project, "EP3000020B1", country="EP", kind="B1", stage="granted")
+
+    def refused(ids: list[uuid.UUID]) -> DomainError:
+        with pytest.raises(DomainError) as raised:
+            patent_service.create_legal_status_lookup(session, project, ids, user)
+        return raised.value
+
+    monkeypatch.setattr(patent_service, "credential_available", lambda reference: False)
+    assert refused([patent.id]).error_code == "epo_ops_not_configured"
+
+    monkeypatch.setattr(patent_service, "credential_available", lambda reference: True)
+    assert refused([]).error_code == "patent_documents_required"
+    assert refused([uuid.uuid4() for _ in range(26)]).error_code == "patent_documents_too_many"
+    assert refused([patent.id, foreign.id]).error_code == "patent_document_not_found"
+    assert refused([patent.id, paper.id]).error_code == "patent_document_not_a_patent"

@@ -79,6 +79,8 @@ class LiteratureSearchRun(UUIDVersionMixin, Base):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     query: Mapped[str] = mapped_column(Text)
     sources: Mapped[list] = mapped_column(JSON, default=list)
+    #: Patent offices the search was restricted to; empty is every office.
+    jurisdictions: Mapped[list] = mapped_column(JSON, default=list)
     requested_limit: Mapped[int] = mapped_column(Integer, default=10)
     fetch_full_text: Mapped[bool] = mapped_column(default=True)
     extract_claims: Mapped[bool] = mapped_column(default=True)

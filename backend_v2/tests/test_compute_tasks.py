@@ -1462,3 +1462,237 @@ def test_a_topic_with_several_subscribers_reaches_all_of_them(task_database, mon
         "bda_v2.copilot_agent_task_settled",
     ]
     assert len({task_id for _, task_id in sent}) == 2
+
+
+_OPS_AUDIT = {
+    "tool": "epo_ops.search",
+    "query": {"url": "https://ops.epo.org/3.2/rest-services/published-data/search/biblio", "params": {}},
+    "response_checksum_sha256": "d" * 64,
+    "http_status": 200,
+    "content_type": "application/json",
+    "byte_count": 10,
+    "attempts": 1,
+    "status": "completed",
+}
+
+
+def _ops_run(factory, ids, **values):
+    from backend_v2.app.literature.models import LiteratureSearchRun
+
+    with factory() as session:
+        run = LiteratureSearchRun(
+            project_id=ids["project"],
+            query="PD-1 antibody",
+            sources=["epo_ops_patents"],
+            requested_limit=5,
+            fetch_full_text=False,
+            extract_claims=False,
+            created_by=ids["user"],
+            **values,
+        )
+        session.add(run)
+        session.commit()
+        return run.id
+
+
+def test_an_ops_patent_search_saves_hits_under_their_own_source_with_offices_applied(task_database, monkeypatch) -> None:
+    from backend_v2.app.literature import epo_ops_client
+    from backend_v2.app.literature.models import LiteratureDocument, LiteratureRetrievalTrace
+    from backend_v2.tests.test_literature_epo_ops import CN_SEARCH_DOC
+
+    factory, ids = task_database
+    run_id = _ops_run(factory, ids, jurisdictions=["CN"])
+    queries: list[str] = []
+    closed: list[bool] = []
+
+    class FakeOps:
+        def __init__(self, credential, **_kwargs):
+            assert credential == ("k", "s")
+            self.audits: list[dict] = []
+
+        def search(self, cql, *, limit):
+            queries.append(cql)
+            self.audits.append(_OPS_AUDIT)
+            return SimpleNamespace(
+                audit=_OPS_AUDIT,
+                data={
+                    "ops:world-patent-data": {
+                        "ops:biblio-search": {
+                            "@total-result-count": "3191",
+                            "ops:search-result": {"exchange-documents": [{"exchange-document": CN_SEARCH_DOC}]},
+                        }
+                    }
+                },
+            )
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(epo_ops_client, "EpoOpsClient", FakeOps)
+    monkeypatch.setattr(epo_ops_client, "load_credential", lambda reference: ("k", "s"))
+
+    result = literature_tasks.literature_search.run(str(run_id))
+
+    assert result["status"] == "completed" and result["result_count"] == 1
+    # The office restriction is applied after the query is formed, never lost in it.
+    assert queries == ['(ta all "PD-1 antibody") and (pn=CN)']
+    assert closed == [True]
+    with factory() as session:
+        document = session.scalar(select(LiteratureDocument).where(LiteratureDocument.project_id == ids["project"]))
+        assert document.source == "epo_ops_patent"
+        assert document.external_id == "CN122461492A"
+        assert document.metadata_json["ref_id"] == "PATENT:CN122461492A"
+        assert document.metadata_json["verification_status"] == "verified_epo_ops_metadata"
+        assert document.metadata_json["patent"]["family_id"] == "100642550"
+        assert document.metadata_json["content_provenance"]["content_kind"] == "database_abstract"
+        traces = list(
+            session.scalars(select(LiteratureRetrievalTrace).where(LiteratureRetrievalTrace.search_run_id == run_id))
+        )
+        assert {trace.source for trace in traces} == {"epo_ops"}, "no OPS trace may name Europe PMC"
+        search_trace = next(trace for trace in traces if trace.stage == "search")
+        assert search_trace.response_metadata["total_result_count"] == 3191
+        assert search_trace.response_metadata["jurisdictions"] == ["CN"]
+
+
+def test_an_ops_search_without_a_credential_fails_and_says_why(task_database, monkeypatch) -> None:
+    from backend_v2.app.literature import epo_ops_client
+    from backend_v2.app.literature.models import LiteratureRetrievalTrace, LiteratureSearchRun
+
+    factory, ids = task_database
+    run_id = _ops_run(factory, ids)
+
+    def unavailable(reference):
+        raise epo_ops_client.EpoOpsUnavailable("epo_ops_not_configured")
+
+    monkeypatch.setattr(epo_ops_client, "load_credential", unavailable)
+
+    result = literature_tasks.literature_search.run(str(run_id))
+
+    assert result["status"] == "failed" and "epo_ops_not_configured" in result["error"]
+    with factory() as session:
+        assert session.get(LiteratureSearchRun, run_id).status == "failed"
+        trace = session.scalar(select(LiteratureRetrievalTrace).where(LiteratureRetrievalTrace.search_run_id == run_id))
+        assert (trace.source, trace.stage, trace.status) == ("epo_ops", "search", "failed")
+
+
+def _patent_document(factory, project_id, *, source="europe_pmc_patent", number="EP1537878", kind="B"):
+    from backend_v2.app.literature.models import LiteratureDocument
+
+    with factory() as session:
+        document = LiteratureDocument(
+            project_id=project_id,
+            title=f"Patent {number}",
+            source=source,
+            external_id=number,
+            status="available",
+            metadata_json={"patent": {"publication_number": number, "country_code": number[:2], "kind_code": kind}},
+        )
+        session.add(document)
+        session.commit()
+        return document.id
+
+
+def test_a_legal_status_lookup_saves_each_documents_events_with_their_trace_and_raw_response(
+    task_database, monkeypatch
+) -> None:
+    from backend_v2.app.literature import epo_ops_client
+    from backend_v2.app.literature.models import LiteratureDocument, LiteratureRetrievalTrace
+    from backend_v2.tests.test_literature_epo_ops import FAMILY_LEGAL
+
+    factory, ids = task_database
+    # Europe PMC records this grant with kind B; DOCDB has B1.
+    granted = _patent_document(factory, ids["project"])
+    paper = _patent_document(factory, ids["project"], source="europe_pmc", number="38000003")
+    unparseable = _patent_document(factory, ids["project"], source="epo_ops_patent", number="not a number", kind=None)
+    calls: list[str] = []
+
+    class FakeOps:
+        def __init__(self, credential, **_kwargs):
+            self.audits: list[dict] = []
+
+        def family_legal(self, reference):
+            calls.append(reference.docdb)
+            if reference.kind:
+                self.audits.append({"tool": "epo_ops.family_legal", "status": "failed", "http_status": 404})
+                raise RuntimeError("epo_ops.family_legal_not_found")
+            audit = {**_OPS_AUDIT, "tool": "epo_ops.family_legal"}
+            self.audits.append(audit)
+            return SimpleNamespace(audit=audit, data=FAMILY_LEGAL)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(epo_ops_client, "EpoOpsClient", FakeOps)
+    monkeypatch.setattr(epo_ops_client, "load_credential", lambda reference: ("k", "s"))
+    lookup_id = str(uuid.uuid4())
+
+    result = literature_tasks.patent_legal_status.run(
+        lookup_id,
+        {
+            "project_id": str(ids["project"]),
+            "requested_by": str(ids["user"]),
+            "document_ids": [str(granted), str(paper), str(unparseable), str(uuid.uuid4())],
+        },
+    )
+
+    assert result == {
+        "lookup_id": lookup_id,
+        "status": "completed_with_gaps",
+        "looked_up": 1,
+        "gaps": 1,
+        "skipped": 2,
+        "refused": None,
+    }
+    assert calls == ["EP.1537878.B", "EP.1537878"]
+    with factory() as session:
+        saved = session.get(LiteratureDocument, granted).metadata_json["patent_legal_status"]
+        assert saved["status"] == "completed"
+        assert saved["application"] == "EP03741154" and saved["event_count"] == 5
+        assert saved["publication"] == "EP.1537878"
+        trace = session.get(LiteratureRetrievalTrace, uuid.UUID(saved["retrieval_trace_id"]))
+        assert (trace.stage, trace.source, trace.document_id) == ("legal_status", "epo_ops", granted)
+        assert trace.response_metadata["family_id"] == "30117379"
+        artifact = session.get(Artifact, uuid.UUID(saved["raw_response_artifact_id"]))
+        assert artifact.artifact_type == "patent_legal_status_response"
+        assert artifact.object_key in FakeStorage.objects
+        assert session.get(LiteratureDocument, unparseable).metadata_json["patent_legal_status"]["status"] == "unresolvable"
+        assert "patent_legal_status" not in session.get(LiteratureDocument, paper).metadata_json
+
+
+def test_a_refused_credential_stops_a_lookup_instead_of_spending_every_request(task_database, monkeypatch) -> None:
+    from backend_v2.app.literature import epo_ops_client
+    from backend_v2.app.literature.models import LiteratureDocument, LiteratureRetrievalTrace
+
+    factory, ids = task_database
+    first = _patent_document(factory, ids["project"], number="EP1537878", kind="B1")
+    second = _patent_document(factory, ids["project"], number="US7595048", kind="B2")
+    calls: list[str] = []
+
+    class FakeOps:
+        def __init__(self, credential, **_kwargs):
+            self.audits: list[dict] = []
+
+        def family_legal(self, reference):
+            calls.append(reference.docdb)
+            self.audits.append({"tool": "epo_ops.family_legal", "status": "failed", "http_status": 403})
+            raise RuntimeError("epo_ops.family_legal_refused: IndividualQuotaPerHour")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(epo_ops_client, "EpoOpsClient", FakeOps)
+    monkeypatch.setattr(epo_ops_client, "load_credential", lambda reference: ("k", "s"))
+
+    result = literature_tasks.patent_legal_status.run(
+        str(uuid.uuid4()),
+        {"project_id": str(ids["project"]), "requested_by": str(ids["user"]), "document_ids": [str(first), str(second)]},
+    )
+
+    assert result["looked_up"] == 0 and result["gaps"] == 2
+    assert "IndividualQuotaPerHour" in result["refused"]
+    assert calls == ["EP.1537878.B1"]
+    with factory() as session:
+        failed = session.get(LiteratureDocument, first).metadata_json["patent_legal_status"]
+        assert failed["status"] == "failed"
+        assert session.get(LiteratureRetrievalTrace, uuid.UUID(failed["retrieval_trace_id"])).status == "failed"
+        assert session.get(LiteratureDocument, second).metadata_json["patent_legal_status"]["status"] == "not_attempted"

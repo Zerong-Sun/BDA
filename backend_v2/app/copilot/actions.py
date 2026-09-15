@@ -19,6 +19,7 @@ from ..intelligence.schemas import IntelligenceCreate
 from ..intelligence.service import create_run as create_intelligence_run
 from ..knowledge.schemas import KnowledgeCreate
 from ..knowledge.service import create_entry as create_knowledge_entry
+from ..literature.patent_service import create_legal_status_lookup
 from ..literature.schemas import LiteratureSearchCreate
 from ..literature.service import create_search as create_literature_search
 from ..projects.models import Project
@@ -88,6 +89,41 @@ _ACTION_REQUEST_TERMS = {
             "搜索",
             "查询",
             "查找",
+        },
+    },
+    # Legal events and families are a lookup of patents already saved, and asked
+    # for as such: "what is the status of these patents" is the request, and a
+    # bare "patent" is not - that authorises a search, not a lookup.
+    "start_patent_legal_status_lookup": {
+        "domains": {
+            "legal status",
+            "legal event",
+            "legal events",
+            "patent family",
+            "patent families",
+            "inpadoc",
+            "法律状态",
+            "法律事件",
+            "专利族",
+            "同族",
+            "专利状态",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "check",
+            "look up",
+            "lookup",
+            "query",
+            "运行",
+            "启动",
+            "排队",
+            "查询",
+            "查找",
+            "核查",
+            "检查",
+            "查",
         },
     },
     "start_target_intelligence": {
@@ -371,8 +407,10 @@ class CopilotActionService:
         query: str,
         *,
         limit: int = 10,
+        database: str = "europe_pmc",
+        jurisdictions: tuple[str, ...] = (),
     ) -> dict[str, Any]:
-        """Queue an audited search of Europe PMC's patent index.
+        """Queue an audited patent search of Europe PMC's patent index or EPO OPS.
 
         The same pipeline as a literature search, so a saved patent carries a
         retrieval trace and a checksummed abstract. Two settings differ, on
@@ -382,12 +420,16 @@ class CopilotActionService:
         patent language as literature claims.
         """
         self._require_explicit("start_patent_search")
+        sources = {"europe_pmc": "europe_pmc_patents", "epo_ops": "epo_ops_patents"}
+        if database not in sources:
+            raise ValueError("patent_database_unknown")
         payload = LiteratureSearchCreate(
             query=query,
-            sources=["europe_pmc_patents"],
+            sources=[sources[database]],
             limit=limit,
             fetch_full_text=False,
             extract_claims=False,
+            jurisdictions=list(jurisdictions),
         )
 
         def execute() -> dict[str, Any]:
@@ -402,8 +444,9 @@ class CopilotActionService:
                 {
                     "search_run_id": str(row.id),
                     "status": "pending",
-                    "database": "europe_pmc_patents",
+                    "database": payload.sources[0],
                     "query": row.query,
+                    "jurisdictions": list(payload.jurisdictions),
                 },
                 row.id,
             )
@@ -411,6 +454,26 @@ class CopilotActionService:
         return self._once(
             "start_patent_search",
             payload.model_dump(mode="json"),
+            execute,
+        )
+
+    def start_patent_legal_status_lookup(self, document_ids: list[str]) -> dict[str, Any]:
+        """Queue an audited EPO OPS lookup of saved patents' families and legal events.
+
+        Only documents this project saved as patents, and only when the user
+        asked about their legal status or family in so many words. The ids are
+        parsed here so a malformed one is refused before anything is queued.
+        """
+        self._require_explicit("start_patent_legal_status_lookup")
+        parsed = [uuid.UUID(str(item)) for item in document_ids]
+
+        def execute() -> dict[str, Any]:
+            result = create_legal_status_lookup(self.session, self.project, parsed, self.user)
+            return _awaitable(self.session, result, uuid.UUID(result["lookup_id"]))
+
+        return self._once(
+            "start_patent_legal_status_lookup",
+            {"document_ids": sorted(str(item) for item in parsed)},
             execute,
         )
 

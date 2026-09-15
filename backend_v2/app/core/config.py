@@ -82,13 +82,17 @@ class Settings(BaseSettings):
     # `backend/`, a directory removed with v1, so BYOK either wrote into whatever the
     # working directory happened to be or failed outright on a read-only root filesystem.
     llm_local_secret_dir: str = "/var/lib/bda/secrets"
+    # EPO Open Patent Services: the consumer key and secret as ``key:secret`` in one
+    # file (``file:/run/secrets/epo-ops``). Unset leaves patent search on Europe PMC
+    # alone, and family and legal-event lookups refuse with a reason.
+    epo_ops_credential_ref: str | None = None
     external_research_sources_json: str = "{}"
     research_package_dir: str = "frontend/public/research-packages"
     plugin_manifest_dir: str = "backend_v2/plugin_manifests"
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0068_alphafold3_parser"
+    schema_revision: str = "0069_patent_search_jurisdictions"
     worker_queues: str = ""
     required_worker_queues: str = ""
     scheduler_dispatch_paused: bool = False
@@ -180,6 +184,8 @@ class Settings(BaseSettings):
                 raise ValueError("production LSF requires an explicit ssh host and remote root")
             if self.lsf_ssh_password_ref and not self.lsf_ssh_password_ref.startswith("file:"):
                 raise ValueError("lsf_ssh_password_ref must be a file: reference, not an inline secret")
+            if self.epo_ops_credential_ref and not self.epo_ops_credential_ref.startswith("file:"):
+                raise ValueError("epo_ops_credential_ref must be a file: reference, not an inline secret")
             if len(self.minio_secret_key) < 16 or "development" in self.minio_secret_key:
                 raise ValueError("production MinIO credentials are insecure")
             if not self.minio_public_endpoint:

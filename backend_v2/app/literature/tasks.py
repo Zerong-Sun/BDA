@@ -106,6 +106,11 @@ def _same_literature_identity(document, result: dict) -> bool:
 def literature_search(search_run_id: str) -> dict:
     import xml.etree.ElementTree as ET
 
+    from ..core.config import get_settings
+    from ..literature.epo_ops import cql_query
+    from ..literature.epo_ops import search_results as ops_search_results
+    from ..literature.epo_ops import search_total as ops_search_total
+    from ..literature.epo_ops_client import EpoOpsClient, load_credential
     from ..literature.indexing import extract_europe_pmc_full_text, index_document_content
     from ..literature.models import LiteratureDocument, LiteratureRetrievalTrace, LiteratureSearchRun
     from ..literature.patents import patent_query
@@ -128,18 +133,29 @@ def literature_search(search_run_id: str) -> dict:
         project_id = run.project_id
         from ..research.search_query import search_topic
 
-        # A patent run is the same pipeline over Europe PMC's patent index. The
+        # A patent run is the same pipeline over a patent index - Europe PMC's or
+        # EPO OPS. The office
         # restriction is applied after translation, not stored in the query: a
         # Chinese topic is rewritten into English terms first, and a filter
         # embedded in the text could be dropped by that rewrite, recording a
         # search nobody asked for.
-        patents_run = "europe_pmc_patents" in (run.sources or [])
-        database = "europe_pmc_patents" if patents_run else "europe_pmc"
-        document_source = "europe_pmc_patent" if patents_run else "europe_pmc"
+        sources = set(run.sources or [])
+        ops_run = "epo_ops_patents" in sources
+        patents_run = ops_run or "europe_pmc_patents" in sources
+        database = "epo_ops_patents" if ops_run else ("europe_pmc_patents" if patents_run else "europe_pmc")
+        document_source = "epo_ops_patent" if ops_run else ("europe_pmc_patent" if patents_run else "europe_pmc")
+        # The index a trace names. An OPS record is not Europe PMC's because the
+        # same pipeline saved it, and a trace that said so would send a reader to
+        # the wrong database to check it.
+        trace_source = "epo_ops" if ops_run else "europe_pmc"
+        metadata_verification = "verified_epo_ops_metadata" if ops_run else "verified_europe_pmc_metadata"
+        jurisdictions = [str(code) for code in (run.jurisdictions or [])]
         try:
             query = search_topic(session, run.project_id, run.query)
-            if patents_run:
-                query = patent_query(query)
+            if ops_run:
+                query = cql_query(query, jurisdictions)
+            elif patents_run:
+                query = patent_query(query, jurisdictions)
         except Exception as exc:
             run.status = "failed"
             run.error = str(exc)[:1000]
@@ -150,15 +166,24 @@ def literature_search(search_run_id: str) -> dict:
         created_by = run.created_by
 
     tools = EvidenceToolService(max_calls=1 + requested_limit * 2, timeout_seconds=20.0)
+    ops_client: EpoOpsClient | None = None
     try:
-        search_result = tools.search_europe_pmc(query, page_size=requested_limit)
-        results = europe_pmc_results(search_result.data, limit=requested_limit)
+        if ops_run:
+            # Read at the moment of use and never stored: the run records that OPS
+            # was searched, not how this server authenticated to it.
+            ops_client = EpoOpsClient(load_credential(get_settings().epo_ops_credential_ref), max_calls=1)
+            search_result = ops_client.search(query, limit=requested_limit)
+            results = ops_search_results(search_result.data, limit=requested_limit)
+        else:
+            search_result = tools.search_europe_pmc(query, page_size=requested_limit)
+            results = europe_pmc_results(search_result.data, limit=requested_limit)
     except RuntimeError as exc:
+        audits = ops_client.audits if ops_client is not None else tools.audits
         audit = (
-            tools.audits[-1]
-            if tools.audits
+            audits[-1]
+            if audits
             else {
-                "tool": "europe_pmc.search",
+                "tool": f"{trace_source}.search",
                 "query": {"query": query},
                 "status": "failed",
                 "error": str(exc),
@@ -180,6 +205,8 @@ def literature_search(search_run_id: str) -> dict:
                 run.completed_at = datetime.now(UTC)
                 run.version += 1
         tools.close()
+        if ops_client is not None:
+            ops_client.close()
         return {"search_run_id": search_run_id, "status": "failed", "error": str(exc)}
 
     search_payload = json.dumps(search_result.data, ensure_ascii=False, sort_keys=True).encode()
@@ -214,7 +241,11 @@ def literature_search(search_run_id: str) -> dict:
                     response_metadata={
                         "result_count": len(results),
                         "raw_response_artifact_id": str(raw_search_artifact.id),
-                        "result_type": "core",
+                        "result_type": "biblio" if ops_run else "core",
+                        # OPS says how many records matched in all, not only how
+                        # many were returned - the difference a reader must see.
+                        **({"total_result_count": ops_search_total(search_result.data)} if ops_run else {}),
+                        **({"jurisdictions": jurisdictions} if jurisdictions else {}),
                     },
                 ),
             )
@@ -278,7 +309,7 @@ def literature_search(search_run_id: str) -> dict:
                         ),
                         "search_run_id": search_run_id,
                         "search_query": query,
-                        "verification_status": "verified_europe_pmc_metadata",
+                        "verification_status": metadata_verification,
                         "review_status": "pending_review",
                     },
                 )
@@ -305,7 +336,7 @@ def literature_search(search_run_id: str) -> dict:
                     search_run_id=parsed,
                     document_id=document.id,
                     stage="search_hit",
-                    source="europe_pmc",
+                    source=trace_source,
                     request_json={"query": query, "rank": result["rank"]},
                     response_metadata={
                         key: result[key]
@@ -326,7 +357,7 @@ def literature_search(search_run_id: str) -> dict:
                 )
             )
 
-        verification_status = "verified_europe_pmc_metadata"
+        verification_status = metadata_verification
         if result["doi"]:
             try:
                 crossref = tools.get_crossref(result["doi"])
@@ -446,7 +477,7 @@ def literature_search(search_run_id: str) -> dict:
                     search_run_id=parsed,
                     document_id=document_id,
                     stage="abstract",
-                    source="europe_pmc",
+                    source=trace_source,
                     request_json=search_result.audit.get("query") or {},
                     response_metadata={
                         "rank": result["rank"],
@@ -510,6 +541,8 @@ def literature_search(search_run_id: str) -> dict:
             run.error = None
             run.version += 1
     tools.close()
+    if ops_client is not None:
+        ops_client.close()
     return {
         "search_run_id": search_run_id,
         "status": "completed_with_gaps" if gaps else "completed",
@@ -585,3 +618,183 @@ def literature_relations_detect(project_id: str) -> dict:
                 )
                 created += 1
     return {"project_id": project_id, "status": "completed", "created": created}
+
+
+def _store_legal_status(document_id: uuid.UUID, record: dict) -> None:
+    from ..literature.models import LiteratureDocument
+
+    with session_scope() as session:
+        document = session.get(LiteratureDocument, document_id)
+        if document is None:
+            return
+        document.metadata_json = {**(document.metadata_json or {}), "patent_legal_status": record}
+        document.version += 1
+
+
+@celery_app.task(name="bda_v2.patent_legal_status")
+def patent_legal_status(lookup_id: str, payload: dict) -> dict:
+    """Look up saved patents' families and INPADOC events through EPO OPS.
+
+    One family request per document, each one audited, its raw response kept
+    as an artifact and its trace attached to the document it describes. What is
+    saved on the document is a summary the landscape can read without another
+    call - and the trace and artifact that let a reader check the summary.
+
+    A document is looked up only if it is a saved patent of the project the
+    operation belongs to; ids from anywhere else are skipped, not trusted.
+    """
+    from ..core.config import get_settings
+    from ..literature.epo_ops import family_legal_summary, publication_reference
+    from ..literature.epo_ops_client import EpoOpsClient, EpoOpsUnavailable, load_credential
+    from ..literature.models import LiteratureDocument, LiteratureRetrievalTrace
+    from ..literature.patent_service import MAX_LEGAL_STATUS_DOCUMENTS, PATENT_SOURCES
+    from ..literature.patents import PatentQueryError
+
+    project_id = uuid.UUID(str(payload["project_id"]))
+    requested_by = uuid.UUID(str(payload["requested_by"]))
+    requested = [uuid.UUID(str(item)) for item in (payload.get("document_ids") or [])][:MAX_LEGAL_STATUS_DOCUMENTS]
+    targets: list[tuple[uuid.UUID, str, str | None]] = []
+    with session_scope() as session:
+        for document_id in requested:
+            document = session.get(LiteratureDocument, document_id)
+            if document is None or document.project_id != project_id or document.source not in PATENT_SOURCES:
+                continue
+            patent = (document.metadata_json or {}).get("patent") or {}
+            targets.append((document.id, str(patent.get("publication_number") or ""), patent.get("kind_code")))
+
+    # Raises before any call when the credential is missing or unreadable, so the
+    # operation fails with that reason instead of recording every document as a gap.
+    client = EpoOpsClient(
+        load_credential(get_settings().epo_ops_credential_ref),
+        # A kind code one index records differently can cost a second request.
+        max_calls=2 * len(targets) + 1,
+    )
+    looked_up = gaps = 0
+    refused: str | None = None
+    try:
+        for document_id, number, kind in targets:
+            retrieved_at = datetime.now(UTC).isoformat()
+            if refused is not None:
+                gaps += 1
+                _store_legal_status(document_id, {"status": "not_attempted", "error": refused, "retrieved_at": retrieved_at})
+                continue
+            try:
+                reference = publication_reference(number, kind)
+            except PatentQueryError as exc:
+                gaps += 1
+                _store_legal_status(document_id, {"status": "unresolvable", "error": str(exc), "retrieved_at": retrieved_at})
+                continue
+            try:
+                try:
+                    result = client.family_legal(reference)
+                except RuntimeError as exc:
+                    if reference.kind is None or not str(exc).endswith("_not_found"):
+                        raise
+                    # Europe PMC's kind code for a publication is not always
+                    # DOCDB's (B for B2); the number alone still names it.
+                    reference = type(reference)(reference.country, reference.number, None)
+                    result = client.family_legal(reference)
+            except RuntimeError as exc:
+                gaps += 1
+                if isinstance(exc, EpoOpsUnavailable) or "_refused" in str(exc):
+                    # A refused credential or an exhausted quota refuses every
+                    # remaining request too; spending them would only add noise.
+                    refused = str(exc)
+                audit = client.audits[-1] if client.audits else {"tool": "epo_ops.family_legal", "status": "failed"}
+                with session_scope() as session:
+                    trace = LiteratureRetrievalTrace(
+                        project_id=project_id,
+                        search_run_id=None,
+                        document_id=document_id,
+                        **_retrieval_trace_values(
+                            audit,
+                            stage="legal_status",
+                            response_metadata={"publication": reference.docdb, "lookup_id": lookup_id},
+                            error=str(exc),
+                        ),
+                    )
+                    session.add(trace)
+                    session.flush()
+                    trace_id = str(trace.id)
+                _store_legal_status(
+                    document_id,
+                    {
+                        "status": "failed",
+                        "error": str(exc)[:300],
+                        "retrieval_trace_id": trace_id,
+                        "retrieved_at": retrieved_at,
+                    },
+                )
+                continue
+
+            summary = family_legal_summary(result.data, reference)
+            raw = json.dumps(result.data, ensure_ascii=False, sort_keys=True).encode()
+            object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal.json"
+            ObjectStorage().put_bytes(object_key, raw, "application/json")
+            with session_scope() as session:
+                artifact = Artifact(
+                    project_id=project_id,
+                    created_by=requested_by,
+                    artifact_type="patent_legal_status_response",
+                    filename=f"epo-ops-{reference.docdb}-family-legal.json",
+                    content_type="application/json",
+                    object_key=object_key,
+                    size_bytes=len(raw),
+                    checksum_sha256=hashlib.sha256(raw).hexdigest(),
+                    lineage={
+                        "lookup_id": lookup_id,
+                        "document_id": str(document_id),
+                        "database": "epo_ops",
+                        "publication": reference.docdb,
+                    },
+                )
+                session.add(artifact)
+                session.flush()
+                trace = LiteratureRetrievalTrace(
+                    project_id=project_id,
+                    search_run_id=None,
+                    document_id=document_id,
+                    **_retrieval_trace_values(
+                        result.audit,
+                        stage="legal_status",
+                        response_metadata={
+                            "publication": reference.docdb,
+                            "lookup_id": lookup_id,
+                            "family_id": summary["family_id"],
+                            "matched_publication": summary["matched_publication"],
+                            "event_count": summary["event_count"],
+                            "raw_response_artifact_id": str(artifact.id),
+                        },
+                    ),
+                )
+                session.add(trace)
+                session.flush()
+                trace_id, artifact_id = str(trace.id), str(artifact.id)
+            matched = bool(summary["matched_publication"])
+            looked_up += int(matched)
+            gaps += int(not matched)
+            _store_legal_status(
+                document_id,
+                {
+                    **summary,
+                    # A family that does not contain the publication asked about
+                    # has no events that can be attributed to it.
+                    "status": "completed" if matched else "not_matched",
+                    "database": "EPO OPS (DOCDB family, INPADOC legal events)",
+                    "publication": reference.docdb,
+                    "retrieved_at": retrieved_at,
+                    "retrieval_trace_id": trace_id,
+                    "raw_response_artifact_id": artifact_id,
+                    "lookup_id": lookup_id,
+                },
+            )
+    finally:
+        client.close()
+    return {
+        "lookup_id": lookup_id,
+        "status": "completed_with_gaps" if gaps else "completed",
+        "looked_up": looked_up,
+        "gaps": gaps,
+        "skipped": len(requested) - len(targets),
+        "refused": refused,
+    }

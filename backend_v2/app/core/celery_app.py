@@ -68,6 +68,7 @@ celery_app.conf.update(
         "bda_v2.research_decision_tree_draft": {"queue": "research"},
         "bda_v2.literature_ingest": {"queue": "research"},
         "bda_v2.literature_search": {"queue": "research"},
+        "bda_v2.patent_legal_status": {"queue": "research"},
         "bda_v2.subscription_run": {"queue": "research"},
         "bda_v2.intelligence_run": {"queue": "research"},
         "bda_v2.intelligence_export": {"queue": "research"},
