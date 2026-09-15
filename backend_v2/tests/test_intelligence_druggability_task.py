@@ -44,9 +44,25 @@ class _FakeEvidenceTools:
             data={"data": OPEN_TARGETS_PDCD1}, audit={"tool": "open_targets.druggability"}
         )
 
-    def count_clinical_trials(self, term: str, *, phase: str | None = None) -> evidence_tools.EvidenceToolResult:
+    def count_clinical_trials(
+        self, term: str, *, phase: str | None = None, start_year: int | None = None
+    ) -> evidence_tools.EvidenceToolResult:
         return evidence_tools.EvidenceToolResult(
-            data={"totalCount": 40 if phase is None else 4}, audit={"tool": "clinical_trials.count", "phase": phase}
+            data={"totalCount": 40 if phase is None and start_year is None else 4},
+            audit={"tool": "clinical_trials.count", "phase": phase, "start_year": start_year},
+        )
+
+    def list_clinical_trial_sponsors(
+        self, term: str, *, page_token: str | None = None
+    ) -> evidence_tools.EvidenceToolResult:
+        return evidence_tools.EvidenceToolResult(
+            data={
+                "studies": [
+                    {"protocolSection": {"sponsorCollaboratorsModule": {"leadSponsor": {"class": "INDUSTRY", "name": "Merck"}}}}
+                ],
+                "nextPageToken": None,
+            },
+            audit={"tool": "clinical_trials.sponsors"},
         )
 
     def close(self) -> None:
@@ -147,6 +163,7 @@ def test_the_task_saves_a_report_and_one_audited_evidence_row_per_section(factor
         "druggability_clinical_candidates",
         "druggability_safety_liabilities",
         "druggability_trial_activity",
+        "druggability_market_landscape",
     }
     assert all(row.citation.get("retrieval") for row in evidence)
     assert all(row.review_status == "pending" for row in evidence)
@@ -161,7 +178,7 @@ def test_a_redelivered_message_does_not_duplicate_the_report(factory) -> None:
     assert again["status"] == "succeeded"
     with factory() as session:
         evidence = session.scalars(select(IntelligenceEvidence).where(IntelligenceEvidence.run_id == run_id)).all()
-    assert len(evidence) == 4
+    assert len(evidence) == 5
 
 
 def test_reading_before_the_run_finishes_says_so_instead_of_returning_an_empty_report(factory) -> None:

@@ -231,3 +231,88 @@ def assessment(
     if not isinstance(report["target"], dict):
         raise DruggabilityInputError("target must be a mapping")
     return report
+
+
+# --- Market prospects, as a competitive landscape ----------------------------
+#
+# "市场前景" cannot honestly be a market size here: no auditable source for
+# market size, price, revenue or share is connected, and a figure without one
+# is exactly what the platform policy refuses. What can be counted is how
+# contested the space is - and that is reported as counts, with their limits.
+
+#: Sponsor pages fetched at most. At 1000 registrations a page this covers
+#: most targets; beyond it the mix is reported as partial, never extrapolated.
+MAX_SPONSOR_PAGES = 5
+
+#: How many start years the registration trend covers, ending with this year.
+TREND_YEARS = 8
+
+MARKET_LIMITS: tuple[str, ...] = (
+    "This is a competitive landscape, not a market forecast. No market size, price, "
+    "revenue or share is estimated: no auditable source for them is connected.",
+    "Trial registrations are counted by study start date for a search term. They are "
+    "not programmes, and one programme can register many studies.",
+    "Sponsor class is ClinicalTrials.gov's own classification. INDUSTRY counts "
+    "registrations a company leads, not what it invests.",
+    "Sponsor figures cover only the registrations retrieved; 'complete' says whether "
+    "that was all of them.",
+    "Patent priority years come only from patents this project has saved through a "
+    "recorded search, and a recent year is under-counted while applications are unpublished.",
+)
+
+
+def sponsor_mix(
+    studies: Iterable[Mapping[str, Any]], *, total_matching: int | None, top: int = 10
+) -> dict[str, Any]:
+    """Who leads the registrations retrieved, by class and by industry sponsor."""
+    by_class: Counter[str] = Counter()
+    industry: Counter[str] = Counter()
+    aggregated = 0
+    for study in studies:
+        if not isinstance(study, Mapping):
+            continue
+        lead = ((study.get("protocolSection") or {}).get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}
+        sponsor_class = str(lead.get("class") or "UNKNOWN")
+        aggregated += 1
+        by_class[sponsor_class] += 1
+        if sponsor_class == "INDUSTRY" and lead.get("name"):
+            industry[str(lead["name"])] += 1
+    return {
+        "studies_aggregated": aggregated,
+        "total_matching": total_matching,
+        # A mix from a partial sample is labelled partial; ordering of the
+        # source's pages is unspecified, so a first page is not a random sample.
+        "complete": bool(total_matching is not None and aggregated >= total_matching),
+        "by_class": dict(by_class.most_common()),
+        "industry_share": round(by_class["INDUSTRY"] / aggregated, 3) if aggregated else None,
+        "top_industry_sponsors": [{"sponsor": name, "registrations": count} for name, count in industry.most_common(top)],
+    }
+
+
+def registration_trend(counts_by_year: Mapping[int, int | None], *, current_year: int) -> dict[str, Any]:
+    """Registrations per study start year, with the unfinished year marked."""
+    years = sorted(counts_by_year)
+    return {
+        "by_start_year": {str(year): counts_by_year[year] for year in years},
+        # A year that could not be retrieved is None, and listed, rather than
+        # drawn as a dip.
+        "years_unavailable": [str(year) for year in years if counts_by_year[year] is None],
+        "partial_year": str(current_year) if current_year in counts_by_year else None,
+    }
+
+
+def market_landscape(
+    *,
+    candidates: Mapping[str, Any] | None,
+    trend: Mapping[str, Any] | None,
+    sponsors: Mapping[str, Any] | None,
+    patent_priority_years: Mapping[str, int] | None,
+) -> dict[str, Any]:
+    return {
+        "approved_on_target": candidates.get("approved") if candidates else None,
+        "clinical_stage_mix": dict(candidates.get("by_stage") or {}) if candidates else None,
+        "trial_registrations": dict(trend) if trend else None,
+        "sponsor_mix": dict(sponsors) if sponsors else None,
+        "patent_priority_years": dict(patent_priority_years) if patent_priority_years else None,
+        "limits": list(MARKET_LIMITS),
+    }

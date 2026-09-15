@@ -163,16 +163,28 @@ class _FakeTools:
         self.open_targets_calls += 1
         return _Result({"data": OPEN_TARGETS_PDCD1}, "open_targets.druggability")
 
-    def count_clinical_trials(self, term, *, phase=None):
+    def count_clinical_trials(self, term, *, phase=None, start_year=None):
         if phase is not None and phase == self.failing_phase:
             raise RuntimeError("clinical_trials.count_failed")
+        if start_year is not None:
+            return _Result({"totalCount": 10}, "clinical_trials.count")
         return _Result({"totalCount": 100 if phase is None else 5}, "clinical_trials.count")
 
+    def list_clinical_trial_sponsors(self, term, *, page_token=None):
+        self.sponsor_pages = getattr(self, "sponsor_pages", 0) + 1
+        # Always offers another page, so the cap is what stops the loop.
+        return _Result(
+            {"studies": [_study("INDUSTRY", "Merck"), _study("OTHER", "Fudan")], "nextPageToken": "next"},
+            "clinical_trials.sponsors",
+        )
 
-def _gather(tools):
+
+def _gather(tools, **kwargs):
     from backend_v2.app.intelligence.tasks import gather_druggability
 
-    return gather_druggability(tools, {"name": "PD-1", "uniprot_accession": "Q15116"}, "PD-1")
+    kwargs.setdefault("patent_priority_years", {"2015": 3})
+    kwargs.setdefault("current_year", 2026)
+    return gather_druggability(tools, {"name": "PD-1", "uniprot_accession": "Q15116"}, "PD-1", **kwargs)
 
 
 def test_a_full_retrieval_records_every_call_and_reports_no_gaps() -> None:
@@ -180,8 +192,36 @@ def test_a_full_retrieval_records_every_call_and_reports_no_gaps() -> None:
 
     assert report["ensembl_id"] == "ENSG00000188389"
     assert report["gaps"] == []
-    assert set(report["retrieval"]) == {"uniprot_mapping", "open_targets", "clinical_trials"}
+    assert set(report["retrieval"]) == {
+        "uniprot_mapping",
+        "open_targets",
+        "clinical_trials",
+        "clinical_trials_trend",
+        "clinical_trials_sponsors",
+    }
     assert report["trial_activity"]["total_matching"] == 100
+
+
+def test_the_sponsor_scan_stops_at_its_cap_and_reports_itself_as_partial() -> None:
+    from backend_v2.app.intelligence import druggability as kernel
+
+    tools = _FakeTools()
+
+    report = _gather(tools)
+
+    sponsors = report["market_landscape"]["sponsor_mix"]
+    assert tools.sponsor_pages == kernel.MAX_SPONSOR_PAGES
+    assert sponsors["studies_aggregated"] == 2 * kernel.MAX_SPONSOR_PAGES
+    assert sponsors["complete"] is False
+    assert report["market_landscape"]["trial_registrations"]["partial_year"] == "2026"
+    assert len(report["market_landscape"]["trial_registrations"]["by_start_year"]) == kernel.TREND_YEARS
+
+
+def test_without_saved_patents_the_filing_trend_is_named_as_missing() -> None:
+    report = _gather(_FakeTools(), patent_priority_years=None)
+
+    assert report["market_landscape"]["patent_priority_years"] is None
+    assert any("No patents are saved" in gap for gap in report["gaps"])
 
 
 def test_an_unreachable_uniprot_is_not_reported_as_a_missing_mapping() -> None:
@@ -210,3 +250,50 @@ def test_one_failed_trial_count_is_none_and_named_not_zero() -> None:
     assert report["trial_activity"]["by_phase"]["PHASE3"] is None
     assert report["trial_activity"]["by_phase"]["PHASE2"] == 5
     assert any("PHASE3" in gap for gap in report["gaps"])
+
+
+# --- Market prospects, as counts with their limits ----------------------------
+
+
+def _study(sponsor_class, name):
+    return {"protocolSection": {"sponsorCollaboratorsModule": {"leadSponsor": {"class": sponsor_class, "name": name}}}}
+
+
+def test_the_sponsor_mix_counts_classes_and_names_industry_leaders() -> None:
+    studies = [_study("INDUSTRY", "Merck"), _study("INDUSTRY", "Merck"), _study("OTHER", "Fudan University")]
+
+    mix = druggability.sponsor_mix(studies, total_matching=3)
+
+    assert mix["by_class"] == {"INDUSTRY": 2, "OTHER": 1}
+    assert mix["industry_share"] == round(2 / 3, 3)
+    assert mix["top_industry_sponsors"] == [{"sponsor": "Merck", "registrations": 2}]
+    assert mix["complete"] is True
+
+
+def test_a_sponsor_mix_from_part_of_the_registrations_says_it_is_partial() -> None:
+    """A first page is not a random sample; the mix must not read as the whole field."""
+    mix = druggability.sponsor_mix([_study("OTHER", "A")], total_matching=4405)
+
+    assert mix["complete"] is False
+    assert mix["studies_aggregated"] == 1
+
+
+def test_an_unretrieved_year_is_listed_not_drawn_as_a_dip() -> None:
+    trend = druggability.registration_trend({2024: 400, 2025: None, 2026: 120}, current_year=2026)
+
+    assert trend["by_start_year"] == {"2024": 400, "2025": None, "2026": 120}
+    assert trend["years_unavailable"] == ["2025"]
+    assert trend["partial_year"] == "2026"
+
+
+def test_the_market_landscape_carries_no_market_size_and_says_why() -> None:
+    landscape = druggability.market_landscape(
+        candidates={"approved": 9, "by_stage": {"APPROVAL": 9}},
+        trend=None,
+        sponsors=None,
+        patent_priority_years={"2015": 3},
+    )
+
+    assert landscape["approved_on_target"] == 9
+    assert not {"market_size", "revenue", "price", "share"} & set(landscape)
+    assert "not a market forecast" in " ".join(landscape["limits"])

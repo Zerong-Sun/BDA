@@ -171,7 +171,14 @@ def intelligence_export(run_id: str) -> dict:
     return {"run_id": run_id, "status": "available", "artifact_id": str(artifact_id)}
 
 
-def gather_druggability(tools: Any, target: dict[str, Any], trial_term: str) -> dict[str, Any]:
+def gather_druggability(
+    tools: Any,
+    target: dict[str, Any],
+    trial_term: str,
+    *,
+    patent_priority_years: dict[str, int] | None = None,
+    current_year: int | None = None,
+) -> dict[str, Any]:
     """Retrieve the public evidence for one target, recording every call.
 
     Takes the evidence service as an argument so it can be exercised without a
@@ -223,9 +230,55 @@ def gather_druggability(tools: Any, target: dict[str, Any], trial_term: str) -> 
         retrieval["clinical_trials"] = audits
         trials = druggability.trial_activity(counts, query=trial_term)
 
+    trend: dict[str, Any] | None = None
+    sponsors: dict[str, Any] | None = None
+    if trial_term and current_year is not None:
+        by_year: dict[int, int | None] = {}
+        trend_audits: list[dict[str, Any]] = []
+        for year in range(current_year - druggability.TREND_YEARS + 1, current_year + 1):
+            try:
+                result = tools.count_clinical_trials(trial_term, start_year=year)
+                total = result.data.get("totalCount")
+                by_year[year] = total if isinstance(total, int) else None
+                trend_audits.append(result.audit)
+            except (RuntimeError, ValueError) as exc:
+                by_year[year] = None
+                failures.append(f"ClinicalTrials.gov count for start year {year} could not be retrieved ({exc}).")
+        retrieval["clinical_trials_trend"] = trend_audits
+        trend = druggability.registration_trend(by_year, current_year=current_year)
+
+        studies: list[dict[str, Any]] = []
+        sponsor_audits: list[dict[str, Any]] = []
+        page_token: str | None = None
+        for _page in range(druggability.MAX_SPONSOR_PAGES):
+            try:
+                result = tools.list_clinical_trial_sponsors(trial_term, page_token=page_token)
+            except (RuntimeError, ValueError) as exc:
+                failures.append(f"ClinicalTrials.gov sponsor page could not be retrieved ({exc}); the mix is partial.")
+                break
+            sponsor_audits.append(result.audit)
+            studies.extend(result.data.get("studies") or [])
+            page_token = result.data.get("nextPageToken")
+            if not page_token:
+                break
+        retrieval["clinical_trials_sponsors"] = sponsor_audits
+        total_matching = (trials or {}).get("total_matching")
+        sponsors = druggability.sponsor_mix(studies, total_matching=total_matching)
+
     report = druggability.assessment(
         target=target, ensembl_id=ensembl_id, open_targets=open_targets, trials=trials
     )
+    report["market_landscape"] = druggability.market_landscape(
+        candidates=report.get("clinical_candidates"),
+        trend=trend,
+        sponsors=sponsors,
+        patent_priority_years=patent_priority_years,
+    )
+    if not patent_priority_years:
+        # Actionable rather than silent: the trend exists once a search is saved.
+        report["gaps"].append(
+            "No patents are saved for this project, so filing trends are absent. Run a patent search to include them."
+        )
     if not mapping_retrieved:
         # The kernel's "no cross-reference" gap would be false here: the entry
         # was never read, so whether it has one is unknown.
@@ -247,6 +300,10 @@ def _druggability_summary(report: dict[str, Any]) -> str:
     trials = report.get("trial_activity")
     if trials is not None and trials.get("total_matching") is not None:
         parts.append(f"{trials['total_matching']} registered trials matching '{trials['query']}'")
+    sponsors = (report.get("market_landscape") or {}).get("sponsor_mix")
+    if sponsors and sponsors.get("industry_share") is not None:
+        scope = "all" if sponsors.get("complete") else f"{sponsors['studies_aggregated']} retrieved"
+        parts.append(f"Industry leads {round(sponsors['industry_share'] * 100)}% of {scope} registrations")
     if report.get("gaps"):
         parts.append(f"{len(report['gaps'])} gap(s) recorded")
     parts.append("Evidence only; no druggability probability is given.")
@@ -279,12 +336,28 @@ def druggability_assessment(run_id: str) -> dict:
             else {"id": str(run.target_id)}
         )
         trial_term = str((run.query or {}).get("trial_term") or target_view.get("name") or "").strip()
+        # Filing years from patents this project already saved through a
+        # recorded search - read here, not searched for: an assessment must not
+        # quietly start a patent search the person did not ask for.
+        from ..literature.patent_service import project_landscape
+
+        patent_years = project_landscape(session, run.project_id)["landscape"]["priority_years"] or None
         run.status = "running"
         run.version += 1
 
-    tools = EvidenceToolService(max_calls=12, timeout_seconds=30.0)
+    from datetime import UTC, datetime
+
+    # UniProt, Open Targets, 6 phase counts, 8 start-year counts and up to 5
+    # sponsor pages: 21 calls, with headroom for retries recorded as calls.
+    tools = EvidenceToolService(max_calls=30, timeout_seconds=30.0)
     try:
-        report = gather_druggability(tools, target_view, trial_term)
+        report = gather_druggability(
+            tools,
+            target_view,
+            trial_term,
+            patent_priority_years=patent_years,
+            current_year=datetime.now(UTC).year,
+        )
     finally:
         tools.close()
 
@@ -294,6 +367,10 @@ def druggability_assessment(run_id: str) -> dict:
         "clinical_candidates": retrieval.get("open_targets"),
         "safety_liabilities": retrieval.get("open_targets"),
         "trial_activity": retrieval.get("clinical_trials"),
+        "market_landscape": {
+            "trend": retrieval.get("clinical_trials_trend"),
+            "sponsors": retrieval.get("clinical_trials_sponsors"),
+        },
     }
     with session_scope() as session:
         run = session.get(IntelligenceRun, parsed)
