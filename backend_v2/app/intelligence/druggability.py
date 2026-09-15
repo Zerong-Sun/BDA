@@ -53,6 +53,9 @@ STAGE_ORDER: tuple[str, ...] = (
 #: ClinicalTrials.gov phase values the task counts, in order.
 TRIAL_PHASES: tuple[str, ...] = ("EARLY_PHASE1", "PHASE1", "PHASE2", "PHASE3", "PHASE4")
 
+#: The phases "late stage" means. Both must be known for the sum to mean anything.
+_LATE_PHASES: tuple[str, ...] = ("PHASE3", "PHASE4")
+
 LIMITS: tuple[str, ...] = (
     "No druggability probability is given. No calibrated dataset supports one, and a "
     "number nobody can validate would be read as certainty.",
@@ -180,7 +183,6 @@ def safety_liabilities(rows: Iterable[Mapping[str, Any]] | None) -> dict[str, An
 def trial_activity(counts: Mapping[str, int | None], *, query: str) -> dict[str, Any]:
     """Registered studies by phase for a search term, with the term stated."""
     phases = {phase: counts.get(phase) for phase in TRIAL_PHASES}
-    known = [value for value in phases.values() if isinstance(value, int)]
     return {
         "query": query,
         "by_phase": phases,
@@ -188,9 +190,47 @@ def trial_activity(counts: Mapping[str, int | None], *, query: str) -> dict[str,
         # A phase whose count could not be retrieved is None, not zero: the two
         # mean opposite things about how crowded a space is.
         "phases_unavailable": [phase for phase, value in phases.items() if value is None],
-        "late_stage": sum(value for key, value in phases.items() if key in {"PHASE3", "PHASE4"} and isinstance(value, int))
-        if known
-        else None,
+        # Only when both late phases were actually retrieved. Summing whichever
+        # of them happened to arrive would report 0 late-stage trials for a
+        # target whose phase 3 count simply failed to load - the same
+        # zero-for-unknown mistake `phases_unavailable` exists to prevent.
+        "late_stage": (
+            sum(value for key, value in phases.items() if key in _LATE_PHASES and isinstance(value, int))
+            if all(isinstance(phases.get(key), int) for key in _LATE_PHASES)
+            else None
+        ),
+    }
+
+
+def literature_signal(
+    counts: Mapping[str, int] | None, *, recent: Iterable[Mapping[str, Any]] = ()
+) -> dict[str, Any]:
+    """What this project has actually read on the target, and can cite.
+
+    Tractability from Open Targets says what the field has established about a
+    target; it says nothing about what *this project* has evidence for. The
+    papers and patents saved here are the ones an answer can cite with a
+    document id and a retrieval trace, so they belong in the report next to the
+    public evidence rather than in a different system.
+
+    Counts of saved documents only. A saved paper has not been read, agreed
+    with, or judged relevant to druggability - claiming any of that from a
+    count is the inference this section must not invite.
+    """
+    saved = dict(counts or {})
+    papers = int(saved.get("papers") or 0)
+    patents = int(saved.get("patents") or 0)
+    return {
+        "saved_papers": papers,
+        "saved_patents": patents,
+        "recent": [dict(item) for item in recent],
+        "interpretation": (
+            "Nothing is saved for this project, so no claim here can be cited to its own evidence. "
+            "Run a literature or patent search first."
+            if not papers and not patents
+            else "Counts of documents saved through recorded searches. Saved is not read, and not "
+            "evidence of druggability by itself; cite the document that supports a claim."
+        ),
     }
 
 
@@ -200,6 +240,7 @@ def assessment(
     ensembl_id: str | None,
     open_targets: Mapping[str, Any] | None,
     trials: Mapping[str, Any] | None,
+    literature: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The report, with every gap named where it would otherwise be a silent zero."""
     gaps: list[str] = []
@@ -216,6 +257,16 @@ def assessment(
     elif trials.get("phases_unavailable"):
         gaps.append(f"Trial counts unavailable for: {', '.join(trials['phases_unavailable'])}.")
 
+    if not isinstance(target, Mapping):
+        # Checked before the report is built, not after: a validation that runs
+        # last has already let the bad value through everything it guards.
+        raise DruggabilityInputError("target must be a mapping")
+    if literature is not None and not literature.get("saved_papers") and not literature.get("saved_patents"):
+        gaps.append(
+            "This project has saved no papers or patents, so nothing in this report can be cited "
+            "to the project's own evidence."
+        )
+
     report: dict[str, Any] = {
         "target": dict(target),
         "ensembl_id": ensembl_id,
@@ -225,11 +276,10 @@ def assessment(
         ),
         "safety_liabilities": safety_liabilities((ot_target or {}).get("safetyLiabilities")) if ot_target else None,
         "trial_activity": trials,
+        "literature_signal": dict(literature) if literature is not None else None,
         "gaps": gaps,
         "limits": list(LIMITS),
     }
-    if not isinstance(report["target"], dict):
-        raise DruggabilityInputError("target must be a mapping")
     return report
 
 

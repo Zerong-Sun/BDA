@@ -180,3 +180,66 @@ def test_search_results_carry_patent_details_only_for_patent_hits() -> None:
     assert results[0]["patent"]["publication_number"] == "WO2011110621"
     assert results[0]["patent"]["stage"] == "pct_application"
     assert results[1]["patent"] is None
+
+
+# --- Edges the audit found untested -----------------------------------------
+
+
+def test_a_publication_with_no_application_date_is_counted_apart() -> None:
+    """Neither within term nor past it: a date nobody has is not a date in the past."""
+    summary = patents.landscape(
+        [{"publication_number": "CN1", "country_code": "CN", "application_date": None}],
+        today=date(2026, 9, 15),
+    )
+
+    assert summary["estimated_term"] == {
+        "basis": "application date + 20 years, as of 2026-09-15",
+        "within_estimated_term": 0,
+        "past_estimated_term": 0,
+        "no_application_date": 1,
+    }
+
+
+def test_a_malformed_application_date_counts_as_undated_rather_than_crashing() -> None:
+    summary = patents.landscape(
+        [{"publication_number": "CN2", "application_date": "not-a-date"}], today=date(2026, 9, 15)
+    )
+
+    assert summary["estimated_term"]["no_application_date"] == 1
+
+
+def test_a_leap_day_filing_lands_on_the_28th_twenty_years_later() -> None:
+    """2044 is not a leap year, so 2024-02-29 + 20y has no same-day equivalent."""
+    within = patents.landscape(
+        [{"publication_number": "US1", "application_date": "2024-02-29"}], today=date(2044, 2, 27)
+    )
+    past = patents.landscape(
+        [{"publication_number": "US1", "application_date": "2024-02-29"}], today=date(2044, 3, 1)
+    )
+
+    assert within["estimated_term"]["within_estimated_term"] == 1
+    assert past["estimated_term"]["past_estimated_term"] == 1
+
+
+def test_a_reissued_us_patent_is_a_grant_and_an_unknown_kind_says_so() -> None:
+    # US kind E is a reissue - a granted patent. A kind nobody can decode is
+    # reported as unknown rather than guessed into a stage.
+    assert patents.publication_stage("US", "E") == "granted"
+    assert patents.publication_stage("CN", "Z9") == "unknown"
+    assert patents.publication_stage("US", "") == "unknown"
+
+
+def test_a_record_with_a_single_classifier_object_reads_as_one_class() -> None:
+    """Europe PMC returns one classifier as an object and several as a list."""
+    details = patents.patent_details(
+        {
+            "id": "CN3",
+            "patentDetails": {
+                "countryCode": "CN",
+                "typeCode": "A",
+                "classifierList": {"classifier": {"classification": "C07K16/28", "classificationType": "IPC"}},
+            },
+        }
+    )
+
+    assert details["ipc"] == ["C07K16/28"]

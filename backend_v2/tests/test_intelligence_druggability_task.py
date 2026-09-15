@@ -231,3 +231,127 @@ def test_another_projects_assessment_is_a_404(factory) -> None:
         druggability_service.read_assessment(session, stranger_id, run_id)
 
     assert error.value.status_code == 404
+
+
+# --- What the audit found: a run that breaks must not stay running -----------
+
+
+def test_a_run_whose_gathering_breaks_ends_failed_with_the_reason_saved(
+    factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Per-source failures are gaps; this is the gathering itself breaking.
+
+    Without containment the run sits at "running" for ever: no report, no
+    error, and nothing to tell a reader whether to wait or to start again.
+    """
+    _, run_id = _queued_run(factory)
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("open_targets.druggability_failed")
+
+    monkeypatch.setattr(intelligence_tasks, "gather_druggability", explode)
+
+    outcome = intelligence_tasks.druggability_assessment.run(str(run_id))
+
+    assert outcome["status"] == "failed"
+    with factory() as session:
+        run = session.get(IntelligenceRun, run_id)
+        report = session.scalar(select(IntelligenceReport).where(IntelligenceReport.run_id == run_id))
+    assert run is not None and run.status == "failed"
+    # The reason is readable: IntelligenceRun has no error column, so it lives
+    # in the report the reader already fetches.
+    assert report is not None
+    assert "open_targets.druggability_failed" in report.content["error"]
+    assert "could not be completed" in report.summary
+
+
+def test_the_projects_own_saved_evidence_is_counted_into_the_report(factory) -> None:
+    """The report cites public sources; this says what the project itself can cite."""
+    from backend_v2.app.literature.models import LiteratureDocument
+    from backend_v2.app.literature.patent_service import PATENT_SOURCE
+
+    project_id, run_id = _queued_run(factory)
+    with factory() as session:
+        session.add_all(
+            [
+                LiteratureDocument(
+                    project_id=project_id, title="PD-1 blockade in NSCLC", source="europe_pmc",
+                    external_id="MED/1", status="indexed",
+                ),
+                LiteratureDocument(
+                    project_id=project_id, title="Anti-PD-1 antibody", source=PATENT_SOURCE,
+                    external_id="CN1", status="indexed",
+                ),
+                LiteratureDocument(
+                    project_id=project_id, title="Second patent", source=PATENT_SOURCE,
+                    external_id="CN2", status="indexed",
+                ),
+            ]
+        )
+        session.commit()
+
+    intelligence_tasks.druggability_assessment.run(str(run_id))
+
+    with factory() as session:
+        report = session.scalar(select(IntelligenceReport).where(IntelligenceReport.run_id == run_id))
+    assert report is not None
+    signal = report.content["literature_signal"]
+    assert (signal["saved_papers"], signal["saved_patents"]) == (1, 2)
+    # The paper is listed; patents are counted but not mixed into the reading list.
+    assert [item["title"] for item in signal["recent"]] == ["PD-1 blockade in NSCLC"]
+    assert "1 papers and 2 patents saved in this project" in report.summary
+    assert not any("saved no papers or patents" in gap for gap in report.content["gaps"])
+
+
+def test_a_project_with_nothing_saved_gets_an_actionable_gap(factory) -> None:
+    _, run_id = _queued_run(factory)
+
+    intelligence_tasks.druggability_assessment.run(str(run_id))
+
+    with factory() as session:
+        report = session.scalar(select(IntelligenceReport).where(IntelligenceReport.run_id == run_id))
+    assert report is not None
+    assert any("saved no papers or patents" in gap for gap in report.content["gaps"])
+
+
+def test_a_supplied_trial_term_that_is_too_long_names_the_term(factory) -> None:
+    with factory() as session:
+        project, user = _project(session)
+        target = Target(project_id=project.id, name="PD-1", uniprot_accession="Q15116")
+        session.add(target)
+        session.flush()
+
+        with pytest.raises(DomainError) as error:
+            druggability_service.create_druggability_run(
+                session, project, target.id, user, trial_term="x" * 201
+            )
+
+    assert error.value.error_code == "trial_term_too_long"
+
+
+def test_a_target_name_too_long_to_search_by_blames_the_name_not_the_term(factory) -> None:
+    """The caller passed no term, so an error about their 'trial term' sends them looking for an argument they never gave."""
+    with factory() as session:
+        project, user = _project(session)
+        target = Target(project_id=project.id, name="P" * 201, uniprot_accession="Q15116")
+        session.add(target)
+        session.flush()
+
+        with pytest.raises(DomainError) as error:
+            druggability_service.create_druggability_run(session, project, target.id, user)
+
+    assert error.value.error_code == "target_name_too_long"
+    assert "Supply a shorter trial_term" in error.value.detail
+
+
+def test_a_target_with_no_name_and_no_term_says_what_is_missing(factory) -> None:
+    with factory() as session:
+        project, user = _project(session)
+        target = Target(project_id=project.id, name="", uniprot_accession="Q15116")
+        session.add(target)
+        session.flush()
+
+        with pytest.raises(DomainError) as error:
+            druggability_service.create_druggability_run(session, project, target.id, user)
+
+    assert error.value.error_code == "trial_term_missing"

@@ -11,7 +11,7 @@ import json
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
@@ -178,6 +178,7 @@ def gather_druggability(
     *,
     patent_priority_years: dict[str, int] | None = None,
     current_year: int | None = None,
+    literature: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Retrieve the public evidence for one target, recording every call.
 
@@ -266,7 +267,11 @@ def gather_druggability(
         sponsors = druggability.sponsor_mix(studies, total_matching=total_matching)
 
     report = druggability.assessment(
-        target=target, ensembl_id=ensembl_id, open_targets=open_targets, trials=trials
+        target=target,
+        ensembl_id=ensembl_id,
+        open_targets=open_targets,
+        trials=trials,
+        literature=literature,
     )
     report["market_landscape"] = druggability.market_landscape(
         candidates=report.get("clinical_candidates"),
@@ -304,6 +309,9 @@ def _druggability_summary(report: dict[str, Any]) -> str:
     if sponsors and sponsors.get("industry_share") is not None:
         scope = "all" if sponsors.get("complete") else f"{sponsors['studies_aggregated']} retrieved"
         parts.append(f"Industry leads {round(sponsors['industry_share'] * 100)}% of {scope} registrations")
+    saved = report.get("literature_signal")
+    if saved is not None:
+        parts.append(f"{saved['saved_papers']} papers and {saved['saved_patents']} patents saved in this project")
     if report.get("gaps"):
         parts.append(f"{len(report['gaps'])} gap(s) recorded")
     parts.append("Evidence only; no druggability probability is given.")
@@ -314,6 +322,7 @@ def _druggability_summary(report: dict[str, Any]) -> str:
 def druggability_assessment(run_id: str) -> dict:
     from ..research.evidence_tools import EvidenceToolService
     from ..targets.models import Target
+    from . import druggability
     from .druggability_service import DRUGGABILITY_KIND
     from .models import IntelligenceEvidence, IntelligenceReport, IntelligenceRun
 
@@ -342,6 +351,36 @@ def druggability_assessment(run_id: str) -> dict:
         from ..literature.patent_service import project_landscape
 
         patent_years = project_landscape(session, run.project_id)["landscape"]["priority_years"] or None
+        # What this project has saved and can cite. Read here for the same
+        # reason the patent years are: an assessment reports the evidence that
+        # exists, and must not start a search nobody asked for to create some.
+        from ..literature.models import LiteratureDocument
+        from ..literature.patent_service import PATENT_SOURCE
+
+        by_source: dict[str, int] = {
+            str(source): int(count)
+            for source, count in session.execute(
+                select(LiteratureDocument.source, func.count())
+                .where(LiteratureDocument.project_id == run.project_id)
+                .group_by(LiteratureDocument.source)
+            ).all()
+        }
+        recent_saved = [
+            {"document_id": str(row.id), "title": row.title, "source": row.source}
+            for row in session.scalars(
+                select(LiteratureDocument)
+                .where(
+                    LiteratureDocument.project_id == run.project_id,
+                    LiteratureDocument.source != PATENT_SOURCE,
+                )
+                .order_by(LiteratureDocument.created_at.desc())
+                .limit(5)
+            )
+        ]
+        literature_counts = {
+            "papers": sum(count for source, count in by_source.items() if source != PATENT_SOURCE),
+            "patents": by_source.get(PATENT_SOURCE, 0),
+        }
         run.status = "running"
         run.version += 1
 
@@ -357,7 +396,28 @@ def druggability_assessment(run_id: str) -> dict:
             trial_term,
             patent_priority_years=patent_years,
             current_year=datetime.now(UTC).year,
+            literature=druggability.literature_signal(literature_counts, recent=recent_saved),
         )
+    except Exception as exc:  # noqa: BLE001 - the run must not be left running
+        # Per-source failures are already gaps inside `gather_druggability`.
+        # Reaching here means the gathering itself broke, and without this the
+        # run would sit at "running" for ever: no report, no error, and nothing
+        # to tell a reader whether to wait or to start again. The reason goes
+        # into a report row because `IntelligenceRun` has no error column.
+        with session_scope() as session:
+            run = session.get(IntelligenceRun, parsed)
+            if run is not None:
+                session.add(
+                    IntelligenceReport(
+                        run_id=run.id,
+                        title=f"Druggability assessment failed: {target_view.get('name') or target_view['id']}",
+                        summary=f"The assessment could not be completed: {str(exc)[:500]}",
+                        content={"error": str(exc)[:2000], "target": target_view, "trial_term": trial_term},
+                    )
+                )
+                run.status = "failed"
+                run.version += 1
+        return {"run_id": run_id, "status": "failed", "error": str(exc)[:500]}
     finally:
         tools.close()
 

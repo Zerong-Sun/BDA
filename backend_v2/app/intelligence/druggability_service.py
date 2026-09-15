@@ -51,9 +51,26 @@ def create_druggability_run(
             "Resolve the target's identity first; it is not guessed from the name.",
             status_code=422,
         )
-    term = trial_term.strip() or target.name
-    if len(term) > 200:
+    # Checked separately, so the error names the value the caller can change.
+    # Blaming a "trial term" the caller never supplied sends them looking for
+    # an argument they did not pass.
+    supplied = trial_term.strip()
+    if len(supplied) > 200:
         raise DomainError("trial_term_too_long", "The trial search term is longer than 200 characters.", status_code=422)
+    term = supplied or str(target.name or "").strip()
+    if not term:
+        raise DomainError(
+            "trial_term_missing",
+            "This target has no name to search trials by. Supply a trial term.",
+            status_code=422,
+        )
+    if len(term) > 200:
+        raise DomainError(
+            "target_name_too_long",
+            f"The target's name is {len(term)} characters, too long to use as a trial search term. "
+            "Supply a shorter trial_term.",
+            status_code=422,
+        )
     row = IntelligenceRun(
         project_id=project.id,
         target_id=target.id,

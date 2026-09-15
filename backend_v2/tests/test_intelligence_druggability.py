@@ -10,6 +10,7 @@ as safe, an unretrieved phase read as zero, and a score where evidence belongs.
 
 from __future__ import annotations
 
+import pytest
 from backend_v2.app.intelligence import druggability
 
 UNIPROT_Q15116 = {
@@ -109,7 +110,20 @@ def test_a_phase_that_was_not_retrieved_is_none_not_zero() -> None:
 
     assert result["by_phase"]["PHASE4"] is None
     assert "PHASE4" in result["phases_unavailable"]
-    assert result["late_stage"] == 432
+    # The test's own name is the rule: an unretrieved phase is not zero. This
+    # asserted 432 - the phase 3 count alone - which reports "432 late-stage
+    # trials" for a target whose phase 4 count simply failed to load.
+    assert result["late_stage"] is None
+
+
+def test_late_stage_is_the_sum_once_both_late_phases_are_known() -> None:
+    result = druggability.trial_activity(
+        {"ALL": 4405, "PHASE1": 1335, "PHASE2": 2587, "PHASE3": 432, "PHASE4": 87},
+        query="PD-1",
+    )
+
+    assert result["late_stage"] == 519
+    assert result["phases_unavailable"] == ["EARLY_PHASE1"]
 
 
 def test_a_report_without_a_mapping_names_the_gap_instead_of_reporting_zeros() -> None:
@@ -297,3 +311,54 @@ def test_the_market_landscape_carries_no_market_size_and_says_why() -> None:
     assert landscape["approved_on_target"] == 9
     assert not {"market_size", "revenue", "price", "share"} & set(landscape)
     assert "not a market forecast" in " ".join(landscape["limits"])
+
+
+# --- Edges the audit found untested -----------------------------------------
+
+
+def test_rows_that_are_not_mappings_are_skipped_rather_than_crashing() -> None:
+    """Every source here is external JSON; a string where an object belongs is its problem, not a traceback."""
+    assert druggability.ensembl_from_uniprot({"uniProtKBCrossReferences": ["nonsense", 7]}) is None
+    rows = druggability.tractability(["nonsense", {"modality": "", "value": True}, {"modality": "SM", "value": True, "label": "X"}])
+    assert [row["modality"] for row in rows if row["supported"]] == ["SM"]
+    assert druggability.safety_liabilities(["nonsense"])["recorded"] == 0
+    assert druggability.sponsor_mix(["nonsense"], total_matching=0)["studies_aggregated"] == 0
+
+
+def test_a_mapped_target_open_targets_does_not_know_is_a_named_gap() -> None:
+    report = druggability.assessment(
+        target={"name": "Mapped but absent"},
+        ensembl_id="ENSG00000999999",
+        open_targets={"target": None},
+        trials=None,
+    )
+
+    assert any("Open Targets returned no record" in gap for gap in report["gaps"])
+    assert report["tractability"] is None
+
+
+def test_a_target_that_is_not_a_mapping_is_refused_before_a_report_exists() -> None:
+    with pytest.raises(druggability.DruggabilityInputError):
+        druggability.assessment(target="PD-1", ensembl_id=None, open_targets=None, trials=None)  # type: ignore[arg-type]
+
+
+def test_a_project_with_nothing_saved_is_told_it_can_cite_nothing() -> None:
+    """The report names public evidence; this says what the project itself can cite."""
+    signal = druggability.literature_signal({"papers": 0, "patents": 0})
+    report = druggability.assessment(
+        target={"name": "PD-1"}, ensembl_id=None, open_targets=None, trials=None, literature=signal
+    )
+
+    assert "Run a literature or patent search first" in signal["interpretation"]
+    assert any("saved no papers or patents" in gap for gap in report["gaps"])
+
+
+def test_saved_documents_are_counted_without_claiming_they_were_read() -> None:
+    signal = druggability.literature_signal(
+        {"papers": 12, "patents": 30},
+        recent=[{"document_id": "doc-1", "title": "PD-1 blockade", "source": "europe_pmc"}],
+    )
+
+    assert (signal["saved_papers"], signal["saved_patents"]) == (12, 30)
+    assert signal["recent"][0]["document_id"] == "doc-1"
+    assert "Saved is not read" in signal["interpretation"]
