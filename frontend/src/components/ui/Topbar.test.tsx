@@ -78,6 +78,13 @@ describe('Topbar logout', () => {
     expect(window.location.hash).toContain('/login')
   })
 
+  it('shows the active project name before the dropdown has been opened', async () => {
+    renderWithProviders(<Topbar />)
+    const selector = await screen.findByRole('combobox')
+    await waitFor(() => expect(selector).toHaveTextContent('Live Project'))
+    expect(selector).not.toHaveTextContent('proj_live')
+  })
+
   it('renders mobile-accessible primary navigation links', async () => {
     useAppStore.setState({ language: 'en' })
 

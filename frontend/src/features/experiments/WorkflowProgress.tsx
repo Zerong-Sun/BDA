@@ -92,7 +92,7 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
   }
 
   return (
-    <section className="mb-6" role="region" aria-labelledby="workflow-progress-heading">
+    <section data-tour-id="main-navigation" className="mb-6" role="region" aria-labelledby="workflow-progress-heading">
       <h2 id="workflow-progress-heading" className="mb-3 text-lg font-semibold text-text-primary">
         {t.projects.workflowProgress.title}
       </h2>

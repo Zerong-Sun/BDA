@@ -22,16 +22,16 @@ export function StatusPill({
   children?: ReactNode
   tone?: StatusTone
 }) {
-  return <StatusBadge status={toneMap[tone] ?? 'neutral'} label={label}>{children}</StatusBadge>
+  const { t } = useI18n()
+  const displayLabel = typeof label === 'string' ? localizeStatusLabel(label, t.shared.status) : label
+  return <StatusBadge status={toneMap[tone] ?? 'neutral'} label={displayLabel}>{children}</StatusBadge>
 }
 
 export function StatusPills({ status }: { status: string }) {
-  const { t } = useI18n()
   const labels = status
     .split(/[·,|/]+/)
     .map((part) => part.trim())
     .filter(Boolean)
-    .map((part) => localizeStatusLabel(part, t.shared.status))
   if (labels.length === 0) return null
   return (
     <div className="flex flex-wrap gap-1.5">
