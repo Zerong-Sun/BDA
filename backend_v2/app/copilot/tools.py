@@ -407,6 +407,79 @@ _register(
 
 _register(
     ToolSpec(
+        id="start_patent_search",
+        description=(
+            "Queue an audited search of Europe PMC's patent index - Chinese (CN), US, "
+            "European (EP), PCT (WO), Japanese and Korean publications - and save each "
+            "hit with its retrieval trace. Report it as queued: it is not done until the "
+            "results are saved, and only saved patents can be cited. A search returns the "
+            "most relevant publications, not every one, and finding none does not show "
+            "that none exist."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"query": {"type": "string"}, "limit": _limit(25, 10)},
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+        capability="patent-search",
+        execution_mode="queue",
+        requires="actions",
+        awaits="operation",
+        audit=True,
+        handler=lambda ctx, args: ctx.actions.start_patent_search(
+            _arg_str(args, "query"), limit=_arg_int(args, "limit", 10)
+        ),
+    )
+)
+
+
+def _summarise_patent_landscape(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..literature import patent_service
+
+    raw_run = _arg_str(args, "search_run_id")
+    jurisdictions = args.get("jurisdictions") or []
+    return patent_service.project_landscape(
+        ctx.session,
+        _project_of(ctx),
+        search_run_id=uuid.UUID(raw_run) if raw_run else None,
+        jurisdictions=tuple(str(code) for code in jurisdictions),
+    )
+
+
+_register(
+    ToolSpec(
+        id="summarise_patent_landscape",
+        description=(
+            "Summarise the patents this project has already saved: publications by office "
+            "(CN, US, EP, WO, JP, KR), by stage (application, granted, PCT, utility model), "
+            "top applicants, IPC subclasses, priority years and an estimated-term count, "
+            "with each listed record's document and retrieval trace. It reads saved "
+            "patents only and runs no search. Legal status is not available from this "
+            "source: never call a patent in force, expired or granted-and-valid from this "
+            "result, and never present it as a freedom-to-operate opinion."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "search_run_id": {"type": "string"},
+                "jurisdictions": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["CN", "US", "EP", "WO", "JP", "KR"]},
+                    "maxItems": 6,
+                },
+            },
+            "additionalProperties": False,
+        },
+        capability="patent-search",
+        execution_mode="read",
+        requires="session",
+        handler=_summarise_patent_landscape,
+    )
+)
+
+_register(
+    ToolSpec(
         id="start_target_intelligence",
         description="Queue a target intelligence run.",
         parameters={

@@ -4896,7 +4896,7 @@ export type LiteratureSearchCreate = {
     /**
      * Sources
      */
-    sources?: Array<'europe_pmc'>;
+    sources?: Array<'europe_pmc' | 'europe_pmc_patents'>;
 };
 
 /**

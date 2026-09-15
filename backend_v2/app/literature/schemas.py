@@ -154,13 +154,19 @@ class SubscriptionUpdate(BaseModel):
     enabled: bool | None = None
 
 
-def _default_literature_sources() -> list[Literal["europe_pmc"]]:
+#: `europe_pmc_patents` is Europe PMC's patent index (`SRC:PAT`): CN, US, EP, WO,
+#: JP and KR publications, searched and saved through the same audited path as
+#: papers so a cited patent carries the same retrieval trace a cited paper does.
+LiteratureSource = Literal["europe_pmc", "europe_pmc_patents"]
+
+
+def _default_literature_sources() -> list[LiteratureSource]:
     return ["europe_pmc"]
 
 
 class LiteratureSearchCreate(BaseModel):
     query: str = Field(min_length=3, max_length=2000)
-    sources: list[Literal["europe_pmc"]] = Field(default_factory=_default_literature_sources, min_length=1)
+    sources: list[LiteratureSource] = Field(default_factory=_default_literature_sources, min_length=1)
     limit: int = Field(default=10, ge=1, le=25)
     fetch_full_text: bool = True
     extract_claims: bool = True

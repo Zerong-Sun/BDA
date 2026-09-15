@@ -212,6 +212,7 @@ BOTS: tuple[BotSpec, ...] = (
             "research-read",
             "knowledge-authoring",
             "literature-search",
+            "patent-search",
             "target-intelligence",
             "research-gap-repair",
             "chain-messaging",
@@ -229,6 +230,8 @@ BOTS: tuple[BotSpec, ...] = (
             "选题", "立项", "研究问题", "写提案",
             "论文", "文献", "引用", "综述", "参考文献",
             "靶点", "情报", "缺口", "补齐", "修复", "靶点情报", "靶点档案",
+            "patent", "patents", "patent landscape", "prior art",
+            "专利", "专利检索", "专利格局", "现有技术",
         ),
     ),
     BotSpec(

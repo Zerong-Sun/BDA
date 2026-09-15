@@ -108,6 +108,7 @@ def literature_search(search_run_id: str) -> dict:
 
     from ..literature.indexing import extract_europe_pmc_full_text, index_document_content
     from ..literature.models import LiteratureDocument, LiteratureRetrievalTrace, LiteratureSearchRun
+    from ..literature.patents import patent_query
     from ..literature.retrieval import europe_pmc_results, text_checksum
     from ..research.evidence_tools import EvidenceToolService, titles_match
 
@@ -127,8 +128,18 @@ def literature_search(search_run_id: str) -> dict:
         project_id = run.project_id
         from ..research.search_query import search_topic
 
+        # A patent run is the same pipeline over Europe PMC's patent index. The
+        # restriction is applied after translation, not stored in the query: a
+        # Chinese topic is rewritten into English terms first, and a filter
+        # embedded in the text could be dropped by that rewrite, recording a
+        # search nobody asked for.
+        patents_run = "europe_pmc_patents" in (run.sources or [])
+        database = "europe_pmc_patents" if patents_run else "europe_pmc"
+        document_source = "europe_pmc_patent" if patents_run else "europe_pmc"
         try:
             query = search_topic(session, run.project_id, run.query)
+            if patents_run:
+                query = patent_query(query)
         except Exception as exc:
             run.status = "failed"
             run.error = str(exc)[:1000]
@@ -172,21 +183,21 @@ def literature_search(search_run_id: str) -> dict:
         return {"search_run_id": search_run_id, "status": "failed", "error": str(exc)}
 
     search_payload = json.dumps(search_result.data, ensure_ascii=False, sort_keys=True).encode()
-    search_object_key = f"projects/{project_id}/literature/searches/{parsed}/europe-pmc.json"
+    search_object_key = f"projects/{project_id}/literature/searches/{parsed}/{database.replace('_', '-')}.json"
     ObjectStorage().put_bytes(search_object_key, search_payload, "application/json")
     with session_scope() as session:
         raw_search_artifact = Artifact(
             project_id=project_id,
             created_by=created_by,
             artifact_type="literature_search_response",
-            filename=f"europe-pmc-{parsed}.json",
+            filename=f"{database.replace('_', '-')}-{parsed}.json",
             content_type="application/json",
             object_key=search_object_key,
             size_bytes=len(search_payload),
             checksum_sha256=hashlib.sha256(search_payload).hexdigest(),
             lineage={
                 "search_run_id": search_run_id,
-                "database": "europe_pmc",
+                "database": database,
                 "query": query,
             },
         )
@@ -216,7 +227,7 @@ def literature_search(search_run_id: str) -> dict:
             document = session.scalar(
                 select(LiteratureDocument).where(
                     LiteratureDocument.project_id == project_id,
-                    LiteratureDocument.source == "europe_pmc",
+                    LiteratureDocument.source == document_source,
                     LiteratureDocument.external_id == result["external_id"],
                 )
             )
@@ -231,16 +242,21 @@ def literature_search(search_run_id: str) -> dict:
                     ),
                     None,
                 )
+            patent = result.get("patent")
             url = (
-                f"https://europepmc.org/article/MED/{result['pmid']}"
-                if result["pmid"]
-                else (f"https://doi.org/{result['doi']}" if result["doi"] else None)
+                patent["url"]
+                if patent
+                else (
+                    f"https://europepmc.org/article/MED/{result['pmid']}"
+                    if result["pmid"]
+                    else (f"https://doi.org/{result['doi']}" if result["doi"] else None)
+                )
             )
             if document is None:
                 document = LiteratureDocument(
                     project_id=project_id,
                     title=result["title"],
-                    source="europe_pmc",
+                    source=document_source,
                     external_id=result["external_id"],
                     abstract=result["abstract"] or None,
                     status="retrieving",
@@ -248,9 +264,17 @@ def literature_search(search_run_id: str) -> dict:
                         **result,
                         "url": url,
                         "ref_id": (
-                            f"PMID:{result['pmid']}"
-                            if result["pmid"]
-                            else (f"DOI:{result['doi'].lower()}" if result["doi"] else f"EPMC:{result['external_id']}")
+                            f"PATENT:{result['external_id']}"
+                            if patent
+                            else (
+                                f"PMID:{result['pmid']}"
+                                if result["pmid"]
+                                else (
+                                    f"DOI:{result['doi'].lower()}"
+                                    if result["doi"]
+                                    else f"EPMC:{result['external_id']}"
+                                )
+                            )
                         ),
                         "search_run_id": search_run_id,
                         "search_query": query,
@@ -368,7 +392,7 @@ def literature_search(search_run_id: str) -> dict:
                         lineage={
                             "search_run_id": search_run_id,
                             "document_id": str(document_id),
-                            "database": "europe_pmc",
+                            "database": database,
                             "pmcid": result["pmcid"],
                             "license_text": license_text,
                         },
@@ -452,7 +476,7 @@ def literature_search(search_run_id: str) -> dict:
                     "retrieval_trace_id": retrieval_trace_id,
                     "raw_content_artifact_id": str(raw_artifact_id) if raw_artifact_id else None,
                     "retrieved_at": datetime.now(UTC).isoformat(),
-                    "database": "europe_pmc",
+                    "database": database,
                     "query": query,
                     "rank": result["rank"],
                     "license_text": license_text,

@@ -8310,7 +8310,10 @@
           },
           "sources": {
             "items": {
-              "const": "europe_pmc",
+              "enum": [
+                "europe_pmc",
+                "europe_pmc_patents"
+              ],
               "type": "string"
             },
             "minItems": 1,

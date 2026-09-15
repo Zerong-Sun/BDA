@@ -471,6 +471,7 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "result-interpretation",
         "knowledge-authoring",
         "literature-search",
+        "patent-search",
         "target-intelligence",
         "research-gap-repair",
         "wetlab-read",

@@ -135,6 +135,18 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "requires_explicit_request": True,
     },
     {
+        "id": "patent-search",
+        "title": "Patent search",
+        "description": (
+            "Queue an audited Europe PMC patent search (CN, US, EP, WO, JP, KR) and "
+            "summarise the patents already saved: offices, stages, applicants, classes "
+            "and an estimated term. No legal status and no freedom-to-operate opinion."
+        ),
+        "execution_mode": "queue",
+        "chat_tools": ["start_patent_search", "summarise_patent_landscape"],
+        "requires_explicit_request": True,
+    },
+    {
         "id": "target-intelligence",
         "title": "Target intelligence",
         "description": "Queue target intelligence for one exact project Target",
@@ -279,6 +291,13 @@ CAPABILITY_ALIASES = {
         "research-trace-authoring",
         "agent-orchestration",
         "structure-analysis",
+        # These three were declared, granted to roster operators, and left out
+        # of this set - so a project on default skills never saw them, with
+        # nothing failing to say so. `test_default_skills_reach_every_roster_capability`
+        # now fails if a bot holds a capability the default cannot reach.
+        "structure-interaction",
+        "sequence-analysis",
+        "patent-search",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -286,6 +305,7 @@ CAPABILITY_ALIASES = {
     },
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
+    "patents": {"research-read", "patent-search"},
     "intelligence": {
         "project-read",
         "research-read",
