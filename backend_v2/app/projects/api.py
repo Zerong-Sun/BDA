@@ -14,6 +14,7 @@ from .repository import ProjectRepository
 from .schemas import (
     CandidateFunnelResponse,
     DeleteResponse,
+    ProjectAccessResponse,
     ProjectCreate,
     ProjectLibraryPage,
     ProjectOverviewResponse,
@@ -39,6 +40,7 @@ from .service import (
     soft_delete_project,
     update_project,
 )
+from .service import project_access as project_access_service
 from .service import project_library_item as project_library_item_service
 from .service import (
     project_overview as project_overview_service,
@@ -199,6 +201,15 @@ def target_readiness(
     user: User = Depends(current_user),
 ) -> TargetReadinessResponse:
     return target_readiness_service(session, require_project(session, project_id, user))
+
+
+@router.get("/{project_id}/access", response_model=ProjectAccessResponse)
+def project_access(
+    project_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ProjectAccessResponse:
+    return ProjectAccessResponse(**project_access_service(session, project_id, user))
 
 
 @router.get("/{project_id}/overview", response_model=ProjectOverviewResponse)

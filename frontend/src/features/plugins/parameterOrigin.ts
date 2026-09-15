@@ -75,3 +75,37 @@ export function clusterConstrainedParameters(
   }
   return pinned
 }
+
+/**
+ * The parameter keys that name the residues a design targets.
+ *
+ * RFdiffusion takes `ppi.hotspot_res` and BindCraft takes
+ * `target_hotspot_residues`; both have been in the plugin registry since those
+ * plugins were registered, and until now nothing produced a value for them -
+ * the residues were retyped out of a chat message into the box.
+ */
+const HOTSPOT_KEYS = ['ppi.hotspot_res', 'hotspot_res', 'target_hotspot_residues', 'hotspots']
+
+/**
+ * The residues a confirmed hotspot set pins, for the fields that take them.
+ *
+ * `constrained` rather than `recommended`, and the distinction is the point: a
+ * confirmed set is a decision somebody signed, and editing the value here would
+ * desynchronise the job from the record of what it was meant to target - the
+ * same argument the cluster's thread count makes one function above.
+ *
+ * Nothing is pinned without a confirmed set. A proposed one is a suggestion an
+ * operator made, and badging it as a constraint would put a person's authority
+ * behind a model's draft.
+ */
+export function hotspotConstrainedParameters(
+  residueArgument: string | undefined,
+  fields: ParameterFieldDefinition[],
+): Record<string, unknown> {
+  if (!residueArgument) return {}
+  const pinned: Record<string, unknown> = {}
+  for (const field of fields) {
+    if (HOTSPOT_KEYS.includes(field.key.toLowerCase())) pinned[field.key] = residueArgument
+  }
+  return pinned
+}

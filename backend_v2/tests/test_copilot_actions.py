@@ -324,3 +324,114 @@ def test_project_scope_rejection_is_failure_audited(
     assert audits[0]["action"] == "copilot.action.start_target_intelligence"
     assert audits[0]["result"] == "failure"
     assert audits[0]["payload"]["error_code"] == "target_not_found"
+
+
+def test_patent_search_is_explicit_pending_audited_and_saves_no_claims(
+    monkeypatch,
+    action_environment,
+) -> None:
+    """A patent search runs the literature pipeline with two settings changed.
+
+    No full text exists for a patent record, and claim extraction is off: the
+    extractor finds scientific claims in paper prose, and patent language run
+    through it would be filed as literature claims.
+    """
+    instance, _, audits = service(
+        monkeypatch,
+        action_environment,
+        "请检索 PD-1 抗体的国内外专利。",
+    )
+    run_id = uuid.uuid4()
+    captured: list[Any] = []
+    monkeypatch.setattr(
+        actions,
+        "create_literature_search",
+        lambda session, project, payload, user: (
+            captured.append(payload) or SimpleNamespace(id=run_id, query=payload.query)
+        ),
+    )
+
+    result = instance.start_patent_search('"PD-1" AND antibody', limit=20)
+
+    assert result == {
+        "search_run_id": str(run_id),
+        "status": "pending",
+        "database": "europe_pmc_patents",
+        "query": '"PD-1" AND antibody',
+    }
+    assert captured[0].sources == ["europe_pmc_patents"]
+    assert captured[0].fetch_full_text is False
+    assert captured[0].extract_claims is False
+    assert audits[0]["action"] == "copilot.action.start_patent_search"
+
+
+@pytest.mark.parametrize(
+    "request_text",
+    [
+        "这个靶点的专利情况怎么样？",  # a question about patents, not a request to search
+        "请检索 PD-1 相关文献。",  # a literature search is not a patent search
+    ],
+)
+def test_patent_search_is_refused_unless_a_patent_search_was_asked_for(
+    monkeypatch,
+    action_environment,
+    request_text: str,
+) -> None:
+    instance, _, audits = service(monkeypatch, action_environment, request_text)
+
+    with pytest.raises(ValueError, match="copilot_action_requires_explicit_user_request"):
+        instance.start_patent_search("PD-1 antibody")
+
+    assert audits == []
+
+
+def test_druggability_assessment_is_explicit_pending_and_audited(
+    monkeypatch,
+    action_environment,
+) -> None:
+    from backend_v2.app.intelligence import druggability_service
+
+    instance, _, audits = service(monkeypatch, action_environment, "请评估这个靶点的成药性。")
+    target_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    captured: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        druggability_service,
+        "create_druggability_run",
+        lambda session, project, parsed_target_id, user, **kwargs: (
+            captured.append({"target_id": parsed_target_id, **kwargs})
+            or SimpleNamespace(id=run_id, target_id=parsed_target_id)
+        ),
+    )
+
+    result = instance.start_druggability_assessment(str(target_id), trial_term="PD-1")
+
+    assert result == {
+        "intelligence_run_id": str(run_id),
+        "target_id": str(target_id),
+        "kind": "druggability",
+        "status": "pending",
+    }
+    assert captured[0]["target_id"] == target_id
+    assert captured[0]["trial_term"] == "PD-1"
+    assert audits[0]["action"] == "copilot.action.start_druggability_assessment"
+
+
+def test_asking_about_druggability_does_not_start_an_assessment(
+    monkeypatch,
+    action_environment,
+) -> None:
+    """A question is not a request, and an assessment spends external calls."""
+    instance, _, audits = service(monkeypatch, action_environment, "这个靶点的成药性怎么样？")
+
+    with pytest.raises(ValueError, match="copilot_action_requires_explicit_user_request"):
+        instance.start_druggability_assessment(str(uuid.uuid4()))
+
+    assert audits == []
+
+
+def test_a_malformed_target_id_is_refused(monkeypatch, action_environment) -> None:
+    instance, _, _ = service(monkeypatch, action_environment, "Please assess the druggability of this target.")
+
+    with pytest.raises(ValueError, match="invalid_target_id"):
+        instance.start_druggability_assessment("not-a-uuid")

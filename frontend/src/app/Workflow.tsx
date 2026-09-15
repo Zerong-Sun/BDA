@@ -1,6 +1,6 @@
 import { Disclosure } from '../components/ui/Disclosure'
 import type { Connection } from '@xyflow/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog'
 import { previewWorkflowNodeScript } from '../lib/api/workflow'
 import { TargetIdentityFix } from '../features/workflow/TargetIdentityFix'
@@ -41,6 +41,7 @@ import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listModelPlugins, validateModelPlugin } from '../lib/api/registry'
 import { awaitOperation } from '../lib/api/operations'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
+import { useSearchParamPatch } from '../lib/nav/useSearchParamPatch'
 import { useTargetReadiness } from '../lib/hooks/useProjectTargetStructure'
 import { useAppStore } from '../lib/store/appStore'
 import { useToastStore } from '../components/ui/toastStore'
@@ -249,11 +250,32 @@ export function WorkflowPage() {
   const [confirmRun, setConfirmRun] = useState(false)
   const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
-  const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<string | null>(null)
+  // The run and node you are looking at live in the URL, so the workbench can be
+  // linked to, reloaded, and stepped back through like any other page. The edge,
+  // artifact and dialog state stay local: they are transient inspectors, not
+  // places. Node clicks replace the history entry; choosing a run pushes one.
+  const [search, patchSearch] = useSearchParamPatch()
+  const requestedWorkflowRunId = search.get('run')
+  const selectedNodeId = search.get('node')
+  const setSelectedNodeId = useCallback(
+    (nodeId: string | null) => patchSearch({ node: nodeId }, { replace: true }),
+    [patchSearch],
+  )
+  // Runs this page chose itself - created, planned, or picked from the run list -
+  // belong to this project by construction. Remembering them lets the check
+  // below skip them: right after a run is created the cached run list does not
+  // contain it yet, and without this the new run would briefly read as foreign.
+  const [ownRunIds, setOwnRunIds] = useState<ReadonlySet<string>>(() => new Set())
+  const selectWorkflowRun = useCallback(
+    (runId: string | null) => {
+      if (runId) setOwnRunIds((current) => (current.has(runId) ? current : new Set(current).add(runId)))
+      patchSearch({ run: runId, node: null })
+    },
+    [patchSearch],
+  )
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([])
   const [artifacts, setArtifacts] = useState<Artifact[]>([])
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | undefined>()
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const canvasRef = useRef<WorkflowCanvasHandle>(null)
   const { t, format, language } = useI18n()
   const appMode = useAppStore((s) => s.appMode)
@@ -265,10 +287,15 @@ export function WorkflowPage() {
     goal.trim() || projectObjective(activeProject, t.workflowExt.routePlanner, format)
   const targetReadiness = useTargetReadiness(projectId)
 
+  // Switching project clears the run and node, which belong to the old one. Only
+  // a real switch: the first resolution of the project on load must not wipe a
+  // run that arrived in a link.
+  const previousProjectId = useRef(projectId)
   useEffect(() => {
-    const resetSelection = window.setTimeout(() => setSelectedWorkflowRunId(null), 0)
-    return () => window.clearTimeout(resetSelection)
-  }, [projectId])
+    const previous = previousProjectId.current
+    previousProjectId.current = projectId
+    if (previous && previous !== projectId) patchSearch({ run: null, node: null }, { replace: true })
+  }, [patchSearch, projectId])
 
   useEffect(() => {
     if (workflowSeed?.projectId === projectId && workflowSeed.goal.trim()) {
@@ -291,15 +318,29 @@ export function WorkflowPage() {
     enabled: Boolean(projectId),
   })
 
-  const { data: projectWorkflowRuns = [] } = useQuery({
+  const workflowRunsQuery = useQuery({
     queryKey: ['workflow-runs', projectId],
     queryFn: () => listProjectWorkflowRuns(projectId),
     enabled: Boolean(projectId),
   })
+  const projectWorkflowRuns = useMemo(() => workflowRunsQuery.data ?? [], [workflowRunsQuery.data])
 
   const [pendingNextSource, setPendingNextSource] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const [connectionPicker, setConnectionPicker] = useState<{source?: string; target?: string; edgeId?: string} | null>(null)
+  // A run id that arrived from outside - a link, a reload, Back - is honoured
+  // only if it belongs to this project. Another project's run, or a deleted one,
+  // falls back to the current run and says so, rather than opening a graph the
+  // project selector does not match. Runs this page selected itself are exempt
+  // (see `ownRunIds`), and nothing is judged until the run list has settled.
+  const linkedRunIsForeign = Boolean(
+    requestedWorkflowRunId &&
+      !ownRunIds.has(requestedWorkflowRunId) &&
+      workflowRunsQuery.isSuccess &&
+      !workflowRunsQuery.isFetching &&
+      !projectWorkflowRuns.some((run) => run.id === requestedWorkflowRunId),
+  )
+  const selectedWorkflowRunId = linkedRunIsForeign ? null : requestedWorkflowRunId
   const workflowRunId = selectedWorkflowRunId ?? currentWorkflowRun?.id
 
   const {
@@ -470,7 +511,8 @@ export function WorkflowPage() {
   const createWorkflow = useMutation({
     mutationFn: () => createWorkflowRun(projectId),
     onSuccess: (run) => {
-      setSelectedWorkflowRunId(run.id)
+      selectWorkflowRun(run.id)
+      queryClient.invalidateQueries({ queryKey: ['workflow-runs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-graph', run.id] })
       queryClient.invalidateQueries({ queryKey: ['workflow-preflight', run.id] })
       queryClient.invalidateQueries({ queryKey: ['workflow-run', 'current', projectId] })
@@ -526,7 +568,7 @@ export function WorkflowPage() {
     },
     onSuccess: (result) => {
       const runId = String(result.workflow_run.id)
-      setSelectedWorkflowRunId(runId)
+      selectWorkflowRun(runId)
       showToast(t.workflowExt.toasts.routeCreated, 'success')
       queryClient.invalidateQueries({ queryKey: ['workflow-runs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-run', 'current', projectId] })
@@ -614,11 +656,23 @@ export function WorkflowPage() {
         workflowStatus={workflowRun?.status}
         projectWorkflowRuns={projectWorkflowRuns}
         onSelectRun={(runId) => {
-          setSelectedWorkflowRunId(runId)
-          setSelectedNodeId(null)
+          selectWorkflowRun(runId)
           setSelectedArtifactId(undefined)
         }}
       />
+
+      {linkedRunIsForeign ? (
+        <Alert className="mb-4" variant="warning">
+          <AlertDescription>
+            {language === 'zh'
+              ? '链接中的运行不属于当前项目，或已不存在。下面显示的是本项目的当前运行。'
+              : 'The run in this link is not part of this project, or no longer exists. Showing the project’s current run instead.'}
+          </AlertDescription>
+          <Button type="button" size="sm" variant="outline" onClick={() => selectWorkflowRun(null)}>
+            {language === 'zh' ? '清除链接' : 'Clear link'}
+          </Button>
+        </Alert>
+      ) : null}
 
       {!isDemoMode && targetReadiness.isSuccess && !targetReady ? (
         <Alert className="mb-4" variant="warning">
@@ -1023,6 +1077,7 @@ export function WorkflowPage() {
                 initialEdges={defaultWorkflowEdges}
                 readOnly
                 onNodeSelected={setSelectedNodeId}
+                selectedNodeId={selectedNodeId}
               />
             ) : workflowRunId ? (
               <>
@@ -1063,6 +1118,7 @@ export function WorkflowPage() {
                   onConnectionRequested={requestConnection}
                   onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
                   onEdgeSelected={setSelectedEdgeId}
+                  selectedNodeId={selectedNodeId}
                   onNodeSelected={(nodeId) => {
                     setSelectedEdgeId(null)
                     setSelectedNodeId(nodeId)

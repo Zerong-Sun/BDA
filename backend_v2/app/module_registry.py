@@ -47,6 +47,9 @@ MODULES = (
     ModuleDescriptor("ligands", ("backend_v2.app.ligands.models",), ("backend_v2.app.ligands.api",), ("backend_v2.app.ligands.tasks",), ("research",)),
     ModuleDescriptor("platform", ("backend_v2.app.platform.models",), ("backend_v2.app.platform.api",), permission_actions=("platform:manage",), metric_prefixes=("bda_v2_database_pool", "bda_v2_worker")),
     ModuleDescriptor("wetlab", ("backend_v2.app.wetlab.models",), ("backend_v2.app.wetlab.api",), permission_actions=("experiment",)),
+    # No models: sequence work is computed from records other domains own, and
+    # a stored copy of a derived construct would be a second source of truth.
+    ModuleDescriptor("sequences", (), ("backend_v2.app.sequences.api",), permission_actions=("project:read",)),
 )
 
 

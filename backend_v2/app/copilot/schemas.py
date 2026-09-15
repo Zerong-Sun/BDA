@@ -36,6 +36,10 @@ class MessageResponse(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
     role: str
+    #: Which operator said this, when one was acting. None is the
+    #: undifferentiated Copilot, and also every message written before the
+    #: column existed - absence means unattributed, never "the default bot".
+    bot: str | None = None
     content: str
     status: str
     citations: list
@@ -133,6 +137,13 @@ class BotResponse(BaseModel):
     #: because a producer does not choose who checks it.
     reviewed_by: list[str] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)
+    #: The guided task recipes this operator owns; empty when it takes none. A
+    #: task client assigns work to a bot and sends one of these as `service_kind`.
+    task_services: list[str] = Field(default_factory=list)
+    #: Per owned recipe, the optional writes this bot can be granted.
+    task_write_tools: dict[str, list[str]] = Field(default_factory=dict)
+    #: Retired operator ids whose recorded runs and handoffs this bot now answers for.
+    absorbs: list[str] = Field(default_factory=list)
 
 
 class HandoffClaim(BaseModel):
@@ -159,6 +170,101 @@ class HandoffResponse(BaseModel):
 
 class HandoffPage(BaseModel):
     items: list[HandoffResponse]
+
+
+class DecisionOption(BaseModel):
+    """One way forward, and what it rests on.
+
+    `rationale` may be empty and is not rejected when it is: an operator that
+    offers an option it cannot justify has said something the reader should
+    see, and dropping the option would hide the choice it actually made.
+    """
+
+    key: str
+    label: str
+    rationale: str = ""
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
+class DecisionRequestResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    #: The run that asked, when a durable task did. Answering does not resume
+    #: it: a question is not a scheduler.
+    run_id: uuid.UUID | None = None
+    asked_by: str
+    question: str
+    options: list[DecisionOption] = Field(default_factory=list)
+    recommended: str | None = None
+    status: str
+    answer: str | None = None
+    answer_note: str | None = None
+    answered_by: uuid.UUID | None = None
+    answered_at: datetime | None = None
+    #: The timeline entry the answer produced, attributed
+    #: `agent_proposed_human_confirmed`.
+    decision_entry_id: uuid.UUID | None = None
+    version: int
+    created_at: datetime
+
+
+class DecisionRequestPage(BaseModel):
+    items: list[DecisionRequestResponse]
+
+
+class DecisionAnswerCreate(BaseModel):
+    #: The key of the option chosen. Free text is not an answer here: the
+    #: options are what the operator undertook to act on.
+    choice: str = Field(min_length=1, max_length=80)
+    note: str = Field(default="", max_length=2000)
+
+
+class RoomTask(BaseModel):
+    """A durable task as the room shows it: who owns it and where it stands."""
+
+    id: uuid.UUID
+    goal: str
+    bot: str | None = None
+    status: str
+    #: Set when this task was opened by another operator rather than by a
+    #: person. The room nests it under the entry that opened it instead of
+    #: listing it as work that arrived from nowhere.
+    parent_run_id: uuid.UUID | None = None
+    turn_count: int = 0
+    #: The delivery, which is not the transport status: a run can be finished as
+    #: a process and still be `needs_input` as a deliverable.
+    delivery_state: str | None = None
+    #: Present once the delivery was saved as a decision record, which is what
+    #: takes it out of the decision inbox.
+    decision_record_id: str | None = None
+    updated_at: datetime
+
+
+class RoomEvent(BaseModel):
+    """One entry in the room, carrying exactly the record it came from.
+
+    A discriminated union rather than a flattened row: a handover's claims and a
+    message's citations are different evidence with different review rules, and
+    squashing both into one "text" field is how a surface starts telling readers
+    that an unsupported claim and a cited answer are the same kind of thing.
+    """
+
+    kind: Literal["message", "handoff", "task", "decision"]
+    id: uuid.UUID
+    occurred_at: datetime
+    #: The operator this entry belongs to: the speaker, the sender of a
+    #: handover, or the owner of a task. None is an unattributed Copilot turn or
+    #: a task started without an owner.
+    bot: str | None = None
+    message: MessageResponse | None = None
+    handoff: HandoffResponse | None = None
+    task: RoomTask | None = None
+    decision: DecisionRequestResponse | None = None
+
+
+class RoomPage(BaseModel):
+    items: list[RoomEvent]
+    next_cursor: str | None = None
 
 
 class RoutePlanCreate(BaseModel):

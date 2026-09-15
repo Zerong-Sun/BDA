@@ -1,15 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowSquareOutIcon,
   ChatCircleIcon,
   FileMagnifyingGlassIcon,
   MagnifyingGlassIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
-import type {
-  ResearchWorkspaceStructure,
-} from '../../lib/api/generated/types.gen'
 import {
   getResearchWorkspace,
   workspaceText,
@@ -28,11 +24,14 @@ import {
   FrameTitle,
 } from '../../components/reui/frame'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
-import { structureSourceFromUrl } from '../pdb-viewer/types'
+import { StructureComparison } from './StructureComparison'
+import { HotspotSetPanel } from './HotspotSetPanel'
+import { useProjectTargetStructure } from '../../lib/hooks/useProjectTargetStructure'
+import { structureSourceFromTarget } from '../pdb-viewer/types'
 import { GenerateSimilarResearchPanel } from './GenerateSimilarResearchPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { LiteraturePanel } from './LiteraturePanel'
@@ -77,7 +76,7 @@ function AskCopilotButton({ entityId, entityType, label }: { entityId: string; e
   const setOpen = useAppStore((state) => state.setCopilotOpen)
   const setSelected = useAppStore((state) => state.setCopilotSelectedEntityIds)
   const ask = () => {
-    setSelected([entityId])
+    setSelected([entityId], undefined, { [entityId]: label })
     setDraft(language === 'zh'
       ? `请仅依据 Research workspace 分析所选${entityType}“${label}”（实体 ID：${entityId}），给出实体级引用、证据等级、审核状态和信息缺口。`
       : `Analyze the selected ${entityType} "${label}" (entity ID: ${entityId}) using only Research workspace evidence. Include entity-level citations, evidence grade, review status, and gaps.`)
@@ -97,57 +96,8 @@ function AskCopilotButton({ entityId, entityType, label }: { entityId: string; e
   )
 }
 
-function StructureWorkspace({ structures, projectId }: { structures: ResearchWorkspaceStructure[]; projectId: string }) {
-  const { language, t } = useI18n()
-  const w = t.research.workspace
-  if (!structures.length) {
-    return (
-      <Alert>
-        <AlertDescription>{w.structuresEmpty}</AlertDescription>
-      </Alert>
-    )
-  }
-  return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {structures.map((item) => (
-        <Frame key={item.artifact_id} dense>
-          <FramePanel className="p-0">
-          {item.download_url ? (
-            <StructureViewerLazy
-              source={structureSourceFromUrl(item.download_url, {
-                projectId,
-                artifactId: item.artifact_id,
-                pdbId: item.pdb_id,
-                proteinName: workspaceText(item.name, language),
-                chains: Array.isArray(item.lineage?.chains)
-                  ? item.lineage.chains.filter((chain): chain is string => typeof chain === 'string')
-                  : undefined,
-              })}
-              height={280}
-              showMetadata
-            />
-          ) : null}
-          <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <span className="font-mono text-xs text-accent">{item.pdb_id ? `PDB ${item.pdb_id}` : item.artifact_id}</span>
-            <Badge variant={item.status === 'available' ? 'success-light' : 'secondary'} size="xs">
-              {item.status === 'available' ? w.statusAvailable : item.status.replaceAll('_', ' ')}
-            </Badge>
-          </div>
-          <h3 className="mt-2 text-sm font-semibold text-text-primary">{workspaceText(item.name, language)}</h3>
-          <p className="mt-1 text-xs text-text-secondary">{workspaceText(item.role, language) || workspaceText(item.method, language) || '—'}</p>
-          <p className="mt-3 text-xs text-text-muted">
-            {workspaceText(item.method, language) || '—'} · {item.resolution ? `${item.resolution} Å` : w.resolutionUnavailable}
-          </p>
-          {item.reference_id ? <p className="mt-2 text-xs text-text-muted">{item.reference_id}</p> : null}
-          <div className="mt-3 flex items-center gap-2">{item.rcsb_url ? <a className="inline-flex items-center gap-1 text-xs text-accent hover:underline" href={item.rcsb_url} target="_blank" rel="noopener noreferrer"><ArrowSquareOutIcon aria-hidden="true" />RCSB</a> : null}<AskCopilotButton entityId={item.artifact_id} entityType="structure" label={workspaceText(item.name, language)} /></div>
-          </div>
-          </FramePanel>
-        </Frame>
-      ))}
-    </section>
-  )
-}
+// A stable reference, so re-renders do not read as a changed Accordion default.
+const NONE_OPEN: string[] = []
 
 function ReferenceUrl({ url, label }: { url: string; label: string }) {
   return <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline"><FileMagnifyingGlassIcon aria-hidden="true" />{label}</a>
@@ -155,6 +105,9 @@ function ReferenceUrl({ url, label }: { url: string; label: string }) {
 
 export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   const { activeProject, projectId } = useProjectContext()
+  // The project's target and its current coordinates: the hotspot panel picks
+  // residues on them, and reviews the sets recorded against them.
+  const targetStructure = useProjectTargetStructure(projectId)
   const { language, t, format } = useI18n()
   const w = t.research.workspace
   const [search, setSearch] = useState('')
@@ -242,8 +195,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-accent">{workspace.project.source_project_key || workspace.project.project_type}</p>
-            <h2 className="mt-1 text-lg font-semibold">{workspaceText(workspace.project.name, language)}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-text-secondary">{workspaceText(workspace.project.summary, language)}</p>
+
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-text-secondary">
             {packageVersion ? <Badge variant="outline">{format(w.packageVersion, { version: packageVersion })}</Badge> : null}
@@ -259,14 +211,14 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
       {view === 'evidence' ? (
         <>
           {workspace.review_document ? (
-            <Frame>
-              <FramePanel>
+            <Disclosure className="science-document" title={w.reviewTitle}>
+              <div>
               <div className="flex items-start justify-between gap-3"><SectionHeading title={w.reviewTitle} /><AskCopilotButton entityId={workspace.review_document.id} entityType="review" label={workspaceText(workspace.review_document.title, language)} /></div>
               <div className="mt-4"><ReviewMarkdown>{workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
-              </FramePanel>
-            </Frame>
+              </div>
+            </Disclosure>
           ) : <Alert><AlertDescription>{w.reviewEmpty}</AlertDescription></Alert>}
-          <ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} />
+          <Disclosure className="science-document" defaultOpen title={language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0">
@@ -274,7 +226,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
                 <FrameDescription>{w.evidenceDescription}</FrameDescription>
               </FrameHeader>
               <div className="flex flex-wrap gap-2">
-                <label className="relative min-w-64 flex-1">
+                <label className="relative min-w-0 flex-1">
                   <MagnifyingGlassIcon aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2 size-4 text-muted-foreground" />
                   <Input
                     aria-label={w.evidenceSearch}
@@ -347,7 +299,17 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
         </>
       ) : null}
 
-      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><FrameHeader className="px-0 py-0"><FrameTitle>{w.structuresTitle}</FrameTitle><FrameDescription>{w.structuresDescription}</FrameDescription></FrameHeader><StructureWorkspace structures={workspace.structures} projectId={projectId} /></FramePanel></Frame><OperationBlock title={w.structureOperations}><TargetIntelligencePanel /></OperationBlock></> : null}
+      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><FrameHeader className="px-0 py-0"><FrameTitle>{w.structuresTitle}</FrameTitle><FrameDescription>{w.structuresDescription}</FrameDescription></FrameHeader><StructureComparison key={projectId} structures={workspace.structures} projectId={projectId} /></FramePanel></Frame>
+        {/* Which residues a design targets: an operator's proposal waiting for a
+            person, and the person's own picks taken off the structure itself. */}
+        <Frame variant="ghost"><FramePanel>
+          <HotspotSetPanel
+            projectId={projectId}
+            targetId={targetStructure.data?.target.id ?? null}
+            source={targetStructure.data ? structureSourceFromTarget(targetStructure.data, projectId) : null}
+          />
+        </FramePanel></Frame>
+        <OperationBlock title={w.structureOperations}><TargetIntelligencePanel /></OperationBlock></> : null}
 
       {view === 'data' ? (
         <section className="grid min-h-0 gap-4">
@@ -393,7 +355,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
               {/* Methods entries are long-form documents, so each one collapses; the
                   first stays open so the tab still shows content on arrival. */}
               {workspace.methods.length ? (
-                <Accordion defaultValue={[workspace.methods[0].id]}>
+                <Accordion defaultValue={NONE_OPEN}>
                   {workspace.methods.map((method) => (
                     <AccordionItem key={method.id} value={method.id}>
                       <AccordionTrigger className="text-sm">{workspaceText(method.title, language)}</AccordionTrigger>

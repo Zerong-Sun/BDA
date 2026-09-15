@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
-import { CircleNotch, MagnifyingGlass, Trash } from '@phosphor-icons/react'
+import { Link } from 'react-router'
+import { ArrowUpRight, Books, Cube, Quotes, Plus, CircleNotch, MagnifyingGlass, Trash } from '@phosphor-icons/react'
 import { Alert, AlertAction, AlertDescription } from '@/components/reui/alert'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { ApiState } from '../../components/ui/ApiState'
 import { Button } from '@/components/ui/Button'
@@ -24,12 +25,14 @@ import { getBundledProteinResearchPackage, syncBundledProteinResearchPackage } f
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import type { useDeleteProjectLifecycle } from '../../lib/hooks/useDeleteProjectLifecycle'
 import { currentRole } from '../research/jsonHelpers'
-import { RepresentativeStructurePreview } from './RepresentativeStructurePreview'
+import { projectBrief } from '../projects/projectBrief'
 
 type SortKey = 'status' | 'name' | 'recent'
 
 interface ProjectLibraryProps {
   onCreate: () => void
+  onToggleIntro: () => void
+  introOpen: boolean
   onManage: (project: Project) => void
   projectDelete: ReturnType<typeof useDeleteProjectLifecycle>
 }
@@ -60,18 +63,12 @@ function ProjectLibrarySkeleton() {
   )
 }
 
-function ProjectCardStructurePreview({ project }: { project: Project }) {
-  return <RepresentativeStructurePreview project={project} />
-}
-
-export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLibraryProps) {
+export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, projectDelete }: ProjectLibraryProps) {
   const { t, language, format } = useI18n()
-  const navigate = useNavigate()
   const client = useQueryClient()
   const {
     visibleProjects,
     projectId,
-    setProjectId,
     projectsLoading,
     projectsError,
     projectsQueryError,
@@ -80,15 +77,6 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortKey, setSortKey] = useState<SortKey>('recent')
-  const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set())
-  const togglePromptExpanded = (projectId: string) => {
-    setExpandedPrompts((current) => {
-      const next = new Set(current)
-      if (next.has(projectId)) next.delete(projectId)
-      else next.add(projectId)
-      return next
-    })
-  }
   const role = currentRole()
   const librarySummary = useQuery({
     queryKey: ['project-library'],
@@ -145,23 +133,24 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
       return (
         localizedProjectText(project, 'name').toLowerCase().includes(normalized) ||
         project.id.toLowerCase().includes(normalized) ||
-        (project.summary ?? '').toLowerCase().includes(normalized)
+        localizedProjectText(project, 'summary').toLowerCase().includes(normalized) ||
+        projectBrief(project, language).objective.toLowerCase().includes(normalized)
       )
     })
 
     items = [...items].sort((a, b) => {
-      if (sortKey === 'name') return a.name.localeCompare(b.name)
+      if (sortKey === 'name') return localizedProjectText(a, 'name').localeCompare(localizedProjectText(b, 'name'), language)
       if (sortKey === 'recent') {
-        const aTime = a.created_at ?? ''
-        const bTime = b.created_at ?? ''
+        const aTime = a.updated_at ?? a.created_at ?? ''
+        const bTime = b.updated_at ?? b.created_at ?? ''
         if (aTime && bTime) return bTime.localeCompare(aTime)
         return b.id.localeCompare(a.id)
       }
-      return statusPriority(a) - statusPriority(b) || a.name.localeCompare(b.name)
+      return statusPriority(a) - statusPriority(b) || localizedProjectText(a, 'name').localeCompare(localizedProjectText(b, 'name'), language)
     })
 
     return items
-  }, [localizedProjectText, query, sortKey, statusFilter, visibleProjects])
+  }, [language, localizedProjectText, query, sortKey, statusFilter, visibleProjects])
 
   const statusOptions = useMemo(() => {
     const statuses = new Set(visibleProjects.map((project) => project.status))
@@ -169,21 +158,23 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
   }, [visibleProjects])
 
   return (
-    <section className="mb-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="project-library mb-6">
+      <div className="project-library-heading">
         <div>
-          <h2 className="text-card-title font-semibold">{t.projectLibrary.title}</h2>
+          <h2>{t.projectLibrary.title}<span className="project-library-count">{visibleProjects.length}</span></h2>
           <p className="mt-1 text-sm text-text-secondary">{t.projectLibrary.subtitle}</p>
         </div>
-        <Button type="button" onClick={onCreate}>
-          {t.common.newExperiment}
-        </Button>
+        <div className="project-library-actions"><Button type="button" variant="ghost" onClick={onToggleIntro} aria-expanded={introOpen}>{t.experimentsExt.gettingStarted}</Button>
+        <Button type="button" className="science-primary" onClick={onCreate}>
+          <Plus aria-hidden="true" />{t.common.newExperiment}
+        </Button></div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="project-library-filters">
         <label className="relative min-w-[12rem] flex-1">
           <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <Input
+            aria-label={t.projectLibrary.searchPlaceholder}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -191,7 +182,7 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
             className="w-full pl-8"
           />
         </label>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
+        <Select items={statusOptions.map((status) => ({ value: status, label: status === 'all' ? t.projectLibrary.filterAll : status }))} value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? 'all')}>
           <SelectTrigger aria-label={t.projectLibrary.filterStatus}>
             <SelectValue />
           </SelectTrigger>
@@ -203,7 +194,7 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
             ))}
           </SelectContent>
         </Select>
-        <Select value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
+        <Select items={[{ value: 'recent', label: t.projectLibrary.sortRecent }, { value: 'status', label: t.projectLibrary.sortStatus }, { value: 'name', label: t.projectLibrary.sortName }]} value={sortKey} onValueChange={(value) => setSortKey((value ?? 'recent') as SortKey)}>
           <SelectTrigger aria-label={t.projectLibrary.sortBy}>
             <SelectValue />
           </SelectTrigger>
@@ -251,104 +242,48 @@ export function ProjectLibrary({ onCreate, onManage, projectDelete }: ProjectLib
         ) : filteredProjects.length === 0 ? (
           <AppFrame className="border-dashed" panelClassName="p-6 text-sm text-text-secondary">
             <p>{t.projectLibrary.noResults}</p>
-            <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => setQuery('')}>
+            <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => { setQuery(''); setStatusFilter('all') }}>
               {t.projectLibrary.clearSearch}
             </Button>
           </AppFrame>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredProjects.map((project) => {
+          <div className="project-list">
+            {filteredProjects.map((project, index) => {
               const isActive = project.id === projectId
               const isDeleting = projectDelete.deletingProjectId === project.id
               const summary = summaryByProject.get(project.id)
-              return (
-                <AppFrame
-                  key={project.id}
-                  className={isActive ? 'ring-1 ring-accent/40' : undefined}
-                  panelClassName="p-0"
-                >
-                  <div className="space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs uppercase tracking-wide text-text-muted">
-                          {formatProjectType(project.project_type)}
-                        </p>
-                        <h3 className="mt-1 line-clamp-2 font-semibold text-text-primary" title={localizedProjectText(project, 'name')}>
-                          {localizedProjectText(project, 'name')}
-                        </h3>
-                      </div>
-                      <StatusPills status={project.status} />
-                    </div>
-                    {localizedProjectText(project, 'summary') ? (
-                      <p className="line-clamp-2 text-xs text-text-secondary">{localizedProjectText(project, 'summary')}</p>
-                    ) : null}
-                    {project.prompt ? (
-                      <div className="text-xs text-text-secondary">
-                        <p className="font-medium text-text-primary">{t.projectLibrary.promptLabel}</p>
-                        <p className={expandedPrompts.has(project.id) ? 'mt-1 whitespace-pre-wrap' : 'mt-1 line-clamp-2'}>
-                          {project.prompt}
-                        </p>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="xs"
-                          className="mt-1 h-auto p-0 text-text-muted"
-                          onClick={() => togglePromptExpanded(project.id)}
-                        >
-                          {expandedPrompts.has(project.id) ? t.projectLibrary.promptShowLess : t.projectLibrary.promptShowMore}
-                        </Button>
-                      </div>
-                    ) : null}
-                    <ProjectCardStructurePreview project={project} />
-                    {summary ? (
-                      <div className="flex flex-wrap gap-1.5 text-[10px] text-text-secondary">
-                        {summary.research_candidate_count ? <span className="rounded border border-border-soft px-2 py-1">{format(t.projectLibrary.researchTargetsCount, { count: summary.research_candidate_count })}</span> : null}
-                        <span className="rounded border border-border-soft px-2 py-1">{format(t.projectLibrary.pdbCount, { count: summary.structure_count })}</span>
-                        <span className="rounded border border-border-soft px-2 py-1">{format(t.projectLibrary.referencesCount, { count: summary.reference_count })}</span>
-                        <span className="rounded border border-border-soft px-2 py-1">{format(t.projectLibrary.claimsCount, { count: summary.finding_count })}</span>
-                      </div>
-                    ) : null}
-                    <p className="text-[11px] text-text-muted">
-                      {project.created_at ? new Date(project.created_at).toLocaleDateString() : project.id}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button"
-                        variant={isActive ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setProjectId(project.id)}
-                      >
-                        {isActive ? t.projectLibrary.current : t.projectLibrary.open}
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>
-                        {t.projectLibrary.manage}
-                      </Button>
-                      {project.source_project_key ? (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => { setProjectId(project.id); navigate(`/research?project=${encodeURIComponent(project.id)}&tab=evidence`) }}>
-                          {t.projectLibrary.researchAction}
-                        </Button>
-                      ) : null}
-                      {summary?.structure_count ? (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => { setProjectId(project.id); navigate(`/research?project=${encodeURIComponent(project.id)}&tab=structures`) }}>
-                          {t.projectLibrary.allStructures}
-                        </Button>
-                      ) : null}
-                      <Button type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={isDeleting || projectDelete.isPending}
-                        onClick={() => projectDelete.confirmAndDeleteProject(project)}
-                      >
-                        {isDeleting ? (
-                          <CircleNotch className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash className="h-4 w-4" />
-                        )}
-                        {t.projectLibrary.moveToTrash}
-                      </Button>
-                    </div>
+              const brief = projectBrief(project, language)
+              const query = `?project=${encodeURIComponent(project.id)}`
+              return <article key={project.id} className="project-row" data-active={isActive || undefined}>
+                <span className="project-index">{String(index + 1).padStart(2, '0')}</span>
+                <div className="project-row-body">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="science-eyebrow">{formatProjectType(project.project_type)}</span>
+                    <StatusPills status={project.status} />
+                    {brief.source === 'public-package' ? <span className="project-source">{language === 'zh' ? '公开演示' : 'Public demo'}</span> : null}
                   </div>
-                </AppFrame>
-              )
+                  <h3><Link to={`/research${query}&tab=goals`}>{localizedProjectText(project, 'name')}</Link></h3>
+                  <p className="project-row-objective">{brief.objective || (language === 'zh' ? '尚未定义目标，打开项目补充。' : 'Define the objective in the project brief.')}</p>
+                  <div className="project-facts">
+                    {summary ? <>
+                      <Link to={`/research${query}&tab=references`}><Books aria-hidden="true" />{format(t.projectLibrary.referencesCount, { count: summary.reference_count })}</Link>
+                      <Link to={`/research${query}&tab=structures`}><Cube aria-hidden="true" />{format(t.projectLibrary.pdbCount, { count: summary.structure_count })}</Link>
+                      <Link to={`/research${query}&tab=evidence`}><Quotes aria-hidden="true" />{format(t.projectLibrary.claimsCount, { count: summary.finding_count })}</Link>
+                    </> : <span>{language === 'zh' ? '资料统计待加载' : 'Material counts unavailable'}</span>}
+                    <span>{language === 'zh' ? '更新于 ' : 'Updated '}{new Date(project.updated_at || project.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
+                  </div>
+                </div>
+                <div className="project-row-actions">
+                  <Button type="button" render={<Link to={`/research${query}&tab=goals`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
+                  <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
+                  <Disclosure className="project-row-menu" title={language === 'zh' ? '更多操作' : 'More actions'}><div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>{t.projectLibrary.manage}</Button>
+                    <Button type="button" variant="ghost" size="sm" disabled={isDeleting || projectDelete.isPending} onClick={() => projectDelete.confirmAndDeleteProject(project)}>
+                      {isDeleting ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}{t.projectLibrary.moveToTrash}
+                    </Button>
+                  </div></Disclosure>
+                </div>
+              </article>
             })}
           </div>
         )}

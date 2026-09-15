@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -48,8 +48,9 @@ function mockProjectContext(projectId = 'proj_test') {
 
 describe('CopilotChat', () => {
   beforeEach(() => {
+    sessionStorage.clear()
     mockProjectContext()
-    useAppStore.setState({ copilotMessages: defaultCopilotMessages, copilotSessions: {}, language: 'en' })
+    useAppStore.setState({ copilotMessages: defaultCopilotMessages, copilotSessions: {}, language: 'en', appMode: 'application' })
     vi.mocked(streamCopilotMessage).mockImplementation(async (_payload, onChunk) => {
       onChunk('Route context carried forward.')
       return { conversationId: 'conversation-test', messageId: 'message-test' }
@@ -64,7 +65,7 @@ describe('CopilotChat', () => {
   it('keeps one conversation across drawer/page remounts', async () => {
     const rendered = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Plan the next protein workflow step' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -83,11 +84,85 @@ describe('CopilotChat', () => {
     })
   })
 
+  it('keeps an in-flight request locked across remounts and completes the original reply', async () => {
+    let complete!: () => void
+    vi.mocked(streamCopilotMessage).mockImplementationOnce((_payload, chunk) => new Promise((resolve) => {
+      complete = () => { chunk('The original reply'); resolve({ conversationId: 'c', messageId: 'm' }) }
+    }))
+    const first = renderWithProviders(<CopilotChat />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Review the sources?' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    first.unmount()
+    renderWithProviders(<CopilotChat />)
+    expect(await screen.findByLabelText('Ask the Copilot a question')).toBeDisabled()
+    expect(screen.getByLabelText('Send message')).toBeDisabled()
+    await act(async () => complete())
+    expect(await screen.findByText('The original reply')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ask the Copilot a question')).toBeEnabled()
+    expect(streamCopilotMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a late reply after reset without overwriting the new conversation', async () => {
+    const complete: Array<() => void> = []
+    vi.mocked(streamCopilotMessage).mockImplementation((_payload, chunk) => new Promise((resolve) => {
+      const index = complete.length
+      complete.push(() => { chunk(`Reply ${index}`); resolve({ conversationId: `c-${index}`, messageId: `m-${index}` }) })
+    }))
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    fireEvent.change(input, { target: { value: 'Old question?' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    expect(screen.getByLabelText('Reset Copilot conversation')).toBeDisabled()
+    act(() => useAppStore.getState().resetCopilotSession('proj_test'))
+    fireEvent.change(input, { target: { value: 'New question?' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await act(async () => complete[0]())
+    expect(screen.queryByText('Reply 0')).not.toBeInTheDocument()
+    expect(input).toBeDisabled()
+    await act(async () => complete[1]())
+    expect(await screen.findByText('Reply 1')).toBeInTheDocument()
+    expect(useAppStore.getState().copilotSessions.proj_test.conversationId).toBe('c-1')
+  })
+
+  it('does not recreate a signed-out session when a pending reply finishes', async () => {
+    let complete!: () => void
+    vi.mocked(streamCopilotMessage).mockImplementationOnce((_payload, chunk) => new Promise((resolve) => {
+      complete = () => { chunk('Late reply'); resolve({ conversationId: 'old', messageId: 'old' }) }
+    }))
+    const page = renderWithProviders(<CopilotChat />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Question?' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    page.unmount()
+    useAppStore.getState().resetAuthenticatedState()
+    await act(async () => complete())
+    expect(useAppStore.getState().copilotSessions).toEqual({})
+  })
+
+  it.each(['viewer', 'demo'])('does not send an initial or typed question in %s mode', async (mode) => {
+    if (mode === 'viewer') sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    else useAppStore.setState({ appMode: 'demo' })
+    useAppStore.getState().setCopilotSessionMessages('proj_test', [{ role: 'user', content: 'Review the evidence', meta: { reviewIntent: true } }, { role: 'assistant', content: 'Existing answer.' }])
+    renderWithProviders(<CopilotChat initialQuestion="Do not send this question" pageContext="route=/research" />)
+    expect(await screen.findByLabelText('Ask the Copilot a question')).toBeDisabled()
+    expect(screen.getByLabelText('Send message')).toBeDisabled()
+    expect(streamCopilotMessage).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Save to project review' })).not.toBeInTheDocument()
+  })
+
+  it('preserves unsent text across remounts without invoking the model', async () => {
+    const rendered = renderWithProviders(<CopilotChat pageContext="route=/bots; project_id=proj_test" />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Which sources support this observation?' } })
+    rendered.unmount()
+    renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
+    expect(await screen.findByLabelText('Ask the Copilot a question')).toHaveValue('Which sources support this observation?')
+    expect(streamCopilotMessage).not.toHaveBeenCalled()
+  })
+
   it('shows a readable failure reason when the Copilot request fails', async () => {
     vi.mocked(streamCopilotMessage).mockRejectedValueOnce(new Error('503 model unavailable'))
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Show Botrytis research' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -101,7 +176,7 @@ describe('CopilotChat', () => {
   it('uses registry controls and one owning conversation scroll area', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    expect(screen.getByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
+    expect(await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
       'data-slot',
       'input',
     )
@@ -111,7 +186,7 @@ describe('CopilotChat', () => {
     )
     expect(document.querySelectorAll('[data-slot="scroll-area"]')).toHaveLength(1)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Plan the next protein workflow step' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -127,7 +202,7 @@ describe('CopilotChat', () => {
   it('does not submit Enter while an IME composition is active', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    const input = screen.getByRole('textbox', { name: 'Ask the Copilot a question' })
+    const input = await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })
     fireEvent.change(input, { target: { value: '蛋白质设计' } })
     fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
 
@@ -180,7 +255,7 @@ describe('CopilotChat', () => {
     })
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Search PDB structures for this target' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -202,7 +277,7 @@ describe('CopilotChat', () => {
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Follow-up question' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -284,7 +359,7 @@ describe('CopilotChat', () => {
     fireEvent.pointerUp(planner, { button: 0 })
     fireEvent.click(planner)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Adjust the workflow threshold' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))
@@ -309,7 +384,7 @@ describe('CopilotChat', () => {
     // applied when the roster request had failed.
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
-    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), {
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
       target: { value: 'Adjust the workflow threshold' },
     })
     fireEvent.click(screen.getByLabelText('Send message'))

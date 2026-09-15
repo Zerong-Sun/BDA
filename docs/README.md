@@ -12,6 +12,8 @@
 
 ## 开始使用
 
+- [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
+- [Bot 工作区视觉层级复审](FRONTEND_VISUAL_REVIEW.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)

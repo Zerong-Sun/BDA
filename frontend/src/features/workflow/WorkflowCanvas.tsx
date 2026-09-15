@@ -11,6 +11,7 @@ import {
   type EdgeTypes,
   type EdgeChange,
   type Node,
+  type NodeChange,
   type NodeTypes,
 } from '@xyflow/react'
 import { CursorClick, SpinnerGap } from '@phosphor-icons/react'
@@ -63,6 +64,12 @@ interface WorkflowCanvasProps {
   onEdgesRemoved?: (ids: string[]) => Promise<void>
   onEdgeSelected?: (edgeId: string) => void
   onNodeSelected?: (nodeId: string | null) => void
+  /**
+   * The node the page considers selected - from `?node=` - so a linked or
+   * reloaded node is highlighted on the canvas, not only in the inspector.
+   * `undefined` leaves the canvas to manage its own selection.
+   */
+  selectedNodeId?: string | null
 }
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasProps>(
@@ -78,6 +85,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       onConnectionRequested,
       onEdgesRemoved,
       onEdgeSelected,
+      selectedNodeId,
     },
     ref,
   ) {
@@ -139,6 +147,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
         return [...retained, ...added]
       })
     }, [initialNodes, initialEdges, setNodes, setEdges])
+
+    // The page's selection, reflected onto the canvas. `nodes.length` is a
+    // dependency so a node linked before the graph loaded is highlighted once
+    // it arrives. Written with `setNodes`, which emits no node changes, so this
+    // cannot echo back through `handleNodesChange`.
+    const nodeCount = nodes.length
+    useEffect(() => {
+      if (selectedNodeId === undefined) return
+      setNodes((current) => {
+        let changed = false
+        const next = current.map((node) => {
+          const selected = node.id === selectedNodeId
+          if (Boolean(node.selected) === selected) return node
+          changed = true
+          return { ...node, selected }
+        })
+        return changed ? next : current
+      })
+    }, [nodeCount, selectedNodeId, setNodes])
+
+    // Keyboard selection. React Flow selects a focused node on Enter or Space
+    // inside its own store and never calls `onNodeClick`, so a keyboard user
+    // could highlight a node without the inspector or the URL ever hearing of
+    // it. Only selections are forwarded: deselection also happens as a side
+    // effect of clicking an edge, and forwarding that would clear the edge the
+    // person just chose. Clearing is the pane click and Escape, below.
+    const handleNodesChange = useCallback(
+      (changes: NodeChange<BdaWorkflowNode>[]) => {
+        onNodesChange(changes)
+        const picked = changes.find((change) => change.type === 'select' && change.selected)
+        if (picked && picked.type === 'select') onNodeSelected?.(picked.id)
+      },
+      [onNodeSelected, onNodesChange],
+    )
 
     const persistLayout = useCallback(
       (currentNodes: Node[], currentEdges: BdaWorkflowEdge[]) => {
@@ -421,8 +463,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           key={flowKey}
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
+          onKeyDown={(event) => {
+            // Escape clears the selection from anywhere on the canvas, except
+            // while typing in a field inside a node, where it belongs to the field.
+            if (event.key !== 'Escape') return
+            if ((event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) return
+            onNodeSelected?.(null)
+          }}
           onConnect={onConnect}
           onEdgeClick={(_, edge) => onEdgeSelected?.(edge.id)}
           onNodeClick={(_, node) => onNodeSelected?.(node.id)}

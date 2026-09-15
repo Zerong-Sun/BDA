@@ -220,11 +220,11 @@ def test_legacy_bot_and_explicit_read_only_task_have_distinct_mandates(session: 
     project, user = _project(session)
     legacy, _ = start_agent_run(
         session, project, user,
-        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="librarian"),
+        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="researcher"),
     )
     scoped, _ = start_agent_run(
         session, project, user,
-        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="librarian", authorized_writes=[]),
+        AgentRunCreate(project_id=project.id, goal="Search the literature", bot="researcher", authorized_writes=[]),
     )
     assert legacy.task_contract == {}
     assert "start_literature_search" in legacy.allowed_tools
@@ -241,7 +241,7 @@ def test_delegation_keeps_explicit_scope_even_when_operator_changes(session: Ses
         allowed_tools=["delegate_to_operator", "post_handoff"],
     )
     child = _run(
-        session, project, user, parent_run_id=parent.id, bot="librarian",
+        session, project, user, parent_run_id=parent.id, bot="researcher",
         goal="Search and save a note",
         allowed_tools=["search_research", "start_literature_search", "post_handoff"],
     )

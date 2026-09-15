@@ -63,6 +63,33 @@ _ACTION_REQUEST_TERMS = {
             "搜索",
         },
     },
+    # Patent words only as domains. The literature entry above accepts the
+    # generic 检索/搜索 as a domain, so any "please search X" authorises it; a
+    # patent search is narrower on purpose, and must be asked for as one.
+    "start_patent_search": {
+        "domains": {
+            "patent",
+            "patents",
+            "prior art",
+            "专利",
+            "现有技术",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "search",
+            "find",
+            "look up",
+            "运行",
+            "启动",
+            "排队",
+            "检索",
+            "搜索",
+            "查询",
+            "查找",
+        },
+    },
     "start_target_intelligence": {
         "domains": {
             "target",
@@ -81,6 +108,32 @@ _ACTION_REQUEST_TERMS = {
             "启动",
             "排队",
             "创建",
+        },
+    },
+    "start_druggability_assessment": {
+        "domains": {
+            "druggability",
+            "druggable",
+            "tractability",
+            "tractable",
+            "developability",
+            "成药性",
+            "可成药",
+            "成药",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "assess",
+            "evaluate",
+            "analyse",
+            "analyze",
+            "运行",
+            "启动",
+            "排队",
+            "评估",
+            "分析",
         },
     },
     "create_knowledge_draft": {
@@ -313,6 +366,54 @@ class CopilotActionService:
             execute,
         )
 
+    def start_patent_search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Queue an audited search of Europe PMC's patent index.
+
+        The same pipeline as a literature search, so a saved patent carries a
+        retrieval trace and a checksummed abstract. Two settings differ, on
+        purpose: there is no full text to fetch for a patent record, and claim
+        extraction is off - the extractor finds scientific claims in paper
+        prose, and running it over patent abstracts would file claim-shaped
+        patent language as literature claims.
+        """
+        self._require_explicit("start_patent_search")
+        payload = LiteratureSearchCreate(
+            query=query,
+            sources=["europe_pmc_patents"],
+            limit=limit,
+            fetch_full_text=False,
+            extract_claims=False,
+        )
+
+        def execute() -> dict[str, Any]:
+            row = create_literature_search(
+                self.session,
+                self.project,
+                payload,
+                self.user,
+            )
+            return _awaitable(
+                self.session,
+                {
+                    "search_run_id": str(row.id),
+                    "status": "pending",
+                    "database": "europe_pmc_patents",
+                    "query": row.query,
+                },
+                row.id,
+            )
+
+        return self._once(
+            "start_patent_search",
+            payload.model_dump(mode="json"),
+            execute,
+        )
+
     def start_target_intelligence(
         self,
         target_id: str,
@@ -355,6 +456,50 @@ class CopilotActionService:
             payload.model_dump(mode="json"),
             execute,
         )
+
+    def start_druggability_assessment(
+        self,
+        target_id: str,
+        *,
+        trial_term: str = "",
+    ) -> dict[str, Any]:
+        """Queue a druggability assessment of one exact project target.
+
+        Public evidence only - Open Targets tractability, drugs and clinical
+        candidates, safety liabilities, and ClinicalTrials.gov activity - with
+        every call audited. It reports evidence and gaps, never a probability.
+        """
+        self._require_explicit("start_druggability_assessment")
+        from ..intelligence.druggability_service import create_druggability_run
+
+        try:
+            parsed_target_id = uuid.UUID(target_id)
+        except ValueError as exc:
+            raise ValueError("invalid_target_id") from exc
+        term = trial_term.strip()
+        payload = {"target_id": str(parsed_target_id), "trial_term": term}
+
+        def execute() -> dict[str, Any]:
+            row = create_druggability_run(
+                self.session,
+                self.project,
+                parsed_target_id,
+                self.user,
+                trial_term=term,
+                source={"source": "copilot", "source_message_id": str(self.source_message_id)},
+            )
+            return _awaitable(
+                self.session,
+                {
+                    "intelligence_run_id": str(row.id),
+                    "target_id": str(row.target_id),
+                    "kind": "druggability",
+                    "status": "pending",
+                },
+                row.id,
+            )
+
+        return self._once("start_druggability_assessment", payload, execute)
 
     def create_knowledge_draft(
         self,

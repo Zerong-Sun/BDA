@@ -61,12 +61,14 @@ describe('CopilotDrawer', () => {
   })
 
   it('opens a unified task workspace and keeps model settings secondary', async () => {
+    // Model settings are shown to people who manage the project.
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'admin' }))
     renderWithProviders(<DrawerHarness />)
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
     expect(screen.getByText('Task workspace')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Agent runs' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.queryByRole('tab', { name: 'Agent runs' })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
     expect(await screen.findByText('Model configuration panel')).toBeInTheDocument()
     expect(screen.getByText('Task workspace')).toBeInTheDocument()
   })
@@ -81,8 +83,8 @@ describe('CopilotDrawer', () => {
 
     const tabs = screen.getAllByRole('tab')
 
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Tasks', 'Chat', 'Chain', 'Agent runs', 'MCP'])
-    expect(screen.getByRole('tab', { name: 'Tasks' })).toHaveAttribute('aria-selected', 'true')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Tasks & deliverables', 'Conversation', 'Bot handoffs', 'External access'])
+    expect(screen.getByRole('tab', { name: 'Tasks & deliverables' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('hands the reader from a handover to the operator it names', async () => {
@@ -122,14 +124,14 @@ describe('CopilotDrawer', () => {
     renderWithProviders(<DrawerHarness />)
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
-    fireEvent.click(screen.getByRole('tab', { name: 'Chain' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Bot handoffs' }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Go to Medic' }))
 
     await waitFor(() => {
       expect(useAppStore.getState().copilotSessions.proj_test?.bot).toBe('medic')
     })
-    expect(await screen.findByText('Conversation')).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Conversation', selected: true })).toBeInTheDocument()
   })
 
   it('opens the chain record, which nothing else in the app shows', async () => {
@@ -139,9 +141,9 @@ describe('CopilotDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Chain' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Bot handoffs' }))
 
     expect(await screen.findByText('Chain record')).toBeInTheDocument()
-    expect(screen.queryByText('Conversation')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Conversation' })).toHaveAttribute('aria-selected', 'false')
   })
 })

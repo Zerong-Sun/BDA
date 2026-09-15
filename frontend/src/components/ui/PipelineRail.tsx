@@ -16,7 +16,7 @@ import {
 } from '@/components/reui/stepper'
 
 export function PipelineRail() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
   const { projectId, activeProject, hasProject } = useProjectContext()
@@ -43,7 +43,7 @@ export function PipelineRail() {
       case 'done':
         return t.shared.status.done
       case 'current':
-        return t.pipeline.currentBadge
+        return language === 'zh' ? '项目进度' : 'Project stage'
       case 'locked':
         return t.shared.status.locked
       default:
@@ -71,8 +71,9 @@ export function PipelineRail() {
                 disabled={stage.state === 'locked'}
               >
                 <StepperTrigger
+                  aria-current={index === routeIndex ? 'page' : undefined}
                   title={stage.state === 'locked' ? t.pipeline.lockedHint : t.nav[stage.navKey]}
-                  className="min-w-0 gap-2 px-2 py-1"
+                  className="min-w-0 gap-2 rounded-none border-b-2 border-transparent px-2 py-1 aria-selected:border-foreground"
                 >
                   <StepperIndicator>
                     {stage.state === 'done' ? (
@@ -86,7 +87,7 @@ export function PipelineRail() {
                   <span className="min-w-0 text-left">
                     <StepperTitle className="truncate">{t.nav[stage.navKey]}</StepperTitle>
                     <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {stateCaption(stage.state)}
+                      {index === routeIndex ? t.pipeline.currentBadge : stateCaption(stage.state)}
                     </span>
                   </span>
                 </StepperTrigger>

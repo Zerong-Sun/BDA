@@ -407,6 +407,142 @@ _register(
 
 _register(
     ToolSpec(
+        id="start_patent_search",
+        description=(
+            "Queue an audited search of Europe PMC's patent index - Chinese (CN), US, "
+            "European (EP), PCT (WO), Japanese and Korean publications - and save each "
+            "hit with its retrieval trace. Report it as queued: it is not done until the "
+            "results are saved, and only saved patents can be cited. A search returns the "
+            "most relevant publications, not every one, and finding none does not show "
+            "that none exist."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"query": {"type": "string"}, "limit": _limit(25, 10)},
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+        capability="patent-search",
+        execution_mode="queue",
+        requires="actions",
+        awaits="operation",
+        audit=True,
+        handler=lambda ctx, args: ctx.actions.start_patent_search(
+            _arg_str(args, "query"), limit=_arg_int(args, "limit", 10)
+        ),
+    )
+)
+
+
+def _summarise_patent_landscape(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..literature import patent_service
+
+    raw_run = _arg_str(args, "search_run_id")
+    jurisdictions = args.get("jurisdictions") or []
+    return patent_service.project_landscape(
+        ctx.session,
+        _project_of(ctx),
+        search_run_id=uuid.UUID(raw_run) if raw_run else None,
+        jurisdictions=tuple(str(code) for code in jurisdictions),
+    )
+
+
+_register(
+    ToolSpec(
+        id="summarise_patent_landscape",
+        description=(
+            "Summarise the patents this project has already saved: publications by office "
+            "(CN, US, EP, WO, JP, KR), by stage (application, granted, PCT, utility model), "
+            "top applicants, IPC subclasses, priority years and an estimated-term count, "
+            "with each listed record's document and retrieval trace. It reads saved "
+            "patents only and runs no search. Legal status is not available from this "
+            "source: never call a patent in force, expired or granted-and-valid from this "
+            "result, and never present it as a freedom-to-operate opinion."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "search_run_id": {"type": "string"},
+                "jurisdictions": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["CN", "US", "EP", "WO", "JP", "KR"]},
+                    "maxItems": 6,
+                },
+            },
+            "additionalProperties": False,
+        },
+        capability="patent-search",
+        execution_mode="read",
+        requires="session",
+        handler=_summarise_patent_landscape,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="start_druggability_assessment",
+        description=(
+            "Queue a druggability assessment of one exact project Target (it must have a "
+            "UniProt accession): Open Targets tractability by modality with the evidence "
+            "behind each, drugs and clinical candidates with their furthest stage, recorded "
+            "safety liabilities, and ClinicalTrials.gov registrations by phase for a search "
+            "term (default: the target's name). Every call is audited and saved with the "
+            "report. It gives evidence and named gaps, never a druggability probability, and "
+            "no market size. Report it as queued until it finishes."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "target_id": {"type": "string"},
+                "trial_term": {"type": "string", "maxLength": 200},
+            },
+            "required": ["target_id"],
+            "additionalProperties": False,
+        },
+        capability="druggability-assessment",
+        execution_mode="queue",
+        requires="actions",
+        awaits="operation",
+        audit=True,
+        handler=lambda ctx, args: ctx.actions.start_druggability_assessment(
+            _arg_str(args, "target_id"), trial_term=str(args.get("trial_term") or "")
+        ),
+    )
+)
+
+
+def _get_druggability_assessment(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..intelligence import druggability_service
+
+    return druggability_service.read_assessment(
+        ctx.session, _project_of(ctx), uuid.UUID(_arg_str(args, "intelligence_run_id"))
+    )
+
+
+_register(
+    ToolSpec(
+        id="get_druggability_assessment",
+        description=(
+            "Read a saved druggability assessment by its intelligence run id: tractability, "
+            "clinical candidates, safety liabilities, trial activity, the gaps and limits, and "
+            "the audited retrieval behind each section. An empty safety list means none "
+            "recorded in Open Targets, never that a target is safe."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"intelligence_run_id": {"type": "string"}},
+            "required": ["intelligence_run_id"],
+            "additionalProperties": False,
+        },
+        capability="druggability-assessment",
+        execution_mode="read",
+        requires="session",
+        handler=_get_druggability_assessment,
+    )
+)
+
+_register(
+    ToolSpec(
         id="start_target_intelligence",
         description="Queue a target intelligence run.",
         parameters={
@@ -996,6 +1132,15 @@ def _structure_handler(kind: str):
                 chain_b=_arg_str(args, "chain_b"),
                 cutoff_angstrom=float(args.get("cutoff_angstrom") or 4.5),
             )
+        if kind == "interface":
+            return structures.interface(
+                ctx.session,
+                project_id,
+                artifact_id,
+                chain_a=_arg_str(args, "chain_a"),
+                chain_b=_arg_str(args, "chain_b"),
+                cutoff_angstrom=float(args.get("cutoff_angstrom") or 4.5),
+            )
         residue = args.get("residue_seq")
         return structures.site(
             ctx.session,
@@ -1057,6 +1202,86 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_structure_handler("contacts"),
+    )
+)
+
+def _compare_structures(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..structures import service as structures
+
+    return structures.superpose(
+        ctx.session,
+        _project_of(ctx),
+        uuid.UUID(_arg_str(args, "reference_artifact_id")),
+        uuid.UUID(_arg_str(args, "mobile_artifact_id")),
+        reference_chain=_arg_str(args, "reference_chain"),
+        mobile_chain=_arg_str(args, "mobile_chain"),
+    )
+
+
+_register(
+    ToolSpec(
+        id="compare_structures",
+        description=(
+            "Fit one structure onto another and report how far off it lands: "
+            "RMSD over C-alpha atoms before and after the fit, the residues "
+            "that moved most, and a TM-score when the chain is long enough for "
+            "its formula. Residues are paired by author numbering, so the two "
+            "files must use the same numbering; a file missing a loop still "
+            "compares correctly. Use it for a design against its prediction, or "
+            "a prediction against a solved structure. The TM-score is evaluated "
+            "on this superposition and is not a TM-align result."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "reference_artifact_id": {"type": "string"},
+                "mobile_artifact_id": {"type": "string"},
+                "reference_chain": {"type": "string"},
+                "mobile_chain": {"type": "string"},
+            },
+            "required": [
+                "reference_artifact_id",
+                "mobile_artifact_id",
+                "reference_chain",
+                "mobile_chain",
+            ],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_compare_structures,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="measure_structure_interface",
+        coerce_numeric_strings=True,
+        description=(
+            "How much surface two chains bury and what the contact is made of: "
+            "buried area per side and the conventional interface area, per-residue "
+            "burial, hydrogen bonds, salt bridges and the hydrophobic fraction. "
+            "Use it to judge a complex that has not been scored by a design tool. "
+            "Hydrogens are absent from most of these files, so a hydrogen bond is "
+            "a donor/acceptor distance with no angle term, and the result says so. "
+            "Buried area is not an affinity."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "chain_a": {"type": "string"},
+                "chain_b": {"type": "string"},
+                "cutoff_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 4.5},
+            },
+            "required": ["artifact_id", "chain_a", "chain_b"],
+            "additionalProperties": False,
+        },
+        capability="structure-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_structure_handler("interface"),
     )
 )
 
@@ -1500,11 +1725,11 @@ _register(
 def _review_compute_declaration(ctx: ToolContext, args: dict[str, Any]) -> Any:
     """What a plugin declares against what the cluster will give it.
 
-    Added because `steward`'s charter named a comparison no tool could make.
+    Added because `auditor`'s resource-review charter named a comparison no tool could make.
     `get_compute_status` returns a draft's free-form specification, while the
     numbers that reach LSF live on the plugin registry row and on the queue - so
     the reviewer was being asked to check four things it could not see, which is
-    the same defect the roster already fixed once in `archivist`.
+    the same defect the roster already fixed once in `archivist` (now part of `analyst`).
     """
     from ..compute import declarations
     from ..registry.models import ComputeNode, ModelPlugin
@@ -1601,3 +1826,502 @@ _register(ToolSpec(
     parameters={"type": "object", "properties": {"goal": {"type": "string", "minLength": 1, "maxLength": 5000}}, "required": ["goal"], "additionalProperties": False},
     capability="workflow-planning", execution_mode="read", requires="session", handler=_plan_workflow_route,
 ))
+
+
+def _request_decision(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import decisions
+
+    run = getattr(ctx, "agent_run", None)
+    row = decisions.record(
+        ctx.session,
+        project_id=_project_of(ctx),
+        user_id=_user_of(ctx),
+        asked_by=_bot_of(ctx),
+        question=_arg_str(args, "question"),
+        options=args.get("options"),
+        recommended=_arg_str(args, "recommended") or None,
+        run_id=getattr(run, "id", None),
+    )
+    return decisions.to_json(row)
+
+
+_DECISION_OPTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "key": {"type": "string", "maxLength": 80, "description": "Short id for this option; generated if omitted."},
+        "label": {"type": "string", "description": "The option, as the person will read it."},
+        "rationale": {
+            "type": "string",
+            "description": "Why this option, and what it costs. Recorded as absent when omitted.",
+        },
+        "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "maxItems": 20,
+            "description": "Ids this option rests on: an artifact, job, result, reference or goal.",
+        },
+    },
+    "required": ["label"],
+    "additionalProperties": False,
+}
+
+_register(
+    ToolSpec(
+        id="request_decision",
+        description=(
+            "Ask the person to settle one choice you may not settle yourself. "
+            "State the question, two to six options, and what each rests on. "
+            "Use it when the choice is irreversible or is a matter of value "
+            "rather than of method - spending cluster budget, putting material "
+            "on a bench, choosing which residues a design will target. Do not "
+            "use it for a question the record already answers, and do not use "
+            "it to ask permission for something you were already asked to do."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "options": {
+                    "type": "array",
+                    "items": _DECISION_OPTION_SCHEMA,
+                    "minItems": 2,
+                    "maxItems": 6,
+                },
+                "recommended": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "The key of the option you would pick, if you have one.",
+                },
+            },
+            "required": ["question", "options"],
+            "additionalProperties": False,
+        },
+        capability="chain-messaging",
+        execution_mode="draft",
+        requires="session",
+        # Copilot bookkeeping, like a handover: it changes no research record,
+        # and asking a person a question is not an action taken on their behalf.
+        intent="internal",
+        needs_operator=True,
+        audit=True,
+        handler=_request_decision,
+    )
+)
+
+
+# --- Structure interaction (draft) -------------------------------------------
+#
+# Reading a structure says what is there; these three are how an operator points
+# at part of it and how a person answers. The split between them is the design:
+# `render_structure_view` shows, `propose_hotspot_set` writes something pending,
+# and `request_residue_selection` hands the choice to a person. None of them can
+# confirm a set - that is a REST endpoint behind `require_command`, because a
+# confirmed set is what reaches a design job.
+
+
+def _residue_list(args: dict[str, Any], field: str) -> list[dict[str, Any]]:
+    raw = args.get(field)
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(f"{field}_must_be_a_list")
+    return [entry for entry in raw if isinstance(entry, dict)]
+
+
+def _render_structure_view(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..structures import service as structures_service
+
+    return structures_service.view(
+        ctx.session,
+        _project_of(ctx),
+        uuid.UUID(_arg_str(args, "artifact_id")),
+        residues=_residue_list(args, "residues"),
+        title=_arg_str(args, "title"),
+        label=_arg_str(args, "label"),
+    )
+
+
+def _propose_hotspot_set(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..targets import hotspots
+    from ..targets.models import Target
+
+    target_id = uuid.UUID(_arg_str(args, "target_id"))
+    target = ctx.session.get(Target, target_id)
+    if target is None or target.project_id != _project_of(ctx):
+        # Same answer for "no such target" and "another project's target": the
+        # difference would tell a caller which ids exist elsewhere.
+        raise ValueError("target_not_found")
+    structure = _arg_str(args, "structure_artifact_id")
+    row = hotspots.record(
+        ctx.session,
+        project_id=_project_of(ctx),
+        target_id=target.id,
+        user_id=_user_of(ctx),
+        label=_arg_str(args, "label"),
+        residues=_residue_list(args, "residues"),
+        # Not a parameter. A tool that could send `origin="human"` could mint a
+        # confirmed set, which is the one thing this table exists to prevent.
+        origin="agent",
+        structure_artifact_id=uuid.UUID(structure) if structure else None,
+        rationale=_arg_str(args, "rationale"),
+        evidence_refs=args.get("evidence_refs"),
+    )
+    result = hotspots.to_json(row)
+    result["next_step"] = (
+        "Pending. A person confirms it before any design job can use it; say what "
+        "you would run with it and why, rather than assuming it is settled."
+    )
+    return result
+
+
+def _request_residue_selection(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import decisions
+
+    run = getattr(ctx, "agent_run", None)
+    candidates = args.get("candidate_sets")
+    if not isinstance(candidates, list) or not (2 <= len(candidates) <= 6):
+        raise ValueError("candidate_sets_must_offer_between_two_and_six_options")
+    options = []
+    # The option key is generated by `decisions.normalise_options` when absent,
+    # so the position is not needed here.
+    for entry in candidates:
+        if not isinstance(entry, dict):
+            raise ValueError("each_candidate_set_must_be_an_object")
+        residues = [item for item in (entry.get("residues") or []) if isinstance(item, dict)]
+        listed = ", ".join(
+            f"{residue.get('chain')}{residue.get('seq')}" for residue in residues
+        )
+        options.append(
+            {
+                "key": str(entry.get("key") or "")[:80],
+                "label": f"{entry.get('label') or 'Option'}: {listed}" if listed else str(entry.get("label") or "Option"),
+                "rationale": str(entry.get("rationale") or ""),
+                "evidence_refs": [
+                    str(ref) for ref in (entry.get("evidence_refs") or []) if str(ref).strip()
+                ],
+            }
+        )
+    row = decisions.record(
+        ctx.session,
+        project_id=_project_of(ctx),
+        user_id=_user_of(ctx),
+        asked_by=_bot_of(ctx),
+        question=_arg_str(args, "question"),
+        options=options,
+        recommended=_arg_str(args, "recommended") or None,
+        run_id=getattr(run, "id", None),
+    )
+    return decisions.to_json(row)
+
+
+_RESIDUE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "chain": {"type": "string", "maxLength": 4, "description": "Author chain id, as the file writes it."},
+        "seq": {"type": "integer", "description": "Author residue number, as the viewer shows it."},
+        "name": {"type": "string", "maxLength": 8},
+    },
+    "required": ["chain", "seq"],
+    "additionalProperties": False,
+}
+
+_register(
+    ToolSpec(
+        id="render_structure_view",
+        description=(
+            "Show a structure with named residues picked out, as a MolViewSpec "
+            "scene the viewer renders. Use it to make 'the interface I mean' "
+            "unambiguous before arguing about it. It shows; it concludes "
+            "nothing - the residues you pass are the ones you already measured."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "residues": {"type": "array", "items": _RESIDUE_SCHEMA, "maxItems": 200},
+                "title": {"type": "string", "maxLength": 200},
+                "label": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One label for the highlighted set, drawn in the scene.",
+                },
+            },
+            "required": ["artifact_id"],
+            "additionalProperties": False,
+        },
+        capability="structure-interaction",
+        execution_mode="read",
+        requires="session",
+        handler=_render_structure_view,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="propose_hotspot_set",
+        description=(
+            "Propose the residues a design should target, with the reason and "
+            "the evidence behind them. The set is recorded as pending: a person "
+            "confirms it, and only a confirmed set can reach a design job. Do "
+            "not describe it as decided."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "target_id": {"type": "string"},
+                "label": {"type": "string", "minLength": 1, "maxLength": 200},
+                "residues": {
+                    "type": "array",
+                    "items": _RESIDUE_SCHEMA,
+                    "minItems": 1,
+                    "maxItems": 40,
+                },
+                "structure_artifact_id": {
+                    "type": "string",
+                    "description": "The structure the residues were read off.",
+                },
+                "rationale": {"type": "string", "maxLength": 2000},
+                "evidence_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
+            },
+            "required": ["target_id", "label", "residues"],
+            "additionalProperties": False,
+        },
+        capability="structure-interaction",
+        execution_mode="draft",
+        requires="session",
+        needs_operator=True,
+        audit=True,
+        handler=_propose_hotspot_set,
+    )
+)
+
+_register(
+    ToolSpec(
+        id="request_residue_selection",
+        description=(
+            "Ask the person to choose between residue sets on the structure. "
+            "Offer two to six, each with the residues it contains and why. Use "
+            "this when the choice is a matter of value rather than of method - "
+            "which face to design against is not a question the record answers."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "minLength": 1, "maxLength": 2000},
+                "candidate_sets": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 6,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string", "maxLength": 80},
+                            "label": {"type": "string", "maxLength": 200},
+                            "residues": {"type": "array", "items": _RESIDUE_SCHEMA, "maxItems": 40},
+                            "rationale": {"type": "string", "maxLength": 2000},
+                            "evidence_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
+                        },
+                        "required": ["label", "residues"],
+                        "additionalProperties": False,
+                    },
+                },
+                "recommended": {"type": "string", "maxLength": 80},
+            },
+            "required": ["question", "candidate_sets"],
+            "additionalProperties": False,
+        },
+        capability="structure-interaction",
+        execution_mode="draft",
+        requires="session",
+        intent="internal",
+        needs_operator=True,
+        audit=True,
+        handler=_request_residue_selection,
+    )
+)
+
+
+def _analyse_sequence(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..sequences import service as sequences_service
+
+    def _uuid(field: str) -> uuid.UUID | None:
+        raw = _arg_str(args, field)
+        return uuid.UUID(raw) if raw else None
+
+    # Ids only. `test_sequences_are_unreachable_through_any_tool` forbids a
+    # `sequence` argument on any tool, and the reason is stronger than the
+    # parameter list: a tool call's arguments are persisted into the transcript
+    # (`copilot_messages.tool_calls`, `copilot_agent_turns`), so accepting
+    # residues here would write the second plaintext copy that
+    # `wetlab.models.Protein` exists to prevent. The service keeps its
+    # `sequence=` path for callers that already hold the text.
+    return sequences_service.analyse(
+        ctx.session,
+        _project_of(ctx),
+        candidate_id=_uuid("candidate_id"),
+        target_id=_uuid("target_id"),
+        protein_id=_uuid("protein_id"),
+        window=_arg_int(args, "patch_window", 9),
+        threshold=float(args.get("patch_threshold") or 1.5),
+    )
+
+
+_register(
+    ToolSpec(
+        id="analyse_sequence",
+        coerce_numeric_strings=True,
+        description=(
+            "What a sequence will do before anyone expresses it: glycosylation "
+            "sequons, deamidation and isomerisation sites, oxidation-prone "
+            "residues, unpaired cysteines, hydrophobic patches, pI, charge at "
+            "two pH values, molecular weight and extinction coefficient. Name "
+            "exactly one of candidate_id, target_id or protein_id - the "
+            "sequence is read from the record, never pasted in. Positions are "
+            "1-based. It reports measurements, not a verdict, and it does not "
+            "return the sequence: a construct's plaintext stays in the library."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "candidate_id": {"type": "string"},
+                "target_id": {"type": "string"},
+                "protein_id": {"type": "string"},
+                "patch_window": {"type": "integer", "minimum": 3, "maximum": 40, "default": 9},
+                "patch_threshold": {"type": "number", "minimum": 0, "maximum": 4.5, "default": 1.5},
+            },
+            "additionalProperties": False,
+        },
+        capability="sequence-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_analyse_sequence,
+    )
+)
+
+
+def _analyse_conservation(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..sequences import service as sequences_service
+
+    # An artifact id, not an alignment: the argument list is written into the
+    # transcript, and an alignment pasted there would carry the query sequence
+    # with it - the same rule that keeps `analyse_sequence` to ids.
+    return sequences_service.conservation_from_artifact(
+        ctx.session,
+        _project_of(ctx),
+        artifact_id=uuid.UUID(_arg_str(args, "artifact_id")),
+        weighting=_arg_str(args, "weighting") or "henikoff",
+        limit=_arg_int(args, "limit", 25),
+    )
+
+
+_register(
+    ToolSpec(
+        id="analyse_conservation",
+        coerce_numeric_strings=True,
+        description=(
+            "Which positions of a protein its homologues have not changed, read "
+            "from an alignment already uploaded to the project (FASTA, a3m or "
+            "Stockholm; the first sequence is taken as the query). Returns the "
+            "most conserved and most variable positions with per-column entropy, "
+            "gap fraction and effective depth. Redundancy is corrected with "
+            "Henikoff weights by default, because an alignment of near-identical "
+            "orthologues otherwise reads as conserved everywhere. Positions are "
+            "1-based in the query's numbering. Conservation is evidence about "
+            "what relatives tolerate, not a prediction that a substitution fails."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "string"},
+                "weighting": {"type": "string", "enum": ["henikoff", "none"], "default": "henikoff"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 25},
+            },
+            "required": ["artifact_id"],
+            "additionalProperties": False,
+        },
+        capability="sequence-analysis",
+        execution_mode="read",
+        requires="session",
+        handler=_analyse_conservation,
+    )
+)
+
+
+def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..candidates.service import triage_candidate
+    from ..projects.models import Project
+    from .route_catalog import declared_tiers, route_by_id
+
+    route_id = _arg_str(args, "route_id")
+    route = route_by_id(route_id)
+    if route is None:
+        raise ValueError("route_not_found")
+    tiers = declared_tiers(route)
+    if not tiers:
+        # A route that sets no bar cannot be one a design "passes". Saying so
+        # is the answer; returning an empty verdict would read as a clean pass.
+        raise ValueError(f"route_declares_no_acceptance_tiers:{route_id}")
+
+    raw_ids = args.get("candidate_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        raise ValueError("candidate_ids_required")
+    if len(raw_ids) > 25:
+        # A tool result a person has to read; a hundred verdicts is a file, not
+        # an answer.
+        raise ValueError("too_many_candidates_at_once")
+
+    project = ctx.session.get(Project, _project_of(ctx))
+    if project is None:
+        raise ValueError("project_not_found")
+    verdicts = [
+        triage_candidate(ctx.session, project, uuid.UUID(str(identifier)), tiers)
+        for identifier in raw_ids
+    ]
+    return {
+        "route_id": route_id,
+        "route_label": route.label,
+        "tiers": tiers,
+        "tier_order": list(tiers),
+        "verdicts": verdicts,
+        "reading_note": (
+            "A criterion is pass, fail or missing. Missing means nothing has "
+            "measured it - not that the design failed - so a design with "
+            "missing criteria has not been rejected by this route."
+        ),
+    }
+
+
+_register(
+    ToolSpec(
+        id="triage_candidates",
+        description=(
+            "Judge named candidates against a design route's declared "
+            "acceptance tiers and say, per criterion, whether the recorded "
+            "metrics pass, fail, or were never measured. The thresholds are "
+            "the route's own; this applies them rather than inventing any. "
+            "A missing measurement is reported as missing and blocks a tier "
+            "without condemning the design. Up to 25 candidates per call."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "route_id": {
+                    "type": "string",
+                    "description": "A route from plan_workflow_route, e.g. de-novo-binder-pooled.",
+                },
+                "candidate_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 25,
+                },
+            },
+            "required": ["route_id", "candidate_ids"],
+            "additionalProperties": False,
+        },
+        capability="result-interpretation",
+        execution_mode="read",
+        requires="session",
+        handler=_triage_candidates,
+    )
+)

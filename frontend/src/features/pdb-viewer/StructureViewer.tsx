@@ -22,6 +22,7 @@ import { StructureMetadataPanel } from './StructureMetadataPanel'
 import {
   applyChainFilter,
   applyResidueHighlights,
+  subscribeResiduePicks,
   applyVisualPreset,
   clearStructures,
   enumerateChainsFromPlugin,
@@ -59,6 +60,12 @@ export interface StructureViewerProps {
   onReady?: () => void
   onError?: (message: string) => void
   allowFullscreen?: boolean
+  /**
+   * Report the residue a person clicks. The viewer could already be told which
+   * residues to highlight and could not be asked; that asymmetry is why picking
+   * a binding site was a sentence typed into a chat box.
+   */
+  onResiduePick?: (residue: HighlightedResidue) => void
 }
 
 function structureSourceKey(source?: StructureSource | null): string {
@@ -89,6 +96,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
       onReady,
       onError,
       allowFullscreen = true,
+      onResiduePick,
     },
     ref,
   ) {
@@ -409,6 +417,14 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
 
       void applyResidueHighlights(viewer.plugin, source.highlightedResidues)
     }, [source?.highlightedResidues, structureLoaded, loading])
+
+    // Picking is subscribed only while a caller wants it: the viewer is read-only
+    // on every page that does not ask, and a click there should stay a click.
+    useEffect(() => {
+      const viewer = viewerRef.current
+      if (!viewer || loading || !structureLoaded || !onResiduePick) return
+      return subscribeResiduePicks(viewer.plugin, onResiduePick)
+    }, [onResiduePick, structureLoaded, loading])
 
     useEffect(() => {
       if (!isFullscreen) return

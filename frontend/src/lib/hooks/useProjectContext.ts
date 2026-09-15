@@ -84,6 +84,9 @@ export function useProjectContext() {
   const setProjectId = (nextProjectId: string) => {
     setActiveProjectId(nextProjectId)
     const next = new URLSearchParams(searchParams)
+    if (nextProjectId !== projectId) {
+      for (const key of ['run', 'structureA', 'structureB', 'compare']) next.delete(key)
+    }
     if (nextProjectId) next.set('project', nextProjectId)
     else next.delete('project')
     setSearchParams(next)

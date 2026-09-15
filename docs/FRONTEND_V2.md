@@ -14,9 +14,11 @@
 
 交付目标为桌面网页版，同时覆盖新手引导与专业操作。页面布局、工作流画布、Copilot 和验收均以桌面浏览器为重点；手机端不在当前开发与交付范围内。浏览器验收默认只运行桌面用例。
 
-前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Experiments、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
+前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 项目上下文使用 UUID；一个项目可包含多个 target，并以 primary target 兼容旧的单目标视图。Candidates 在没有项目时禁止发起查询，避免空项目串数据。
+
+新增 Bot 工作区、公开项目简报、结构对照和验收记录见[前端交互改版](BOT_FIRST_WORKSPACE.md)。项目 Open 直接进入目标页；Bot 对话、任务及交接具有独立路由 `/bots?project=...`。项目切换清理临时草稿及选中实体，已保存会话保持按项目隔离。
 
 ## 2. API 契约
 
@@ -68,6 +70,8 @@ Campaign、Literature、Intelligence、Registry、Knowledge 使用各自领域�
 
 - TanStack Query 管理服务器状态，query key 必须包含 project/resource UUID。
 - Zustand 只保存 UI 偏好、当前项目和抽屉状态，不复制权威业务资源。
+- “正在看哪一个”属于 URL，而不是组件状态：项目（`?project=`）、Bot 页的视图与任务（`?view=`、`?run=`）、工作流页的运行与节点（`?run=`、`?node=`）都可链接、可刷新、可后退。修改查询串统一用 `lib/nav/useSearchParamPatch`：它在最新参数上合并补丁、返回稳定函数、无变化时不导航；频繁的选择（画布节点）用 `replace`，有意的切换（换运行）推入历史。来自外部的运行 ID 必须属于当前项目，否则回退到当前运行并提示。抽屉、对话框、正在编辑的边等瞬时检查器仍是本地状态。
+- 全局跳转（⌘K / Ctrl-K 与顶栏按钮）只导航、不执行：不提供提交、确认、删除等会花钱或改记录的动作，且只索引外壳已加载的项目与成员，打开时不发请求。路由表只有 `lib/nav/routes.ts` 一份。
 - 401 触发单次刷新；409 展示状态/幂等冲突；412 提示重载；422 展示字段错误；429/5xx 只对 GET/HEAD 做有限退避。
 - SSE 断线按资源状态决定是否重连，终态后关闭连接。
 

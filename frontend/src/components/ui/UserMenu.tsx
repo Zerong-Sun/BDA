@@ -69,7 +69,7 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1.5 border border-border px-2.5 text-sm hover:bg-muted">
+      <DropdownMenuTrigger aria-label={userLabel} title={userLabel} className="inline-flex h-8 items-center gap-1.5 border border-border px-2.5 text-sm hover:bg-muted">
         <UserIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <span className="hidden max-w-28 truncate sm:inline">{userLabel}</span>
         <CaretDownIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />

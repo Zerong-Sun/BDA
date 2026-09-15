@@ -1123,6 +1123,12 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
   add('GET', `/api/v2/jobs/job_browser`, {}, () => ok(jobFixture(scenario)))
+  // The job drawer now streams every job that is still moving, so a running job
+  // opens this on mount. The fixture answers with a body that carries no SSE
+  // frames: the stream ends at once, which is the degrade path the hook is
+  // built for - it drops back to polling - and the one worth pinning, since a
+  // stream a proxy closes early is the common case in production.
+  add('GET', `/api/v2/jobs/job_browser/events`, {}, () => ok({}))
   add('GET', '/api/v2/jobs/job_browser/logs', { limit: '200' }, () => ok({
     items: [
       { id: 'log_1', job_id: 'job_browser', level: 'info', message: 'Browser job started.', created_at: NOW },
@@ -1325,6 +1331,12 @@ function createStrictRoutes({ scenario, routeId }) {
     model: '', checked_at: null, checks: {}, eligible_services: [], reason: 'No model in this browser fixture.',
   }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/room`, { limit: '100' }, () => ok({ items: [], next_cursor: null }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/decision-requests`, { status: 'open' }, () => ok({ items: [] }))
+  // Hotspot sets are read on the Research structures view and by the workflow
+  // node form, which asks only for the confirmed ones.
+  add('GET', `/api/v2/projects/${PROJECT_ID}/hotspot-sets`, {}, () => ok({ items: [] }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/hotspot-sets`, { status: 'confirmed' }, () => ok({ items: [] }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/config`, {}, () => ok({
     project_id: PROJECT_ID,
     llm_provider_id: null,
@@ -1338,10 +1350,20 @@ function createStrictRoutes({ scenario, routeId }) {
   }))
   // The bot roster is a server-side declaration, not project data, so it is the
   // same in every scenario - including `empty`, where a project with no data
-  // still has the same operators available to it. Three entries rather than all
-  // twelve, one per stance: the picker groups by stance, so a stub carrying only
-  // producers would render one group and pass a test the real roster fails. A
-  // full copy would be a second roster to keep in step with `copilot/bots.py`.
+  // still has the same operators available to it. Four entries rather than all
+  // six: one per stance, because the picker groups by stance and a stub
+  // carrying only producers would pass a test the real roster fails, plus the
+  // researcher, which owns the one stubbed task service so the task composer has
+  // someone to assign work to. A full copy would be a second roster to keep in
+  // step with `copilot/bots.py`.
+  // Project access narrows command controls. The read-only scenario is a project
+  // viewer; every other scenario may act, as the session role already allows.
+  add('GET', `/api/v2/projects/${PROJECT_ID}/access`, {}, () => ok({
+    project_id: PROJECT_ID,
+    role: scenario === 'read-only' ? 'viewer' : 'owner',
+    permissions: Object.fromEntries(['read', 'write', 'compute', 'research_import', 'artifact', 'experiment', 'autopilot', 'manage']
+      .map((action) => [action, action === 'read' || scenario !== 'read-only'])),
+  }))
   add('GET', '/api/v2/copilot/bots', {}, () => ok([
     {
       id: 'conductor',
@@ -1354,24 +1376,48 @@ function createStrictRoutes({ scenario, routeId }) {
       capabilities: ['project-read', 'chain-orchestration', 'chain-messaging'],
       handoff: ['auditor'],
       reviews: [],
-      directs: ['structuralist', 'planner'],
+      directs: ['researcher', 'planner'],
       reviewed_by: [],
       triggers: ['delegate', '调度'],
+      task_services: [],
+      task_write_tools: {},
+      absorbs: [],
     },
     {
-      id: 'structuralist',
-      title: 'Structuralist',
-      title_zh: '结构与残基',
-      phase: 3,
+      id: 'planner',
+      title: 'Planner',
+      title_zh: '方案设计',
+      phase: 2,
       stance: 'produce',
-      summary: 'Read structures at residue level: chains, gaps, contacts, sites and confidence.',
-      charter: 'You report geometry as measurement. Never infer function from geometry.',
-      capabilities: ['project-read', 'structure-analysis', 'chain-messaging'],
-      handoff: ['planner'],
+      summary: 'Read the structures, choose the route and draft the compute that implements it.',
+      charter: 'You report geometry as measurement and stop at a draft. Never infer function from geometry.',
+      capabilities: ['project-read', 'structure-analysis', 'workflow-planning', 'chain-messaging'],
+      handoff: ['runner'],
       reviews: [],
       directs: [],
       reviewed_by: ['auditor'],
       triggers: ['structure', 'residue'],
+      task_services: ['planning'],
+      task_write_tools: { planning: [] },
+      absorbs: ['structuralist'],
+    },
+    {
+      id: 'researcher',
+      title: 'Researcher',
+      title_zh: '研究员',
+      phase: 1,
+      stance: 'produce',
+      summary: 'Turn an intent into a falsifiable question and gather the literature and target evidence behind it.',
+      charter: 'Never summarise a paper you have not retrieved.',
+      capabilities: ['research-read', 'literature-search', 'knowledge-authoring', 'chain-messaging'],
+      handoff: ['planner'],
+      reviews: [],
+      directs: [],
+      reviewed_by: ['auditor'],
+      triggers: ['literature', '文献'],
+      task_services: ['brief', 'literature'],
+      task_write_tools: { brief: [], literature: ['start_literature_search', 'create_knowledge_draft'] },
+      absorbs: ['briefing', 'librarian', 'scout'],
     },
     {
       id: 'auditor',
@@ -1383,10 +1429,13 @@ function createStrictRoutes({ scenario, routeId }) {
       charter: 'You judge claims; you never repair them.',
       capabilities: ['project-read', 'review-audit', 'chain-messaging'],
       handoff: ['conductor'],
-      reviews: ['structuralist'],
+      reviews: ['researcher', 'planner'],
       directs: [],
       reviewed_by: [],
       triggers: ['review', '复核'],
+      task_services: [],
+      task_write_tools: {},
+      absorbs: [],
     },
   ]))
   add('GET', '/api/v2/compute-drafts', { limit: '200', project_id: PROJECT_ID }, () => ok({

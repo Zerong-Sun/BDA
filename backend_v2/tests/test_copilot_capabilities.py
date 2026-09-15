@@ -45,3 +45,26 @@ def test_gap_repair_turn_can_resolve_only_research_targets() -> None:
 
     assert research_kinds_for_capabilities(capabilities) == {"research_target"}
     assert research_kinds_for_capabilities({"research-read"}) is None
+
+
+def test_default_skills_reach_every_roster_capability() -> None:
+    """A capability a bot holds but the default skill set omits is invisible.
+
+    `bot.capabilities` is intersected with the project's enabled skills, and a
+    project that never configured skills gets the `research` alias. Three
+    capabilities - structure-interaction, sequence-analysis and patent-search -
+    were granted to operators and missing from that alias, so on a default
+    project their tools were never offered and nothing reported it.
+    """
+    from backend_v2.app.copilot.bots import BOTS
+    from backend_v2.app.copilot.capabilities import normalize_capabilities
+
+    default = normalize_capabilities(None)
+    unreachable = {
+        (bot.id, capability)
+        for bot in BOTS
+        for capability in bot.capabilities
+        if capability not in default
+    }
+
+    assert not unreachable, f"roster capabilities a default project cannot reach: {sorted(unreachable)}"

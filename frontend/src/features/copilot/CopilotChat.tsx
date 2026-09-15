@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { useCopilotReadOnly } from './commandAccess'
+import { ApiState } from '../../components/ui/ApiState'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowCounterClockwiseIcon,
@@ -7,7 +9,7 @@ import {
   SpinnerGapIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
-import { Link } from 'react-router'
+import { CopilotCitations } from './CopilotCitations'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { useCopilotChat } from './useCopilotChat'
 import { byStance, reviewersOf, successorsOf } from './bots/registry'
@@ -25,7 +27,6 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
-import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import {
   Select,
@@ -42,9 +43,9 @@ import {
 //: value of its own.
 const AUTO_BOT = '__auto__'
 
-export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void }) {
+export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, externalRoster = false }: { pageContext?: string; initialQuestion?: string; onTaskRequested?: (goal: string) => void; externalRoster?: boolean }) {
   const { t, format, language } = useI18n()
-  const { projectId, activeProject, setProjectId } = useProjectContext()
+  const { projectId, activeProject, setProjectId, projectsLoading, projectsError, projectsQueryError, refetchProjects } = useProjectContext()
   const queryClient = useQueryClient()
   const {
     messages,
@@ -59,13 +60,16 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
     bot,
     setBot,
   } = useCopilotChat(projectId, pageContext, language)
-  const [input, setInput] = useState('')
+  const readOnly = useCopilotReadOnly()
+  const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
+  const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
+  const setInput = useCallback((value: string) => setSessionInput(projectId, value), [projectId, setSessionInput])
   const initialSent = useRef(false)
   useEffect(() => {
-    if (!initialQuestion || initialSent.current) return
+    if (!initialQuestion || initialSent.current || readOnly || projectsLoading || projectsError) return
     initialSent.current = true
     void send(initialQuestion)
-  }, [initialQuestion, send])
+  }, [initialQuestion, send, projectsLoading, projectsError, readOnly])
   const copilotDraft = useAppStore((state) => state.copilotDraft)
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -104,22 +108,23 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
 
   const handleSend = async () => {
     const trimmed = input.trim()
-    if (!trimmed) return
+    if (!trimmed || loading || readOnly) return
     setInput('')
     if (onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
     await send(trimmed)
   }
 
   useEffect(() => {
-    if (!copilotDraft) return
+    if (!copilotDraft || projectsLoading || projectsError) return
     const timer = window.setTimeout(() => {
       setInput(copilotDraft)
       setCopilotDraft('')
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [copilotDraft, setCopilotDraft])
+  }, [copilotDraft, setCopilotDraft, setInput, projectsLoading, projectsError])
 
   const sendStarter = async (starter: string) => {
+    if (loading || readOnly) return
     setInput('')
     await send(starter)
   }
@@ -140,8 +145,11 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
     return target ? [target] : []
   })
 
+  if (projectsLoading || projectsError) return <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>{null}</ApiState>
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {readOnly ? <p role="status" className="p-4 text-sm text-text-secondary">{language === 'zh' ? '只读模式：可以查看对话，不能发送新请求。' : 'Read-only mode: you can inspect conversations but cannot send requests.'}</p> : null}
       <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
         {/* Which project this conversation is bound to. Kept, and kept first:
             the drawer stays open while the reader navigates, and every answer
@@ -152,7 +160,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
-        {bots.length > 0 ? (
+        {bots.length > 0 && !externalRoster ? (
           <Select
             value={bot ?? AUTO_BOT}
             onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
@@ -163,7 +171,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
             <SelectContent>
               <SelectItem value={AUTO_BOT}>{t.copilot.chat.botAuto}</SelectItem>
               {/* Grouped by stance, not by phase. A director is not the step
-                  before briefing and a reviewer is not the step after
+                  before research and a reviewer is not the step after
                   archiving; a single ordered list says they are, which is the
                   reading this roster exists to correct.
 
@@ -192,7 +200,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
           size="icon-sm"
           aria-label={t.copilot.chat.resetAriaLabel}
           title={t.copilot.chat.resetTitle}
-          disabled={loading}
+          disabled={readOnly || loading}
           onClick={resetMessages}
         >
           <ArrowCounterClockwiseIcon aria-hidden="true" />
@@ -203,7 +211,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
           the screen, which made selecting one a gesture rather than a decision.
           Only when a bot is chosen: the undifferentiated case has no charter to
           show and the row would be permanent chrome. */}
-      {activeBotSpec ? (
+      {activeBotSpec && !externalRoster ? (
         <div className="shrink-0 border-b bg-muted/40 px-4 py-2">
           <p className="text-xs font-medium text-foreground">{activeBotSpec.summary}</p>
           <p className="mt-1 text-xs text-muted-foreground">{activeBotSpec.charter}</p>
@@ -293,7 +301,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
                       type="button"
                       variant="outline"
                       className="h-auto justify-start whitespace-normal text-left"
-                      disabled={loading}
+                      disabled={readOnly || loading}
                       onClick={() => void sendStarter(starter)}
                     >
                       {starter}
@@ -311,7 +319,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
                     .find((item) => item.role === 'user')
                 : undefined
             const showSaveButton =
-              message.role === 'assistant' &&
+              !readOnly && message.role === 'assistant' &&
               Boolean(message.content) &&
               !loading &&
               projectId &&
@@ -319,7 +327,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
                 userMessage?.meta?.reviewIntent ||
                 onResearchPage)
             const showResearchImport =
-              message.role === 'assistant' &&
+              !readOnly && message.role === 'assistant' &&
               !loading &&
               Boolean(activeProject?.organization_id) &&
               looksLikeCopilotResearchResult(message.content)
@@ -343,77 +351,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
                       ''
                     ))}
                   {message.role === 'assistant' && message.meta?.citations?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-2">
-                      {message.meta.citations.map((citation, citationIndex) => {
-                        const url = typeof citation.url === 'string' ? citation.url : ''
-                        const label = String(
-                          citation.label ||
-                            citation.entity_id ||
-                            citation.workspace_type ||
-                            format(t.copilot.chat.citationSourceFallback, {
-                              index: citationIndex + 1,
-                            }),
-                        )
-                        const evidence = [citation.evidence_grade, citation.review_status]
-                          .filter(Boolean)
-                          .join(' · ')
-                        const internal = citation.source_type === 'research_workspace'
-                        const origin = internal
-                          ? t.copilot.chat.citationProject
-                          : t.copilot.chat.citationExternal
-                        const accessibleLabel = [label, origin, evidence]
-                          .filter(Boolean)
-                          .join(' ')
-                        const kind = String(citation.workspace_type || '')
-                        const tab =
-                          kind === 'reference'
-                            ? 'references'
-                            : kind === 'structure'
-                              ? 'structures'
-                              : ['dataset', 'research_target'].includes(kind)
-                                ? 'data'
-                                : kind === 'method'
-                                  ? 'methods'
-                                  : 'evidence'
-                        const badge = (
-                          <Badge
-                            variant={internal ? 'info-light' : 'outline'}
-                            size="xs"
-                            className="h-auto whitespace-normal py-1"
-                          >
-                            <span>{label}</span>
-                            <span className="text-[9px] uppercase">
-                              {origin}
-                              {evidence ? ` · ${String(evidence)}` : ''}
-                            </span>
-                          </Badge>
-                        )
-                        const key = `${String(citation.entity_id)}-${citationIndex}`
-                        return url ? (
-                          <a
-                            key={key}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={accessibleLabel}
-                            className="hover:underline"
-                          >
-                            {badge}
-                          </a>
-                        ) : internal && projectId ? (
-                          <Link
-                            key={key}
-                            to={`/research?tab=${tab}&project=${encodeURIComponent(projectId)}`}
-                            aria-label={accessibleLabel}
-                            className="hover:underline"
-                          >
-                            {badge}
-                          </Link>
-                        ) : (
-                          <span key={key}>{badge}</span>
-                        )
-                      })}
-                    </div>
+                    <CopilotCitations citations={message.meta.citations} projectId={projectId} />
                   ) : null}
                   {showSaveButton ? (
                     <SaveToReviewButton
@@ -457,7 +395,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
           placeholder={t.copilot.chat.inputPlaceholder}
           className="flex-1"
           value={input}
-          disabled={loading}
+          disabled={readOnly || loading}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
@@ -470,7 +408,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested }: {
           variant="outline"
           size="icon"
           aria-label={t.copilot.chat.sendAriaLabel}
-          disabled={loading || !input.trim()}
+          disabled={readOnly || loading || !input.trim()}
           onClick={() => void handleSend()}
         >
           {loading ? (

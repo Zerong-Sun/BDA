@@ -32,6 +32,7 @@ from .base import (
 # Importing the modules is what registers them.
 from . import (  # noqa: E402, F401  isort:skip
     alphafold2_superfold,
+    alphafold3,
     manifest_metadata,
     proteinhunter,
     proteinmpnn,
