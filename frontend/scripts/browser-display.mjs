@@ -54,7 +54,7 @@ try {
     assert.equal(await selector.innerText(), fullName)
     assert.equal(await selector.getAttribute('title'), fullName)
     assert.equal(await page.getByRole('combobox', { name: language === 'zh' ? '按状态筛选' : 'Filter by status', exact: true }).innerText(), language === 'zh' ? '全部状态' : 'All statuses')
-    assert.equal(await page.getByRole('combobox', { name: language === 'zh' ? '排序方式' : 'Sort projects', exact: true }).innerText(), language === 'zh' ? '最近创建' : 'Recently created')
+    assert.equal(await page.getByRole('combobox', { name: language === 'zh' ? '排序方式' : 'Sort projects', exact: true }).innerText(), language === 'zh' ? '最近更新' : 'Recently updated')
     await page.getByText(language === 'zh' ? '自动调度已暂停，仍可浏览已有项目和结果。' : 'Automatic scheduling is paused. You can continue browsing existing projects and results.').waitFor()
     assert.ok(!(await page.locator('body').innerText()).includes('8100'))
     await page.screenshot({ path: `${output}/${name}-page.png` })

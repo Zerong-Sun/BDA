@@ -155,6 +155,7 @@ export function Topbar() {
       {/* On small screens the pipeline rail collapses, so the topbar keeps a
           full route list for reachability (and for accessibility tests). */}
       <nav
+        data-tour-id="main-navigation"
         aria-label={t.shared.mainNavigation}
         className="science-navigation flex gap-1 overflow-x-auto border-b border-border-soft bg-bg-app px-3 py-2"
       >
