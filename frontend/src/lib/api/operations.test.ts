@@ -26,7 +26,62 @@ function operation(status: string, extra: Record<string, unknown> = {}) {
 }
 
 describe('awaitOperation', () => {
-  afterEach(() => vi.clearAllMocks())
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('polls even while the stream stays open without events', async () => {
+    vi.useFakeTimers()
+    api.stream.mockImplementation(() => new Promise(() => {}))
+    api.get.mockResolvedValue(operation('succeeded'))
+    const pending = awaitOperation('op-1', { intervalMs: 10, timeoutMs: 100 })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect((await pending).status).toBe('succeeded')
+    expect(api.stream.mock.calls[0][1].signal.aborted).toBe(true)
+  })
+
+  it('returns a terminal event without waiting for the stream to close', async () => {
+    vi.useFakeTimers()
+    api.stream.mockImplementation((_path, { onEvent }) => {
+      onEvent({ event: 'operation', data: JSON.stringify(operation('succeeded').data) })
+      return new Promise(() => {})
+    })
+    const result = vi.fn()
+    void awaitOperation('op-1').then(result)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(result).toHaveBeenCalledWith(operation('succeeded').data)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not start requests for an already aborted caller', async () => {
+    const controller = new AbortController()
+    controller.abort(new Error('navigation cancelled'))
+    api.stream.mockRejectedValue(new Error('stream unavailable'))
+    await expect(awaitOperation('op-1', { signal: controller.signal })).rejects.toThrow('navigation cancelled')
+    expect(api.stream).not.toHaveBeenCalled()
+    expect(api.get).not.toHaveBeenCalled()
+  })
+
+  it.each(['deadline', 'abort'])('bounds a hung poll by %s and aborts both requests', async (cause) => {
+    vi.useFakeTimers()
+    api.stream.mockImplementation(() => new Promise(() => {}))
+    api.get.mockImplementation(() => new Promise(() => {}))
+    const controller = new AbortController()
+    const outcome = awaitOperation('op-1', {
+      intervalMs: 10, timeoutMs: 100, signal: controller.signal,
+    }).catch((error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(10)
+    if (cause === 'abort') controller.abort(new Error('navigation cancelled'))
+    else await vi.advanceTimersByTimeAsync(90)
+    const error = await outcome
+    if (cause === 'abort') expect(String(error)).toContain('navigation cancelled')
+    else expect(error).toBeInstanceOf(OperationTimeout)
+    expect(api.get.mock.calls[0][0].signal.aborted).toBe(true)
+    expect(api.stream.mock.calls[0][1].signal.aborted).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+  })
 
   it('settles from the stream without asking for the operation at all', async () => {
     api.stream.mockImplementation(async (_path: string, { onEvent }: { onEvent: (e: unknown) => void }) => {

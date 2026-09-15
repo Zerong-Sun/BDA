@@ -63,8 +63,9 @@ def finish_operation(
     result: dict | None = None,
     error: Exception | None = None,
 ) -> None:
-    operation = session.get(Operation, operation_id)
-    if operation is None:
+    session.flush()
+    operation = session.get(Operation, operation_id, with_for_update=True, populate_existing=True)
+    if operation is None or operation.status in {"succeeded", "failed", "cancelled"}:
         return
     operation.finished_at = datetime.now(UTC)
     if error is None:

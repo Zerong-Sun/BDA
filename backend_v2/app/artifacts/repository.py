@@ -15,7 +15,7 @@ class ArtifactRepository:
     def upload(self, upload_id: uuid.UUID, *, for_update: bool = False) -> ArtifactUpload | None:
         query = select(ArtifactUpload).where(ArtifactUpload.id == upload_id)
         if for_update:
-            query = query.with_for_update()
+            query = query.with_for_update().execution_options(populate_existing=True)
         return self.session.scalar(query)
 
     def artifact(self, artifact_id: uuid.UUID) -> Artifact | None:

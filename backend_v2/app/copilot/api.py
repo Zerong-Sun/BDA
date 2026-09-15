@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from ..core.config import get_settings
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
@@ -409,6 +409,7 @@ def stream_messages(
     user: User = Depends(streaming_user),
 ) -> EventSourceResponse:
     with SessionFactory() as session:
+        set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
         conversation = CopilotRepository(session).conversation(conversation_id)
         if conversation is None:
             raise DomainError("conversation_not_found", "Conversation was not found", status_code=404)
@@ -418,6 +419,8 @@ def stream_messages(
         seen: set[uuid.UUID] = set()
         if after_message_id is not None:
             with SessionFactory() as session:
+                set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
+                require_project(session, conversation.project_id, user)
                 rows = CopilotRepository(session).all_messages(conversation_id)
                 for row in rows:
                     seen.add(row.id)
@@ -425,6 +428,8 @@ def stream_messages(
                         break
         while True:
             with SessionFactory() as session:
+                set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
+                require_project(session, conversation.project_id, user)
                 rows = CopilotRepository(session).all_messages(conversation_id)
                 payloads = [MessageResponse.model_validate(x).model_dump(mode="json") for x in rows if x.id not in seen]
                 seen.update(x.id for x in rows)

@@ -137,3 +137,29 @@ def test_finishing_an_operation_that_is_gone_is_not_an_error(session: Session) -
     """A redelivered signal for a purged operation must not fail the task."""
     finish_operation(session, uuid.uuid4(), result={})
     assert list(session.scalars(select(OutboxEvent).where(OutboxEvent.topic == "operation.settled"))) == []
+
+
+@pytest.mark.parametrize("terminal", ["succeeded", "failed", "cancelled"])
+@pytest.mark.parametrize("late_error", [None, RuntimeError("late delivery")])
+def test_late_completion_cannot_overwrite_a_terminal_operation(session, terminal, late_error) -> None:
+    operation = _queue(session)
+    operation.status = terminal
+    operation.result = {"original": True}
+    session.commit()
+    version = operation.version
+    finish_operation(session, operation.id, result={"late": True}, error=late_error)
+    session.commit()
+    assert operation.status == terminal
+    assert operation.version == version
+    assert operation.result == {"original": True}
+    assert _settled(session, operation) == []
+
+
+def test_duplicate_completion_emits_only_one_settled_event(session) -> None:
+    operation = _queue(session)
+    finish_operation(session, operation.id, result={"original": True})
+    session.commit()
+    finish_operation(session, operation.id, result={"duplicate": True})
+    session.commit()
+    assert operation.result == {"original": True}
+    assert len(_settled(session, operation)) == 1

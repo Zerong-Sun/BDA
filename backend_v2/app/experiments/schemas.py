@@ -13,7 +13,7 @@ class ExperimentResultCreate(BaseModel):
     batch_key: str | None = Field(default=None, max_length=255)
     experiment_type: str = Field(min_length=1, max_length=120)
     pass_status: str = Field(default="unknown", pattern="^(pass|fail|unknown)$")
-    value: float | None = None
+    value: float | None = Field(default=None, allow_inf_nan=False)
     unit: str | None = Field(default=None, max_length=40)
     conclusion: str | None = Field(default=None, max_length=5000)
     failure_reason: str | None = Field(default=None, max_length=5000)

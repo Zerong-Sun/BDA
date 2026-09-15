@@ -18,13 +18,16 @@ from .repository import IdentityRepository
 
 
 def hash_password(password: str) -> str:
+    encoded = password.encode()
+    if len(encoded) > 72:
+        raise DomainError("weak_password", "Password must be at most 72 UTF-8 bytes")
     if (
         len(password) < 8
         or not any(char.isalpha() for char in password)
         or not any(char.isdigit() for char in password)
     ):
         raise DomainError("weak_password", "Password must contain letters and digits and be at least 8 characters")
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
+    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=12)).decode()
 
 
 # A real bcrypt hash at the same cost as hash_password, compared against when no user
@@ -36,8 +39,12 @@ _DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"bda-v2-timing-equalizer", bcrypt.gensalt(
 def authenticate(session: Session, username: str, password: str) -> User:
     user = IdentityRepository(session).user_by_username(username)
     stored = user.password_hash.encode() if user and user.password_hash else _DUMMY_PASSWORD_HASH
-    matched = bcrypt.checkpw(password.encode(), stored)
-    if user is None or not user.password_hash or not matched:
+    encoded = password.encode()
+    # bcrypt 5 rejects inputs beyond 72 bytes. Still perform a cost-equivalent
+    # comparison for rejected input, without accepting a truncated password.
+    oversized = len(encoded) > 72
+    matched = bcrypt.checkpw(b"invalid-oversized-password" if oversized else encoded, stored)
+    if oversized or user is None or not user.password_hash or not matched:
         raise DomainError("invalid_credentials", "Invalid username or password", status_code=401)
     return user
 
@@ -244,11 +251,13 @@ def complete_oidc(session: Session, provider: str, state: str, code: str) -> Use
     subject = str(claims["sub"])
     repo = IdentityRepository(session)
     user = repo.user_by_oidc(issuer, subject)
+    if user is not None and not user.enabled:
+        raise DomainError("invalid_credentials", "OIDC user is unavailable", status_code=401)
     if user is None:
         base_username = str(claims.get("preferred_username") or claims.get("email") or f"oidc-{subject}")[:100]
         username = base_username
         suffix = 1
-        while repo.user_by_username(username):
+        while repo.user_by_username_any_status(username):
             suffix += 1
             username = f"{base_username[:110]}-{suffix}"
         user = User(

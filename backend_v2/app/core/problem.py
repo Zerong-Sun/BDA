@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import math
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -56,6 +57,8 @@ def _json_safe(value: Any) -> Any:
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
         return [_json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
     if isinstance(value, str | int | float | bool) or value is None:
         return value
     return str(value)
@@ -68,7 +71,7 @@ def problem_response(
     code: str,
     detail: str,
     errors: Sequence[Any] | None = None,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     body = Problem(
         type=f"https://bda.invalid/problems/{code}",
@@ -100,7 +103,9 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
 
 
 async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    return problem_response(request, status=exc.status_code, code="http_error", detail=str(exc.detail))
+    return problem_response(
+        request, status=exc.status_code, code="http_error", detail=str(exc.detail), headers=exc.headers
+    )
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

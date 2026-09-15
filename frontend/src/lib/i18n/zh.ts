@@ -130,7 +130,7 @@ export const zh: TranslationDict = {
   pipeline: {
     eyebrow: '设计闭环',
     stepOf: '第 {index} / {total} 步',
-    currentBadge: '当前位置',
+    currentBadge: '项目当前阶段',
     lockedHint: '完成当前步骤后即可解锁此阶段。',
     nextStep: '下一步',
     continueTo: '前往{stage}',

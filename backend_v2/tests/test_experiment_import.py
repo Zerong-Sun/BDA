@@ -8,6 +8,7 @@ measured and tested_candidate_count reported zero.
 from __future__ import annotations
 
 from collections.abc import Generator
+from contextlib import contextmanager
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
@@ -27,7 +28,7 @@ from backend_v2.app.identity.models import Organization, OrganizationMember, Use
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.tests._sqlite import enforce_foreign_keys
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 
 @pytest.fixture
@@ -95,6 +96,30 @@ def test_whitelist_covers_the_columns_the_model_actually_has() -> None:
     assert EXPERIMENT_IMPORT_COLUMNS <= columns
     for required in ("batch_key", "failure_reason", "candidate_ref"):
         assert required in EXPERIMENT_IMPORT_COLUMNS
+
+
+@pytest.mark.parametrize("column,value", [
+    ("pass_status", "maybe"), ("pass_status", 0), ("value", "NaN"), ("value", "Infinity"),
+    ("value", "-Infinity"), ("unit", "x" * 41), ("experiment_type", "x" * 121),
+    ("candidate_ref", 42), ("conclusion", "x" * 5001),
+])
+def test_import_uses_api_field_constraints(column, value) -> None:
+    values, error = _coerce_experiment_row({"experiment_type": "measurement", column: value}, 3)
+    assert values is None
+    assert error is not None and error["row"] == 3 and error["column"] == column
+
+
+def test_extra_csv_cells_are_row_errors() -> None:
+    rows = _experiment_rows("results.csv", "text/csv", b"experiment_type,value\nmeasurement,1,extra\n")
+    values, error = _coerce_experiment_row(rows[0], 1)
+    assert values is None
+    assert error is not None and "columns" in error["message"]
+
+
+@pytest.mark.parametrize("header", [b"value,value", b"experiment_type,"])
+def test_invalid_csv_headers_are_rejected(header) -> None:
+    with pytest.raises(ValueError, match="experiment_headers"):
+        _experiment_rows("results.csv", "text/csv", header + b"\n1,2\n")
 
 
 def test_csv_and_json_rows_parse() -> None:
@@ -167,3 +192,38 @@ def test_an_empty_workbook_reports_rather_than_crashing() -> None:
     workbook.save(buffer)
     with pytest.raises(ValueError, match="experiment_workbook_empty"):
         _experiment_rows("empty.xlsx", "application/vnd.ms-excel", buffer.getvalue())
+
+
+def test_dry_run_and_import_agree_on_malformed_rows(env, monkeypatch) -> None:
+    session, user, project, _ = env
+    artifact = Artifact(
+        project_id=project.id, created_by=user.id, artifact_type="score_table", filename="data.csv",
+        content_type="text/csv", object_key="staging/test", size_bytes=1, checksum_sha256="a" * 64,
+        status="available",
+    )
+    session.add(artifact)
+    session.commit()
+    factory = sessionmaker(session.get_bind(), expire_on_commit=False)
+
+    @contextmanager
+    def scope():
+        with factory.begin() as scoped:
+            yield scoped
+
+    class Store:
+        def read_bytes(self, *args, **kwargs):
+            return (b"experiment_type,value,pass_status,ignored\n"
+                    b"measurement,1,pass,note\nmeasurement,NaN,pass,note\n"
+                    b"measurement,2,maybe,note\nmeasurement,3,pass,note,overflow\n")
+
+    monkeypatch.setattr(experiments_tasks, "SessionFactory", factory)
+    monkeypatch.setattr(experiments_tasks, "session_scope", scope)
+    monkeypatch.setattr(experiments_tasks, "ObjectStorage", Store)
+    preview = experiments_tasks.experiment_results_import(str(artifact.id), dry_run=True)
+    assert preview["would_import"] == 1 and preview["skipped"] == 3
+    assert preview["ignored_columns"] == ["ignored"]
+    committed = experiments_tasks.experiment_results_import(str(artifact.id))
+    assert committed["imported"] == 1 and committed["skipped"] == 3
+    assert committed["errors"] == preview["errors"]
+    assert experiments_tasks.experiment_results_import(str(artifact.id))["imported"] == 0
+    assert session.query(ExperimentResult).count() == 1

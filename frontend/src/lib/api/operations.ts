@@ -51,9 +51,10 @@ export async function listOperations(query: OperationQuery = {}) {
   return page.data
 }
 
-export async function getOperation(operationId: string): Promise<Operation> {
+export async function getOperation(operationId: string, signal?: AbortSignal): Promise<Operation> {
   const { data } = await getOperationApiV2OperationsOperationIdGet<true>({
     path: { operation_id: operationId },
+    signal,
     throwOnError: true,
   })
   return data
@@ -81,76 +82,77 @@ export interface AwaitOperationOptions {
   signal?: AbortSignal
 }
 
-/**
- * Watch the operation stream until it settles, or give up so the caller can poll.
- *
- * Resolves with the settled operation, or with null when the stream could not carry
- * the answer - it failed to open, dropped, or the environment has no streaming body.
- * Null is not an error: polling is the floor underneath this, and treating a dropped
- * connection as a failed operation would be a lie about the work.
- */
-async function watchOperation(
-  operationId: string,
-  timeoutMs: number,
-  signal: AbortSignal | undefined,
-): Promise<Operation | null> {
-  const controller = new AbortController()
-  const abort = () => controller.abort()
-  signal?.addEventListener('abort', abort)
-  const giveUp = window.setTimeout(abort, timeoutMs)
-  let settled: Operation | null = null
-  try {
-    await streamServerEvents(`/operations/${operationId}/events`, {
-      signal: controller.signal,
-      onEvent: (event) => {
-        if (event.event !== 'operation') return
-        const operation = JSON.parse(event.data) as Operation
-        if (isSettled(operation)) settled = operation
-      },
-    })
-  } catch {
-    return null
-  } finally {
-    window.clearTimeout(giveUp)
-    signal?.removeEventListener('abort', abort)
-  }
-  if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
-  return settled
-}
-
-/**
- * Wait for an operation to settle.
- *
- * This replaced three hand-rolled loops that each had their own cadence, their own
- * timeout and their own wording for the same event - 60x500ms, 30x1000ms and
- * 180x1000ms, in two files. Callers differ only in how long they are willing to wait
- * and whether a failure is an exception or a result to render.
- *
- * The stream is tried first and polling is the floor beneath it, rather than the
- * stream replacing polling. A server-sent stream has more ways to not arrive than a
- * request does - a proxy that buffers, an idle timeout, a corporate middlebox - and
- * every one of them would otherwise read to the user as "my import is stuck" when the
- * import is fine.
- */
+/** Wait with streaming updates, independent polling, and a shared deadline. */
 export async function awaitOperation(
   operationId: string,
   { timeoutMs = 180_000, intervalMs = 1_000, settleOnFailure = false, signal }: AwaitOperationOptions = {},
 ): Promise<Operation> {
-  const deadline = Date.now() + timeoutMs
-  const streamed = await watchOperation(operationId, timeoutMs, signal)
-  if (streamed) return finish(streamed, settleOnFailure)
-
-  for (;;) {
-    if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
-    const operation = await getOperation(operationId)
-    if (isSettled(operation)) return finish(operation, settleOnFailure)
-    if (Date.now() + intervalMs > deadline) {
-      throw new OperationTimeout(
-        `${operation.kind} has not finished yet. It is still running — reopen Activity to check on it.`,
-      )
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, intervalMs))
+  if (signal?.aborted) throw signal.reason ?? new Error('Aborted')
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) {
+    throw new RangeError('Operation timeout and polling interval must be positive finite numbers')
   }
+  return new Promise<Operation>((resolve, reject) => {
+    const controller = new AbortController()
+    let done = false
+    let polling = false
+    let latest: Operation | undefined
+    let pollTimer: number | undefined
+    const deadlineTimer = window.setTimeout(() => fail(new OperationTimeout(
+      `${latest?.kind ?? 'Operation'} has not finished yet. It is still running — reopen Activity to check on it.`,
+    )), timeoutMs)
+
+    function cleanup() {
+      done = true
+      window.clearTimeout(deadlineTimer)
+      window.clearTimeout(pollTimer)
+      signal?.removeEventListener('abort', abort)
+      controller.abort()
+    }
+    function fail(error: unknown) {
+      if (done) return
+      cleanup()
+      reject(error)
+    }
+    function abort() {
+      fail(signal?.reason ?? new Error('Aborted'))
+    }
+    function observe(operation: Operation) {
+      if (done) return
+      latest = operation
+      if (!isSettled(operation)) return
+      try {
+        const result = finish(operation, settleOnFailure)
+        cleanup()
+        resolve(result)
+      } catch (error) {
+        fail(error)
+      }
+    }
+    async function poll() {
+      if (done || polling) return
+      window.clearTimeout(pollTimer)
+      polling = true
+      try {
+        observe(await getOperation(operationId, controller.signal))
+      } catch (error) {
+        fail(error)
+      } finally {
+        polling = false
+        if (!done) pollTimer = window.setTimeout(() => void poll(), intervalMs)
+      }
+    }
+
+    signal?.addEventListener('abort', abort, { once: true })
+    pollTimer = window.setTimeout(() => void poll(), intervalMs)
+    // A buffering proxy must not hold polling hostage. Stream termination only
+    // accelerates the next poll; terminal events settle immediately while open.
+    void streamServerEvents(`/operations/${operationId}/events`, {
+      signal: controller.signal,
+      onEvent: (event) => {
+        if (event.event === 'operation') observe(JSON.parse(event.data) as Operation)
+      },
+    }).then(() => poll(), () => poll())
+  })
 }
 
 function finish(operation: Operation, settleOnFailure: boolean): Operation {

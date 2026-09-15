@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Generator
+from datetime import UTC, datetime
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
+from backend_v2.app.compute import api as compute_api
 from backend_v2.app.compute import service as compute_service
-from backend_v2.app.compute.models import Job, OutboxEvent
+from backend_v2.app.compute.models import Job, JobEvent, OutboxEvent
 from backend_v2.app.compute.schemas import SubmissionCreate
 from backend_v2.app.compute.service import (
     create_submission,
@@ -22,7 +25,35 @@ from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
 from backend_v2.tests._sqlite import enforce_foreign_keys
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
+
+
+@pytest.mark.parametrize("count", [100, 205])
+def test_terminal_job_stream_drains_pages_with_equal_timestamps(compute_session, monkeypatch, count) -> None:
+    session, user, project, workflow = compute_session
+    _, jobs = create_submission(
+        session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend="demo"),
+        idempotency_key="stream-pages", user=user,
+    )
+    job = jobs[0]
+    job.status = "failed"
+    job.version += 1
+    timestamp = datetime.now(UTC)
+    events = [JobEvent(job_id=job.id, event_type="test", payload={"index": i}, created_at=timestamp) for i in range(count)]
+    session.add_all(events)
+    session.commit()
+    expected = {str(event.id) for event in events}
+    monkeypatch.setattr(compute_api, "SessionFactory", sessionmaker(session.get_bind(), expire_on_commit=False))
+    response = compute_api.job_events(job.id, user)
+
+    async def collect():
+        return [event async for event in response.body_iterator]
+
+    received = asyncio.run(collect())
+    test_events = [event for event in received if event["event"] == "test"]
+    assert len(test_events) == count
+    assert {event["id"] for event in test_events} == expected
+    assert received[-1]["event"] == "done"
 
 
 @pytest.fixture

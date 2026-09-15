@@ -61,7 +61,9 @@ publisher 用 `FOR UPDATE SKIP LOCKED` 发布任务。队列为 `dispatch`、`po
 1. `POST /artifact-uploads` 创建 session。
 2. 客户端计算 SHA-256，并按 required headers 直传预签名 URL。
 3. `POST /artifact-uploads/{id}/complete` 提交 checksum。
-4. 服务校验大小、checksum 与 PDB/mmCIF/FASTA/JSON/CSV/XLSX/ZIP/PDF 格式，提升到最终对象并创建 artifact。
+4. 服务读取一份受大小上限约束的内容快照，校验大小、checksum 与 PDB/mmCIF/FASTA/JSON/CSV/XLSX/ZIP/PDF 格式，将同一份字节写入最终对象并创建 artifact。
+
+完成接口不立即删除 staging，确保数据库回滚后可在上传有效期内重试；最终对象不受仍有效的上传 URL 后续覆盖影响。已完成或失败的 staging 由现有 reconciliation 在对象最后修改超过一小时后清理，活动且未过期的上传继续受保护。默认内容上限为 100 MiB，配置为 `BDA_V2_MAX_UPLOAD_BYTES`；服务端内存与临时对象存储应按并发上传量预留。
 
 Artifact 状态为 uploading、available、failed、deleted。reconciliation 检查超时 staging、孤儿对象、缺失对象、共享 checksum 引用和软删除项目。
 
