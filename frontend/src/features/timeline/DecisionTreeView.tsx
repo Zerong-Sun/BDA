@@ -3,6 +3,8 @@ import { createContext, useContext, useMemo, useState } from 'react'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { Button } from '../../components/ui/Button'
+import { useAppStore } from '../../lib/store/appStore'
+import { buildDecisionCopilotPrompt } from './decisionCopilotPrompt'
 import type { StatusTone } from '../../components/ui/statusTone'
 import { useI18n } from '../../lib/i18n'
 import type { ResearchGoal } from '../../lib/api/researchGoals'
@@ -114,6 +116,8 @@ function DecidedByMark({ entry }: { entry: TimelineEntry }) {
 }
 
 function DecisionCard({ node }: { node: DecisionNode }) {
+  const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
+  const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
   const actions = useContext(TreeActionsContext)
   const { t, format, language } = useI18n()
   const tl = t.timeline
@@ -173,6 +177,32 @@ function DecisionCard({ node }: { node: DecisionNode }) {
             {open ? tl.hideDetail : tl.showDetail}
           </Button>
         ) : null}
+        {/* Same reasoning as the attach control below: the tree is the default view, so
+            "have the Bot explain this" has to be reachable from here. Not gated on
+            `actions` - asking for an explanation writes nothing, and the read-only
+            renderings (research panel, browser harness) are exactly where a reader is
+            most likely to ask. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-0 py-0 text-[11px]"
+          onClick={() => {
+            setCopilotDraft(
+              buildDecisionCopilotPrompt(entry, {
+                intro: format(tl.copilotPromptIntro, { decision: entry.decision_ref || entry.title }),
+                evidenceRule: tl.copilotPromptEvidence,
+                output: tl.copilotPromptOutput,
+                evidenceLabel: tl.evidence,
+                outcomeHeading: tl.outcomeHeading,
+                outcomeLabel: tl.outcome[entry.outcome as keyof typeof tl.outcome] ?? entry.outcome,
+              }),
+            )
+            setCopilotOpen(true)
+          }}
+        >
+          {tl.askCopilot}
+        </Button>
         {actions ? (
           <>
             <Button
