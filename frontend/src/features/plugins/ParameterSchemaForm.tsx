@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { parseParameterSchema, type ParameterFieldDefinition } from '../../lib/forms/parameterSchema'
+import { isParameterFieldActive, parseParameterSchema, type ParameterFieldDefinition } from '../../lib/forms/parameterSchema'
 import {
   parameterOrigin,
   type ParameterOrigin,
@@ -60,8 +60,9 @@ export function ParameterSchemaForm({
     )
   }
 
-  const basicFields = fields.filter((field) => !field.advanced)
-  const advancedFields = fields.filter((field) => field.advanced)
+  const activeFields = fields.filter((field) => isParameterFieldActive(field, fields, values))
+  const basicFields = activeFields.filter((field) => !field.advanced)
+  const advancedFields = activeFields.filter((field) => field.advanced)
 
   const renderField = (field: ParameterFieldDefinition) => {
     const value = values[field.key] ?? field.default ?? ''
@@ -112,6 +113,15 @@ function ParameterField({
   const { t } = useI18n()
   const label = field.label ?? field.key
   const id = `param-${field.key}`
+  const copy = t.plugins.parameterSchema
+  const details = [
+    field.default !== undefined
+      ? `${copy.defaultValue}: ${field.default === '' ? copy.emptyValue : typeof field.default === 'string' ? field.default : JSON.stringify(field.default)}`
+      : undefined,
+    field.min !== undefined ? `${copy.minimum}: ${field.min}` : undefined,
+    field.max !== undefined ? `${copy.maximum}: ${field.max}` : undefined,
+  ].filter(Boolean).join(' · ')
+  const descriptionId = field.help || details ? `${id}-description` : undefined
 
   return (
     <div className="block">
@@ -126,8 +136,13 @@ function ParameterField({
         </span>
         <OriginMark origin={origin} />
       </Label>
-      <FieldControl id={id} field={field} value={value} onChange={onChange} disabled={disabled} />
-      {field.help ? <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{field.help}</span> : null}
+      <FieldControl id={id} descriptionId={descriptionId} field={field} value={value} onChange={onChange} disabled={disabled} />
+      {descriptionId ? (
+        <div id={descriptionId} className="mt-1 space-y-1 text-xs leading-relaxed text-text-secondary">
+          {field.help ? <p className="whitespace-pre-line">{field.help}</p> : null}
+          {details ? <p className="break-words">{details}</p> : null}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -155,12 +170,14 @@ function OriginMark({ origin }: { origin: ParameterOrigin }) {
 
 function FieldControl({
   id,
+  descriptionId,
   field,
   value,
   onChange,
   disabled,
 }: {
   id: string
+  descriptionId?: string
   field: ParameterFieldDefinition
   value: unknown
   onChange: (value: unknown) => void
@@ -170,6 +187,7 @@ function FieldControl({
     return (
       <Checkbox
         id={id}
+        aria-describedby={descriptionId}
         className="mt-2"
         checked={Boolean(value)}
         disabled={disabled}
@@ -181,7 +199,7 @@ function FieldControl({
   if (field.type === 'enum') {
     return (
       <Select value={String(value ?? '')} onValueChange={(nextValue) => onChange(nextValue ?? '')} disabled={disabled}>
-        <SelectTrigger id={id} className="mt-1 w-full" disabled={disabled}>
+        <SelectTrigger id={id} aria-describedby={descriptionId} className="mt-1 w-full" disabled={disabled}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -199,6 +217,7 @@ function FieldControl({
     return (
       <Textarea
         id={id}
+        aria-describedby={descriptionId}
         className="mt-1 min-h-24 font-mono text-xs"
         value={typeof value === 'string' ? value : JSON.stringify(value ?? {}, null, 2)}
         disabled={disabled}
@@ -213,6 +232,7 @@ function FieldControl({
     return (
       <Textarea
         id={id}
+        aria-describedby={descriptionId}
         className="mt-1 min-h-16 font-mono text-xs"
         value={String(value ?? '')}
         disabled={disabled}
@@ -225,6 +245,7 @@ function FieldControl({
     return (
       <Input
         id={id}
+        aria-describedby={descriptionId}
         type="number"
         className="mt-1"
         min={field.min}
@@ -240,6 +261,7 @@ function FieldControl({
   return (
     <Input
       id={id}
+      aria-describedby={descriptionId}
       type="text"
       className="mt-1"
       value={String(value ?? '')}

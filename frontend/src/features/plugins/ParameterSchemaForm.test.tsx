@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { ParameterSchemaForm } from './ParameterSchemaForm'
 import { defaultsFromFields, fieldsFromParameterSchema } from '../../lib/forms/parameterSchema'
@@ -97,5 +98,50 @@ describe('numeric parameter editing', () => {
     const onChange = renderForm()
     fireEvent.change(screen.getByLabelText(/^Num designs/), { target: { value: '1.5' } })
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ num_designs: 1.5 }))
+  })
+})
+
+const ROSETTA_SCHEMA = {
+  type: 'object',
+  properties: {
+    application: { type: 'string', title: 'Rosetta application', enum: ['score_jd2', 'relax', 'InterfaceAnalyzer'], default: 'score_jd2' },
+    nstruct: { type: 'integer', title: 'Independent structures', minimum: 1, maximum: 1000, default: 1, description: 'Number of independent output structures.' },
+    interface: { type: 'string', title: 'Interface chains', default: '', description: 'Chain groups separated by an underscore, such as AB_C.', 'x-bda-modes': ['InterfaceAnalyzer'] },
+    constrain: { type: 'boolean', title: 'Constrain coordinates', default: false, 'x-bda-modes': ['relax'] },
+  },
+}
+
+describe('application-specific plugin parameters', () => {
+  it('shows schema documentation, defaults and bounds as accessible field descriptions', () => {
+    render(<ParameterSchemaForm schema={ROSETTA_SCHEMA} values={{ nstruct: 5 }} onChange={vi.fn()} />)
+    const count = screen.getByLabelText(/^Independent structures/)
+    expect(count).toHaveValue(5)
+    expect(count).toHaveAccessibleDescription('Number of independent output structures. Default: 1 · Minimum: 1 · Maximum: 1000')
+    expect(screen.getByLabelText('Rosetta application')).toHaveAccessibleDescription('Default: score_jd2')
+    expect(screen.queryByLabelText('Interface chains')).toBeNull()
+    expect(screen.queryByLabelText('Constrain coordinates')).toBeNull()
+  })
+
+  it('switches visible parameters through the mode selector while preserving the draft', async () => {
+    function Editor() {
+      const [values, setValues] = useState<Record<string, unknown>>({ interface: 'AB_C' })
+      return <ParameterSchemaForm schema={ROSETTA_SCHEMA} values={values} onChange={setValues} />
+    }
+    render(<Editor />)
+    const selectMode = async (name: string) => {
+      fireEvent.click(screen.getByLabelText(/^Rosetta application/))
+      const option = await screen.findByRole('option', { name })
+      fireEvent.pointerDown(option, { button: 0 })
+      fireEvent.pointerUp(option, { button: 0 })
+      fireEvent.click(option)
+    }
+    await selectMode('InterfaceAnalyzer')
+    expect(screen.getByLabelText(/^Interface chains/)).toHaveValue('AB_C')
+    expect(screen.getByLabelText(/^Interface chains/)).toHaveAccessibleDescription('Chain groups separated by an underscore, such as AB_C. Default: (empty)')
+    await selectMode('relax')
+    expect(screen.queryByLabelText(/^Interface chains/)).toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'Constrain coordinates' })).toHaveAccessibleDescription('Default: false')
+    await selectMode('InterfaceAnalyzer')
+    expect(screen.getByLabelText(/^Interface chains/)).toHaveValue('AB_C')
   })
 })

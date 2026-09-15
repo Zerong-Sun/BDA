@@ -1,0 +1,54 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "method_affinity_score",
+  "slug": "method-affinity-score",
+  "summary": "亲和力评分：当前仅有 demo-1.0 注册记录，输入/输出/参数 schema 均为空。",
+  "sources": [
+    {
+      "id": "bda",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "scope": "本次实时 BDA 声明；不是上游功能或运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream",
+      "path": "backend_v2/app/registry/models.py",
+      "scope": "本地方法注册模型；没有可归属的上游 GitHub 算法",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "demo",
+      "title": "demo 声明",
+      "purpose": "记录方法类型，尚不构成可执行科学算法",
+      "required_inputs": [],
+      "parameters": {},
+      "bda_status": "unverified",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "缺少原始指标来源、单位/对数转换、评分公式和权重；不能当作 Kd 或 ΔΔG。"
+      ],
+      "source_refs": [
+        "bda"
+      ]
+    }
+  ],
+  "parameters": [],
+  "outputs": [],
+  "usage_steps": [
+    "选择本页明确版本和功能模式，按模式绑定输入，核对链号、序列和原子完整性。",
+    "输入参数后预览最终命令/生成配置；未映射字段不能视为生效，未接入模式需先补适配。",
+    "运行条件验证后检查全部原始输出、失败样本和缺失值；保存所用版本、配置、输入输出哈希。"
+  ],
+  "pitfalls": [
+    "没有产生测量值，不能把缺失结果填成 0 或参与候选排名。"
+  ],
+  "gaps": [
+    "缺少原始指标来源、单位/对数转换、评分公式和权重；不能当作 Kd 或 ΔΔG。",
+    "本轮在 backend_v2/app 检索仅找到方法注册 CRUD，没有按此 key 分派的算法执行实现；enabled=true 不等于算法存在。",
+    "使用前需补算法实现/版本、非空 schema、输入缺失处理、可复现单元样例与真实输出验证；不应给未知参数编造默认值。"
+  ]
+}

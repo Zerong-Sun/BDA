@@ -31,6 +31,8 @@ def render_plugin(profile: dict[str, Any], catalog: dict[str, Any]) -> str:
         NOTICE,
         f"# {key}: QM cluster runbook",
         "",
+        "功能模式、全部参数、生成指标与使用限制见 [插件参数手册](REFERENCE.md)。",
+        "",
         f"> Inventory date: {catalog['inventory_date']} · Cluster: {catalog['cluster']}",
         "",
         "This page records how this plugin is written for the SUSTech QM cluster and what has actually run. "
@@ -171,7 +173,9 @@ def render_index(catalog: dict[str, Any]) -> str:
         NOTICE,
         "# QM plugin cluster runbooks",
         "",
-        "Every registered model-plugin key has one runbook below. These pages complement the executable ModelPlugin declaration: "
+        "全量当前插件（含 authoring 草稿及方法 demo）的模式和参数说明见 [完整文档目录](../../docs/plugins/INDEX.md)；[解释与使用规范](../../docs/plugins/STANDARD.md)。",
+        "",
+        "This historical cluster inventory contains the base model-plugin runbooks below; the full current registry is covered by the documentation index linked above. These pages complement the executable ModelPlugin declaration: "
         "the declaration renders the job, while the runbook explains the SUSTech LSF rules and preserves dated observations.",
         "",
         f"Inventory date: `{catalog['inventory_date']}` · cluster: `{catalog['cluster']}` · "

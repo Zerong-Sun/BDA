@@ -1,0 +1,5 @@
+{
+  "application": "rosetta_scripts",
+  "parser_protocol": "score.xml",
+  "parser_script_vars": "weights=ref2015"
+}

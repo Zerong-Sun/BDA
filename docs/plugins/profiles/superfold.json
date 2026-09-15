@@ -1,0 +1,709 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "superfold",
+  "slug": "superfold",
+  "summary": "QM AF2 monomer_ptm包装，支持PDB initial_guess或FASTA预测、伪MSA、多模型/种子；不是AF2-Multimer通用入口。",
+  "sources": [
+    {
+      "id": "registry",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "commit": null,
+      "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/superfold/README.md",
+      "commit": null,
+      "scope": "2026-08-30历史QM运行手册；与当前声明不同处需单列",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter-env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "commit": null,
+      "scope": "parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-0",
+      "url": "https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/run_superfold.py",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/superfold/run_superfold.py",
+      "commit": "021d2d1d0501cf67c83039d18225ed3eab0bcefa",
+      "scope": "run_superfold.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-1",
+      "url": "https://github.com/rdkibler/superfold/blob/021d2d1d0501cf67c83039d18225ed3eab0bcefa/README.md",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/superfold/README.md",
+      "commit": "021d2d1d0501cf67c83039d18225ed3eab0bcefa",
+      "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "sequence_prediction",
+      "title": "序列单体PTM权重预测",
+      "purpose": "FASTA输入及伪MSA特征",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "initial_guess": false,
+        "mock_msa_depth": 1,
+        "models": "all",
+        "nstruct": 1
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "initial_guess",
+      "title": "PDB坐标条件预测",
+      "purpose": "用输入PDB坐标初始化网络",
+      "required_inputs": [
+        "与设计序列/链边界一致的PDB"
+      ],
+      "parameters": {
+        "initial_guess": true,
+        "mock_msa_depth": 1,
+        "models": "all"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "ensemble",
+      "title": "多权重/种子重复",
+      "purpose": "比较跨权重和seed的稳健性",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "models": "all",
+        "nstruct": 3,
+        "seed_start": 0,
+        "enable_dropout": false
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "af_multimer_weights",
+      "title": "AF-Multimer权重",
+      "purpose": "官方superfold所查commit明确不执行此路径",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "--type/--version历史参数已失效，当前上游固定monomer_ptm/monomer代码；多链输入不等于Multimer权重"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "enable_dropout",
+      "type": "boolean",
+      "description": "推理时启用dropout增加采样变化；需记录并与不启用情况区分。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --enable_dropout；BDA enable_dropout → --enable_dropout；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "enable_dropout"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "initial_guess",
+      "type": "boolean",
+      "description": "用输入结构坐标初始化AF2包装的预测；属于有坐标条件预测，不能当完全独立的从序列验证。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --initial_guess；BDA initial_guess → --initial_guess；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "initial_guess"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "max_recycles",
+      "type": "integer",
+      "description": "superfold最多回收循环数。",
+      "unit": "计数",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --max_recycles；BDA max_recycles → --max_recycles；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "max_recycles"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 3,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 3
+    },
+    {
+      "key": "mock_msa_depth",
+      "type": "integer",
+      "description": "superfold复制/伪MSA深度；默认1表示单序列特征，不是检索得到的真实同源MSA深度。",
+      "unit": "计数",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --mock_msa_depth；BDA mock_msa_depth → --mock_msa_depth；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "mock_msa_depth"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 1,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "models",
+      "type": "string",
+      "description": "选择模型权重；superfold接受all或1–5列表，另一个predict.py包装声明整数1–5，不能混用。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --models；BDA models → --models；BDA把整个字符串作为单一argv，不能用字符串1 2代替上游nargs多值；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "models"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": "all",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": "all"
+    },
+    {
+      "key": "nstruct",
+      "type": "integer",
+      "description": "superfold每套权重生成的结构数，总输出还要乘选中权重与输入数量。",
+      "unit": "计数",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --nstruct；BDA nstruct → --nstruct；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "nstruct"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 1,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "num_ensemble",
+      "type": "integer",
+      "description": "AF2网络内部ensemble设置；不等于独立随机种子或实验重复数。",
+      "unit": "计数",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --num_ensemble；BDA num_ensemble → --num_ensemble；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_ensemble"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 1,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "output_pae",
+      "type": "boolean",
+      "description": "保存superfold PAE矩阵/统计；单体没有跨链接口PAE。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --output_pae；BDA output_pae → --output_pae；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "output_pae"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "output_summary",
+      "type": "boolean",
+      "description": "生成reports.txt汇总供后续读取；仍须保留逐模型JSON。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --output_summary；BDA output_summary → --output_summary；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "output_summary"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "overwrite",
+      "type": "boolean",
+      "description": "允许替换已有superfold结果，防止误混新旧版本。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --overwrite；BDA overwrite → --overwrite；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "overwrite"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "recycle_tol",
+      "type": "number",
+      "description": "按相邻回收输出的Cα RMSD设置提前停止阈值；0禁用提前停止。",
+      "unit": "Å",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --recycle_tol；BDA recycle_tol → --recycle_tol；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "recycle_tol"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 0.0,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "reference_pdb",
+      "type": "string",
+      "description": "superfold用于对齐/RMSD的参考结构，不自动等同initial_guess的输入坐标。",
+      "unit": "路径",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --reference_pdb；BDA reference_pdb → --reference_pdb；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "reference_pdb"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": ""
+    },
+    {
+      "key": "seed_start",
+      "type": "integer",
+      "description": "superfold生成种子序列的起始整数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "sequence_prediction",
+        "initial_guess",
+        "ensemble",
+        "af_multimer_weights"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --seed_start；BDA seed_start → --seed_start；superfold@qm-20260803: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "seed_start"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "superfold",
+            "version": "qm-20260803",
+            "enabled": true,
+            "default": 0,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 0
+    }
+  ],
+  "outputs": [
+    {
+      "name": "predicted_structure / complex",
+      "meaning": "预测原子坐标及链/残基映射",
+      "unit": "Å",
+      "interpretation": "坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pLDDT",
+      "meaning": "局部结构置信度",
+      "unit": "0–100",
+      "interpretation": "逐文件核对尺度，不是概率或亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pTM",
+      "meaning": "monomer_ptm权重的整体拓扑置信度",
+      "unit": "0–1",
+      "interpretation": "固定源码强制monomer_ptm；ipTM仅在不可达的multimer分支，不是此入口可生成输出，多链initial_guess也不改变该限制。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "PAE",
+      "meaning": "对齐后的相对位置预测误差矩阵",
+      "unit": "Å",
+      "interpretation": "保留链映射、非对角块和聚合定义；不能单独证明结合位点。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "mean_pae_interaction",
+      "meaning": "跨链PAE汇总",
+      "unit": "Å",
+      "interpretation": "单体NaN为N/A，不应存零或算通过；跨链亦须说明initial_guess。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "reports.txt / *_prediction_results.json",
+      "meaning": "逐模型/种子置信度与回收信息",
+      "unit": "混合字段",
+      "interpretation": "不要只保留最优模型；已装包装字段以实际输出核验。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "先按模型与版本确认输入实体、链ID、序列SHA、MSA/模板来源；区分预测、设计与亲和力。",
+    "从当前BDA快照核对enabled、command和ports；文档中的configuration_only/not_exposed不是可执行能力承诺。",
+    "填写对应模式配置，检查参数最终进入命令或结构化输入；数据库/权重需已存在且记录版本。",
+    "预览任务脚本和实际输入文件，核对CPU/GPU、布尔false、输出目录及样本总数；本次审计不提交任务。",
+    "完成后逐输入/seed/model核对文件、原始指标和失败样本；声明、成功退出、解析成功及科学结论分开记录。"
+  ],
+  "pitfalls": [
+    "pLDDT/ipTM/RMSD不等于ΔG/ΔΔG/Kd或生物活性。",
+    "template、initial_guess、空MSA和真实MSA是不同证据条件；不能混成独立交叉验证。",
+    "未消费的UI参数不可写入报告为已执行条件；本地catalog默认、BDA默认、命令回退和安装默认要区分。",
+    "QM安装源码commit未与此次上游021d2d1逐文件比较；当前声明参数仅有配置级证据。",
+    "upstream固定monomer_ptm，不能把多链initial_guess叫成AF2-Multimer独立验证。",
+    "initial_guess默认true，FASTA输入必须关闭，或使用上游支持的明确坐标路径方式，但当前BDA字段仅boolean。",
+    "reference_pdb是string而非artifact_ref，跨机器路径是否staging需显式处理。",
+    "mock_msa_depth是伪特征规模，不能当真实MSA或Neff；单体mean_pae_interaction为NaN应N/A。"
+  ],
+  "gaps": [
+    "QM安装源码commit未与此次上游021d2d1逐文件比较；当前声明参数仅有配置级证据。",
+    "upstream固定monomer_ptm，不能把多链initial_guess叫成AF2-Multimer独立验证。",
+    "initial_guess默认true，FASTA输入必须关闭，或使用上游支持的明确坐标路径方式，但当前BDA字段仅boolean。",
+    "reference_pdb是string而非artifact_ref，跨机器路径是否staging需显式处理。",
+    "mock_msa_depth是伪特征规模，不能当真实MSA或Neff；单体mean_pae_interaction为NaN应N/A。"
+  ]
+}

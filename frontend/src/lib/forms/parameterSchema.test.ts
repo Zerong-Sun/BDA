@@ -167,4 +167,26 @@ describe('prepareParameterValues', () => {
   it('omits a cleared optional numeric parameter instead of submitting zero or null', () => {
     expect(prepareParameterValues([{ key: 'seed', type: 'integer' }], { seed: '' })).toEqual({})
   })
+
+  const modes = parseParameterSchema({ properties: {
+    application: { type: 'string', enum: ['score_jd2', 'relax', 'InterfaceAnalyzer'], default: 'score_jd2' },
+    nstruct: { type: 'integer', minimum: 1, default: 1 },
+    interface: { type: 'string', default: '', 'x-bda-modes': ['InterfaceAnalyzer'] },
+    iterations: { type: 'integer', minimum: 1, 'x-bda-modes': ['relax'] },
+  }, required: ['iterations'] })
+
+  it('submits only parameters applicable to the selected application', () => {
+    const draft = { application: 'InterfaceAnalyzer', nstruct: 2, interface: 'AB_C', iterations: '' }
+    expect(prepareParameterValues(modes, draft)).toEqual({ application: 'InterfaceAnalyzer', nstruct: 2, interface: 'AB_C' })
+    expect(draft.iterations).toBe('')
+    expect(() => prepareParameterValues(modes, { ...draft, application: 'relax' })).toThrow('Iterations: a value is required')
+  })
+
+  it('uses the default application when a draft has not selected one', () => {
+    expect(prepareParameterValues(modes, { nstruct: 1, interface: 'AB_C', iterations: 5 })).toEqual({ nstruct: 1 })
+  })
+
+  it('preserves optional empty strings for active fields', () => {
+    expect(prepareParameterValues(modes, { application: 'InterfaceAnalyzer', interface: '' })).toEqual({ application: 'InterfaceAnalyzer', interface: '' })
+  })
 })

@@ -1,0 +1,348 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "US-align",
+  "slug": "us-align",
+  "summary": "比较结构的几何相似性；当前批量入口将目录中查询结构逐一比到一个参考。",
+  "sources": [
+    {
+      "id": "bda",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "scope": "本次实时 BDA 声明；不是上游功能或运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream",
+      "url": "https://github.com/pylelab/USalign/blob/fcb0f9d921415a2095bc509975db7fc1e968af1d/USalign.cpp",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15",
+      "commit": "fcb0f9d921415a2095bc509975db7fc1e968af1d"
+    }
+  ],
+  "modes": [
+    {
+      "id": "batch",
+      "title": "单体批量结构比对",
+      "purpose": "目录查询结构对单个参考",
+      "required_inputs": [
+        "structures: PDB/mmCIF",
+        "reference: 一个参考结构"
+      ],
+      "parameters": {
+        "tmscore_mode": 0,
+        "outfmt": 2
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "index",
+      "title": "按残基编号叠合",
+      "purpose": "针对编号已对应的结构比较",
+      "required_inputs": [
+        "编号对应的两个结构"
+      ],
+      "parameters": {
+        "tmscore_mode": 1,
+        "outfmt": 2
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "complex",
+      "title": "寡聚复合体比对",
+      "purpose": "同时处理多链链映射",
+      "required_inputs": [
+        "两个多链复合物"
+      ],
+      "parameters": {
+        "mm": 1,
+        "ter": 1
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "flexible",
+      "title": "柔性结构比对",
+      "purpose": "上游带铰链的比对",
+      "required_inputs": [
+        "两个结构"
+      ],
+      "parameters": {
+        "mm": 7
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "tmscore_mode",
+      "type": "integer",
+      "description": "控制残基对应方式而非归一化长度：0 结构驱动比对；1 同残基编号；2 同编号且同链 ID；5 序列 glocal；6 优化链映射后同编号；7 链序列比对后整体叠合。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-TMscore",
+      "bda_keys": [
+        "tmscore_mode"
+      ],
+      "modes": [
+        "batch",
+        "index"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": 0
+    },
+    {
+      "key": "outfmt",
+      "type": "integer",
+      "description": "0 完整输出，1 紧凑 FASTA，2 制表符表，-1 完整但省略版本引用。BDA 收集表格时应保持 2。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-outfmt",
+      "bda_keys": [
+        "outfmt"
+      ],
+      "modes": [
+        "batch",
+        "index"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": 2
+    },
+    {
+      "key": "mm",
+      "type": "integer",
+      "description": "多体模式：0 单体；1 寡聚复合体；2 链对寡聚体；3 环形置换；4 多结构共识；5/6 非顺序；7 柔性。当前 BDA 没有对应字段。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-mm",
+      "bda_keys": [],
+      "modes": [
+        "complex",
+        "flexible"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "ter",
+      "type": "integer",
+      "description": "决定读取哪些 MODEL/链：0 全部；1 首 MODEL 全链；2 首链；3 首链首 TER 段。mm=1/2 需 ter=0/1。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ter",
+      "bda_keys": [],
+      "modes": [
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "a",
+      "type": "string",
+      "description": "额外报告的 TM-score 归一化选择，T/1 平均长度，F（默认）第二结构长度；显式 -a 0 不被该源码接受，-2 较长，-1 较短；不是 -TMscore。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-a",
+      "bda_keys": [],
+      "modes": [
+        "batch",
+        "index",
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "chain1",
+      "type": "string",
+      "description": "指定结构 1 的链，可逗号分隔；输入链 ID 需保持一致。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-chain1",
+      "bda_keys": [],
+      "modes": [
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "chain2",
+      "type": "string",
+      "description": "指定结构 2 的链，可逗号分隔；默认链策略可能只读首链。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-chain2",
+      "bda_keys": [],
+      "modes": [
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "m",
+      "type": "string",
+      "description": "写入刚体叠合旋转和平移矩阵的路径；当前包装未请求生成。",
+      "unit": "文件",
+      "flag_or_mapping": "-m",
+      "bda_keys": [],
+      "modes": [
+        "batch",
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "o",
+      "type": "string",
+      "description": "叠合后结构输出前缀；当前包装未请求生成。",
+      "unit": "文件前缀",
+      "flag_or_mapping": "-o",
+      "bda_keys": [],
+      "modes": [
+        "batch",
+        "complex"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "TM1,TM2",
+      "meaning": "按两个结构各自长度归一化的 TM-score；务必保留两种归一化",
+      "unit": "0–1",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "RMSD",
+      "meaning": "参与比对的代表原子（蛋白通常 Cα）叠合偏差",
+      "unit": "Å",
+      "interpretation": "不同残基对应和覆盖下不能直接比较；不是原子接触距离",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "Lali,L1,L2",
+      "meaning": "比对长度和两结构参与读取的长度",
+      "unit": "残基数",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "ID1,ID2,IDali",
+      "meaning": "分别相对各结构及比对长度的序列一致性；具体列名读版本表头",
+      "unit": "0–1",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "usalign_tmscores.tsv",
+      "meaning": "批量结果；保存表头与查询/参考文件映射",
+      "unit": "按列定义",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "query.list",
+      "meaning": "本次参与批量比较的结构文件名列表",
+      "unit": "文件名",
+      "interpretation": "生成控制文件，不是序列",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择本页明确版本和功能模式，按模式绑定输入，核对链号、序列和原子完整性。",
+    "输入参数后预览最终命令/生成配置；未映射字段不能视为生效，未接入模式需先补适配。",
+    "运行条件验证后检查全部原始输出、失败样本和缺失值；保存所用版本、配置、输入输出哈希。"
+  ],
+  "pitfalls": [],
+  "gaps": [
+    "tmscore_mode 的旧 UI label/help 将残基对应策略误写为归一化；文档已纠正，运行字段仍按 -TMscore 消费。",
+    "当前包装没有 -mm/-ter/-chain1/-chain2，不能把默认单体输出当作完整受体复合物比对。",
+    "outfmt 可变但输出收集预期表格；2 以外模式需单独适配解析器。",
+    "当前不输出 -m 矩阵或 -o 叠合结构；原子距离/方向角另需一致的受体对齐与链映射流程。"
+  ]
+}

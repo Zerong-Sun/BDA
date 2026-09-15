@@ -307,6 +307,57 @@ def test_a_catch_all_glob_does_not_capture_unrelated_outputs(monkeypatch) -> Non
     assert collected[0]["artifact_type"] == "compute_output"
 
 
+@pytest.mark.parametrize(
+    ("relative", "expected_port", "expected_type"),
+    [
+        ("runs/input-01/replicate-1/relaxed.pdb", "relaxed", "relaxed_structure"),
+        ("runs/input-02/replicate-2/score.sc", "scores", "score_table"),
+        ("legacy-layout/input.pdb", "legacy", "candidate_structure"),
+    ],
+)
+def test_nested_rosetta_outputs_match_relative_globs_in_both_collectors(monkeypatch, relative, expected_port, expected_type):
+    payload = b"fixture data, not a biological calculation\n"
+    job_id, transport = _collect_fixture(payload, relative=relative)
+    storage = _FakeStorage()
+    monkeypatch.setattr(adapters, "ObjectStorage", lambda: storage)
+    job = _job(job_id, [], [
+        {"name": "relaxed", "kind": "protein_structure", "artifact_type": "relaxed_structure", "filename_glob": "runs/**/*.pdb"},
+        {"name": "scores", "kind": "tabular", "artifact_type": "score_table", "filename_glob": "runs/**/*.sc"},
+        {"name": "legacy", "kind": "protein_structure", "artifact_type": "candidate_structure", "filename_glob": "*.pdb"},
+    ])
+    ssh = _adapter(transport)._collect_over_ssh(job)[0]
+    assert (ssh["port"], ssh["artifact_type"]) == (expected_port, expected_type)
+    assert ssh["object_key"].endswith("/outputs/" + relative)
+    assert ssh["filename"] == relative.rsplit("/", 1)[-1]
+    # The presigned collector knows the full path from the verified object-key prefix,
+    # even when its runner only supplied a display basename and no port/type.
+    manifest = {"schema_version": "1", "outputs": [{k: v for k, v in ssh.items() if k not in {"port", "artifact_type"}}]}
+    monkeypatch.setattr(storage, "read_json", lambda _: manifest, raising=False)
+    signed = adapters._collect_manifest(job)[0]
+    assert signed == ssh
+
+
+def test_nested_globs_keep_first_match_and_port_directory_precedence(monkeypatch):
+    job_id, transport = _collect_fixture(b"fixture", relative="runs/input-01/score.sc")
+    monkeypatch.setattr(adapters, "ObjectStorage", lambda: _FakeStorage())
+    ports = [
+        {"name": "first", "kind": "tabular", "artifact_type": "first_type", "filename_glob": "runs/**/*.sc"},
+        {"name": "second", "kind": "tabular", "artifact_type": "second_type", "filename_glob": "*.sc"},
+    ]
+    job = _job(job_id, [], ports)
+    assert _adapter(transport)._collect_over_ssh(job)[0]["port"] == "first"
+    ports.append({"name": "runs", "kind": "tabular", "artifact_type": "directory_type", "filename_glob": "*.nothing"})
+    assert _adapter(transport)._collect_over_ssh(_job(job_id, [], ports))[0]["port"] == "runs"
+
+
+def test_nested_glob_does_not_bypass_relative_path_validation(monkeypatch):
+    job_id, transport = _collect_fixture(b"fixture", relative="runs/../escape.pdb")
+    monkeypatch.setattr(adapters, "ObjectStorage", lambda: _FakeStorage())
+    job = _job(job_id, [], [{"name": "structures", "kind": "protein_structure", "artifact_type": "relaxed_structure", "filename_glob": "runs/**/*.pdb"}])
+    with pytest.raises(ValueError, match="output_manifest_path_invalid"):
+        _adapter(transport)._collect_over_ssh(job)
+
+
 def test_every_declared_input_port_gets_a_directory_before_the_command_runs() -> None:
     """An unbound input port must still have a directory, or the job dies before it starts.
 

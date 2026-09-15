@@ -1,0 +1,6 @@
+{
+  "application": "cartesian_ddg",
+  "ddg_mut_file": "mutations.txt",
+  "score_weights": "ref2015_cart",
+  "ddg_iterations": 3
+}

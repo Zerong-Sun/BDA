@@ -1,0 +1,3195 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "RFdiffusion",
+  "slug": "rfdiffusion",
+  "summary": "RFdiffusion 第一代骨架生成与条件扩散。118 个旧 library 键逐项解释；17 个 BDA/authoring 字段追踪到实际命令。结构生成、置信度和约束保留均不是结合能或功能证明。",
+  "sources": [
+    {
+      "id": "live",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "scope": "当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "scope": "手工提交库参数清单；不是 BDA command 已转发的证据",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/rfdiffusion/README.md",
+      "scope": "旧集群 runbook；历史记录与当前声明证明边界",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "readme",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/README.md",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "官方模式、contig、hotspot、partial/provide_seq、symmetry 与 RFpeptides",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "config",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/config/inference/base.yaml",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "固定 commit 的 118 个基础 Hydra 配置及默认值",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runner",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/model_runners.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "checkpoint 选择、partial 长度/索引断言、模型配置回载与采样",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "contigs",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/contigs.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "contig 解析、序列遮罩与输入/输出索引",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "utils",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/utils.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "去噪与 scaffold SS/adjacency 采样",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "network",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/RoseTTAFoldModel.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "神经网络维度与模型参数传递",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "symmetry",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/inference/symmetry.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "对称操作、半径与重居中",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "potentials",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/rfdiffusion/potentials/manager.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "势函数构造、链间接触与衰减",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "entrypoint",
+      "url": "https://github.com/RosettaCommons/RFdiffusion/blob/2d0c003df46b9db41d119321f15403dec3716cd9/scripts/run_inference.py",
+      "commit": "2d0c003df46b9db41d119321f15403dec3716cd9",
+      "scope": "输出PDB/TRB、占位Gly、B-factor掩码、确定性与编号逻辑",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter_env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "scope": "参数环境导出：标量小写键、bool为1/空字符串、array/object不导出",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "unconditional",
+      "title": "无条件 de novo 骨架",
+      "purpose": "按长度从噪声生成骨架。",
+      "required_inputs": [],
+      "parameters": {
+        "contigs": "[100-100]",
+        "num_designs": 10,
+        "partial_t": 0
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "顶层 PDB/TRB 一一对应；链长为100；不把轨迹帧计为独立候选。"
+      ],
+      "limitations": [
+        "模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。"
+      ],
+      "source_refs": [
+        "readme",
+        "live"
+      ]
+    },
+    {
+      "id": "binder",
+      "title": "靶标与 hotspot 条件 binder",
+      "purpose": "围绕已知靶标和指定热点生成新链。",
+      "required_inputs": [
+        "靶标 PDB 绑定 inference_input_pdb；实际链号与残基编号"
+      ],
+      "parameters": {
+        "contigs": "[A1-150/0 70-100]",
+        "hotspot_res": "[A59,A83,A91]",
+        "num_designs": 10
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "热点是生成条件，不保证接触全部热点或实验结合；需独立复合物预测、界面评分和功能测试。"
+      ],
+      "source_refs": [
+        "readme",
+        "live"
+      ]
+    },
+    {
+      "id": "motif",
+      "title": "固定 motif scaffolding",
+      "purpose": "保留输入片段坐标并设计连接骨架。",
+      "required_inputs": [
+        "含 motif 的 PDB 与输入到输出残基映射"
+      ],
+      "parameters": {
+        "contigs": "[10-40/A163-181/10-40]",
+        "ckpt_override_path": "models/ActiveSite_ckpt.pt"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "按 TRB 索引映射计算保留 motif 原子 RMSD；排查链断裂与严重冲突。"
+      ],
+      "limitations": [
+        "ActiveSite 权重针对小 motif；是否必要依 motif 大小选择，站点相对权重路径需核实。"
+      ],
+      "source_refs": [
+        "readme",
+        "live"
+      ]
+    },
+    {
+      "id": "partial",
+      "title": "部分扩散与 provide_seq",
+      "purpose": "对完整已知骨架加有限步噪声再去噪，可固定部分序列。",
+      "required_inputs": [
+        "每个输出位置都有输入坐标的完整 PDB；不改变总长度或映射偏移"
+      ],
+      "parameters": {
+        "contigs": "[100-100/0 20-20]",
+        "partial_t": 10,
+        "diffuser_t": 50,
+        "provide_seq": "[100-119]"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "确认总长度和输入输出索引完全一致；验证固定序列保留与几何变化；记录实际 checkpoint。"
+      ],
+      "limitations": [
+        "0 < partial_T <= T；RFD1 的单位是步数。T=200 的 partial_T=80 不能直接照搬到 T=50，README 等效例为20。",
+        "provide_seq 按整个映射的零起始、闭区间；不要用输入 PDB 残基号直接代替。"
+      ],
+      "source_refs": [
+        "readme",
+        "runner",
+        "live"
+      ]
+    },
+    {
+      "id": "symmetry",
+      "title": "对称寡聚体与对称 motif",
+      "purpose": "按指定群生成对称骨架。",
+      "required_inputs": [
+        "群类型、可整除亚基数的总 contig 长度；motif 模式需要预先对称化坐标"
+      ],
+      "parameters": {
+        "symmetry": "c4",
+        "contigs": "[400]"
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA 转发 symmetry，但未提供官方示例的 --config-name symmetry；不可把单一字段当作完整经过验证的对称流程。"
+      ],
+      "source_refs": [
+        "readme",
+        "symmetry",
+        "live"
+      ]
+    },
+    {
+      "id": "fold_conditioned",
+      "title": "二级结构/接触拓扑条件",
+      "purpose": "以 SS 与 adjacency 模板约束生成折叠或 binder。",
+      "required_inputs": [
+        "scaffold_dir 下配套 _ss.pt/_adj.pt；如有靶标则提供靶标 SS/adj"
+      ],
+      "parameters": {
+        "scaffoldguided.scaffoldguided": true,
+        "scaffoldguided.scaffold_dir": "/staged/scaffolds"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "旧 library 支持这些 Hydra 键；当前 BDA command 没有转发 scaffoldguided.*。BDA scaffold 下拉框只是元数据，不会自动加载天然模板。"
+      ],
+      "source_refs": [
+        "readme",
+        "utils",
+        "library"
+      ]
+    },
+    {
+      "id": "macrocycle",
+      "title": "RFpeptides 环肽模式",
+      "purpose": "在上游固定 commit 的环化链表示下生成骨架。",
+      "required_inputs": [
+        "兼容环化拓扑的 contigs 与相应权重/运行版本"
+      ],
+      "parameters": {
+        "inference.cyclic": true,
+        "inference.cyc_chains": "a",
+        "contigmap.contigs": "[12-18]"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "当前 BDA 未转发 cyclic/cyc_chains；普通 PDB 也不能单独证明真实化学闭环。"
+      ],
+      "source_refs": [
+        "readme",
+        "runner",
+        "library"
+      ]
+    },
+    {
+      "id": "expert_config",
+      "title": "专家网络/噪声配置",
+      "purpose": "记录上游配置而非提供可随意调整的科学筛选阈值。",
+      "required_inputs": [
+        "与模型 checkpoint 一致的配置"
+      ],
+      "parameters": {
+        "diffuser.T": 50
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "模型维度与预处理维度必须匹配权重；不少基础值会由 checkpoint 配置回载，必须检查最终解析配置。"
+      ],
+      "source_refs": [
+        "config",
+        "runner",
+        "network",
+        "library"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "inference.input_pdb",
+      "type": "any",
+      "description": "作为 motif、靶标或部分扩散起点的 PDB 坐标文件；BDA 实际读取 inference_input_pdb 输入端口中的首个排序 PDB。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.input_pdb=<Hydra value>",
+      "bda_keys": [
+        "input_pdb"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 input_pdb 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 input_pdb 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "live",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.num_designs",
+      "type": "integer",
+      "description": "生成独立设计的数量；不是轨迹帧数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.num_designs=<Hydra value>",
+      "bda_keys": [
+        "num_designs"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 num_designs 的声明：{\"type\":\"integer\",\"default\":100,\"min\":1,\"max\":100000}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 num_designs 的声明：{\"type\":\"integer\",\"default\":100,\"min\":1,\"max\":100000}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "live",
+        "entrypoint"
+      ],
+      "default": 10
+    },
+    {
+      "key": "inference.design_startnum",
+      "type": "integer",
+      "description": "输出设计编号起点，便于分块生成时避免编号冲突。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.design_startnum=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": 0
+    },
+    {
+      "key": "inference.ckpt_override_path",
+      "type": "any",
+      "description": "覆盖自动选择的模型权重路径；需匹配任务和训练配置。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.ckpt_override_path=<Hydra value>",
+      "bda_keys": [
+        "ckpt_override_path"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 ckpt_override_path 的声明：{\"type\":\"enum\",\"default\":\"\",\"options\":[\"\",\"models/ActiveSite_ckpt.pt\",\"models/Complex_beta_ckpt.pt\"]}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 ckpt_override_path 的声明：{\"type\":\"enum\",\"default\":\"\",\"options\":[\"\",\"models/ActiveSite_ckpt.pt\",\"models/Complex_beta_ckpt.pt\"]}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "live",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.symmetry",
+      "type": "any",
+      "description": "对称群标识，如 c4、d2、tetrahedral；这是寡聚体对称性，不是肽链闭环。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.symmetry=<Hydra value>",
+      "bda_keys": [
+        "symmetry"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 symmetry 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 symmetry 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "live",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.recenter",
+      "type": "boolean",
+      "description": "对称复制时是否重新居中基本单元，影响亚基相对于对称轴的位置。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.recenter=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": true
+    },
+    {
+      "key": "inference.radius",
+      "type": "number",
+      "description": "对称构造中基本单元沿基准轴放置的半径；不能解释为结合距离。",
+      "unit": "Å",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.radius=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": 10.0
+    },
+    {
+      "key": "inference.model_only_neighbors",
+      "type": "boolean",
+      "description": "传入对称生成器的邻居建模选项；该固定源码构造函数接收但未使用此值，不能宣称开启后会降低模型规模。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.model_only_neighbors=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference.output_prefix",
+      "type": "string",
+      "description": "设计输出路径前缀；BDA 强制置于 BDA_OUTPUT_DIR 下再拼接该值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.output_prefix=<Hydra value>",
+      "bda_keys": [
+        "output_prefix"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 output_prefix 的声明：{\"type\":\"string\",\"default\":\"outputs/rfdiffusion/design\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 output_prefix 的声明：{\"type\":\"string\",\"default\":\"outputs/rfdiffusion/design\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "live",
+        "entrypoint"
+      ],
+      "default": "samples/design"
+    },
+    {
+      "key": "inference.write_trajectory",
+      "type": "boolean",
+      "description": "是否写去噪中间结构轨迹，增加存储而非独立候选数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.write_trajectory=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": true
+    },
+    {
+      "key": "inference.empty_cache_per_design",
+      "type": "boolean",
+      "description": "每个设计间清理 GPU 缓存的运行选项，不改变科学筛选定义。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.empty_cache_per_design=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference.scaffold_guided",
+      "type": "boolean",
+      "description": "基础配置保留的旧式 scaffold 开关；实际 runner 选择使用 scaffoldguided.scaffoldguided，不能把此旧键当作已接通。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.scaffold_guided=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference.model_runner",
+      "type": "string",
+      "description": "选择采样器实现类，如 SelfConditioning；必须存在于安装版本。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.model_runner=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": "SelfConditioning"
+    },
+    {
+      "key": "inference.cautious",
+      "type": "boolean",
+      "description": "避免覆盖已有结果的谨慎输出策略；重跑需确认跳过行为。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.cautious=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": true
+    },
+    {
+      "key": "inference.align_motif",
+      "type": "boolean",
+      "description": "去噪预测中将固定 motif 与输入对齐的几何处理开关。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.align_motif=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": true
+    },
+    {
+      "key": "inference.symmetric_self_cond",
+      "type": "boolean",
+      "description": "对称任务中对上一轮预测进行对称化后作为 self-conditioning 输入。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.symmetric_self_cond=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": true
+    },
+    {
+      "key": "inference.final_step",
+      "type": "integer",
+      "description": "逆扩散的终止时间步，通常到1；提前终止可能留下未完成去噪结构。",
+      "unit": "步",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.final_step=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": 1
+    },
+    {
+      "key": "inference.deterministic",
+      "type": "boolean",
+      "description": "为设计设置确定性随机状态的运行选项；仍需保存软件/硬件与权重版本。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.deterministic=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference.trb_save_ckpt_path",
+      "type": "any",
+      "description": "内部写入TRB的真实checkpoint路径记录槽；用户必须保持null，runner断言非null会失败，并自动填写实际加载路径。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.trb_save_ckpt_path=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.schedule_directory_path",
+      "type": "any",
+      "description": "扩散旋转噪声调度缓存目录；用于预计算数据，不是输出候选目录。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.schedule_directory_path=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.model_directory_path",
+      "type": "any",
+      "description": "自动寻找模型权重的目录；不同于直接指定 checkpoint 文件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.model_directory_path=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference.cyclic",
+      "type": "boolean",
+      "description": "启用 RFpeptides 的宏环链索引处理；需结合 cyc_chains。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.cyclic=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference.cyc_chains",
+      "type": "string",
+      "description": "要采用闭环索引的输出链字母字符串，例如 a 或 ab；与 contigs 必须一致。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional",
+        "binder",
+        "motif",
+        "partial",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference.cyc_chains=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "runner",
+        "readme",
+        "symmetry",
+        "entrypoint"
+      ],
+      "default": "a"
+    },
+    {
+      "key": "contigmap.contigs",
+      "type": "any",
+      "description": "输入片段和新生长度的 Hydra 列表；A10-20 引用输入编号、10-20 采样新长度、/0 后的空格标识链断点。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.contigs=<Hydra value>",
+      "bda_keys": [
+        "contigs"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 contigs 的声明：{\"type\":\"string\",\"default\":\"[A1-150/0 70-100]\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 contigs 的声明：{\"type\":\"string\",\"default\":\"[A1-150/0 70-100]\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.inpaint_seq",
+      "type": "any",
+      "description": "隐藏指定输入位置的氨基酸身份并允许重新设计；使用输入链/残基标识。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.inpaint_seq=<Hydra value>",
+      "bda_keys": [
+        "inpaint_seq"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 inpaint_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 inpaint_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.inpaint_str",
+      "type": "any",
+      "description": "隐藏指定输入片段的结构条件，使这些区域重新生成。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.inpaint_str=<Hydra value>",
+      "bda_keys": [
+        "inpaint_str"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 inpaint_str 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 inpaint_str 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.inpaint_str_helix",
+      "type": "any",
+      "description": "结构重绘区域中要求螺旋的残基选择；需要支持二级结构条件的 runner/checkpoint。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.inpaint_str_helix=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.inpaint_str_strand",
+      "type": "any",
+      "description": "结构重绘区域中要求 β 链的残基选择；不等于固定实验二级结构。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.inpaint_str_strand=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.inpaint_str_loop",
+      "type": "any",
+      "description": "结构重绘区域中指定 loop 的残基选择；与其他 SS 选择避免重叠。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.inpaint_str_loop=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.provide_seq",
+      "type": "any",
+      "description": "部分扩散中保留序列身份的零起始闭区间列表；触发相应序列条件 checkpoint 自动选择。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.provide_seq=<Hydra value>",
+      "bda_keys": [
+        "provide_seq"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 provide_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 provide_seq 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "contigmap.length",
+      "type": "any",
+      "description": "限定生成部分的长度或范围，以拒绝采样不符合长度的 contig；不是任意裁剪输入结构。",
+      "unit": "残基",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "contigmap.length=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs"
+      ],
+      "default": null
+    },
+    {
+      "key": "model.n_extra_block",
+      "type": "integer",
+      "description": "处理额外 MSA 轨道的迭代块数，属于权重结构。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_extra_block=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.n_main_block",
+      "type": "integer",
+      "description": "主迭代轨道块数，属于权重结构。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_main_block=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.n_ref_block",
+      "type": "integer",
+      "description": "结构细化块数，属于权重结构。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_ref_block=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.d_msa",
+      "type": "integer",
+      "description": "主 MSA 表征通道维度，不是 MSA 序列条数或 Neff。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_msa=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 256
+    },
+    {
+      "key": "model.d_msa_full",
+      "type": "integer",
+      "description": "额外 MSA 表征通道维度，不是输入同源序列深度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_msa_full=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 64
+    },
+    {
+      "key": "model.d_pair",
+      "type": "integer",
+      "description": "残基对表征通道维度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_pair=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 128
+    },
+    {
+      "key": "model.d_templ",
+      "type": "integer",
+      "description": "模板嵌入表征维度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_templ=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 64
+    },
+    {
+      "key": "model.n_head_msa",
+      "type": "integer",
+      "description": "MSA 注意力头数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_head_msa=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 8
+    },
+    {
+      "key": "model.n_head_pair",
+      "type": "integer",
+      "description": "残基对注意力头数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_head_pair=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.n_head_templ",
+      "type": "integer",
+      "description": "模板注意力头数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.n_head_templ=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.d_hidden",
+      "type": "integer",
+      "description": "主网络内部隐藏通道宽度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_hidden=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.d_hidden_templ",
+      "type": "integer",
+      "description": "模板模块内部隐藏通道宽度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.d_hidden_templ=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.p_drop",
+      "type": "number",
+      "description": "网络 dropout 概率配置；推理模型通常处于 eval 模式，不等于推理噪声比例。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.p_drop=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 0.15
+    },
+    {
+      "key": "model.SE3_param_full.num_layers",
+      "type": "integer",
+      "description": "完整图配置的等变结构模块层数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.num_layers=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 1
+    },
+    {
+      "key": "model.SE3_param_full.num_channels",
+      "type": "integer",
+      "description": "完整图配置的等变特征通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.num_channels=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.SE3_param_full.num_degrees",
+      "type": "integer",
+      "description": "完整图配置的等变表示包含的 degree 数量；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.num_degrees=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 2
+    },
+    {
+      "key": "model.SE3_param_full.n_heads",
+      "type": "integer",
+      "description": "完整图配置的等变注意力头数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.n_heads=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.SE3_param_full.div",
+      "type": "integer",
+      "description": "完整图配置的等变注意力通道分割/压缩系数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.div=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.SE3_param_full.l0_in_features",
+      "type": "integer",
+      "description": "完整图配置的标量（degree 0）输入通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.l0_in_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 8
+    },
+    {
+      "key": "model.SE3_param_full.l0_out_features",
+      "type": "integer",
+      "description": "完整图配置的标量（degree 0）输出通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.l0_out_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 8
+    },
+    {
+      "key": "model.SE3_param_full.l1_in_features",
+      "type": "integer",
+      "description": "完整图配置的向量（degree 1）输入通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.l1_in_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 3
+    },
+    {
+      "key": "model.SE3_param_full.l1_out_features",
+      "type": "integer",
+      "description": "完整图配置的向量（degree 1）输出通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.l1_out_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 2
+    },
+    {
+      "key": "model.SE3_param_full.num_edge_features",
+      "type": "integer",
+      "description": "完整图配置的等变模块边特征通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_full.num_edge_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.SE3_param_topk.num_layers",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变结构模块层数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.num_layers=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 1
+    },
+    {
+      "key": "model.SE3_param_topk.num_channels",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变特征通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.num_channels=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 32
+    },
+    {
+      "key": "model.SE3_param_topk.num_degrees",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变表示包含的 degree 数量；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.num_degrees=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 2
+    },
+    {
+      "key": "model.SE3_param_topk.n_heads",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变注意力头数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.n_heads=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.SE3_param_topk.div",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变注意力通道分割/压缩系数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.div=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 4
+    },
+    {
+      "key": "model.SE3_param_topk.l0_in_features",
+      "type": "integer",
+      "description": "top-k 邻接图配置的标量（degree 0）输入通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.l0_in_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 64
+    },
+    {
+      "key": "model.SE3_param_topk.l0_out_features",
+      "type": "integer",
+      "description": "top-k 邻接图配置的标量（degree 0）输出通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.l0_out_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 64
+    },
+    {
+      "key": "model.SE3_param_topk.l1_in_features",
+      "type": "integer",
+      "description": "top-k 邻接图配置的向量（degree 1）输入通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.l1_in_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 3
+    },
+    {
+      "key": "model.SE3_param_topk.l1_out_features",
+      "type": "integer",
+      "description": "top-k 邻接图配置的向量（degree 1）输出通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.l1_out_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 2
+    },
+    {
+      "key": "model.SE3_param_topk.num_edge_features",
+      "type": "integer",
+      "description": "top-k 邻接图配置的等变模块边特征通道数；属于 checkpoint 架构，不是用户的 MSA 或筛选指标。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.SE3_param_topk.num_edge_features=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": 64
+    },
+    {
+      "key": "model.freeze_track_motif",
+      "type": "boolean",
+      "description": "网络结构更新时冻结 motif 轨道的模型选项；必须与训练配置匹配。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.freeze_track_motif=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "model.use_motif_timestep",
+      "type": "boolean",
+      "description": "对 motif 使用专门时间步条件的模型选项；由匹配 checkpoint 决定。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "model.use_motif_timestep=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "network",
+        "runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "diffuser.T",
+      "type": "integer",
+      "description": "扩散离散总步数；决定 partial_T 所在的噪声调度，不能当作物理模拟时长。",
+      "unit": "步",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "diffuser.T=<Hydra value>",
+      "bda_keys": [
+        "diffuser_t"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 diffuser_t 的声明：{\"type\":\"integer\",\"default\":50,\"min\":1,\"max\":200}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 diffuser_t 的声明：{\"type\":\"integer\",\"default\":50,\"min\":1,\"max\":200}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": 50
+    },
+    {
+      "key": "diffuser.b_0",
+      "type": "string",
+      "description": "平移扩散 beta 调度的起始系数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.b_0=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": "1e-2"
+    },
+    {
+      "key": "diffuser.b_T",
+      "type": "string",
+      "description": "平移扩散 beta 调度的末端系数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.b_T=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": "7e-2"
+    },
+    {
+      "key": "diffuser.schedule_type",
+      "type": "string",
+      "description": "平移 beta 随时间变化的调度类型。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.schedule_type=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": "linear"
+    },
+    {
+      "key": "diffuser.so3_type",
+      "type": "string",
+      "description": "旋转扩散的实现族，基础配置为 IGSO(3)。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.so3_type=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": "igso3"
+    },
+    {
+      "key": "diffuser.crd_scale",
+      "type": "number",
+      "description": "坐标进入扩散噪声计算前的缩放因子。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.crd_scale=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 0.25
+    },
+    {
+      "key": "diffuser.partial_T",
+      "type": "any",
+      "description": "部分扩散的加噪起始步；null 关闭，BDA 当前传0会走普通全扩散分支。",
+      "unit": "步",
+      "modes": [
+        "motif",
+        "partial",
+        "binder",
+        "unconditional"
+      ],
+      "flag_or_mapping": "diffuser.partial_T=<Hydra value>",
+      "bda_keys": [
+        "partial_t"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 partial_t 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0,\"max\":50}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 partial_t 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0,\"max\":50}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "readme",
+        "runner",
+        "contigs",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "diffuser.so3_schedule_type",
+      "type": "string",
+      "description": "旋转噪声随时间的调度类型。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.so3_schedule_type=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": "linear"
+    },
+    {
+      "key": "diffuser.min_b",
+      "type": "number",
+      "description": "SO(3) 旋转 beta 调度的低端参数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.min_b=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 1.5
+    },
+    {
+      "key": "diffuser.max_b",
+      "type": "number",
+      "description": "SO(3) 旋转 beta 调度的高端参数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.max_b=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 2.5
+    },
+    {
+      "key": "diffuser.min_sigma",
+      "type": "number",
+      "description": "SO(3) 扩散 sigma 的最小值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.min_sigma=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 0.02
+    },
+    {
+      "key": "diffuser.max_sigma",
+      "type": "number",
+      "description": "SO(3) 扩散 sigma 的最大值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "diffuser.max_sigma=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 1.5
+    },
+    {
+      "key": "denoiser.noise_scale_ca",
+      "type": "number",
+      "description": "逆扩散 CA 平移随机噪声的倍率，降低会减少采样随机性。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.noise_scale_ca=<Hydra value>",
+      "bda_keys": [
+        "noise_scale_ca"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 noise_scale_ca 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 noise_scale_ca 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": 1
+    },
+    {
+      "key": "denoiser.final_noise_scale_ca",
+      "type": "integer",
+      "description": "CA 噪声调度终点倍率；是否生效取决于调度实现。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.final_noise_scale_ca=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils"
+      ],
+      "default": 1
+    },
+    {
+      "key": "denoiser.ca_noise_schedule_type",
+      "type": "string",
+      "description": "CA 噪声倍率调度类型，默认恒定。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.ca_noise_schedule_type=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils"
+      ],
+      "default": "constant"
+    },
+    {
+      "key": "denoiser.noise_scale_frame",
+      "type": "number",
+      "description": "逆扩散局部残基坐标框旋转噪声倍率。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.noise_scale_frame=<Hydra value>",
+      "bda_keys": [
+        "noise_scale_frame"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 noise_scale_frame 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 noise_scale_frame 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":5}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": 1
+    },
+    {
+      "key": "denoiser.final_noise_scale_frame",
+      "type": "integer",
+      "description": "坐标框旋转噪声调度终点倍率；默认恒定调度下不应假定独立可调效果。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.final_noise_scale_frame=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils"
+      ],
+      "default": 1
+    },
+    {
+      "key": "denoiser.frame_noise_schedule_type",
+      "type": "string",
+      "description": "局部坐标框旋转噪声倍率随时间的调度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "denoiser.frame_noise_schedule_type=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils"
+      ],
+      "default": "constant"
+    },
+    {
+      "key": "ppi.hotspot_res",
+      "type": "any",
+      "description": "靶标表面的 hotspot 残基列表；指定输入 PDB 链号及编号，作为生成接触偏好。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "ppi.hotspot_res=<Hydra value>",
+      "bda_keys": [
+        "hotspot_res"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 hotspot_res 的声明：{\"type\":\"string\",\"default\":\"[A59,A83,A91]\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 hotspot_res 的声明：{\"type\":\"string\",\"default\":\"[A59,A83,A91]\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "potentials.guiding_potentials",
+      "type": "any",
+      "description": "一个或多个辅助势定义的 Hydra 字符串列表，例如 type:monomer_ROG；这是生成过程引导，不是 Rosetta 能量。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.guiding_potentials=<Hydra value>",
+      "bda_keys": [
+        "guiding_potentials"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 guiding_potentials 的声明：{\"type\":\"json\",\"default\":\"[]\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 guiding_potentials 的声明：{\"type\":\"json\",\"default\":\"[]\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme",
+        "live",
+        "parameter_env"
+      ],
+      "default": null
+    },
+    {
+      "key": "potentials.guide_scale",
+      "type": "integer",
+      "description": "辅助势梯度的总体倍率，不是 kcal/mol 或结合自由能。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.guide_scale=<Hydra value>",
+      "bda_keys": [
+        "guide_scale"
+      ],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "BDA 别名已出现在 command；字段默认值/范围可能与 upstream 不同，见 gaps。",
+        "BDA RFdiffusion@1.1.0 字段 guide_scale 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":20}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 guide_scale 的声明：{\"type\":\"number\",\"default\":1.0,\"min\":0,\"max\":20}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme",
+        "live"
+      ],
+      "default": 10
+    },
+    {
+      "key": "potentials.guide_decay",
+      "type": "string",
+      "description": "引导梯度随时间的衰减方式，如 constant、linear、quadratic、cubic；需安装代码支持。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.guide_decay=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme"
+      ],
+      "default": "constant"
+    },
+    {
+      "key": "potentials.olig_inter_all",
+      "type": "any",
+      "description": "寡聚体接触势中是否对所有不同链对开启吸引项。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.olig_inter_all=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme"
+      ],
+      "default": null
+    },
+    {
+      "key": "potentials.olig_intra_all",
+      "type": "any",
+      "description": "寡聚体接触势中是否对所有链内接触开启吸引项。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.olig_intra_all=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme"
+      ],
+      "default": null
+    },
+    {
+      "key": "potentials.olig_custom_contact",
+      "type": "any",
+      "description": "自定义链对接触规则字符串；覆盖自动链对接触矩阵部分元素。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.olig_custom_contact=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme"
+      ],
+      "default": null
+    },
+    {
+      "key": "potentials.substrate",
+      "type": "any",
+      "description": "底物接触势引用的输入配体标识；需要对应输入原子和实现支持。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "binder",
+        "motif",
+        "symmetry"
+      ],
+      "flag_or_mapping": "potentials.substrate=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "potentials",
+        "readme"
+      ],
+      "default": null
+    },
+    {
+      "key": "contig_settings.ref_idx",
+      "type": "any",
+      "description": "手动输入参考结构索引映射，须同时给 hal_idx 和 idx_rf；基础 runner 是否读取该独立配置节点需另核对。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "contig_settings.ref_idx=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": null
+    },
+    {
+      "key": "contig_settings.hal_idx",
+      "type": "any",
+      "description": "手动指定输出链/残基索引映射；必须与 ref_idx 等长对应。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "contig_settings.hal_idx=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": null
+    },
+    {
+      "key": "contig_settings.idx_rf",
+      "type": "any",
+      "description": "RoseTTAFold 内部连续/跳跃残基索引，表达链断点；不是 PDB 展示编号。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "contig_settings.idx_rf=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": null
+    },
+    {
+      "key": "contig_settings.inpaint_seq_tensor",
+      "type": "any",
+      "description": "直接给出序列保留/遮罩布尔张量，属于程序内部接口；shell Hydra 配置不能自动提供 tensor 对象。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "contig_settings.inpaint_seq_tensor=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": null
+    },
+    {
+      "key": "preprocess.sidechain_input",
+      "type": "boolean",
+      "description": "是否将非 motif 侧链作为预处理结构输入；必须匹配模型训练方式。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.sidechain_input=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": false
+    },
+    {
+      "key": "preprocess.motif_sidechain_input",
+      "type": "boolean",
+      "description": "是否保留 motif 侧链作为结构条件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.motif_sidechain_input=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": true
+    },
+    {
+      "key": "preprocess.d_t1d",
+      "type": "integer",
+      "description": "一维模板/时间条件特征通道数，与模型权重输入维度一致。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.d_t1d=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 22
+    },
+    {
+      "key": "preprocess.d_t2d",
+      "type": "integer",
+      "description": "二维模板/几何条件特征通道数，与模型权重输入维度一致。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.d_t2d=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 44
+    },
+    {
+      "key": "preprocess.prob_self_cond",
+      "type": "number",
+      "description": "预处理配置保留的 self-conditioning 概率；基础 runner 的实际使用未在已核对路径中确认，不能当作已生效开关。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.prob_self_cond=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "preprocess.str_self_cond",
+      "type": "boolean",
+      "description": "预处理配置中的结构 self-conditioning 标记；与实际模型采样器逻辑需一起核实。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.str_self_cond=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": false
+    },
+    {
+      "key": "preprocess.predict_previous",
+      "type": "boolean",
+      "description": "预处理配置中的预测前一步目标标记，属于训练/模型兼容性配置。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "preprocess.predict_previous=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": false
+    },
+    {
+      "key": "logging.inputs",
+      "type": "boolean",
+      "description": "输入日志配置标记；当前执行路径是否消费未确认，应依实际日志验证。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_config"
+      ],
+      "flag_or_mapping": "logging.inputs=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library"
+      ],
+      "default": false
+    },
+    {
+      "key": "scaffoldguided.scaffoldguided",
+      "type": "boolean",
+      "description": "启用 SS/adjacency 条件的 scaffold-guided 采样器，并选择相应 checkpoint。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.scaffoldguided=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "scaffoldguided.target_pdb",
+      "type": "boolean",
+      "description": "scaffold-guided binder 模式是否含独立靶标 PDB。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.target_pdb=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "scaffoldguided.target_path",
+      "type": "any",
+      "description": "scaffold-guided 靶标坐标路径。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.target_path=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffoldguided.scaffold_list",
+      "type": "any",
+      "description": "待采样 scaffold 标识列表或每行一个标识的文本文件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.scaffold_list=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffoldguided.scaffold_dir",
+      "type": "any",
+      "description": "保存配套 scaffold 二级结构和 adjacency 张量的目录。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.scaffold_dir=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffoldguided.sampled_insertion",
+      "type": "integer",
+      "description": "每段 loop 中随机增加残基数的上限或范围；不 masking loops 时要求0。",
+      "unit": "残基",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.sampled_insertion=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": 0
+    },
+    {
+      "key": "scaffoldguided.sampled_N",
+      "type": "integer",
+      "description": "N 端随机增加残基数的上限或范围；不是直接指定总长度。",
+      "unit": "残基",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.sampled_N=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": 0
+    },
+    {
+      "key": "scaffoldguided.sampled_C",
+      "type": "integer",
+      "description": "C 端随机增加残基数的上限或范围。",
+      "unit": "残基",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.sampled_C=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": 0
+    },
+    {
+      "key": "scaffoldguided.ss_mask",
+      "type": "integer",
+      "description": "每段 helix/strand 两端隐藏二级结构标签的残基数。",
+      "unit": "残基",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.ss_mask=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": 0
+    },
+    {
+      "key": "scaffoldguided.systematic",
+      "type": "boolean",
+      "description": "按 scaffold 列表顺序系统遍历而非随机抽取。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.systematic=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "scaffoldguided.target_ss",
+      "type": "any",
+      "description": "靶标二级结构张量路径；须与靶标裁剪和编号一致。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.target_ss=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffoldguided.target_adj",
+      "type": "any",
+      "description": "靶标残基接触/拓扑 adjacency 张量路径；须与 target_ss 对应。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.target_adj=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffoldguided.mask_loops",
+      "type": "boolean",
+      "description": "将 loop 条件遮罩以允许重新生成；false 时禁止额外 N/C/loop 插入。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.mask_loops=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": true
+    },
+    {
+      "key": "scaffoldguided.contig_crop",
+      "type": "any",
+      "description": "按 contig 选择裁剪靶标及对应 SS/adjacency，以降低上下文大小。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "scaffoldguided.contig_crop=<Hydra value>",
+      "bda_keys": [],
+      "constraints": [
+        "默认值来自固定 commit 的 base config；最终 checkpoint 回载配置应作为运行证据。",
+        "当前 BDA command 未映射此键；仅旧 library 配置覆盖或内部配置，不能从 UI 凭空提交。"
+      ],
+      "source_refs": [
+        "config",
+        "library",
+        "utils",
+        "runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "scaffold",
+      "type": "enum",
+      "description": "BDA 模板家族标签（custom/monellin/brazzein/thaumatin/mabinlin）；实际 command 未读取该字段，不会自动加载模板。",
+      "unit": "无",
+      "modes": [
+        "motif",
+        "fold_conditioned"
+      ],
+      "flag_or_mapping": "无上游命令映射",
+      "bda_keys": [
+        "scaffold"
+      ],
+      "constraints": [
+        "必须实际绑定模板 PDB 并提供 contigs，不能只选模板名。",
+        "BDA RFdiffusion@1.1.0 字段 scaffold 的声明：{\"type\":\"enum\",\"default\":\"custom\",\"options\":[\"custom\",\"monellin\",\"brazzein\",\"thaumatin\",\"mabinlin\"]}；仅记录声明，不等于命令已执行该值。",
+        "BDA RFdiffusion-authoring-6810138a@1.1.0-draft.1 字段 scaffold 的声明：{\"type\":\"enum\",\"default\":\"custom\",\"options\":[\"custom\",\"monellin\",\"brazzein\",\"thaumatin\",\"mabinlin\"]}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "live"
+      ],
+      "default": "custom"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "design_*.pdb",
+      "meaning": "生成骨架坐标",
+      "unit": "Å",
+      "interpretation": "固定源码最终PDB只写前4个骨架原子；未指定身份的生成位置输出Gly占位。B-factor写1/0标记固定/扩散位置，绝不能把该列当pLDDT；pLDDT在TRB中。",
+      "source_refs": [
+        "readme",
+        "runner",
+        "entrypoint"
+      ]
+    },
+    {
+      "name": "design_*.trb",
+      "meaning": "配置、输入输出编号映射和预测轨迹元数据",
+      "unit": "混合",
+      "interpretation": "用 con_ref/con_hal 对齐保留片段；预测 pLDDT 不能用作结合能。",
+      "source_refs": [
+        "readme",
+        "contigs",
+        "runner",
+        "entrypoint"
+      ]
+    },
+    {
+      "name": "traj/*_Xt-1_traj.pdb / traj/*_pX0_traj.pdb",
+      "meaning": "中间去噪结构",
+      "unit": "Å",
+      "interpretation": "同一设计的时间步，不是额外候选或物理 MD。",
+      "source_refs": [
+        "readme",
+        "entrypoint"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择具体插件版本并冻结输入文件、序列/结构编号映射、配置和权重校验值。",
+    "按下列模式检查输入条件；先 render/preview，对照实际命令检查每个参数被接收。",
+    "按站点流程 validate → render/preview → review → stage → review → submit。",
+    "执行后核对输出数量、参数回显、随机种子、条件几何与残基保留，再将结构和元数据一并入库。"
+  ],
+  "pitfalls": [
+    "RFD1 diffusion 是生成模型的加噪/去噪，不是 Rosetta、分子动力学或结合 ΔG。",
+    "provide_seq 的零起始映射索引与 hotspot/contigs 的 PDB 链编号不同，必须保存转换表。",
+    "降低噪声可能减少多样性；不能把某个噪声倍率设为通用优秀候选阈值。",
+    "Hydra 列表要保持单一参数与引号；potentials 的 JSON 对象不能假定被 BDA 环境变量自动序列化。",
+    "最终PDB的Gly是占位，B-factor是固定/扩散掩码；不能把它当最终候选序列或pLDDT。"
+  ],
+  "gaps": [
+    "覆盖前：library 118 键多无帮助文本；base/authoring 17 字段；现逐项 118/118 与 17/17 覆盖。",
+    "RFdiffusion-authoring-6810138a 1.1.0-draft.1 与 base 1.1.0 的 command/字段键一致；仅文档覆盖，不写数据库或宣称草稿已验证。",
+    "input_pdb UI 字段未直接参与 command；实际使用 inference_input_pdb 端口首个排序 PDB，多文件会静默取首个。",
+    "UI 默认 num_designs=100 而 shell 缺值=10；output_prefix UI=outputs/rfdiffusion/design 但 shell 缺值=design；guide_scale UI=1 与 upstream=10；partial_t UI=0 与 upstream=null。",
+    "BDA diffuser_t 范围1–200、partial_t 范围0–50只是表单约束；仍需满足 partial_t<=diffuser_t。",
+    "guiding_potentials 为 JSON 字段；如果解析成原生 array/object，当前环境导出层不导出复杂对象，必须 preview 验证字符串传参，未证明复杂配置可执行。",
+    "symmetry 缺少官方 --config-name symmetry 切换；scaffoldguided/cyclic 等不在当前 command 中；这些模式不能标记为全流程跑通。",
+    "118 个配置键包括 checkpoint 架构和可能未消费的旧配置，不应作为119项可自由更改的运行参数；contig_settings.*、logging.inputs 等消费边界已明确。",
+    "旧 runbook 没有当前声明的源支持运行证明；live 的 unknown/unproven 标签不能升级为通过。"
+  ]
+}

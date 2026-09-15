@@ -1,0 +1,716 @@
+{
+  "schema_version": 1,
+  "plugin_version": "2024.09-bda.1",
+  "modes": {
+    "score_jd2": "单点评分：对输入结构评分，不进行 Relax，不等于界面结合能。",
+    "relax": "FastRelax：侧链重排与局部最小化；不是纳秒分子动力学。",
+    "InterfaceAnalyzer": "蛋白–蛋白界面分析：已有复合物的界面能、埋藏面积和氢键等。",
+    "relax_interface": "先用 relax 优化并保存坐标，再对每个优化后的复合物运行 InterfaceAnalyzer。",
+    "docking_protocol": "RosettaDock：蛋白–蛋白刚体/侧链采样；需要已有组装与明确伙伴链。",
+    "cartesian_ddg": "Cartesian ΔΔG：匹配 WT/突变体的折叠稳定性分数差；不是结合 ΔΔG。",
+    "rosetta_scripts": "使用上传的 XML 协议；XML 的 mover/filter 参数与输出由该协议定义。"
+  },
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "application": {
+        "type": "string",
+        "default": "score_jd2",
+        "title": "功能模式",
+        "description": "选择计算阶段；不同模式的分数不能混作同一种结合自由能。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "enum": [
+          "score_jd2",
+          "relax",
+          "InterfaceAnalyzer",
+          "relax_interface",
+          "docking_protocol",
+          "cartesian_ddg",
+          "rosetta_scripts"
+        ]
+      },
+      "nstruct": {
+        "type": "integer",
+        "default": 1,
+        "title": "每输入生成数",
+        "description": "每个输入、每个独立重复生成的 decoy 数；cartesian_ddg 使用 ddg_iterations，不使用本参数。",
+        "x-bda-unit": "个",
+        "x-bda-flag": "-nstruct",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 10000,
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "InterfaceAnalyzer",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "replicates": {
+        "type": "integer",
+        "default": 1,
+        "title": "独立重复数",
+        "description": "分别启动进程并使用不同随机种子；各重复保留原始结果，不只保存最优值。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "seed": {
+        "type": "integer",
+        "default": 111111,
+        "title": "起始随机种子",
+        "description": "启用 constant_seed；每个输入/重复的种子递增。固定种子利于复现，不证明采样收敛。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-run:constant_seed / -run:jran",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 2000000000
+      },
+      "score_weights": {
+        "type": "string",
+        "default": "ref2015",
+        "title": "评分函数",
+        "description": "所有比较对象使用同一权重。Cartesian 模式必须选择 *_cart；REU 不能直接当 kcal/mol。",
+        "x-bda-unit": "Rosetta 权重集",
+        "x-bda-flag": "-score:weights",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "enum": [
+          "ref2015",
+          "ref2015_cart",
+          "beta_nov16",
+          "beta_nov16_cart"
+        ]
+      },
+      "out_scorefile": {
+        "type": "string",
+        "default": "score.sc",
+        "title": "评分文件名",
+        "description": "各输入/重复独立目录内的 .sc 文件名；不接受目录或路径穿越。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-out:file:scorefile",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*\\.sc$"
+      },
+      "ex1": {
+        "type": "boolean",
+        "default": false,
+        "title": "额外 χ1 旋转异构体",
+        "description": "扩大侧链 χ1 rotamer 采样；增加打包计算量，不是独立结构重复。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ex1",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "ex2": {
+        "type": "boolean",
+        "default": false,
+        "title": "额外 χ2 旋转异构体",
+        "description": "扩大侧链 χ2 rotamer 采样；仅在协议实际执行 packing 时影响采样。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ex2",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "use_input_sc": {
+        "type": "boolean",
+        "default": true,
+        "title": "保留输入侧链候选",
+        "description": "将输入侧链构象纳入 packing rotamer 候选集合。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-use_input_sc",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "ignore_unrecognized_res": {
+        "type": "boolean",
+        "default": false,
+        "title": "忽略无法识别的残基",
+        "description": "默认关闭。开启可能删除糖基、配体或特殊残基，改变体系；须检查运行日志和保存结构。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ignore_unrecognized_res",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "extra_res_fa": {
+        "type": "string",
+        "default": "",
+        "title": "全原子残基参数文件",
+        "description": "aux 端口下的 .params 相对文件名；为非标准残基提供全原子参数，不自动生成小分子参数。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:extra_res_fa",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "extra_res_cen": {
+        "type": "string",
+        "default": "",
+        "title": "Centroid 残基参数文件",
+        "description": "aux 端口下的 .params 文件；对接低分辨率阶段使用非标准残基时需匹配 centroid 参数。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:extra_res_cen",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "x-bda-modes": [
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "constraints_file": {
+        "type": "string",
+        "default": "",
+        "title": "约束文件",
+        "description": "aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-constraints:cst_fa_file",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "constraint_weight": {
+        "type": "number",
+        "default": 1.0,
+        "title": "文件约束权重",
+        "description": "仅在提供 constraints_file 时传入；不等同于 Relax 自动坐标约束权重。",
+        "x-bda-unit": "权重",
+        "x-bda-flag": "-constraints:cst_fa_weight",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 0,
+        "maximum": 1000,
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "pack_input": {
+        "type": "boolean",
+        "default": false,
+        "title": "先重排输入界面",
+        "description": "分析前是否对输入界面进行侧链 packing；这是评分内部分支，不会覆盖保存的 Relax 坐标。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-pack_input",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "pack_separated": {
+        "type": "boolean",
+        "default": true,
+        "title": "分离后重排界面",
+        "description": "计算 dG_separated 时，是否重排分離伙伴暴露界面的侧链。与 pack_input 分开控制。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-pack_separated",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "compute_packstat": {
+        "type": "boolean",
+        "default": false,
+        "title": "计算界面堆积统计",
+        "description": "启用有随机成分的 packstat；大界面可能较慢。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-compute_packstat",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "interface": {
+        "type": "string",
+        "default": "",
+        "title": "界面链分组",
+        "description": "必填，例如 AB_C 表示受体 A/B 与蛋白 C；天然双链配体可为 AB_CD。使用输入文件实际链标识，不能混淆 mmCIF label/auth ID。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-interface",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "packstat_oversample": {
+        "type": "integer",
+        "default": 100,
+        "title": "Packstat 过采样",
+        "description": "仅 compute_packstat=true 时生效；增加采样以降低随机波动。",
+        "x-bda-unit": "倍",
+        "x-bda-flag": "-packstat:oversample",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "minimum": 1,
+        "maximum": 1000,
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "relax_repeats": {
+        "type": "integer",
+        "default": 5,
+        "title": "Relax 内部循环",
+        "description": "一个 FastRelax 轨迹内的打包/最小化循环；不同于 nstruct 和独立重复。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "-relax:default_repeats",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "minimum": 1,
+        "maximum": 50,
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "relax_cartesian": {
+        "type": "boolean",
+        "default": false,
+        "title": "Cartesian Relax",
+        "description": "使用笛卡尔坐标最小化；必须选 ref2015_cart 或 beta_nov16_cart。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:cartesian",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "constrain_start": {
+        "type": "boolean",
+        "default": true,
+        "title": "约束到输入坐标",
+        "description": "由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:constrain_relax_to_start_coords",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "ramp_constraints": {
+        "type": "boolean",
+        "default": false,
+        "title": "渐弱坐标约束",
+        "description": "配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:ramp_constraints",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "movemap_file": {
+        "type": "string",
+        "default": "",
+        "title": "Relax 自由度文件",
+        "description": "aux 端口下的 MoveMap 文件，控制骨架/侧链/jump 可动性。默认未提供时沿用该 relax 构建的自由度；不是受体自动固定。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:movemap",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "relax_script": {
+        "type": "string",
+        "default": "",
+        "title": "自定义 Relax 循环脚本",
+        "description": "aux 端口下的 Relax script；覆盖内部优化流程，需与 repeats/约束策略一起审阅。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-relax:script",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "dock_partners": {
+        "type": "string",
+        "default": "",
+        "title": "对接伙伴链",
+        "description": "必填，例如 AB_C。对接分组与界面分析分组语法类似，但这是 docking:partners。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-docking:partners",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_search": {
+        "type": "string",
+        "default": "local",
+        "title": "对接搜索范围",
+        "description": "local 从现有姿态附近扰动；global 随机化两个伙伴取向，须充分采样；都不是物理 MD。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "enum": [
+          "local",
+          "global"
+        ],
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_translation": {
+        "type": "number",
+        "default": 3.0,
+        "title": "初始平移扰动",
+        "description": "local 模式 dock_pert 的平移幅度；不能据此推导结合距离或动力学。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "-docking:dock_pert [translation rotation]",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "minimum": 0,
+        "maximum": 100,
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_rotation": {
+        "type": "number",
+        "default": 8.0,
+        "title": "初始旋转扰动",
+        "description": "local 模式 dock_pert 的旋转幅度。",
+        "x-bda-unit": "度",
+        "x-bda-flag": "-docking:dock_pert [translation rotation]",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "minimum": 0,
+        "maximum": 180,
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_local_refine": {
+        "type": "boolean",
+        "default": false,
+        "title": "仅高分辨率对接精修",
+        "description": "跳过低分辨率搜索，用于已有可信近邻姿态；不能与 global 搜索组合。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-docking:docking_local_refine",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "native_file": {
+        "type": "string",
+        "default": "",
+        "title": "参考复合物",
+        "description": "aux 中用于对接 RMSD 的参考结构，不自动作为位置约束；必须具有匹配的链/残基映射。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:native",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "ddg_mut_file": {
+        "type": "string",
+        "default": "",
+        "title": "突变定义文件",
+        "description": "cartesian_ddg 必填的 aux mut_file。使用 Rosetta pose 编号；需要 WT 与突变定义校验，不能用 PDB 编号直接替代。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-ddg:mut_file",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_iterations": {
+        "type": "integer",
+        "default": 3,
+        "title": "WT/突变采样迭代",
+        "description": "每个突变定义的采样次数，不是 nstruct；输出的是协议相关折叠稳定性差分。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "-ddg:iterations",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 1,
+        "maximum": 100,
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_cartesian": {
+        "type": "boolean",
+        "default": true,
+        "title": "DDG Cartesian 优化",
+        "description": "本插件只支持 Cartesian 协议，必须保持 true。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ddg:cartesian",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "enum": [
+          true
+        ],
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_bb_neighbors": {
+        "type": "integer",
+        "default": 1,
+        "title": "骨架邻居范围",
+        "description": "围绕突变位置允许处理的序列邻居范围；不是空间半径。",
+        "x-bda-unit": "残基数",
+        "x-bda-flag": "-ddg:bbnbrs",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 0,
+        "maximum": 10,
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_dump_pdbs": {
+        "type": "boolean",
+        "default": true,
+        "title": "保存 DDG 结构",
+        "description": "保存 WT/突变模型供原子级核查；关闭则仅保存原始分数与日志。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ddg:dump_pdbs",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "fa_max_dis": {
+        "type": "number",
+        "default": 9.0,
+        "title": "全原子作用距离截断",
+        "description": "Cartesian DDG 推荐协议的相互作用截断；须与 WT 预先 Cartesian Relax 的设置一致。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "-fa_max_dis",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 3,
+        "maximum": 20,
+        "x-bda-modes": [
+          "relax",
+          "relax_interface",
+          "InterfaceAnalyzer",
+          "cartesian_ddg"
+        ]
+      },
+      "parser_protocol": {
+        "type": "string",
+        "default": "",
+        "title": "RosettaScripts XML",
+        "description": "rosetta_scripts 必填，aux 下的 XML 文件。平台不会猜测 XML 的科学阶段；生成时验证 XML 可解析，完整 schema 由实际 Rosetta 构建验证。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-parser:protocol",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "parser_script_vars": {
+        "type": "string",
+        "default": "",
+        "title": "XML 变量",
+        "description": "空白分隔的 name=value；作为独立 argv 值传入，不运行 shell。所有变量名必须在 XML 的 %%name%% 中出现，所有占位符必须有值。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-parser:script_vars",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "xml_expected_output": {
+        "type": "string",
+        "default": "score",
+        "title": "XML 最低输出契约",
+        "description": "score 要求至少 nstruct 个有效 SCORE 行；structure 还要求对应数量 PDB。自定义协议的完整科学输出仍由协议作者解释。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "enum": [
+          "score",
+          "structure"
+        ],
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "geometry_contacts": {
+        "type": "boolean",
+        "default": true,
+        "title": "计算界面原子距离",
+        "description": "从同一被评分的复合物坐标提取重原子接触和逐残基对最短距离；内部 packing 的临时姿态不在此几何文件中。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "contact_cutoff": {
+        "type": "number",
+        "default": 4.5,
+        "title": "接触距离阈值",
+        "description": "输出此半径内的全部跨界面重原子对及其距离；没有接触不等于证明不结合。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "minimum": 2,
+        "maximum": 10,
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "receptor_axis": {
+        "type": "string",
+        "default": "",
+        "title": "受体角度锚点",
+        "description": "可选，两枚 CA 的 chain:residue 标识，逗号分隔，如 A:10,A:100；方向从第一个指向第二个。须与 binder_axis 一起提供。",
+        "x-bda-unit": "PDB链:残基编号",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.acos",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "binder_axis": {
+        "type": "string",
+        "default": "",
+        "title": "配体蛋白角度锚点",
+        "description": "可选，两枚 CA 标识，如 C:1,C:50。报告此有向轴与受体轴的夹角；不是未经定义的“整体结合角”。",
+        "x-bda-unit": "PDB链:残基编号",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.acos",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "geometry_reference_file": {
+        "type": "string",
+        "default": "",
+        "title": "天然参考复合物",
+        "description": "可选，aux 下同链分组的参考 PDB；计算其接触、质心距离与相同锚点定义夹角供比较。参考应记录是实验复合物还是对接假说；不同支架的接触编号不能直接当同源位点。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      }
+    },
+    "description": "BDA Rosetta 显式参数表；默认值是本插件默认，非所有 Rosetta 构建的默认。",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "enum": [
+                "InterfaceAnalyzer",
+                "relax_interface"
+              ]
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "interface"
+          ],
+          "properties": {
+            "interface": {
+              "minLength": 3
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "cartesian_ddg"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "ddg_mut_file",
+            "score_weights"
+          ],
+          "properties": {
+            "ddg_mut_file": {
+              "minLength": 1
+            },
+            "score_weights": {
+              "enum": [
+                "ref2015_cart",
+                "beta_nov16_cart"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "docking_protocol"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "dock_partners"
+          ],
+          "properties": {
+            "dock_partners": {
+              "minLength": 3
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "rosetta_scripts"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "parser_protocol"
+          ],
+          "properties": {
+            "parser_protocol": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  }
+}

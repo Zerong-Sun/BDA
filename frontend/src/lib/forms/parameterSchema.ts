@@ -20,6 +20,8 @@ export interface ParameterFieldDefinition {
   jsonType?: 'object' | 'array'
   nullable?: boolean
   required?: boolean
+  /** Applications for which this parameter is editable and submitted. Unset means all. */
+  modes?: string[]
 }
 
 export interface ParameterSchemaMetadata {
@@ -111,6 +113,9 @@ function fieldFromJsonSchemaProperty(
     nullable: Array.isArray(property.type) && property.type.includes('null'),
     jsonType: declaredType === 'object' || declaredType === 'array' ? declaredType : undefined,
     required,
+    modes: Array.isArray(property['x-bda-modes'])
+      ? property['x-bda-modes'].filter((mode): mode is string => typeof mode === 'string')
+      : undefined,
   }
 }
 
@@ -256,6 +261,17 @@ export function defaultsFromFields(fields: ParameterFieldDefinition[]): Record<s
   }, {})
 }
 
+/** Keep visibility and submission in agreement, including a fresh node's default mode. */
+export function isParameterFieldActive(
+  field: ParameterFieldDefinition,
+  fields: ParameterFieldDefinition[],
+  values: Record<string, unknown>,
+): boolean {
+  if (field.key === 'application' || field.modes === undefined) return true
+  const application = values.application ?? fields.find((item) => item.key === 'application')?.default
+  return typeof application === 'string' && field.modes.includes(application)
+}
+
 /** Prepare the editable drafts for the API; full JSON Schema validation stays in preflight. */
 export function prepareParameterValues(
   fields: ParameterFieldDefinition[],
@@ -263,6 +279,12 @@ export function prepareParameterValues(
 ): Record<string, unknown> {
   const result = { ...values }
   for (const field of fields) {
+    // Switching applications must not submit stale flags from the previous mode.
+    // The editor keeps those values in its draft so switching back remains reversible.
+    if (!isParameterFieldActive(field, fields, values)) {
+      delete result[field.key]
+      continue
+    }
     let value = result[field.key]
     const label = field.label ?? field.key
     if (value === undefined || value === '') {

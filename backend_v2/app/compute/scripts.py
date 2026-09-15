@@ -124,20 +124,23 @@ def preview_context(node, plugin, backend: str, command: str, parameters: dict |
     A preview that shows a script the cluster will not run is worse than no preview.
     """
     from ..core.config import get_settings
+    from ..registry.site_runtime import resolve_plugin_runtime
 
     settings = get_settings()
-    resources = plugin.resources if plugin and isinstance(plugin.resources, dict) else {}
+    runtime = resolve_plugin_runtime(
+        plugin, image=node.container_image, queue=node.queue, default_queue=settings.lsf_queue, backend=backend
+    )
     return ScriptContext(
         job_name=f"bda-{PREVIEW_JOB_ID}",
         remote_dir=f"{settings.lsf_remote_root.rstrip('/')}/jobs/{PREVIEW_JOB_ID}",
         command=command,
-        queue=str(node.queue or settings.lsf_queue),
+        queue=str(runtime["queue"]),
         backend=backend,
-        runtime_mode=str(getattr(plugin, "runtime_mode", None) or "container"),
-        container_image=node.container_image or (plugin.container_image if plugin else None),
+        runtime_mode=runtime["runtime_mode"],
+        container_image=runtime["image"],
         upload_wrapper=settings.lsf_upload_wrapper,
-        resources=resources,
-        runtime_setup=list(getattr(plugin, "runtime_setup", None) or []),
+        resources=runtime["resources"],
+        runtime_setup=runtime["runtime_setup"],
         parameters=parameters if parameters is not None else dict(node.parameters or {}),
         staging_mode=settings.lsf_staging_mode,
         input_ports=[
@@ -337,6 +340,8 @@ def _runtime_preamble(ctx: ScriptContext) -> list[str]:
     """
     if ctx.runtime_setup:
         return list(ctx.runtime_setup)
+    if ctx.container_image and ctx.container_image.startswith("site://"):
+        raise ValueError("plugin_site_unresolved: site URI cannot be used as a module/environment name")
     if ctx.runtime_mode == "module" and ctx.container_image:
         return [f"module load {ctx.container_image}"]
     if ctx.runtime_mode == "conda" and ctx.container_image:

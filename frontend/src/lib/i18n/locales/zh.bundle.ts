@@ -1724,6 +1724,10 @@ export const bundleZh = {
       noSchema: '该插件尚未注册参数 schema。',
       advancedParameters: '高级参数',
       required: '插件 schema 要求必填',
+      defaultValue: '默认值',
+      emptyValue: '（空）',
+      minimum: '最小值',
+      maximum: '最大值',
     },
   },
   operations: {

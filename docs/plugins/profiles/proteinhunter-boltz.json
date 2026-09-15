@@ -1,0 +1,1164 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "proteinhunter_boltz",
+  "slug": "proteinhunter-boltz",
+  "summary": "Protein-Hunter以Boltz结构幻觉和LigandMPNN循环生成设计；当前BDA不提供affinity头或seq输入，旧文档与上游seq实现存在冲突。",
+  "sources": [
+    {
+      "id": "registry",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "commit": null,
+      "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/proteinhunter-boltz/README.md",
+      "commit": null,
+      "scope": "2026-08-30历史QM运行手册；与当前声明不同处需单列",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter-env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "commit": null,
+      "scope": "parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-0",
+      "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/design.py",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/boltz_ph/design.py",
+      "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
+      "scope": "boltz_ph/design.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-1",
+      "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/README.md",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/README.md",
+      "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
+      "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-2",
+      "url": "https://github.com/yehlincho/Protein-Hunter/blob/d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c/boltz_ph/pipeline.py",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/proteinhunter-boltz/boltz_ph/pipeline.py",
+      "commit": "d4bd9515882c2aa81e97f3d3bf7f42247a9fe80c",
+      "scope": "boltz_ph/pipeline.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "protein_binder",
+      "title": "蛋白靶标设计",
+      "purpose": "设计链A针对protein_seqs的B/C等目标",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "mode": "binder",
+        "protein_seqs": "<reviewed_target_amino_acid_sequence>",
+        "num_designs": 3,
+        "num_cycles": 3
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "small_molecule_binder",
+      "title": "小分子靶标设计",
+      "purpose": "提供一个CCD或SMILES小分子",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "mode": "binder",
+        "ligand_ccd": "SAM",
+        "ligand_smiles": ""
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "nucleic_binder",
+      "title": "核酸靶标设计",
+      "purpose": "设计蛋白针对DNA/RNA目标",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "mode": "binder",
+        "nucleic_type": "rna",
+        "nucleic_seq": "<reviewed_RNA_sequence>"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "unconditional",
+      "title": "无靶标设计",
+      "purpose": "仅生成蛋白结构/序列",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "mode": "unconditional",
+        "protein_seqs": "",
+        "ligand_ccd": "",
+        "ligand_smiles": "",
+        "nucleic_seq": ""
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "cyclic",
+      "title": "环化链设计配置",
+      "purpose": "在binder配置上请求cyclic",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "mode": "binder",
+        "cyclic": true
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "需额外核对实际成键与几何；仅有标记不是闭环验证"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "affinity",
+      "title": "小分子affinity评估",
+      "purpose": "当前Protein-Hunter包装不暴露Boltz-2 affinity head",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "command只提供boltz2_conf.ckpt，不可把通用Boltz-2亲和力能力赋予本入口"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "scaffold_conditioned",
+      "title": "固定支架序列条件",
+      "purpose": "BDA不暴露seq；官方起始序列支持与固定支架条件设计须区分",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "BDA command没有seq；官方pipeline读取a.seq为初始化，但不保证固定支架或固定序列",
+        "旧runbook关于上游完全不读seq的说法与固定源码冲突"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "alanine_bias",
+      "type": "boolean",
+      "description": "在重设计采样中抑制丙氨酸倾向；不能替代完整可开发性筛查。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --alanine_bias；BDA alanine_bias → --alanine_bias；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "alanine_bias"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env",
+        "upstream-2"
+      ],
+      "default": false
+    },
+    {
+      "key": "contact_residues",
+      "type": "string",
+      "description": "指定蛋白靶标接触残基；目标链间用竖线分隔、同链位置用逗号分隔，例如1,2,5|3,5。必须有protein_seqs并核对编号。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "cyclic"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --contact_residues；BDA contact_residues → --contact_residues；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "contact_residues"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "cyclic",
+      "type": "boolean",
+      "description": "请求环化设计链；结构成键及参数消费须验证，不能只凭开关认为化学闭环已成功。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --cyclic；BDA cyclic → --cyclic；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "cyclic"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env",
+        "upstream-2"
+      ],
+      "default": false
+    },
+    {
+      "key": "diffuse_steps",
+      "type": "integer",
+      "description": "Protein-Hunter内Boltz扩散步骤数，映射--diffuse_steps；不是直接官方Boltz --sampling_steps的界面参数名。",
+      "unit": "计数",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --diffuse_steps；BDA diffuse_steps → --diffuse_steps；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "diffuse_steps"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 100,
+            "minimum": 1,
+            "maximum": 1000,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 100
+    },
+    {
+      "key": "high_iptm_threshold",
+      "type": "number",
+      "description": "内部high-confidence集合的ipTM阈值，0–1；因用同一模型优化而不能作为独立亲和力或功能验证。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --high_iptm_threshold；BDA high_iptm_threshold → --high_iptm_threshold；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "high_iptm_threshold"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 0.8,
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 0.8
+    },
+    {
+      "key": "high_plddt_threshold",
+      "type": "number",
+      "description": "内部high-confidence集合的pLDDT阈值，包装使用0–1；不可直接与AF2/AF3的0–100混比。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --high_plddt_threshold；BDA high_plddt_threshold → --high_plddt_threshold；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "high_plddt_threshold"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 0.8,
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 0.8
+    },
+    {
+      "key": "ligand_ccd",
+      "type": "string",
+      "description": "以PDB CCD代码指定小分子靶标；与ligand_smiles非空值互斥。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "small_molecule_binder"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --ligand_ccd；BDA ligand_ccd → --ligand_ccd；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "ligand_ccd"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "ligand_smiles",
+      "type": "string",
+      "description": "以SMILES定义小分子靶标，需明确电荷/立体化学；与ligand_ccd互斥。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "small_molecule_binder"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --ligand_smiles；BDA ligand_smiles → --ligand_smiles；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "ligand_smiles"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "max_protein_length",
+      "type": "integer",
+      "description": "随机设计蛋白长度上界，需大于等于下界。",
+      "unit": "aa",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --max_protein_length；BDA max_protein_length → --max_protein_length；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "max_protein_length"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 120,
+            "minimum": 4,
+            "maximum": 2000,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 120
+    },
+    {
+      "key": "min_protein_length",
+      "type": "integer",
+      "description": "随机设计蛋白长度下界，需小于等于上界。",
+      "unit": "aa",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --min_protein_length；BDA min_protein_length → --min_protein_length；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "min_protein_length"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 60,
+            "minimum": 4,
+            "maximum": 2000,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 60
+    },
+    {
+      "key": "mode",
+      "type": "string",
+      "description": "Protein-Hunter binder模式针对提供靶标生成链A；unconditional模式不应提供任何靶标。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --mode；BDA mode → --mode；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "mode"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "binder",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "binder",
+              "unconditional"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": "binder"
+    },
+    {
+      "key": "msa_mode",
+      "type": "string",
+      "description": "Protein-Hunter目标MSA路径：single或mmseqs；single并非MMseqs搜索完成后无命中。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "cyclic"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --msa_mode；BDA msa_mode → --msa_mode；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "msa_mode"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "single",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "single",
+              "mmseqs"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": "single"
+    },
+    {
+      "key": "nucleic_seq",
+      "type": "string",
+      "description": "DNA/RNA靶标序列；不是要表达的设计蛋白DNA构建。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "nucleic_binder"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --nucleic_seq；BDA nucleic_seq → --nucleic_seq；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "nucleic_seq"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "nucleic_type",
+      "type": "string",
+      "description": "核酸靶标类型dna或rna，与nucleic_seq共同使用。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "nucleic_binder"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --nucleic_type；BDA nucleic_type → --nucleic_type（仅nucleic_seq非空时传入）；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "nucleic_type"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "dna",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "dna",
+              "rna"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": "dna"
+    },
+    {
+      "key": "num_cycles",
+      "type": "integer",
+      "description": "Protein-Hunter结构预测/序列重设计的迭代轮数；每轮序列可能不同，分数必须绑定该轮序列。",
+      "unit": "计数",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --num_cycles；BDA num_cycles → --num_cycles；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_cycles"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 3,
+            "minimum": 1,
+            "maximum": 100,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 3
+    },
+    {
+      "key": "num_designs",
+      "type": "integer",
+      "description": "独立设计轨迹数量，不等于通过筛选候选数。",
+      "unit": "计数",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --num_designs；BDA num_designs → --num_designs；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_designs"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 3,
+            "minimum": 1,
+            "maximum": 10000,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 3
+    },
+    {
+      "key": "omit_aa",
+      "type": "string",
+      "description": "禁止LigandMPNN采样的氨基酸集合，映射--omit_AA；当前默认排除C，不适合直接宣称保留二硫键支架。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --omit_AA；BDA omit_aa → --omit_AA；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "omit_aa"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "C",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": "C"
+    },
+    {
+      "key": "percent_x",
+      "type": "integer",
+      "description": "初始设计链中X未知残基的百分比，映射--percent_X；X是设计初始化标记，不是最终成熟蛋白序列。",
+      "unit": "%",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --percent_X；BDA percent_x → --percent_X；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "percent_x"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 90,
+            "minimum": 0,
+            "maximum": 100,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 90
+    },
+    {
+      "key": "protein_seqs",
+      "type": "string",
+      "description": "蛋白靶标氨基酸序列，冒号分隔多链；设计链A，目标从B/C等开始，必须核对最终链映射。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "cyclic"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --protein_seqs；BDA protein_seqs → --protein_seqs；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "protein_seqs"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "recycling_steps",
+      "type": "integer",
+      "description": "Boltz结构回收循环数；不是优化轮次num_cycles，也不是物理时间。",
+      "unit": "计数",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --recycling_steps；BDA recycling_steps → --recycling_steps；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "recycling_steps"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 3,
+            "minimum": 0,
+            "maximum": 20,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 3
+    },
+    {
+      "key": "seq",
+      "type": "string",
+      "description": "BDA当前schema限定空值且command不传。官方d4bd951 pipeline实际读取a.seq设定起始序列和长度，和旧runbook说法冲突；起始序列也不等于固定支架/固定残基约束。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游CLI --seq由pipeline读取为初始序列；BDA schema禁止非空且command未传--seq；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "seq"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": null,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ]
+    },
+    {
+      "key": "temperature",
+      "type": "number",
+      "description": "LigandMPNN序列采样温度；BDA默认1.0与上游该commit的0.1不同，必须记录来源。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "protein_binder",
+        "small_molecule_binder",
+        "nucleic_binder",
+        "unconditional",
+        "cyclic",
+        "affinity",
+        "scaffold_conditioned"
+      ],
+      "flag_or_mapping": "固定上游parser声明CLI --temperature；BDA temperature → --temperature；proteinhunter_boltz@d4bd951-qm-c18-20260416-sampling: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "temperature"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "proteinhunter_boltz",
+            "version": "d4bd951-qm-c18-20260416-sampling",
+            "enabled": true,
+            "default": 1.0,
+            "minimum": 0.0,
+            "maximum": 10.0,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": 1.0
+    }
+  ],
+  "outputs": [
+    {
+      "name": "predicted_structure / complex",
+      "meaning": "预测原子坐标及链/残基映射",
+      "unit": "Å",
+      "interpretation": "坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pLDDT",
+      "meaning": "局部结构置信度",
+      "unit": "通常0–100；Boltz/Protein-Hunter原始汇总常0–1",
+      "interpretation": "逐文件核对尺度，不是概率或亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pTM / ipTM",
+      "meaning": "整体折叠/多链相对构象置信度",
+      "unit": "0–1",
+      "interpretation": "单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "PAE",
+      "meaning": "对齐后的相对位置预测误差矩阵",
+      "unit": "Å",
+      "interpretation": "保留链映射、非对角块和聚合定义；不能单独证明结合位点。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "summary_all_runs.csv / summary_high_iptm.csv",
+      "meaning": "所有轨迹及内部阈值通过集合",
+      "unit": "混合字段",
+      "interpretation": "每轮可能换序列；只有与当前候选SHA一致轮次属于该候选。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "0_protein_hunter_design / high_iptm_pdb / high_iptm_yaml",
+      "meaning": "设计轨迹、筛选后的结构与配套YAML",
+      "unit": "结构+参数",
+      "interpretation": "内部high confidence不是独立验证；没有affinity JSON不能声称算了亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "先按模型与版本确认输入实体、链ID、序列SHA、MSA/模板来源；区分预测、设计与亲和力。",
+    "从当前BDA快照核对enabled、command和ports；文档中的configuration_only/not_exposed不是可执行能力承诺。",
+    "填写对应模式配置，检查参数最终进入命令或结构化输入；数据库/权重需已存在且记录版本。",
+    "预览任务脚本和实际输入文件，核对CPU/GPU、布尔false、输出目录及样本总数；本次审计不提交任务。",
+    "完成后逐输入/seed/model核对文件、原始指标和失败样本；声明、成功退出、解析成功及科学结论分开记录。"
+  ],
+  "pitfalls": [
+    "pLDDT/ipTM/RMSD不等于ΔG/ΔΔG/Kd或生物活性。",
+    "template、initial_guess、空MSA和真实MSA是不同证据条件；不能混成独立交叉验证。",
+    "未消费的UI参数不可写入报告为已执行条件；本地catalog默认、BDA默认、命令回退和安装默认要区分。",
+    "上游commit d4bd951可核实，但QM版本另含c18/sampling本地改动，未证明安装源码逐字一致。",
+    "仅boltz2_conf.ckpt路径；没有affinity请求和独立亲和力权重，iptm不是小分子Kd或ΔG。",
+    "目标结构port未在command消费，实际目标来自protein_seqs/ligand/nucleic参数；不能宣称结构模板已用于设计。",
+    "内部优化后的同模型confidence属于选择偏差，需独立结构方法及实验验证。",
+    "random seed未在此BDA schema/command暴露；seeded_proteinhunter_entry.py历史作业包装不能自动归属于此注册入口。",
+    "BDA禁止seq非空且command未传；但官方d4bd951 pipeline.py读取a.seq作为起始序列，与旧runbook/registry描述冲突。须核验QM本地c18源码；初始化序列不等于固定支架。"
+  ],
+  "gaps": [
+    "上游commit d4bd951可核实，但QM版本另含c18/sampling本地改动，未证明安装源码逐字一致。",
+    "仅boltz2_conf.ckpt路径；没有affinity请求和独立亲和力权重，iptm不是小分子Kd或ΔG。",
+    "目标结构port未在command消费，实际目标来自protein_seqs/ligand/nucleic参数；不能宣称结构模板已用于设计。",
+    "内部优化后的同模型confidence属于选择偏差，需独立结构方法及实验验证。",
+    "random seed未在此BDA schema/command暴露；seeded_proteinhunter_entry.py历史作业包装不能自动归属于此注册入口。",
+    "BDA禁止seq非空且command未传；但官方d4bd951 pipeline.py读取a.seq作为起始序列，与旧runbook/registry描述冲突。须核验QM本地c18源码；初始化序列不等于固定支架。",
+    "上游另有template_path/refiner_mode/use_alphafold3_validation/contact过滤控制，但当前BDA未暴露；不能把上游可选AF3验证当作本作业已经执行。"
+  ]
+}

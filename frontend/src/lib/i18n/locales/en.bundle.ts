@@ -1790,6 +1790,10 @@ export const bundleEn = {
       noSchema: 'No parameter schema is registered for this plugin yet.',
       advancedParameters: 'Advanced parameters',
       required: 'Required by the plugin schema',
+      defaultValue: 'Default',
+      emptyValue: '(empty)',
+      minimum: 'Minimum',
+      maximum: 'Maximum',
     },
   },
   operations: {

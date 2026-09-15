@@ -1,0 +1,1280 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "ProteinMPNN",
+  "slug": "proteinmpnn",
+  "summary": "ProteinMPNN 在给定蛋白骨架和链/位置约束下采样序列，或计算序列条件概率。覆盖34个 library 参数与所有版本25个唯一 BDA 字段；概率分数不代表结合 ΔG、热稳定性或实验活性。",
+  "sources": [
+    {
+      "id": "live",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "scope": "当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "scope": "手工提交库参数清单；不是 BDA command 已转发的证据",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/proteinmpnn/README.md",
+      "scope": "旧集群 runbook；历史记录与当前声明证明边界",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "readme",
+      "url": "https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/README.md",
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "scope": "采样、评分、概率模式、权重种类与 FASTA 指标",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "cli",
+      "url": "https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_run.py",
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "scope": "完整34参数、分支优先级、数量取整、路径与权重加载",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "utils",
+      "url": "https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/protein_mpnn_utils.py",
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "scope": "采样概率、PSSM、tied positions 与 mask",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "fixed",
+      "url": "https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_fixed_positions_dict.py",
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "scope": "一开始编号的解析链位置映射",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "ties",
+      "url": "https://github.com/dauparas/ProteinMPNN/blob/8907e6671bfbfc92303b5f79c4b5e6ce47cdef57/helper_scripts/make_tied_positions_dict.py",
+      "commit": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "scope": "同源链与跨链等同残基映射",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter_env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "scope": "参数环境导出：标量小写键、bool为1/空字符串、array/object不导出",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "sample",
+      "title": "骨架条件序列采样",
+      "purpose": "对指定链的可设计残基采样序列。",
+      "required_inputs": [
+        "pdb_path 或 jsonl_path 一个骨架输入；明确 pdb_path_chains"
+      ],
+      "parameters": {
+        "num_seq_per_target": 8,
+        "batch_size": 1,
+        "sampling_temp": "0.1",
+        "seed": 37
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "每个温度实际样本数为 floor(num_seq_per_target/batch_size)*batch_size；排除第一条参考序列。",
+        "核对链顺序、序列长度与氨基酸字母表；保存每条 FASTA score/global_score/seed/model。"
+      ],
+      "limitations": [
+        "模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。"
+      ],
+      "source_refs": [
+        "readme",
+        "cli",
+        "live"
+      ]
+    },
+    {
+      "id": "fixed_tied",
+      "title": "固定位置和跨链 tied 设计",
+      "purpose": "保留 motif 的序列身份，或让多位置共享氨基酸。",
+      "required_inputs": [
+        "骨架与设计链；逐结构名/逐链的一开始编号位置 JSONL"
+      ],
+      "parameters": {
+        "fixed_positions_jsonl": "/staged/fixed.jsonl",
+        "tied_positions_jsonl": "/staged/ties.jsonl",
+        "num_seq_per_target": 8
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "逐样本验证固定位置完全保留、tied 组身份一致；不能只检查任务 exit=0。"
+      ],
+      "limitations": [
+        "command 有参数入口；fixed_positions 端口有明确 staging，其他 artifact_ref 路径需 preview 检查实际解析，不能假定 UI 资产ID可作为文件路径。",
+        "固定和 tied 条件冲突、链号错误必须提前检查。"
+      ],
+      "source_refs": [
+        "fixed",
+        "ties",
+        "live",
+        "cli"
+      ]
+    },
+    {
+      "id": "soluble",
+      "title": "可溶蛋白专用权重",
+      "purpose": "采用仅可溶蛋白训练的权重进行条件序列设计。",
+      "required_inputs": [
+        "完整 N/CA/C/O 骨架与可用 soluble checkpoint"
+      ],
+      "parameters": {
+        "use_soluble_model": true,
+        "model_name": "v_48_020"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "官方 soluble 权重列出 v_48_010、v_48_020；并非所有 UI model_name 都有 soluble 版本。",
+        "不保证表达可溶性，也不能据此断言 vanilla 权重一定产生表面疏水聚集。"
+      ],
+      "source_refs": [
+        "readme",
+        "cli",
+        "live"
+      ]
+    },
+    {
+      "id": "ca_only",
+      "title": "CA-only 逆折叠",
+      "purpose": "对仅有 CA 的骨架使用专门模型。",
+      "required_inputs": [
+        "CA 骨架和 ca_model_weights；不能同时 soluble"
+      ],
+      "parameters": {
+        "ca_only": true,
+        "use_soluble_model": false,
+        "model_name": "v_48_020"
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA 先运行 parse_multiple_chains.py，未显式传 CA-only 解析选项；需核实预解析与模型输入兼容。",
+        "官方 CA+soluble 路径会退出，不能视为合法组合。"
+      ],
+      "source_refs": [
+        "readme",
+        "cli",
+        "live"
+      ]
+    },
+    {
+      "id": "score",
+      "title": "已有序列评分",
+      "purpose": "计算给定骨架与已有序列的负对数概率。",
+      "required_inputs": [
+        "骨架；可选按链字母排序并以 / 分隔的 path_to_fasta"
+      ],
+      "parameters": {
+        "score_only": 1,
+        "path_to_fasta": "/staged/candidates.fa",
+        "num_seq_per_target": 8
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA command 未转发 score_only/path_to_fasta；旧 library 支持。",
+        "保持相同骨架、链mask、噪声与checkpoint比较；不是通用跨蛋白亲和力排序。"
+      ],
+      "source_refs": [
+        "readme",
+        "cli",
+        "library"
+      ]
+    },
+    {
+      "id": "conditional",
+      "title": "逐位置条件概率",
+      "purpose": "给出 p(s_i | 其余序列, backbone)，可切到仅骨架条件。",
+      "required_inputs": [
+        "骨架及参考序列"
+      ],
+      "parameters": {
+        "conditional_probs_only": 1,
+        "conditional_probs_only_backbone": 0,
+        "num_seq_per_target": 8
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA command 未转发此分支开关；conditional_probs_only_backbone 只有配合 conditional_probs_only 才生效。"
+      ],
+      "source_refs": [
+        "cli",
+        "utils",
+        "library"
+      ]
+    },
+    {
+      "id": "unconditional_probs",
+      "title": "仅骨架概率",
+      "purpose": "单次 forward 得到 p(s_i | backbone)，此处 unconditional 仍以骨架为条件。",
+      "required_inputs": [
+        "骨架"
+      ],
+      "parameters": {
+        "unconditional_probs_only": 1,
+        "num_seq_per_target": 8
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "不是无骨架 de novo 序列生成；BDA 未转发此分支开关。"
+      ],
+      "source_refs": [
+        "cli",
+        "utils",
+        "library"
+      ]
+    },
+    {
+      "id": "bias_pssm",
+      "title": "氨基酸限制、偏置与 PSSM",
+      "purpose": "控制全局/逐位氨基酸组成、禁用集合或与 PSSM 概率混合。",
+      "required_inputs": [
+        "编号对齐的 bias/omit/PSSM JSONL"
+      ],
+      "parameters": {
+        "bias_AA_jsonl": "/staged/bias.jsonl",
+        "pssm_multi": 0.5,
+        "pssm_bias_flag": 1
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA 只转发全局 omit_aas；多数 bias/PSSM fields 虽可见但 command 不读取。"
+      ],
+      "source_refs": [
+        "cli",
+        "utils",
+        "library",
+        "live"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "backbone_noise",
+      "type": "number",
+      "description": "向骨架原子加入高斯坐标扰动的标准差；属于推理噪声，区别于模型名中的训练噪声。",
+      "unit": "Å",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--backbone_noise <value>",
+      "bda_keys": [
+        "backbone_noise"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 backbone_noise 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 backbone_noise 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "batch_size",
+      "type": "integer",
+      "description": "每批并行样本数；固定代码用整数除法决定批次数，不能超过请求样本数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--batch_size <value>",
+      "bda_keys": [
+        "batch_size"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "正整数且不大于 num_seq_per_target；建议整除以免静默少样本。",
+        "BDA ProteinMPNN@1.0.0 字段 batch_size 的声明：{\"type\":\"integer\",\"default\":1,\"min\":1,\"max\":1024}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 batch_size 的声明：{\"type\":\"integer\",\"default\":1,\"min\":1,\"max\":1024}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": 1
+    },
+    {
+      "key": "bias_AA_jsonl",
+      "type": "string",
+      "description": "按氨基酸类型给全局 logits 添加偏置的 JSONL，正值提高相对采样倾向、负值降低。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--bias_AA_jsonl <value>",
+      "bda_keys": [
+        "bias_aa_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 bias_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 bias_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "bias_by_res_jsonl",
+      "type": "string",
+      "description": "逐结构、逐位置、逐氨基酸的 logits 偏置矩阵路径，必须与解析后位置对齐。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--bias_by_res_jsonl <value>",
+      "bda_keys": [
+        "bias_by_res_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 bias_by_res_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 bias_by_res_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "ca_only",
+      "type": "boolean",
+      "description": "启用仅 CA 输入与专用 CA 模型；不补全原子，也不能与 soluble 默认权重组合。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "soluble",
+        "ca_only"
+      ],
+      "flag_or_mapping": "--ca_only (flag)",
+      "bda_keys": [
+        "ca_only"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 ca_only 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 ca_only 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live",
+        "parameter_env"
+      ],
+      "default": false
+    },
+    {
+      "key": "chain_id_jsonl",
+      "type": "string",
+      "description": "逐结构指定设计链与固定链的 JSONL；上游缺省会设计所有链，BDA 则自行生成此文件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "--chain_id_jsonl <value>",
+      "bda_keys": [
+        "chain_id_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 chain_id_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 chain_id_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "fixed",
+        "ties",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "conditional_probs_only",
+      "type": "integer",
+      "description": "进入逐位置条件概率分支，保存 log p(s_i | 其余序列, X)；1开启、0关闭。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "conditional"
+      ],
+      "flag_or_mapping": "--conditional_probs_only <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "conditional_probs_only_backbone",
+      "type": "integer",
+      "description": "配合 conditional_probs_only，将条件从其余序列+骨架改为仅骨架。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "conditional"
+      ],
+      "flag_or_mapping": "--conditional_probs_only_backbone <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "fixed_positions_jsonl",
+      "type": "string",
+      "description": "保留设计链中指定位置氨基酸身份的 JSONL；位置为解析链内一开始编号，非任意原始 PDB 编号。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "--fixed_positions_jsonl <value>",
+      "bda_keys": [
+        "fixed_positions_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 fixed_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 fixed_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "fixed",
+        "ties",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "jsonl_path",
+      "type": "string",
+      "description": "解析骨架 JSONL 文件，包含结构名、各链序列及坐标；官方 help 的 folder 措辞不应误导成目录。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--jsonl_path <value>",
+      "bda_keys": [
+        "jsonl_path"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 jsonl_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 jsonl_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "max_length",
+      "type": "integer",
+      "description": "读取数据时允许的最大序列长度过滤上限；不是模型可承受的显存保证。",
+      "unit": "残基",
+      "modes": [
+        "sample"
+      ],
+      "flag_or_mapping": "--max_length <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 200000
+    },
+    {
+      "key": "model_name",
+      "type": "string",
+      "description": "权重文件基名；v_48_020 表示48邻边、0.20 Å训练噪声版本，须检查具体权重目录。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "soluble",
+        "ca_only"
+      ],
+      "flag_or_mapping": "--model_name <value>",
+      "bda_keys": [
+        "model_name"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 model_name 的声明：{\"type\":\"enum\",\"default\":\"v_48_020\",\"options\":[\"v_48_002\",\"v_48_010\",\"v_48_020\",\"v_48_030\"]}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 model_name 的声明：{\"type\":\"enum\",\"default\":\"v_48_020\",\"options\":[\"v_48_002\",\"v_48_010\",\"v_48_020\",\"v_48_030\"]}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": "v_48_020"
+    },
+    {
+      "key": "num_seq_per_target",
+      "type": "integer",
+      "description": "每个骨架每个温度请求的序列样本数；实际按 batch_size 整数批截断。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--num_seq_per_target <value>",
+      "bda_keys": [
+        "num_seq_per_target"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "选择 batch_size 的正整数倍；每个温度独立产生该数量。",
+        "BDA ProteinMPNN@1.0.0 字段 num_seq_per_target 的声明：{\"type\":\"integer\",\"default\":8,\"min\":1,\"max\":10000}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 num_seq_per_target 的声明：{\"type\":\"integer\",\"default\":8,\"min\":1,\"max\":10000}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": 1
+    },
+    {
+      "key": "omit_AA_jsonl",
+      "type": "string",
+      "description": "逐链、逐位置的禁止氨基酸集合映射文件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--omit_AA_jsonl <value>",
+      "bda_keys": [
+        "omit_aa_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 omit_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 omit_aa_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "omit_AAs",
+      "type": "string",
+      "description": "所有可设计位置全局禁止的氨基酸字母串，默认禁止 X；不可将所有允许类型排除。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--omit_AAs <value>",
+      "bda_keys": [
+        "omit_aas"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 omit_aas 的声明：{\"type\":\"string\",\"default\":\"X\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 omit_aas 的声明：{\"type\":\"string\",\"default\":\"X\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": "X"
+    },
+    {
+      "key": "out_folder",
+      "type": "string",
+      "description": "序列与概率/评分文件的输出目录；BDA command 强制使用 BDA_OUTPUT_DIR，忽略同名 UI 值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--out_folder <value>",
+      "bda_keys": [
+        "out_folder"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 out_folder 的声明：{\"type\":\"string\",\"default\":\"outputs/proteinmpnn\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 out_folder 的声明：{\"type\":\"string\",\"default\":\"outputs/proteinmpnn\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "path_to_fasta",
+      "type": "string",
+      "description": "score_only 模式要评估的序列 FASTA；多链按字母顺序以 / 分隔并匹配骨架长度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "score"
+      ],
+      "flag_or_mapping": "--path_to_fasta <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": ""
+    },
+    {
+      "key": "path_to_model_weights",
+      "type": "string",
+      "description": "直接指定权重目录，优先于自动 vanilla/soluble/CA 目录选择；需留存文件 SHA。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "soluble",
+        "ca_only"
+      ],
+      "flag_or_mapping": "--path_to_model_weights <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": ""
+    },
+    {
+      "key": "pdb_path",
+      "type": "string",
+      "description": "上游单个 PDB 输入路径；BDA 通过 pdb_path 端口目录批量预解析 PDB。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--pdb_path <value>",
+      "bda_keys": [
+        "pdb_path"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 pdb_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pdb_path 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "pdb_path_chains",
+      "type": "string",
+      "description": "用空格分隔要设计的链字母；BDA 使用它生成 assigned_pdbs.jsonl，缺值默认 A。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "--pdb_path_chains <value>",
+      "bda_keys": [
+        "pdb_path_chains"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 pdb_path_chains 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pdb_path_chains 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "fixed",
+        "ties",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "pssm_bias_flag",
+      "type": "integer",
+      "description": "是否把 PSSM 概率按 pssm_multi 与模型采样概率混合；1开启。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--pssm_bias_flag <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils"
+      ],
+      "default": 0
+    },
+    {
+      "key": "pssm_jsonl",
+      "type": "string",
+      "description": "含逐位 PSSM 系数、概率和 log-odds 的 JSONL；须与解析链及位置一一对应。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--pssm_jsonl <value>",
+      "bda_keys": [
+        "pssm_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 pssm_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "pssm_log_odds_flag",
+      "type": "integer",
+      "description": "是否应用 PSSM log-odds 阈值产生的逐位氨基酸允许掩码。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--pssm_log_odds_flag <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils"
+      ],
+      "default": 0
+    },
+    {
+      "key": "pssm_multi",
+      "type": "number",
+      "description": "PSSM 概率混合强度，0忽略混合、1尽量由PSSM决定；须配合 pssm_bias_flag 和有效逐位系数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--pssm_multi <value>",
+      "bda_keys": [
+        "pssm_multi"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 pssm_multi 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_multi 的声明：{\"type\":\"number\",\"default\":0.0,\"min\":0,\"max\":1}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "pssm_threshold",
+      "type": "number",
+      "description": "将逐位 PSSM log-odds 与此阈值比较，代码使用严格大于；须启用 pssm_log_odds_flag 才用于采样限制。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "bias_pssm"
+      ],
+      "flag_or_mapping": "--pssm_threshold <value>",
+      "bda_keys": [
+        "pssm_threshold"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 未读取或被内部生成值替代，不能依字段存在推断生效。",
+        "BDA ProteinMPNN@1.0.0 字段 pssm_threshold 的声明：{\"type\":\"number\",\"default\":0.0}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 pssm_threshold 的声明：{\"type\":\"number\",\"default\":0.0}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "utils",
+        "live"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "sampling_temp",
+      "type": "string",
+      "description": "空格分隔的一组采样温度字符串；越高通常越多样，不是物理温度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample"
+      ],
+      "flag_or_mapping": "--sampling_temp <value>",
+      "bda_keys": [
+        "sampling_temp"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "必须正数；1.0.1 schema 是单数 number，不能表示多个温度；UI 允许0但上游除以温度不应设0。",
+        "BDA ProteinMPNN@1.0.0 字段 sampling_temp 的声明：{\"type\":\"string\",\"default\":\"0.1\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN@1.0.1 字段 sampling_temp 的声明：{\"type\":\"number\",\"default\":0.0001,\"minimum\":0.0,\"maximum\":1.0}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 sampling_temp 的声明：{\"type\":\"string\",\"default\":\"0.1\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": "0.1"
+    },
+    {
+      "key": "save_probs",
+      "type": "integer",
+      "description": "保存序列采样时每位概率及相关数组的开关（整数0/1）。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample"
+      ],
+      "flag_or_mapping": "--save_probs <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "save_score",
+      "type": "integer",
+      "description": "额外保存负对数概率评分数组的开关（整数0/1），与 FASTA 头中的分数记录不同。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "score"
+      ],
+      "flag_or_mapping": "--save_score <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "score_only",
+      "type": "integer",
+      "description": "只计算输入骨架/序列评分，不生成新序列；优先于其他概率分支。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "score"
+      ],
+      "flag_or_mapping": "--score_only <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "seed",
+      "type": "integer",
+      "description": "随机种子；官方0会自动抽取随机种子，复现实验需保留实际非零 seed。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "score",
+        "conditional",
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--seed <value>",
+      "bda_keys": [
+        "seed"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 seed 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 seed 的声明：{\"type\":\"integer\",\"default\":0,\"min\":0}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live"
+      ],
+      "default": 0
+    },
+    {
+      "key": "suppress_print",
+      "type": "integer",
+      "description": "抑制常规终端打印，整数0/1；不应因此省略采样参数的证据保存。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample"
+      ],
+      "flag_or_mapping": "--suppress_print <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "tied_positions_jsonl",
+      "type": "string",
+      "description": "规定多个位置同次采样共享氨基酸的组映射，可跨链实现序列对称；位置必须与解析序列一致。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "--tied_positions_jsonl <value>",
+      "bda_keys": [
+        "tied_positions_jsonl"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 tied_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 tied_positions_jsonl 的声明：{\"type\":\"artifact_ref\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "fixed",
+        "ties",
+        "live"
+      ],
+      "default": ""
+    },
+    {
+      "key": "unconditional_probs_only",
+      "type": "integer",
+      "description": "输出仅骨架条件的逐位 log 概率，使用一次前向计算；不以其他位置的序列为条件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "unconditional_probs"
+      ],
+      "flag_or_mapping": "--unconditional_probs_only <value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA schema/command 未公开此 CLI 参数；手工 library 可表达。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library"
+      ],
+      "default": 0
+    },
+    {
+      "key": "use_soluble_model",
+      "type": "boolean",
+      "description": "选择仅可溶蛋白训练的权重目录；不能直接预测表达可溶性。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "sample",
+        "soluble",
+        "ca_only"
+      ],
+      "flag_or_mapping": "--use_soluble_model (flag)",
+      "bda_keys": [
+        "use_soluble_model"
+      ],
+      "constraints": [
+        "BDA 字段存在；command 有读取/输入 staging 映射，仍应核对实际路径。",
+        "BDA ProteinMPNN@1.0.0 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN@1.0.1 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":true}；仅记录声明，不等于命令已执行该值。",
+        "BDA ProteinMPNN-authoring-6810138a@1.0.0-draft.1 字段 use_soluble_model 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "cli",
+        "readme",
+        "library",
+        "live",
+        "parameter_env"
+      ],
+      "default": false
+    },
+    {
+      "key": "seqs_per_struct",
+      "type": "integer",
+      "description": "BDA 1.0.1 中表示每个结构序列数的旧包装字段；实际 command 仅读取 num_seq_per_target，因此该值目前不控制样本数。",
+      "unit": "无",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "当前无有效 CLI 映射",
+      "bda_keys": [
+        "seqs_per_struct"
+      ],
+      "constraints": [
+        "这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。",
+        "BDA ProteinMPNN@1.0.1 字段 seqs_per_struct 的声明：{\"type\":\"integer\",\"default\":8,\"minimum\":1,\"maximum\":64}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "live",
+        "cli"
+      ],
+      "default": 8
+    },
+    {
+      "key": "relax_cycles",
+      "type": "integer",
+      "description": "BDA 1.0.1 的旧包装 relax 轮数字段；官方 ProteinMPNN CLI 不做 Rosetta relax，当前 command 也无 relax 阶段。",
+      "unit": "轮",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "当前无有效 CLI 映射",
+      "bda_keys": [
+        "relax_cycles"
+      ],
+      "constraints": [
+        "这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。",
+        "BDA ProteinMPNN@1.0.1 字段 relax_cycles 的声明：{\"type\":\"integer\",\"default\":0,\"minimum\":0,\"maximum\":10}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "live",
+        "cli"
+      ],
+      "default": 0
+    },
+    {
+      "key": "fixed_positions",
+      "type": "string",
+      "description": "BDA 1.0.1 的字符串属性；与名为 fixed_positions 的文件输入端口不是同一对象，command 使用 staged JSON/JSONL，未解析此字符串。",
+      "unit": "无",
+      "modes": [
+        "sample",
+        "fixed_tied"
+      ],
+      "flag_or_mapping": "当前无有效 CLI 映射",
+      "bda_keys": [
+        "fixed_positions"
+      ],
+      "constraints": [
+        "这是可追溯的接口缺口，不能为该字段编造官方含义或声称已生效。",
+        "BDA ProteinMPNN@1.0.1 字段 fixed_positions 的声明：{\"type\":\"string\",\"default\":\"\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "live",
+        "cli"
+      ],
+      "default": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "seqs/*.fa",
+      "meaning": "参考序列与设计序列；多链以 / 分隔",
+      "unit": "氨基酸单字母",
+      "interpretation": "FASTA 头的编号、T、sample、score 是元数据，不能拼入序列；首条通常为原骨架序列。",
+      "source_refs": [
+        "readme",
+        "cli"
+      ]
+    },
+    {
+      "name": "score",
+      "meaning": "设计且可设计位置上的平均负自然对数概率",
+      "unit": "nats/残基",
+      "interpretation": "同一骨架、权重、mask 和协议下较低表示模型更偏好；不是 REU/kcal/mol/亲和力。",
+      "source_refs": [
+        "readme",
+        "cli",
+        "utils"
+      ]
+    },
+    {
+      "name": "global_score",
+      "meaning": "所有有坐标残基含固定链的平均负对数概率",
+      "unit": "nats/残基",
+      "interpretation": "大靶标固定链可主导分数，不能替代 binder 设计区域 score。",
+      "source_refs": [
+        "readme",
+        "cli"
+      ]
+    },
+    {
+      "name": "seq_recovery",
+      "meaning": "设计掩码区域与参考序列相同的残基比例",
+      "unit": "0–1",
+      "interpretation": "参考恢复率，不是功能恢复率。",
+      "source_refs": [
+        "cli"
+      ]
+    },
+    {
+      "name": "score_only/*.npz / scores/*.npz",
+      "meaning": "评分分支或额外保存的评分数组",
+      "unit": "nats/残基",
+      "interpretation": "需保留 seed/重复、链 mask、native 与 FASTA来源；BDA 当前未暴露该分支。",
+      "source_refs": [
+        "cli"
+      ]
+    },
+    {
+      "name": "conditional_probs_only/*.npz / unconditional_probs_only/*.npz / probs/*.npz",
+      "meaning": "逐位置21字母概率或 log_p 与位置/设计 mask",
+      "unit": "概率或 log 概率，按数组名",
+      "interpretation": "区分条件定义并核对 shape、字母顺序和掩码；未自动转成受体结合证据。",
+      "source_refs": [
+        "cli",
+        "utils"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择具体插件版本并冻结输入文件、序列/结构编号映射、配置和权重校验值。",
+    "按下列模式检查输入条件；先 render/preview，对照实际命令检查每个参数被接收。",
+    "按站点流程 validate → render/preview → review → stage → review → submit。",
+    "执行后核对输出数量、参数回显、随机种子、条件几何与残基保留，再将结构和元数据一并入库。"
+  ],
+  "pitfalls": [
+    "ProteinMPNN 不进行 MD、Rosetta relax 或亲和力测量；scoring、conditional 和 sampling 是不同分支。",
+    "固定位置与 tied 映射按解析链的一开始位置，不宜直接输入含缺口/插入码的原 PDB 编号。",
+    "FASTA 描述行有数字和字母是元数据；真正序列行只应含氨基酸符号及约定链分隔符。",
+    "不同温度、骨架长度、固定靶标比例的 score 不能不加说明混排。",
+    "0 seed 不是固定种子；num_seq_per_target 不整除 batch_size 会减少实际输出数。"
+  ],
+  "gaps": [
+    "覆盖前：library 34 键；1.0.0/authoring 22 字段，1.0.1 5 properties；并集25。已覆盖34/34及25/25。",
+    "ProteinMPNN-authoring-6810138a 1.0.0-draft.1 字段与base1.0.0一致，但 command 新增 pdb_path_chains 非空检查；base 缺值默认 A。",
+    "1.0.1 同一 command 与新版 properties 不匹配：seqs_per_struct/relax_cycles/fixed_positions 字符串无对应实现，不能声称这三个设置已经运行。",
+    "1.0.1 sampling_temp 默认0.0001、use_soluble_model=true；这些是本地策略，不是官方推荐普适阈值，原描述的表面疏水归因无普适证据。",
+    "1.0.0 UI num_seq_per_target=8、sampling_temp=0.1、seed=0；shell缺值分别5、0.2、37；文档 default 指 upstream，必须另看选定BDA版本的最终配置。",
+    "bias_aa_jsonl/bias_by_res_jsonl/omit_aa_jsonl/pssm_jsonl/pssm_multi/pssm_threshold 存在表单字段但未进 command；chain_id_jsonl 被内部 assign_fixed_chains 输出替代。",
+    "fixed_positions 端口有明确 staging；tied_positions_jsonl 等 artifact_ref 是否被转换成运行路径需实际 preview/小样验证。",
+    "上游示例默认权重支持集与 BDA model_name 枚举不同；CA-only 不支持 soluble 组合。",
+    "输出端口宣称 *.csv score_table，但官方主要分数位于 FASTA/NPY/NPZ；不得保证产生 CSV，需检查 proteinmpnn_fasta parser 的实际入库结果。",
+    "站点 <SITE_PATH> 的具体 commit 与 CLI 差异未由 live 快照证明；此处 pinned GitHub 语义不能当成站点二进制完全等同证据。",
+    "官方 argparse 帮助把 save_score 称为写npy，但固定源码实际 np.savez 写 scores/*.npz；按代码记录真实产物。"
+  ]
+}

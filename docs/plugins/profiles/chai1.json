@@ -1,0 +1,1035 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "Chai-1",
+  "slug": "chai1",
+  "summary": "Chai多分子结构预测，可用ESM、MSA、模板及约束；当前BDA注册disabled，只提供可审阅配置，不能宣称可运行。",
+  "sources": [
+    {
+      "id": "registry",
+      "path": "private/datasets/plugin-docs-audit-20260915/snapshots/live-registry.json",
+      "commit": null,
+      "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/chai1/README.md",
+      "commit": null,
+      "scope": "2026-08-30历史QM运行手册；与当前声明不同处需单列",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "commit": "c544fb183e865c4950909444db860a9d50604f66",
+      "scope": "手工提交library的chai1参数提取，默认值不是BDA默认值",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter-env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "commit": null,
+      "scope": "parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-0",
+      "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/chai_lab/chai1.py",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/chai_lab/chai1.py",
+      "commit": "c544fb183e865c4950909444db860a9d50604f66",
+      "scope": "chai_lab/chai1.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-1",
+      "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/README.md",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/README.md",
+      "commit": "c544fb183e865c4950909444db860a9d50604f66",
+      "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-2",
+      "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/examples/restraints/README.md",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/examples/restraints/README.md",
+      "commit": "c544fb183e865c4950909444db860a9d50604f66",
+      "scope": "examples/restraints/README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-3",
+      "url": "https://github.com/chaidiscovery/chai-lab/blob/c544fb183e865c4950909444db860a9d50604f66/pyproject.toml",
+      "path": "private/datasets/plugin-docs-audit-20260915/prediction-sources/chai1/pyproject.toml",
+      "commit": "c544fb183e865c4950909444db860a9d50604f66",
+      "scope": "pyproject.toml；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "single_sequence",
+      "title": "ESM/单序列预测",
+      "purpose": "特殊FASTA输入，无远端MSA",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "use_esm_embeddings": true,
+        "use_msa_server": false
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "complex",
+      "title": "多分子复合物",
+      "purpose": "FASTA不同实体定义蛋白、核酸或ligand",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "num_diffn_samples": 5
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "msa_server",
+      "title": "远端MSA",
+      "purpose": "MMseqs服务产生目标MSA",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "use_msa_server": true
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "local_msa",
+      "title": "本地MSA",
+      "purpose": "使用Chai格式MSA目录",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "msa_directory": "/reviewed/chai-msas"
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "restraints",
+      "title": "接触/成键约束",
+      "purpose": "输入兼容Chai schema的约束文件",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "restraints_json": "/reviewed/restraints.csv"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "templates",
+      "title": "模板特征",
+      "purpose": "服务或template_hits_path加载模板",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "use_templates_server": true
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "Chai BDA插件disabled；template_cif_folder未映射到实际命令"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "constraint_path",
+      "type": "string",
+      "description": "Chai接触约束CSV文件；链ID及带氨基酸字母的一起始位置需匹配FASTA。该commit中confidence/min_distance_angstrom列未被模型使用。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(constraint_path=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": null
+    },
+    {
+      "key": "device",
+      "type": "string",
+      "description": "PyTorch设备字符串，例如cuda:0；按调度器可见设备编号。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(device=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "downloads_dir",
+      "type": "string",
+      "description": "BDA旧Chai缓存目录字段；command未导出CHAI_DOWNLOADS_DIR，当前无生效证据。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "downloads_dir"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": ""
+    },
+    {
+      "key": "fasta_file",
+      "type": "string",
+      "description": "Chai特殊FASTA输入，实体header指定protein/ligand/RNA等；普通氨基酸FASTA只表达蛋白信息。",
+      "unit": "路径",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(fasta_file=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "fasta_names_as_cif_chains",
+      "type": "boolean",
+      "description": "将FASTA实体名用于输出mmCIF链命名；需遵守可用链ID约束并保留映射。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(fasta_names_as_cif_chains=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "input_fasta",
+      "type": "artifact_ref",
+      "description": "BDA Chai输入FASTA端口/参数；需核对staging路径是否绑定进command变量。",
+      "unit": "路径",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "input_fasta"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": ""
+    },
+    {
+      "key": "low_memory",
+      "type": "boolean",
+      "description": "启用Chai低内存推理路径，降低内存峰值但可能影响速度。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(low_memory=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "msa_directory",
+      "type": "string",
+      "description": "Chai本地预计算MSA目录，需采用Chai指定格式和序列hash命名；不是任意a3m目录。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(msa_directory=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "msa_server_url",
+      "type": "string",
+      "description": "远端MSA服务地址；启用服务会向该服务发送目标序列，需明确数据流。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(msa_server_url=...)；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "msa_server_url"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": "https://api.colabfold.com"
+    },
+    {
+      "key": "num_diffn_samples",
+      "type": "integer",
+      "description": "每个trunk样本的扩散样本数。",
+      "unit": "计数",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(num_diffn_samples=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 5
+    },
+    {
+      "key": "num_diffn_timesteps",
+      "type": "integer",
+      "description": "Chai扩散去噪时间步数，非MD时间。",
+      "unit": "计数",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(num_diffn_timesteps=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 200
+    },
+    {
+      "key": "num_samples",
+      "type": "integer",
+      "description": "BDA样本数别名；Boltz映射--diffusion_samples，Chai映射--num-diffn-samples。",
+      "unit": "计数",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_samples"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": 5,
+            "minimum": 1,
+            "maximum": 100,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 5
+    },
+    {
+      "key": "num_trunk_recycles",
+      "type": "integer",
+      "description": "Chai主干网络回收次数。",
+      "unit": "计数",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(num_trunk_recycles=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 3
+    },
+    {
+      "key": "num_trunk_samples",
+      "type": "integer",
+      "description": "独立主干网络采样数，总输出还取决于扩散样本数。",
+      "unit": "计数",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(num_trunk_samples=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "output_dir",
+      "type": "string",
+      "description": "输出目录；BDA通常以作业隔离的BDA_OUTPUT_DIR接管，不能假定界面值决定实际路径。",
+      "unit": "路径",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(output_dir=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "output_folder",
+      "type": "string",
+      "description": "BDA输出目录草稿；Chai command使用BDA_OUTPUT_DIR，不读取这个字段。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "output_folder"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "outputs/chai1",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": "outputs/chai1"
+    },
+    {
+      "key": "recycle_msa_subsample",
+      "type": "integer",
+      "description": "回收循环中的MSA子采样量；源码仅在大于0时启用，0禁用该子采样。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(recycle_msa_subsample=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 0
+    },
+    {
+      "key": "restraints_json",
+      "type": "artifact_ref",
+      "description": "BDA约束文件别名映射Chai --constraint-path；此commit的接触约束是CSV表，名称含JSON不代表接受任意JSON。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "restraints_json"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "upstream-2"
+      ],
+      "default": ""
+    },
+    {
+      "key": "seed",
+      "type": "integer",
+      "description": "推理随机种子；同时记录模型/软件/输入版本，种子不能保证跨硬件完全重现。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(seed=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "template_cif_folder",
+      "type": "string",
+      "description": "BDA旧Chai字段声称自定义模板目录，但command没有使用；不能视作template_hits_path已接通。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；Chai-1@0.6.1: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "template_cif_folder"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": ""
+    },
+    {
+      "key": "template_hits_path",
+      "type": "string",
+      "description": "Chai模板命中数据文件；模板残基映射必须与查询序列一致。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(template_hits_path=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "use_esm_embeddings",
+      "type": "boolean",
+      "description": "Chai是否使用ESM蛋白语言模型embedding；可无MSA预测不代表无需检查序列与模型限制。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(use_esm_embeddings=...)；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "use_msa_server",
+      "type": "boolean",
+      "description": "是否使用远端MMseqs/ColabFold服务生成MSA；false本身不等于已经准备好空MSA或本地MSA。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(use_msa_server=...)；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "use_msa_server"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "use_templates_server",
+      "type": "boolean",
+      "description": "是否通过Chai模板服务生成模板命中；与本地template_hits_path区分。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "single_sequence",
+        "complex",
+        "msa_server",
+        "local_msa",
+        "restraints",
+        "templates"
+      ],
+      "flag_or_mapping": "Python run_inference(use_templates_server=...)；Chai-1@0.6.1: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "use_templates_server"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "Chai-1",
+            "version": "0.6.1",
+            "enabled": false,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "predicted_structure / complex",
+      "meaning": "预测原子坐标及链/残基映射",
+      "unit": "Å",
+      "interpretation": "坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pLDDT",
+      "meaning": "局部结构置信度",
+      "unit": "Python返回0–1；mmCIF B-factor写入时×100",
+      "interpretation": "逐文件核对尺度，不是概率或亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pTM / ipTM",
+      "meaning": "整体折叠/多链相对构象置信度",
+      "unit": "0–1",
+      "interpretation": "单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "PAE",
+      "meaning": "对齐后的相对位置预测误差矩阵",
+      "unit": "Å",
+      "interpretation": "run_inference返回对象中含PAE/PDE/pLDDT张量；默认scores.npz不等于保存了完整PAE，需显式持久化。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pred.model_idx_<i>.cif / scores.model_idx_<i>.npz",
+      "meaning": "每样本结构和ranking字段",
+      "unit": "混合字段",
+      "interpretation": "NPZ不是JSON；当前BDA confidence_json端口名称不能替代实际格式检查。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "先按模型与版本确认输入实体、链ID、序列SHA、MSA/模板来源；区分预测、设计与亲和力。",
+    "从当前BDA快照核对enabled、command和ports；文档中的configuration_only/not_exposed不是可执行能力承诺。",
+    "填写对应模式配置，检查参数最终进入命令或结构化输入；数据库/权重需已存在且记录版本。",
+    "预览任务脚本和实际输入文件，核对CPU/GPU、布尔false、输出目录及样本总数；本次审计不提交任务。",
+    "完成后逐输入/seed/model核对文件、原始指标和失败样本；声明、成功退出、解析成功及科学结论分开记录。"
+  ],
+  "pitfalls": [
+    "pLDDT/ipTM/RMSD不等于ΔG/ΔΔG/Kd或生物活性。",
+    "template、initial_guess、空MSA和真实MSA是不同证据条件；不能混成独立交叉验证。",
+    "未消费的UI参数不可写入报告为已执行条件；本地catalog默认、BDA默认、命令回退和安装默认要区分。",
+    "BDA条目disabled且旧runbook记录环境不可用，所有示例为配置规划。",
+    "input_fasta在command中直接变量使用，需验证artifact staging resolver；output_folder被忽略。",
+    "template_cif_folder/downloads_dir未消费；Chai本地MSA与template_hits_path未暴露。",
+    "restraints_json名称与上游约束文件格式可能不符；需检查格式，不可传任意JSON。",
+    "BDA boolean已正确导出1/空字符串；实际安装API/CLI版本与library固定commit未验证。"
+  ],
+  "gaps": [
+    "BDA条目disabled且旧runbook记录环境不可用，所有示例为配置规划。",
+    "input_fasta在command中直接变量使用，需验证artifact staging resolver；output_folder被忽略。",
+    "template_cif_folder/downloads_dir未消费；Chai本地MSA与template_hits_path未暴露。",
+    "restraints_json名称与上游约束文件格式可能不符；需检查格式，不可传任意JSON。",
+    "BDA boolean已正确导出1/空字符串；实际安装API/CLI版本与library固定commit未验证。",
+    "Chai返回PAE/PDE张量但默认保存scores.npz；BDA端口名confidence_json与真实NPZ格式不一致，需明确持久化与解析。"
+  ]
+}

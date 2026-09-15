@@ -1,0 +1,6 @@
+{
+  "application": "docking_protocol",
+  "dock_partners": "AB_C",
+  "dock_search": "local",
+  "nstruct": 100
+}

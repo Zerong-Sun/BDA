@@ -13,6 +13,7 @@ files, so gating on content type would reject valid scientific data.
 from __future__ import annotations
 
 from fnmatch import fnmatch
+from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -106,10 +107,16 @@ def artifact_accepted(port: InputPort, artifact_type: str) -> bool:
     return not port.accepts or artifact_type in port.accepts
 
 
+def output_filename_matches(filename: str, pattern: str) -> bool:
+    """Match model-owned relative layouts while retaining legacy basename globs."""
+    relative = PurePosixPath(filename)
+    return fnmatch(relative.as_posix(), pattern) or fnmatch(relative.name, pattern)
+
+
 def output_port_for_artifact(ports: list[OutputPort], artifact_type: str, filename: str) -> OutputPort | None:
     """Best-effort reverse lookup used when collected outputs carry no explicit port."""
     typed = [port for port in ports if port.artifact_type == artifact_type]
     for port in typed:
-        if fnmatch(filename, port.filename_glob):
+        if output_filename_matches(filename, port.filename_glob):
             return port
     return typed[0] if typed else None

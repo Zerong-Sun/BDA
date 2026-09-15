@@ -1,0 +1,6 @@
+{
+  "application": "relax",
+  "nstruct": 3,
+  "constrain_start": true,
+  "ramp_constraints": false
+}
