@@ -1,0 +1,7 @@
+{
+  "application": "InterfaceAnalyzer",
+  "interface": "AB_C",
+  "pack_input": false,
+  "pack_separated": true,
+  "compute_packstat": true
+}

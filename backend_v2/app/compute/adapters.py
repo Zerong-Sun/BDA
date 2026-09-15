@@ -9,12 +9,12 @@ import tempfile
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from fnmatch import fnmatch
 from pathlib import PurePosixPath
 from typing import Protocol
 
 from ..artifacts.storage import MAX_PRESIGN_SECONDS, ObjectStorage
 from ..core.config import get_settings
+from ..registry.ports import output_filename_matches
 from .scripts import ScriptContext, parameter_environment, render_script
 from .ssh_transport import KeySSHTransport, PasswordSSHTransport, SSHTransport, read_secret
 
@@ -244,21 +244,23 @@ class LSFAdapter:
         """
         snapshot = job.runtime_spec.get("plugin_snapshot")
         snapshot = snapshot if isinstance(snapshot, dict) else {}
+        frozen = snapshot.get("resolved_runtime")
+        resolved = frozen if isinstance(frozen, dict) and frozen.get("schema_version") == "1" else None
         return ScriptContext(
             job_name=job.deterministic_name,
             remote_dir=self.remote_dir(job),
             command=str(job.runtime_spec.get("command") or "true"),
-            queue=str(job.runtime_spec.get("queue") or self.default_queue),
+            queue=str(resolved["queue"] if resolved else job.runtime_spec.get("queue") or self.default_queue),
             backend="lsf",
-            runtime_mode=str(snapshot.get("runtime_mode") or "container"),
-            container_image=job.runtime_spec.get("image") or snapshot.get("image"),
+            runtime_mode=str(resolved["runtime_mode"] if resolved else snapshot.get("runtime_mode") or "container"),
+            container_image=resolved["image"] if resolved else job.runtime_spec.get("image") or snapshot.get("image"),
             input_manifest_url=env.get("BDA_INPUT_MANIFEST_URL", ""),
             output_manifest_url=env.get("BDA_OUTPUT_MANIFEST_URL", ""),
             upload_wrapper=self.upload_wrapper,
             staging_mode=self.staging_mode,
-            runtime_setup=raw_setup if isinstance(raw_setup := snapshot.get("runtime_setup"), list) else [],
+            runtime_setup=resolved["runtime_setup"] if resolved else raw_setup if isinstance(raw_setup := snapshot.get("runtime_setup"), list) else [],
             parameters=raw_params if isinstance(raw_params := job.runtime_spec.get("parameters"), dict) else {},
-            resources=raw_resources if isinstance(raw_resources := snapshot.get("resources"), dict) else {},
+            resources=resolved["resources"] if resolved else raw_resources if isinstance(raw_resources := snapshot.get("resources"), dict) else {},
             input_ports=[
                 str(port["name"])
                 for port in (snapshot.get("input_ports") or [])
@@ -445,17 +447,7 @@ class LSFAdapter:
             # A file under outputs/<port>/ declares its port by location. Models that
             # write to their own directory layout, or straight into the root, are typed
             # by matching the declared filename globs instead.
-            port_name = relative.parts[0] if len(relative.parts) > 1 and relative.parts[0] in declared else None
-            if port_name is None:
-                port_name = next(
-                    (
-                        name
-                        for name, port in declared.items()
-                        if fnmatch(relative.name, str(port.get("filename_glob") or "*"))
-                        and str(port.get("filename_glob") or "*") != "*"
-                    ),
-                    None,
-                )
+            port_name = _infer_output_port(relative, declared)
             collected.append(
                 {
                     "object_key": object_key,
@@ -473,6 +465,20 @@ class LSFAdapter:
                 }
             )
         return collected
+
+
+def _infer_output_port(relative: PurePosixPath, declared: dict) -> str | None:
+    """Port directories win, then the first matching non-catch-all declaration."""
+    if len(relative.parts) > 1 and relative.parts[0] in declared:
+        return relative.parts[0]
+    return next(
+        (
+            name for name, port in declared.items()
+            if (pattern := str(port.get("filename_glob") or "*")) != "*"
+            and output_filename_matches(relative.as_posix(), pattern)
+        ),
+        None,
+    )
 
 
 def _parameter_environment(job: RuntimeJob) -> dict[str, str]:
@@ -510,6 +516,11 @@ def _collect_manifest(job: RuntimeJob) -> list[dict]:
     if manifest.get("schema_version") != "1" or not isinstance(manifest.get("outputs"), list):
         raise ValueError("output_manifest_schema_invalid")
     outputs: list[dict] = []
+    declared = {
+        str(port.get("name")): port
+        for port in (job.runtime_spec.get("plugin_snapshot") or {}).get("output_ports", [])
+        if isinstance(port, dict)
+    }
     for raw in manifest["outputs"]:
         if not isinstance(raw, dict):
             raise ValueError("output_manifest_entry_invalid")
@@ -527,6 +538,8 @@ def _collect_manifest(job: RuntimeJob) -> list[dict]:
         filename_path = PurePosixPath(filename)
         if filename_path.is_absolute() or len(filename_path.parts) != 1 or filename in {".", ".."}:
             raise ValueError("output_manifest_filename_invalid")
+        relative = PurePosixPath(object_key[len(expected_prefix):])
+        port_name = str(raw["port"]) if raw.get("port") else _infer_output_port(relative, declared)
         outputs.append(
             {
                 "object_key": object_key,
@@ -534,11 +547,15 @@ def _collect_manifest(job: RuntimeJob) -> list[dict]:
                 "size_bytes": size,
                 "filename": filename,
                 "content_type": str(raw.get("content_type") or "application/octet-stream"),
-                "artifact_type": str(raw.get("artifact_type") or "compute_output"),
+                "artifact_type": str(
+                    raw.get("artifact_type")
+                    or (declared.get(port_name, {}).get("artifact_type") if port_name else None)
+                    or "compute_output"
+                ),
                 # Which declared output port this file belongs to. Optional: when the
                 # runner omits it, collection falls back to an artifact_type/filename
                 # reverse lookup so plugins written before ports still wire up.
-                "port": str(raw["port"]) if raw.get("port") else None,
+                "port": port_name,
                 "metadata": raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {},
             }
         )

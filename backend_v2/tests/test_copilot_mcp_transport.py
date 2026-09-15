@@ -160,15 +160,38 @@ def test_unknown_method_is_method_not_found(client: TestClient, session: Session
     assert error["code"] == mcp_app.METHOD_NOT_FOUND
 
 
-def test_resources_list_is_empty_rather_than_an_error(client: TestClient, session: Session) -> None:
-    """The resources here are what a tool result hands out, not a catalogue.
+def test_resources_list_offers_the_app_page_and_no_project_data(
+    client: TestClient, session: Session
+) -> None:
+    """The listing is the picker, and nothing else.
 
-    Enumerating the project's entities would be a second read surface with no
-    capability behind it, so the list is empty - but the method exists, because
-    the server declares the resources capability.
+    Two rules meet here. Project entities stay unenumerated - a catalogue would
+    be a second read surface with no capability behind it, and the citations a
+    tool result hands out are addressed rather than listed. The MCP Apps page is
+    the exception and has to be: a host that cannot discover the resource cannot
+    render the tool's interface, and the page itself carries no project data -
+    it displays what a tool result already returned.
     """
     token = _token(session)
-    assert _call(client, token, "resources/list").json()["result"] == {"resources": []}
+
+    resources = _call(client, token, "resources/list").json()["result"]["resources"]
+
+    assert [entry["uri"] for entry in resources] == ["ui://bda/structure-picker"]
+    assert resources[0]["mimeType"] == "text/html;profile=mcp-app"
+
+
+def test_the_app_page_is_readable_as_html_by_any_grant(
+    client: TestClient, session: Session
+) -> None:
+    """No capability gate, because the page discloses nothing to gate."""
+    token = _token(session)
+
+    result = _call(
+        client, token, "resources/read", {"uri": "ui://bda/structure-picker"}
+    ).json()["result"]
+
+    assert result["contents"][0]["mimeType"] == "text/html;profile=mcp-app"
+    assert result["contents"][0]["text"].lstrip().startswith("<!doctype html>")
 
 
 def test_unparseable_body_is_a_parse_error(client: TestClient, session: Session) -> None:

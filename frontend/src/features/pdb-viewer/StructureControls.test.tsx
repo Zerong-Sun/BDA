@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -52,13 +52,15 @@ describe('StructureControls registry contract', () => {
     fireEvent.pointerUp(chainB, { button: 0 })
     fireEvent.click(chainB)
     expect(callbacks.onChainChange).toHaveBeenCalledWith('B')
+    await waitFor(() => expect(chainSelector).toHaveAttribute('aria-expanded', 'false'))
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'B' })).not.toBeInTheDocument())
 
     fireEvent.click(chainSelector)
     const allChainsAgain = await screen.findByRole('option', { name: 'All chains' })
     fireEvent.pointerDown(allChainsAgain, { button: 0 })
     fireEvent.pointerUp(allChainsAgain, { button: 0 })
     fireEvent.click(allChainsAgain)
-    expect(callbacks.onChainChange).toHaveBeenLastCalledWith(null)
+    await waitFor(() => expect(callbacks.onChainChange).toHaveBeenLastCalledWith(null))
   })
 
   it('uses one accessible ToggleGroup and registry action buttons', async () => {

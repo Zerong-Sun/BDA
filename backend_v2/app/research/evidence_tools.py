@@ -16,6 +16,7 @@ IDENTIFIER_PATTERNS = {
     "uniprot": re.compile(r"^[A-Z0-9]{6,10}$", re.IGNORECASE),
     "pdb": re.compile(r"^[0-9][A-Z0-9]{3}$", re.IGNORECASE),
     "pmcid": re.compile(r"^PMC_?[0-9]+$", re.IGNORECASE),
+    "ensembl_gene": re.compile(r"^ENSG[0-9]{11}$", re.IGNORECASE),
 }
 
 
@@ -96,6 +97,86 @@ class EvidenceToolService:
             params={"query": query, "species": species, "cluster": "true"},
         )
 
+    #: The druggability query. Fixed here, not passed in: the endpoint is fixed
+    #: for the same reason every other method's URL is - a caller that could
+    #: send arbitrary GraphQL could read anything the API exposes under this
+    #: service's name, and the audit would record a query nobody reviewed.
+    OPEN_TARGETS_DRUGGABILITY_QUERY = (
+        "query Druggability($ensemblId: String!) { target(ensemblId: $ensemblId) { "
+        "id approvedSymbol "
+        "tractability { modality label value } "
+        "safetyLiabilities { event datasource effects { direction } } "
+        "drugAndClinicalCandidates { count rows { maxClinicalStage drug { id name } } } "
+        "} }"
+    )
+
+    def get_open_targets_druggability(self, ensembl_id: str) -> EvidenceToolResult:
+        normalized = self._identifier("ensembl_gene", ensembl_id).upper()
+        return self._post(
+            "open_targets.druggability",
+            "https://api.platform.opentargets.org/api/v4/graphql",
+            json_body={
+                "query": self.OPEN_TARGETS_DRUGGABILITY_QUERY,
+                "variables": {"ensemblId": normalized},
+            },
+        )
+
+    @staticmethod
+    def _trial_term(intervention: str) -> str:
+        term = intervention.strip()
+        if not term or len(term) > 200:
+            raise ValueError("invalid_clinical_trials_query")
+        return term
+
+    def count_clinical_trials(
+        self, intervention: str, *, phase: str | None = None, start_year: int | None = None
+    ) -> EvidenceToolResult:
+        """How many ClinicalTrials.gov registrations match, counted server-side.
+
+        `pageSize=1` with `countTotal=true`: the count is what is wanted, and
+        downloading thousands of studies to count them locally would spend the
+        call budget and the source's goodwill for nothing. A start year narrows
+        to registrations whose study start date falls in that calendar year.
+        """
+        params: dict[str, Any] = {
+            "query.intr": self._trial_term(intervention),
+            "countTotal": "true",
+            "pageSize": 1,
+            "fields": "NCTId",
+        }
+        clauses: list[str] = []
+        if phase is not None:
+            if not re.fullmatch(r"(EARLY_)?PHASE[0-4]", phase):
+                raise ValueError("invalid_clinical_trials_phase")
+            clauses.append(f"AREA[Phase]{phase}")
+        if start_year is not None:
+            if isinstance(start_year, bool) or not 1990 <= start_year <= 2100:
+                raise ValueError("invalid_clinical_trials_year")
+            clauses.append(f"AREA[StartDate]RANGE[{start_year}-01-01,{start_year}-12-31]")
+        if clauses:
+            params["filter.advanced"] = " AND ".join(clauses)
+        return self._get("clinical_trials.count", "https://clinicaltrials.gov/api/v2/studies", params=params)
+
+    def list_clinical_trial_sponsors(
+        self, intervention: str, *, page_token: str | None = None, page_size: int = 1000
+    ) -> EvidenceToolResult:
+        """One page of matching registrations, with only their lead sponsor.
+
+        Only the fields a sponsor mix needs are requested: a full study record is
+        tens of kilobytes, and a thousand of them to read one name each would be
+        waste the source pays for.
+        """
+        params: dict[str, Any] = {
+            "query.intr": self._trial_term(intervention),
+            "pageSize": max(1, min(page_size, 1000)),
+            "fields": "NCTId,LeadSponsorName,LeadSponsorClass",
+        }
+        if page_token is not None:
+            if not re.fullmatch(r"[A-Za-z0-9_\-=]{1,500}", page_token):
+                raise ValueError("invalid_clinical_trials_page_token")
+            params["pageToken"] = page_token
+        return self._get("clinical_trials.sponsors", "https://clinicaltrials.gov/api/v2/studies", params=params)
+
     @staticmethod
     def _identifier(kind: str, value: str) -> str:
         normalized = value.strip()
@@ -138,6 +219,61 @@ class EvidenceToolService:
         audit = {
             "tool": tool,
             "query": {"url": url, "params": params or {}},
+            "queried_at": started_at.isoformat(),
+            "attempts": self.max_retries + 1,
+            "status": "failed",
+            "error": str(last_error)[:500],
+        }
+        self.audits.append(audit)
+        raise RuntimeError(f"{tool}_failed") from last_error
+
+    def _post(self, tool: str, url: str, *, json_body: dict[str, Any]) -> EvidenceToolResult:
+        """`_get` for a fixed POST endpoint, with the request body in the audit.
+
+        The body is recorded because for GraphQL it *is* the query: an audit
+        that kept only the URL would say a call was made to the API and not
+        what was asked of it.
+        """
+        if self.calls >= self.max_calls:
+            raise RuntimeError("evidence_tool_call_limit_reached")
+        self.calls += 1
+        started_at = datetime.now(UTC)
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self.client.post(url, json=json_body)
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("evidence_tool_response_not_object")
+                if payload.get("errors"):
+                    # GraphQL answers 200 with an `errors` list; treating that as
+                    # success would save an empty report as if it were evidence.
+                    raise ValueError(f"evidence_tool_graphql_error: {str(payload['errors'])[:300]}")
+                audit = {
+                    "tool": tool,
+                    "query": {"url": url, "body": json_body},
+                    "queried_at": started_at.isoformat(),
+                    "response_checksum_sha256": hashlib.sha256(response.content).hexdigest(),
+                    "http_status": response.status_code,
+                    "content_type": response.headers.get("content-type"),
+                    "byte_count": len(response.content),
+                    "attempts": attempt + 1,
+                    "status": "completed",
+                }
+                self.audits.append(audit)
+                return EvidenceToolResult(data=payload, audit=audit)
+            except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
+                last_error = exc
+                status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                if status_code is not None and status_code != 429 and status_code < 500:
+                    break
+                if isinstance(exc, ValueError) and "graphql_error" in str(exc):
+                    # A query the server rejects will be rejected again.
+                    break
+        audit = {
+            "tool": tool,
+            "query": {"url": url, "body": json_body},
             "queried_at": started_at.isoformat(),
             "attempts": self.max_retries + 1,
             "status": "failed",

@@ -143,7 +143,7 @@ class TestSettleStage:
             select(AutopilotLedgerEntry).where(AutopilotLedgerEntry.event_type == "stage.settled")
         ).one()
         assert entry.payload["status"] == "failed"
-        assert entry.payload["operator"] == "librarian"
+        assert entry.payload["operator"] == "researcher"
         # Signed by the worker principal, not by the person who confirmed the
         # campaign: attributing an automatic settlement to them answers "who
         # caused this" wrongly.

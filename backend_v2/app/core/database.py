@@ -39,6 +39,17 @@ def _database_connection_checked_in(*_args: object) -> None:
 update_database_pool_capacity_metrics(engine.pool)
 
 
+@event.listens_for(Session, "after_begin")
+def _apply_request_context(session: Session, _transaction: object, connection) -> None:
+    context = session.info.get("bda_request_rls")
+    if context is not None and connection.dialect.name == "postgresql":
+        connection.execute(
+            text("select set_config('bda.user_id', :user_id, true), "
+                 "set_config('bda.is_global_admin', :is_admin, true)"),
+            context,
+        )
+
+
 @event.listens_for(SessionFactory.class_, "after_begin")
 def _apply_worker_project_context(_session: Session, _transaction: object, connection) -> None:
     """Apply the Celery message's project fence to every worker transaction."""
@@ -79,9 +90,17 @@ def session_scope() -> Generator[Session]:
 
 
 def set_request_rls_context(session: Session, *, user_id: object, is_global_admin: bool) -> None:
-    """Set transaction-local values consumed by PostgreSQL RLS policies."""
+    """Retain the request identity across transactions, using transaction-local SQL.
+
+    Services may commit before external I/O. Save the identity on this session
+    so after_begin restores it; connection-pool reuse must never retain it.
+    """
     if session.bind is None or session.bind.dialect.name != "postgresql":
         return
+    session.info["bda_request_rls"] = {
+        "user_id": str(user_id),
+        "is_admin": "true" if is_global_admin else "false",
+    }
     session.execute(
         text("select set_config('bda.user_id', :user_id, true)"),
         {"user_id": str(user_id)},

@@ -62,6 +62,7 @@ const draft = {
 }
 
 beforeEach(() => {
+  sessionStorage.clear()
   vi.clearAllMocks()
   useAppStore.setState({ language: 'en', appMode: 'application' })
   vi.mocked(useProjectContext).mockReturnValue({
@@ -214,6 +215,20 @@ describe('ClusterDrafts', () => {
 })
 
 describe('CopilotSettings', () => {
+  it.each(['viewer', 'demo'])('does not expose model configuration commands in %s mode', async (mode) => {
+    if (mode === 'viewer') sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    else useAppStore.setState({ appMode: 'demo' })
+    const onActionsReady = vi.fn()
+    renderSurface(<CopilotSettings onActionsReady={onActionsReady} />)
+    const save = await screen.findByRole('button', { name: 'Save configuration' })
+    expect(save).toBeDisabled()
+    fireEvent.click(save)
+    const actions = onActionsReady.mock.calls.at(-1)?.[0]
+    expect(actions).toMatchObject({ canSave: false, canTest: false })
+    actions.save(); actions.test()
+    expect(updateCopilotConfig).not.toHaveBeenCalled()
+    expect(testCopilotConfig).not.toHaveBeenCalled()
+  })
   it('discards model and secret drafts when switching projects', async () => {
     const ui = renderSurface(<CopilotSettings />)
     fireEvent.click(await screen.findByRole('button', { name: 'Advanced model settings' }))

@@ -285,6 +285,7 @@ def copilot_respond(message_id: str) -> dict:
                     CopilotMessage(
                         conversation_id=source.conversation_id,
                         role="assistant",
+                        bot=active_bot.id if active_bot else None,
                         status="completed",
                         content=answer,
                         citations=citations,
@@ -304,6 +305,10 @@ def copilot_respond(message_id: str) -> dict:
                     CopilotMessage(
                         conversation_id=source.conversation_id,
                         role="assistant",
+                        # A failure is attributed too: "planner could not answer"
+                        # and "the assistant could not answer" are different
+                        # records, and the second loses who was asked.
+                        bot=active_bot.id if active_bot else None,
                         status="failed",
                         content="Copilot provider failed; no scientific conclusion was generated.",
                         error=str(exc)[:2000],

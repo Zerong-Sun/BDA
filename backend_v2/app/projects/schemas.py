@@ -140,3 +140,18 @@ class ProjectPromptDraftResponse(BaseModel):
     status: str
     prompt: str | None
     error: str | None
+
+
+class ProjectAccessResponse(BaseModel):
+    """What the signed-in user may do in one project, so a client can narrow its UI.
+
+    Derived from the same deny-first role the server authorizes every action with.
+    The server still enforces each action; a client reading this can only hide a
+    control it would otherwise show, never enable one the server would refuse.
+    """
+
+    project_id: uuid.UUID
+    #: The effective role after global, organization and project caps.
+    role: str
+    #: One entry per project permission action.
+    permissions: dict[str, bool]

@@ -1,0 +1,1616 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "AlphaFold 3",
+  "slug": "alphafold3",
+  "summary": "以结构化JSON预测多分子体系；支持独立数据准备、MSA/模板及推理阶段，但BDA当前命令没有连接全部界面开关。",
+  "sources": [
+    {
+      "id": "registry",
+      "commit": null,
+      "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/alphafold3/README.md",
+      "commit": null,
+      "scope": "2026-08-30历史QM运行手册；与当前声明不同处需单列",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
+      "scope": "手工提交library的alphafold3参数提取，默认值不是BDA默认值",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter-env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "commit": null,
+      "scope": "parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "af3-adapter",
+      "path": "backend_v2/app/compute/input_adapters/af3_fold_input.py",
+      "commit": null,
+      "scope": "FASTA转AF3 JSON；list[int]种子、显式JSON优先及蛋白实体限制",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-0",
+      "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/run_alphafold.py",
+      "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
+      "scope": "run_alphafold.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream-1",
+      "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/README.md",
+      "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
+      "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream-2",
+      "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/input.md",
+      "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
+      "scope": "docs/input.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream-3",
+      "url": "https://github.com/google-deepmind/alphafold3/blob/b2f3d45fbfcacc5183bd5345d15df93571b8437f/docs/output.md",
+      "commit": "b2f3d45fbfcacc5183bd5345d15df93571b8437f",
+      "scope": "docs/output.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    }
+  ],
+  "modes": [
+    {
+      "id": "monomer",
+      "title": "AF3单蛋白",
+      "purpose": "输入JSON含单个protein实体",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "num_diffusion_samples": 1
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "complex",
+      "title": "AF3复合物",
+      "purpose": "JSON定义蛋白/核酸/配体及成键关系",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "num_diffusion_samples": 1
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "data_pipeline",
+      "title": "仅数据准备",
+      "purpose": "生成MSA和模板",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "run_data_pipeline": true,
+        "run_inference": false
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "官方能力存在，但当前BDA command未传这两个开关"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "inference_prepared",
+      "title": "预处理输入推理",
+      "purpose": "复用完整_data.json",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "run_data_pipeline": false,
+        "run_inference": true
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "当前BDA command未传此阶段选择"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "empty_msa",
+      "title": "显式空MSA对照",
+      "purpose": "JSON protein unpairedMsa/pairedMsa均为空字符串，templates为空列表",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {},
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "必须在输入JSON声明；缺省/null与空字符串含义不同",
+        "无同源MSA输入不意味着特征中不存在query行"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "templates",
+      "title": "给定模板对照",
+      "purpose": "输入protein.templates提供mmCIF和query/template indices",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {},
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "templates是模板特征，不等同AF2 initial_guess或固定坐标约束"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "buckets",
+      "type": "list",
+      "description": "递增的token编译桶大小列表；决定JAX编译复用及内存，不是序列长度筛选分数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --buckets；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Strictly increasing order of token sizes for which to cache compilations. For any input with more tokens than the largest bucket size, a new bucket is created for exactly that number of tokens.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": [
+        "256",
+        "512",
+        "768",
+        "1024",
+        "1280",
+        "1536",
+        "2048",
+        "2560",
+        "3072",
+        "3584",
+        "4096",
+        "4608",
+        "5120"
+      ]
+    },
+    {
+      "key": "compress_large_output_files",
+      "type": "boolean",
+      "description": "以zstandard压缩大mmCIF及confidence JSON；收集器需识别相应后缀。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --compress_large_output_files；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "If True, compresses the output mmCIF and confidences JSON files (the two largest files) using zstandard. Note that embeddings and distogram, if saved, are already stored in a compressed format.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "conformer_max_iterations",
+      "type": "integer",
+      "description": "覆盖RDKit小分子初始构象搜索的最大迭代次数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --conformer_max_iterations；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Optional override for maximum number of iterations to run for RDKit conformer search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "db_dir",
+      "type": "list",
+      "description": "AF3数据库查找目录列表；可多个目录按序搜索，${DB_DIR}由工具解析，不是用户HOME。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --db_dir；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "db_dir"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the directory containing the databases. Can be specified multiple times to search multiple directories in order.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": "/root/public_databases",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "fix_standalone_glycans",
+      "type": "boolean",
+      "description": "改变未成键糖配体离去原子的处理；启用会偏离AF3原训练/评估处理方式。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --fix_standalone_glycans；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "AlphaFold 3 model training and evaluation filtered out leaving atoms from glycan ligands even if they were not bonded to anything (\"standalone\" glycans). Setting this flag to True fixes this undesirable behavior, but moves away from the regime where AlphaFold 3 was trained and evaluated.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "flash_attention_implementation",
+      "type": "string",
+      "description": "注意力实现triton/cudnn/xla；固定源码默认triton，triton/cudnn要求Ampere或更新GPU，xla为兼容路径；catalog漏取了此默认值。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --flash_attention_implementation；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [],
+        "library_extracted_default": null,
+        "upstream_enum": [
+          "triton",
+          "cudnn",
+          "xla"
+        ],
+        "default_source": "固定上游run_alphafold.py，纠正catalog提取漏值"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "triton"
+    },
+    {
+      "key": "force_output_dir",
+      "type": "boolean",
+      "description": "允许使用已存在非空输出目录；适用于分开的预处理/推理复用，需防混入旧结果。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --force_output_dir；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to force the output directory to be used even if it already exists and is non-empty. Useful to set this to True to run the data pipeline and the inference separately, but use the same output directory.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "gpu_device",
+      "type": "integer",
+      "description": "可见GPU中的零起始设备编号；CUDA_VISIBLE_DEVICES已过滤时按过滤后的索引解释。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --gpu_device；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Optional override for the GPU device to use for inference, uses zero-based indexing. Defaults to the 0th GPU on the system. Useful on multi-GPU systems to pin each run to a specific GPU. Note that if GPUs are already pre-filtered by the environment (e.g. by using CUDA_VISIBLE_DEVICES), this flag refers to the GPU index after the filtering has been done.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": 0
+    },
+    {
+      "key": "hmmalign_binary_path",
+      "type": "string",
+      "description": "hmmalign搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --hmmalign_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Hmmalign binary.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hmmbuild_binary_path",
+      "type": "string",
+      "description": "hmmbuild搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --hmmbuild_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Hmmbuild binary.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hmmsearch_binary_path",
+      "type": "string",
+      "description": "hmmsearch搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --hmmsearch_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Hmmsearch binary.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "input_dir",
+      "type": "string",
+      "description": "包含多个AF3输入JSON的目录，与单个json_path路径形式区分。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --input_dir；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the directory containing input JSON files.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "jackhmmer_binary_path",
+      "type": "string",
+      "description": "jackhmmer搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --jackhmmer_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Jackhmmer binary.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "jackhmmer_max_parallel_shards",
+      "type": "integer",
+      "description": "分片数据库同时启动的Jackhmmer任务数；未指定可能每个分片一个进程，须纳入CPU总预算。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --jackhmmer_max_parallel_shards；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Maximum number of shards to search against in parallel. If unset, one Jackhmmer instance will be run per shard. Only applicable if the database is sharded.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "jackhmmer_n_cpu",
+      "type": "integer",
+      "description": "jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与LSF分配协调。",
+      "unit": "计数",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --jackhmmer_n_cpu；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of CPUs to use for Jackhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "jax_compilation_cache_dir",
+      "type": "string",
+      "description": "持久化JAX编译缓存目录；记录版本和硬件，缓存不代表预测结果。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --jax_compilation_cache_dir；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to a directory for the JAX compilation cache.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "json_path",
+      "type": "string",
+      "description": "完整AF3输入JSON；其中分子实体、modelSeeds、MSA和模板定义才决定复合物内容。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --json_path；AlphaFold 3@3.0: 从同名staged port解析，不直接信任字段路径",
+      "bda_keys": [
+        "json_path"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the input JSON file.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "max_template_date",
+      "type": "string",
+      "description": "模板发布日期上限，格式YYYY-MM-DD；用于限制结构信息泄漏。AF3还会据此限制CCD参考构象回退。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --max_template_date；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Maximum template release date to consider. Format: YYYY-MM-DD. All templates released after this date will be ignored. Controls also whether to allow use of model coordinates for a chemical component from the CCD if RDKit conformer generation fails and the component does not have ideal coordinates set. Only for components that have been released before this date the model coordinates can be used as a fallback.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "2021-09-30"
+    },
+    {
+      "key": "mgnify_database_path",
+      "type": "string",
+      "description": "mgnify数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --mgnify_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Mgnify database path, used for protein MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/mgy_clusters_2022_05.fa"
+    },
+    {
+      "key": "mgnify_z_value",
+      "type": "integer",
+      "description": "mgnify数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --mgnify_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "model_dir",
+      "type": "string",
+      "description": "AF3模型权重目录；固定上游commit不证明本地checkpoint相同。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --model_dir；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "model_dir"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the model to use for inference.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": "/root/models",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "model_seeds",
+      "type": "string",
+      "description": "官方AF3字段是输入JSON modelSeeds。BDA序列adapter会读取list[int]，但当前UI声明string，逗号字符串会回退[1]；显式JSON优先且不被此参数覆盖。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "sequences adapter: list[int]→fold_input.json.modelSeeds；UI string类型不兼容会回退[1]；显式JSON不改写",
+      "bda_keys": [
+        "model_seeds"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": "1",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "af3-adapter"
+      ],
+      "default": "1"
+    },
+    {
+      "key": "nhmmer_binary_path",
+      "type": "string",
+      "description": "nhmmer搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --nhmmer_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Nhmmer binary.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "nhmmer_max_parallel_shards",
+      "type": "integer",
+      "description": "分片RNA数据库同时运行的Nhmmer任务数，控制搜索并发资源。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --nhmmer_max_parallel_shards；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Maximum number of shards to search against in parallel. If unset, one Nhmmer instance will be run per shard. Only applicable if the database is sharded.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "nhmmer_n_cpu",
+      "type": "integer",
+      "description": "nhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与LSF分配协调。",
+      "unit": "计数",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --nhmmer_n_cpu；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of CPUs to use for Nhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "non_commercial_ack",
+      "type": "boolean",
+      "description": "BDA记录的权重许可确认字段，不是官方模型CLI参数；不能据此推断任意商业用途已获许可。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "non_commercial_ack"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "ntrna_database_path",
+      "type": "string",
+      "description": "ntrna数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --ntrna_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "NT-RNA database path, used for RNA MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/nt_rna_2023_02_23_clust_seq_id_90_cov_80_rep_seq.fasta"
+    },
+    {
+      "key": "ntrna_z_value",
+      "type": "number",
+      "description": "ntrna数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --ntrna_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "num_diffusion_samples",
+      "type": "integer",
+      "description": "每个随机种子的扩散结构样本数；每个seed/sample需有独立输出与置信度。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --num_diffusion_samples；AlphaFold 3@3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_diffusion_samples"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of diffusion samples to generate.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": 1,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": 5
+    },
+    {
+      "key": "num_recycles",
+      "type": "integer",
+      "description": "结构推理循环次数；不是MD时间步，也不是MSA深度。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --num_recycles；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "num_recycles"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of recycles to use during inference.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": 10,
+            "minimum": 1,
+            "maximum": 48,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": 10
+    },
+    {
+      "key": "num_seeds",
+      "type": "integer",
+      "description": "由输入JSON单个种子展开连续种子数；启用时输入必须只有一个modelSeeds起始值。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --num_seeds；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of seeds to use for inference. If set, only a single seed must be provided in the input JSON. AlphaFold 3 will then generate random seeds in sequence, starting from the single seed specified in the input JSON. The full input JSON produced by AlphaFold 3 will include the generated random seeds. If not set, AlphaFold 3 will use the seeds as provided in the input JSON.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "output_dir",
+      "type": "string",
+      "description": "输出目录；BDA通常以作业隔离的BDA_OUTPUT_DIR接管，不能假定界面值决定实际路径。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --output_dir；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "output_dir"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to a directory where the results will be saved.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": "outputs/alphafold3",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "pdb_database_path",
+      "type": "string",
+      "description": "pdb数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --pdb_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "PDB database directory with mmCIF files path, used for template search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/mmcif_files"
+    },
+    {
+      "key": "resolve_msa_overlaps",
+      "type": "boolean",
+      "description": "处理AF3 paired/unpaired MSA之间的重叠行；会影响有效特征，不能只比较原始行数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --resolve_msa_overlaps；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to deduplicate unpaired MSA against paired MSA. The default behaviour matches the method described in the AlphaFold 3 paper. Set this to false if providing custom paired MSA using the unpaired MSA field to keep it exactly as is as deduplication against the paired MSA could break the manually crafted pairing between MSA sequences.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "rfam_database_path",
+      "type": "string",
+      "description": "rfam数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --rfam_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Rfam database path, used for RNA MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/rfam_14_9_clust_seq_id_90_cov_80_rep_seq.fasta"
+    },
+    {
+      "key": "rfam_z_value",
+      "type": "number",
+      "description": "rfam数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --rfam_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "rna_central_database_path",
+      "type": "string",
+      "description": "rna_central数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --rna_central_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "RNAcentral database path, used for RNA MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/rnacentral_active_seq_id_90_cov_80_linclust.fasta"
+    },
+    {
+      "key": "rna_central_z_value",
+      "type": "number",
+      "description": "rna_central数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --rna_central_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in megabases for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "run_data_pipeline",
+      "type": "boolean",
+      "description": "是否运行遗传MSA/模板搜索；false时必须提供足够完整的预处理输入，不能当成自动填充MSA。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --run_data_pipeline；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "run_data_pipeline"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to run the data pipeline on the fold inputs.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "run_inference",
+      "type": "boolean",
+      "description": "是否运行结构推理；false可做CPU预处理，但当前BDA命令是否传递此开关须另核。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "data_pipeline",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --run_inference；AlphaFold 3@3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "run_inference"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to run inference on the fold inputs.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold 3",
+            "version": "3.0",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "save_distogram",
+      "type": "boolean",
+      "description": "保存模型距离分布输出；不是坐标距离实测值。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --save_distogram；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to save the final distogram in the output. Note that the distogram is a large float16 array: num_tokens * num_tokens * 64.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "save_embeddings",
+      "type": "boolean",
+      "description": "保存模型embedding特征，供后处理；不是亲和力测量。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "complex",
+        "inference_prepared",
+        "empty_msa",
+        "templates"
+      ],
+      "flag_or_mapping": "官方CLI --save_embeddings；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to save the final trunk single and pair embeddings in the output. Note that the embeddings are large float16 arrays: num_tokens * 384 + num_tokens * num_tokens * 128.",
+        "bda_variants": [],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "seqres_database_path",
+      "type": "string",
+      "description": "seqres数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --seqres_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "PDB sequence database path, used for template search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/pdb_seqres_2022_09_28.fasta"
+    },
+    {
+      "key": "small_bfd_database_path",
+      "type": "string",
+      "description": "small_bfd数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --small_bfd_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Small BFD database path, used for protein MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/bfd-first_non_consensus_sequences.fasta"
+    },
+    {
+      "key": "small_bfd_z_value",
+      "type": "integer",
+      "description": "small_bfd数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --small_bfd_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "uniprot_cluster_annot_database_path",
+      "type": "string",
+      "description": "uniprot_cluster_annot数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --uniprot_cluster_annot_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "UniProt database path, used for protein paired MSA search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/uniprot_all_2021_04.fa"
+    },
+    {
+      "key": "uniprot_cluster_annot_z_value",
+      "type": "integer",
+      "description": "uniprot_cluster_annot数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --uniprot_cluster_annot_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "uniref90_database_path",
+      "type": "string",
+      "description": "uniref90数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --uniref90_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "UniRef90 database path, used for MSA search. The MSA obtained by searching it is used to construct the profile for template search.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": "${DB_DIR}/uniref90_2022_05.fa"
+    },
+    {
+      "key": "uniref90_z_value",
+      "type": "integer",
+      "description": "uniref90数据库规模，用于分片搜索E-value计算；蛋白数据库按序列数，RNA数据库按百万碱基，不能填成分片数。",
+      "unit": "序列数（蛋白）/百万碱基（RNA）",
+      "modes": [
+        "data_pipeline"
+      ],
+      "flag_or_mapping": "官方CLI --uniref90_z_value；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The Z-value representing the database size in number of sequences for E-value calculation. Must be set for sharded databases.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "predicted_structure / complex",
+      "meaning": "预测原子坐标及链/残基映射",
+      "unit": "Å",
+      "interpretation": "坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pLDDT",
+      "meaning": "局部结构置信度",
+      "unit": "通常0–100；Boltz/Protein-Hunter原始汇总常0–1",
+      "interpretation": "逐文件核对尺度，不是概率或亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pTM / ipTM",
+      "meaning": "整体折叠/多链相对构象置信度",
+      "unit": "0–1",
+      "interpretation": "单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "PAE",
+      "meaning": "对齐后的相对位置预测误差矩阵",
+      "unit": "Å",
+      "interpretation": "保留链映射、非对角块和聚合定义；不能单独证明结合位点。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "*_data.json",
+      "meaning": "完整已解析输入，含MSA/模板与seed",
+      "unit": "结构化JSON",
+      "interpretation": "空字符串、null、缺省不同；保存原始/去重/非query行数，Neff需另算。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "ranking_score",
+      "meaning": "AF3内部模型排序综合分数",
+      "unit": "模型定义分数",
+      "interpretation": "含置信度、无序及碰撞项；不是能量。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "先按模型与版本确认输入实体、链ID、序列SHA、MSA/模板来源；区分预测、设计与亲和力。",
+    "从当前BDA快照核对enabled、command和ports；文档中的configuration_only/not_exposed不是可执行能力承诺。",
+    "填写对应模式配置，检查参数最终进入命令或结构化输入；数据库/权重需已存在且记录版本。",
+    "预览任务脚本和实际输入文件，核对CPU/GPU、布尔false、输出目录及样本总数；本次审计不提交任务。",
+    "完成后逐输入/seed/model核对文件、原始指标和失败样本；声明、成功退出、解析成功及科学结论分开记录。"
+  ],
+  "pitfalls": [
+    "pLDDT/ipTM/RMSD不等于ΔG/ΔΔG/Kd或生物活性。",
+    "template、initial_guess、空MSA和真实MSA是不同证据条件；不能混成独立交叉验证。",
+    "未消费的UI参数不可写入报告为已执行条件；本地catalog默认、BDA默认、命令回退和安装默认要区分。",
+    "run_data_pipeline/run_inference/num_recycles未出现在BDA command；model_seeds另有adapter但UI string与adapter list[int]不匹配，字符串会回退默认[1]。",
+    "model_dir/db_dir/output_dir由命令硬编码，UI默认/root路径不是真实执行路径。",
+    "AF3上游固定commit与QM v3.0.1安装未做源码一致性验证；部分library参数可能不在已装版本。",
+    "MSA/templates的JSON字段未被平铺UI完整暴露；必须审阅真实输入JSON和_data.json。",
+    "模型权重许可限制需按实际获得条款处理；本次文档审计不构成许可授权。"
+  ],
+  "gaps": [
+    "run_data_pipeline/run_inference/num_recycles未出现在BDA command；model_seeds另有adapter但UI string与adapter list[int]不匹配，字符串会回退默认[1]。",
+    "model_dir/db_dir/output_dir由命令硬编码，UI默认/root路径不是真实执行路径。",
+    "AF3上游固定commit与QM v3.0.1安装未做源码一致性验证；部分library参数可能不在已装版本。",
+    "MSA/templates的JSON字段未被平铺UI完整暴露；必须审阅真实输入JSON和_data.json。",
+    "模型权重许可限制需按实际获得条款处理；本次文档审计不构成许可授权。"
+  ]
+}

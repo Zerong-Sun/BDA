@@ -7,6 +7,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.models import Base, UUIDVersionMixin
 
+# A brief that a review-round script stamped with this scope key is that round's
+# progress note, not the project's review document. The writers set it themselves, so the
+# platform can classify without guessing from titles or lengths.
+ROUND_NOTE_SCOPE_KEY = "portfolio_review_key"
+PROGRESS_NOTE_STATUS = "progress_note"
+
 
 class ResearchBrief(UUIDVersionMixin, Base):
     __tablename__ = "research_briefs"

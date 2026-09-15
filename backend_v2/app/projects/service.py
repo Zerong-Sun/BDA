@@ -18,7 +18,8 @@ from ..intelligence.models import IntelligenceRun
 from ..knowledge.models import KnowledgeEntry
 from ..literature.models import LiteratureDocument
 from ..platform.operations import enqueue_operation
-from ..research.models import ResearchBrief, ResearchFinding
+from ..research.models import ResearchFinding
+from ..research.workspace import preferred_review_brief
 from ..targets.repository import TargetRepository
 
 # Through the timeline domain's own service, never into its table: a prompt rewrite is
@@ -114,6 +115,23 @@ def _authorize_project_action(
     if action != "read":
         enforce_project_quota(user.id, project.organization_id, action)
     return project
+
+
+def project_access(session: Session, project_id: uuid.UUID, user: User) -> dict:
+    """The effective role and what it permits, computed as `_authorize_project_action` would.
+
+    Reading it requires read access, so a caller learns nothing about a project it
+    cannot see.
+    """
+    project = _require_project_access(session, project_id, user)
+    role = ProjectRepository(session).effective_project_role(project, user)
+    ranks = {"viewer": 0, "researcher": 1, "admin": 2, "owner": 3}
+    rank = ranks[role] if role in ranks else -1
+    return {
+        "project_id": project.id,
+        "role": role or "none",
+        "permissions": {action: rank >= ranks[minimum] for action, minimum in PROJECT_PERMISSION_MINIMUMS.items()},
+    }
 
 
 def visible_project_ids(session: Session, user: User) -> list[uuid.UUID] | None:
@@ -367,9 +385,19 @@ def project_overview(session: Session, project: Project) -> ProjectOverviewRespo
 
 
 def project_research_summary(session: Session, project: Project) -> ProjectResearchSummaryResponse:
-    brief = session.scalar(
-        select(ResearchBrief).where(ResearchBrief.project_id == project.id).order_by(ResearchBrief.created_at.desc())
-    )
+    """Summarize a project's research, using the same brief the Research page shows.
+
+    This used to run its own ``created_at desc`` query, which is the defect
+    ``preferred_review_brief`` was written to fix - fixed in one caller and left in this
+    one, so two endpoints could disagree about which brief is the project's brief. That is
+    not cosmetic here: the literature panel reads ``brief.scope.source_material`` from this
+    response, and a round status note's scope carries no source material at all, so the
+    source list came from the wrong brief; project search indexes ``brief.title`` and
+    ``brief.content`` from it and matched the status note instead of the review.
+
+    One function now answers "which brief is this project's brief" for every caller.
+    """
+    brief = preferred_review_brief(session, project.id)
     findings = list(
         session.scalars(
             select(ResearchFinding)

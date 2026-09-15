@@ -1,0 +1,802 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "org.bda.rosetta",
+  "plugin_key": "Rosetta",
+  "plugin_version": "2024.09-bda.1",
+  "display_name": "Rosetta · 多模式参数工作台",
+  "command_template": "python3 - run <<'BDA_ROSETTA_PLUGIN'\n\"\"\"BDA Rosetta runner: validated argv, per-input/seed directories and raw evidence.\n\nOnly Python standard library is required on the compute node. This source and SPEC\nare embedded in the immutable manifest. No Rosetta software is bundled.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport csv\nimport hashlib\nimport json\nimport math\nimport os\nfrom pathlib import Path\nimport re\nimport shlex\nimport subprocess\nimport sys\nimport xml.etree.ElementTree as ET\n\nSPEC = json.loads('{\"schema_version\": 1, \"plugin_version\": \"2024.09-bda.1\", \"modes\": {\"score_jd2\": \"单点评分：对输入结构评分，不进行 Relax，不等于界面结合能。\", \"relax\": \"FastRelax：侧链重排与局部最小化；不是纳秒分子动力学。\", \"InterfaceAnalyzer\": \"蛋白–蛋白界面分析：已有复合物的界面能、埋藏面积和氢键等。\", \"relax_interface\": \"先用 relax 优化并保存坐标，再对每个优化后的复合物运行 InterfaceAnalyzer。\", \"docking_protocol\": \"RosettaDock：蛋白–蛋白刚体/侧链采样；需要已有组装与明确伙伴链。\", \"cartesian_ddg\": \"Cartesian ΔΔG：匹配 WT/突变体的折叠稳定性分数差；不是结合 ΔΔG。\", \"rosetta_scripts\": \"使用上传的 XML 协议；XML 的 mover/filter 参数与输出由该协议定义。\"}, \"schema\": {\"type\": \"object\", \"additionalProperties\": false, \"properties\": {\"application\": {\"type\": \"string\", \"default\": \"score_jd2\", \"title\": \"功能模式\", \"description\": \"选择计算阶段；不同模式的分数不能混作同一种结合自由能。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"enum\": [\"score_jd2\", \"relax\", \"InterfaceAnalyzer\", \"relax_interface\", \"docking_protocol\", \"cartesian_ddg\", \"rosetta_scripts\"]}, \"nstruct\": {\"type\": \"integer\", \"default\": 1, \"title\": \"每输入生成数\", \"description\": \"每个输入、每个独立重复生成的 decoy 数；cartesian_ddg 使用 ddg_iterations，不使用本参数。\", \"x-bda-unit\": \"个\", \"x-bda-flag\": \"-nstruct\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"minimum\": 1, \"maximum\": 10000, \"x-bda-modes\": [\"score_jd2\", \"relax\", \"InterfaceAnalyzer\", \"relax_interface\", \"docking_protocol\", \"rosetta_scripts\"]}, \"replicates\": {\"type\": \"integer\", \"default\": 1, \"title\": \"独立重复数\", \"description\": \"分别启动进程并使用不同随机种子；各重复保留原始结果，不只保存最优值。\", \"x-bda-unit\": \"次\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"minimum\": 1, \"maximum\": 100}, \"seed\": {\"type\": \"integer\", \"default\": 111111, \"title\": \"起始随机种子\", \"description\": \"启用 constant_seed；每个输入/重复的种子递增。固定种子利于复现，不证明采样收敛。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-run:constant_seed / -run:jran\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"minimum\": 1, \"maximum\": 2000000000}, \"score_weights\": {\"type\": \"string\", \"default\": \"ref2015\", \"title\": \"评分函数\", \"description\": \"所有比较对象使用同一权重。Cartesian 模式必须选择 *_cart；REU 不能直接当 kcal/mol。\", \"x-bda-unit\": \"Rosetta 权重集\", \"x-bda-flag\": \"-score:weights\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"enum\": [\"ref2015\", \"ref2015_cart\", \"beta_nov16\", \"beta_nov16_cart\"]}, \"out_scorefile\": {\"type\": \"string\", \"default\": \"score.sc\", \"title\": \"评分文件名\", \"description\": \"各输入/重复独立目录内的 .sc 文件名；不接受目录或路径穿越。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-out:file:scorefile\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"pattern\": \"^[A-Za-z0-9][A-Za-z0-9_.-]*\\\\\\\\.sc$\"}, \"ex1\": {\"type\": \"boolean\", \"default\": false, \"title\": \"额外 χ1 旋转异构体\", \"description\": \"扩大侧链 χ1 rotamer 采样；增加打包计算量，不是独立结构重复。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-ex1\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\"}, \"ex2\": {\"type\": \"boolean\", \"default\": false, \"title\": \"额外 χ2 旋转异构体\", \"description\": \"扩大侧链 χ2 rotamer 采样；仅在协议实际执行 packing 时影响采样。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-ex2\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\"}, \"use_input_sc\": {\"type\": \"boolean\", \"default\": true, \"title\": \"保留输入侧链候选\", \"description\": \"将输入侧链构象纳入 packing rotamer 候选集合。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-use_input_sc\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\"}, \"ignore_unrecognized_res\": {\"type\": \"boolean\", \"default\": false, \"title\": \"忽略无法识别的残基\", \"description\": \"默认关闭。开启可能删除糖基、配体或特殊残基，改变体系；须检查运行日志和保存结构。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-ignore_unrecognized_res\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\"}, \"extra_res_fa\": {\"type\": \"string\", \"default\": \"\", \"title\": \"全原子残基参数文件\", \"description\": \"aux 端口下的 .params 相对文件名；为非标准残基提供全原子参数，不自动生成小分子参数。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-in:file:extra_res_fa\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\"}, \"extra_res_cen\": {\"type\": \"string\", \"default\": \"\", \"title\": \"Centroid 残基参数文件\", \"description\": \"aux 端口下的 .params 文件；对接低分辨率阶段使用非标准残基时需匹配 centroid 参数。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-in:file:extra_res_cen\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"x-bda-modes\": [\"docking_protocol\", \"rosetta_scripts\"]}, \"constraints_file\": {\"type\": \"string\", \"default\": \"\", \"title\": \"约束文件\", \"description\": \"aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-constraints:cst_fa_file\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"x-bda-modes\": [\"score_jd2\", \"relax\", \"relax_interface\", \"docking_protocol\", \"rosetta_scripts\"]}, \"constraint_weight\": {\"type\": \"number\", \"default\": 1.0, \"title\": \"文件约束权重\", \"description\": \"仅在提供 constraints_file 时传入；不等同于 Relax 自动坐标约束权重。\", \"x-bda-unit\": \"权重\", \"x-bda-flag\": \"-constraints:cst_fa_weight\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/full-options-list\", \"minimum\": 0, \"maximum\": 1000, \"x-bda-modes\": [\"score_jd2\", \"relax\", \"relax_interface\", \"docking_protocol\", \"rosetta_scripts\"]}, \"pack_input\": {\"type\": \"boolean\", \"default\": false, \"title\": \"先重排输入界面\", \"description\": \"分析前是否对输入界面进行侧链 packing；这是评分内部分支，不会覆盖保存的 Relax 坐标。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-pack_input\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"pack_separated\": {\"type\": \"boolean\", \"default\": true, \"title\": \"分离后重排界面\", \"description\": \"计算 dG_separated 时，是否重排分離伙伴暴露界面的侧链。与 pack_input 分开控制。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-pack_separated\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"compute_packstat\": {\"type\": \"boolean\", \"default\": false, \"title\": \"计算界面堆积统计\", \"description\": \"启用有随机成分的 packstat；大界面可能较慢。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-compute_packstat\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"interface\": {\"type\": \"string\", \"default\": \"\", \"title\": \"界面链分组\", \"description\": \"必填，例如 AB_C 表示受体 A/B 与蛋白 C；天然双链配体可为 AB_CD。使用输入文件实际链标识，不能混淆 mmCIF label/auth ID。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-interface\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer\", \"pattern\": \"^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"packstat_oversample\": {\"type\": \"integer\", \"default\": 100, \"title\": \"Packstat 过采样\", \"description\": \"仅 compute_packstat=true 时生效；增加采样以降低随机波动。\", \"x-bda-unit\": \"倍\", \"x-bda-flag\": \"-packstat:oversample\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer\", \"minimum\": 1, \"maximum\": 1000, \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"relax_repeats\": {\"type\": \"integer\", \"default\": 5, \"title\": \"Relax 内部循环\", \"description\": \"一个 FastRelax 轨迹内的打包/最小化循环；不同于 nstruct 和独立重复。\", \"x-bda-unit\": \"次\", \"x-bda-flag\": \"-relax:default_repeats\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"minimum\": 1, \"maximum\": 50, \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"relax_cartesian\": {\"type\": \"boolean\", \"default\": false, \"title\": \"Cartesian Relax\", \"description\": \"使用笛卡尔坐标最小化；必须选 ref2015_cart 或 beta_nov16_cart。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-relax:cartesian\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"constrain_start\": {\"type\": \"boolean\", \"default\": true, \"title\": \"约束到输入坐标\", \"description\": \"由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-relax:constrain_relax_to_start_coords\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"ramp_constraints\": {\"type\": \"boolean\", \"default\": false, \"title\": \"渐弱坐标约束\", \"description\": \"配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-relax:ramp_constraints\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"movemap_file\": {\"type\": \"string\", \"default\": \"\", \"title\": \"Relax 自由度文件\", \"description\": \"aux 端口下的 MoveMap 文件，控制骨架/侧链/jump 可动性。默认未提供时沿用该 relax 构建的自由度；不是受体自动固定。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-in:file:movemap\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"relax_script\": {\"type\": \"string\", \"default\": \"\", \"title\": \"自定义 Relax 循环脚本\", \"description\": \"aux 端口下的 Relax script；覆盖内部优化流程，需与 repeats/约束策略一起审阅。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-relax:script\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax\", \"x-bda-modes\": [\"relax\", \"relax_interface\"]}, \"dock_partners\": {\"type\": \"string\", \"default\": \"\", \"title\": \"对接伙伴链\", \"description\": \"必填，例如 AB_C。对接分组与界面分析分组语法类似，但这是 docking:partners。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-docking:partners\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"pattern\": \"^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$\", \"x-bda-modes\": [\"docking_protocol\"]}, \"dock_search\": {\"type\": \"string\", \"default\": \"local\", \"title\": \"对接搜索范围\", \"description\": \"local 从现有姿态附近扰动；global 随机化两个伙伴取向，须充分采样；都不是物理 MD。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"enum\": [\"local\", \"global\"], \"x-bda-modes\": [\"docking_protocol\"]}, \"dock_translation\": {\"type\": \"number\", \"default\": 3.0, \"title\": \"初始平移扰动\", \"description\": \"local 模式 dock_pert 的平移幅度；不能据此推导结合距离或动力学。\", \"x-bda-unit\": \"Å\", \"x-bda-flag\": \"-docking:dock_pert [translation rotation]\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"minimum\": 0, \"maximum\": 100, \"x-bda-modes\": [\"docking_protocol\"]}, \"dock_rotation\": {\"type\": \"number\", \"default\": 8.0, \"title\": \"初始旋转扰动\", \"description\": \"local 模式 dock_pert 的旋转幅度。\", \"x-bda-unit\": \"度\", \"x-bda-flag\": \"-docking:dock_pert [translation rotation]\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"minimum\": 0, \"maximum\": 180, \"x-bda-modes\": [\"docking_protocol\"]}, \"dock_local_refine\": {\"type\": \"boolean\", \"default\": false, \"title\": \"仅高分辨率对接精修\", \"description\": \"跳过低分辨率搜索，用于已有可信近邻姿态；不能与 global 搜索组合。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-docking:docking_local_refine\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"x-bda-modes\": [\"docking_protocol\"]}, \"native_file\": {\"type\": \"string\", \"default\": \"\", \"title\": \"参考复合物\", \"description\": \"aux 中用于对接 RMSD 的参考结构，不自动作为位置约束；必须具有匹配的链/残基映射。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-in:file:native\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol\", \"x-bda-modes\": [\"docking_protocol\"]}, \"ddg_mut_file\": {\"type\": \"string\", \"default\": \"\", \"title\": \"突变定义文件\", \"description\": \"cartesian_ddg 必填的 aux mut_file。使用 Rosetta pose 编号；需要 WT 与突变定义校验，不能用 PDB 编号直接替代。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-ddg:mut_file\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"x-bda-modes\": [\"cartesian_ddg\"]}, \"ddg_iterations\": {\"type\": \"integer\", \"default\": 3, \"title\": \"WT/突变采样迭代\", \"description\": \"每个突变定义的采样次数，不是 nstruct；输出的是协议相关折叠稳定性差分。\", \"x-bda-unit\": \"次\", \"x-bda-flag\": \"-ddg:iterations\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"minimum\": 1, \"maximum\": 100, \"x-bda-modes\": [\"cartesian_ddg\"]}, \"ddg_cartesian\": {\"type\": \"boolean\", \"default\": true, \"title\": \"DDG Cartesian 优化\", \"description\": \"本插件只支持 Cartesian 协议，必须保持 true。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-ddg:cartesian\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"enum\": [true], \"x-bda-modes\": [\"cartesian_ddg\"]}, \"ddg_bb_neighbors\": {\"type\": \"integer\", \"default\": 1, \"title\": \"骨架邻居范围\", \"description\": \"围绕突变位置允许处理的序列邻居范围；不是空间半径。\", \"x-bda-unit\": \"残基数\", \"x-bda-flag\": \"-ddg:bbnbrs\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"minimum\": 0, \"maximum\": 10, \"x-bda-modes\": [\"cartesian_ddg\"]}, \"ddg_dump_pdbs\": {\"type\": \"boolean\", \"default\": true, \"title\": \"保存 DDG 结构\", \"description\": \"保存 WT/突变模型供原子级核查；关闭则仅保存原始分数与日志。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-ddg:dump_pdbs\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"x-bda-modes\": [\"cartesian_ddg\"]}, \"fa_max_dis\": {\"type\": \"number\", \"default\": 9.0, \"title\": \"全原子作用距离截断\", \"description\": \"Cartesian DDG 推荐协议的相互作用截断；须与 WT 预先 Cartesian Relax 的设置一致。\", \"x-bda-unit\": \"Å\", \"x-bda-flag\": \"-fa_max_dis\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/cartesian-ddG\", \"minimum\": 3, \"maximum\": 20, \"x-bda-modes\": [\"relax\", \"relax_interface\", \"InterfaceAnalyzer\", \"cartesian_ddg\"]}, \"parser_protocol\": {\"type\": \"string\", \"default\": \"\", \"title\": \"RosettaScripts XML\", \"description\": \"rosetta_scripts 必填，aux 下的 XML 文件。平台不会猜测 XML 的科学阶段；生成时验证 XML 可解析，完整 schema 由实际 Rosetta 构建验证。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"-parser:protocol\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts\", \"x-bda-modes\": [\"rosetta_scripts\"]}, \"parser_script_vars\": {\"type\": \"string\", \"default\": \"\", \"title\": \"XML 变量\", \"description\": \"空白分隔的 name=value；作为独立 argv 值传入，不运行 shell。所有变量名必须在 XML 的 %%name%% 中出现，所有占位符必须有值。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"-parser:script_vars\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts\", \"x-bda-modes\": [\"rosetta_scripts\"]}, \"xml_expected_output\": {\"type\": \"string\", \"default\": \"score\", \"title\": \"XML 最低输出契约\", \"description\": \"score 要求至少 nstruct 个有效 SCORE 行；structure 还要求对应数量 PDB。自定义协议的完整科学输出仍由协议作者解释。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts\", \"enum\": [\"score\", \"structure\"], \"x-bda-modes\": [\"rosetta_scripts\"]}, \"geometry_contacts\": {\"type\": \"boolean\", \"default\": true, \"title\": \"计算界面原子距离\", \"description\": \"从同一被评分的复合物坐标提取重原子接触和逐残基对最短距离；内部 packing 的临时姿态不在此几何文件中。\", \"x-bda-unit\": \"无量纲\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.python.org/3/library/math.html#math.dist\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"contact_cutoff\": {\"type\": \"number\", \"default\": 4.5, \"title\": \"接触距离阈值\", \"description\": \"输出此半径内的全部跨界面重原子对及其距离；没有接触不等于证明不结合。\", \"x-bda-unit\": \"Å\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.python.org/3/library/math.html#math.dist\", \"minimum\": 2, \"maximum\": 10, \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"receptor_axis\": {\"type\": \"string\", \"default\": \"\", \"title\": \"受体角度锚点\", \"description\": \"可选，两枚 CA 的 chain:residue 标识，逗号分隔，如 A:10,A:100；方向从第一个指向第二个。须与 binder_axis 一起提供。\", \"x-bda-unit\": \"PDB链:残基编号\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.python.org/3/library/math.html#math.acos\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"binder_axis\": {\"type\": \"string\", \"default\": \"\", \"title\": \"配体蛋白角度锚点\", \"description\": \"可选，两枚 CA 标识，如 C:1,C:50。报告此有向轴与受体轴的夹角；不是未经定义的“整体结合角”。\", \"x-bda-unit\": \"PDB链:残基编号\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.python.org/3/library/math.html#math.acos\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}, \"geometry_reference_file\": {\"type\": \"string\", \"default\": \"\", \"title\": \"天然参考复合物\", \"description\": \"可选，aux 下同链分组的参考 PDB；计算其接触、质心距离与相同锚点定义夹角供比较。参考应记录是实验复合物还是对接假说；不同支架的接触编号不能直接当同源位点。\", \"x-bda-unit\": \"文件\", \"x-bda-flag\": \"BDA 控制参数，不直接作为 Rosetta flag\", \"x-bda-source\": \"https://docs.python.org/3/library/math.html#math.dist\", \"x-bda-modes\": [\"InterfaceAnalyzer\", \"relax_interface\"]}}, \"description\": \"BDA Rosetta 显式参数表；默认值是本插件默认，非所有 Rosetta 构建的默认。\", \"allOf\": [{\"if\": {\"properties\": {\"application\": {\"enum\": [\"InterfaceAnalyzer\", \"relax_interface\"]}}, \"required\": [\"application\"]}, \"then\": {\"required\": [\"interface\"], \"properties\": {\"interface\": {\"minLength\": 3}}}}, {\"if\": {\"properties\": {\"application\": {\"const\": \"cartesian_ddg\"}}, \"required\": [\"application\"]}, \"then\": {\"required\": [\"ddg_mut_file\", \"score_weights\"], \"properties\": {\"ddg_mut_file\": {\"minLength\": 1}, \"score_weights\": {\"enum\": [\"ref2015_cart\", \"beta_nov16_cart\"]}}}}, {\"if\": {\"properties\": {\"application\": {\"const\": \"docking_protocol\"}}, \"required\": [\"application\"]}, \"then\": {\"required\": [\"dock_partners\"], \"properties\": {\"dock_partners\": {\"minLength\": 3}}}}, {\"if\": {\"properties\": {\"application\": {\"const\": \"rosetta_scripts\"}}, \"required\": [\"application\"]}, \"then\": {\"required\": [\"parser_protocol\"], \"properties\": {\"parser_protocol\": {\"minLength\": 1}}}}]}}')\n\n\nclass ConfigurationError(ValueError):\n    pass\n\n\ndef digest(path):\n    h = hashlib.sha256()\n    with path.open(\"rb\") as stream:\n        for block in iter(lambda: stream.read(1024 * 1024), b\"\"):\n            h.update(block)\n    return h.hexdigest()\n\n\ndef normalize(raw):\n    if not isinstance(raw, dict):\n        raise ConfigurationError(\"Configuration must be a JSON object\")\n    props = SPEC[\"schema\"][\"properties\"]\n    unknown = set(raw) - set(props)\n    if unknown:\n        raise ConfigurationError(\"Unknown parameters: \" + \", \".join(sorted(unknown)))\n    p = {k: v[\"default\"] for k, v in props.items()}\n    p.update(raw)\n    for k, v in p.items():\n        s = props[k]\n        valid = {\n            \"string\": isinstance(v, str),\n            \"boolean\": isinstance(v, bool),\n            \"integer\": isinstance(v, int) and not isinstance(v, bool),\n            \"number\": isinstance(v, (int, float)) and not isinstance(v, bool),\n        }[s[\"type\"]]\n        if not valid or (isinstance(v, float) and not math.isfinite(v)):\n            raise ConfigurationError(k + \": wrong type or nonfinite value\")\n        if \"enum\" in s and v not in s[\"enum\"]:\n            raise ConfigurationError(k + \": unsupported value\")\n        if \"minimum\" in s and v < s[\"minimum\"] or \"maximum\" in s and v > s[\"maximum\"]:\n            raise ConfigurationError(k + \": outside supported range\")\n        if \"pattern\" in s and not re.fullmatch(s[\"pattern\"], v):\n            raise ConfigurationError(k + \": invalid format\")\n        if isinstance(v, str) and (\"\\x00\" in v or \"\\n\" in v or \"\\r\" in v):\n            raise ConfigurationError(k + \": control characters are not allowed\")\n    mode = p[\"application\"]\n    for k in raw:\n        modes = props[k].get(\"x-bda-modes\", [])\n        if modes and mode not in modes and raw[k] != props[k][\"default\"]:\n            raise ConfigurationError(k + \": not applicable to \" + mode)\n    for modes, field in [\n        ([\"InterfaceAnalyzer\", \"relax_interface\"], \"interface\"),\n        ([\"docking_protocol\"], \"dock_partners\"),\n        ([\"cartesian_ddg\"], \"ddg_mut_file\"),\n        ([\"rosetta_scripts\"], \"parser_protocol\"),\n    ]:\n        if mode in modes and not p[field]:\n            raise ConfigurationError(field + \": required for \" + mode)\n    if (\n        mode == \"cartesian_ddg\"\n        or mode in [\"relax\", \"relax_interface\"]\n        and p[\"relax_cartesian\"]\n    ) and not p[\"score_weights\"].endswith(\"_cart\"):\n        raise ConfigurationError(\n            \"Cartesian protocols require a supported *_cart score_weights\"\n        )\n    if (\n        mode == \"docking_protocol\"\n        and p[\"dock_search\"] == \"global\"\n        and p[\"dock_local_refine\"]\n    ):\n        raise ConfigurationError(\"global search and local-refine-only are incompatible\")\n    if (\n        mode in [\"relax\", \"relax_interface\"]\n        and p[\"ramp_constraints\"]\n        and not p[\"constrain_start\"]\n    ):\n        raise ConfigurationError(\"ramp_constraints requires constrain_start\")\n    if mode in [\"InterfaceAnalyzer\", \"relax_interface\"]:\n        if bool(p[\"receptor_axis\"]) != bool(p[\"binder_axis\"]):\n            raise ConfigurationError(\n                \"Provide both receptor_axis and binder_axis, or neither\"\n            )\n        if not p[\"geometry_contacts\"] and any(\n            p[k] for k in [\"receptor_axis\", \"binder_axis\", \"geometry_reference_file\"]\n        ):\n            raise ConfigurationError(\n                \"Geometry anchors/reference require geometry_contacts\"\n            )\n    return {\n        k: v\n        for k, v in p.items()\n        if not props[k].get(\"x-bda-modes\") or mode in props[k][\"x-bda-modes\"]\n    }\n\n\ndef from_environment():\n    out = {}\n    for k, s in SPEC[\"schema\"][\"properties\"].items():\n        if k not in os.environ:\n            continue\n        v = os.environ[k]\n        if s[\"type\"] == \"boolean\":\n            if v not in [\"1\", \"\", \"true\", \"false\", \"True\", \"False\", \"0\"]:\n                raise ConfigurationError(k + \": invalid boolean\")\n            out[k] = v in [\"1\", \"true\", \"True\"]\n        elif s[\"type\"] == \"integer\":\n            out[k] = int(v)\n        elif s[\"type\"] == \"number\":\n            out[k] = float(v)\n        else:\n            out[k] = v\n    return out\n\n\ndef auxiliary(root, name):\n    if not name:\n        return None\n    path = (root / \"aux\" / name).resolve()\n    if (\n        Path(name).is_absolute()\n        or not path.is_relative_to((root / \"aux\").resolve())\n        or not path.is_file()\n    ):\n        raise ConfigurationError(\"Auxiliary file must exist under input/aux: \" + name)\n    return path\n\n\ndef pdb_info(path):\n    chains = set()\n    residues = []\n    seen = set()\n    models = 0\n    for line in path.read_text().splitlines():\n        if line.startswith(\"MODEL \"):\n            models += 1\n        if line.startswith((\"ATOM  \", \"HETATM\")):\n            if len(line) < 54:\n                raise ConfigurationError(\"Truncated PDB atom record: \" + str(path))\n            chain = line[21]\n            chains.add(chain)\n            key = (chain, line[22:27], line[17:20])\n            if key not in seen:\n                seen.add(key)\n                residues.append(\n                    {\n                        \"chain\": chain,\n                        \"pdb_number\": line[22:27].strip(),\n                        \"resname\": line[17:20],\n                    }\n                )\n    if not chains or models > 1:\n        raise ConfigurationError(\"Require a nonempty, single-model PDB: \" + str(path))\n    return {\"chains\": sorted(chains), \"residues\": residues}\n\n\ndef check_partners(partners, chains):\n    left, right = partners.split(\"_\")\n    if len(set(left + right)) != len(left + right):\n        raise ConfigurationError(\n            \"Partner groups must be disjoint with no repeated chain IDs\"\n        )\n    if set(left + right) != set(chains):\n        raise ConfigurationError(\n            \"Partner groups must cover exactly all input PDB chains; observed \"\n            + repr(chains)\n        )\n\n\ndef check_mutations(path, info):\n    rows = [x.split() for x in path.read_text().splitlines() if x.strip()]\n    if not rows or len(rows[0]) != 2 or rows[0][0] != \"total\":\n        raise ConfigurationError(\"mut_file must start with total N\")\n    amino = dict(\n        zip(\n            [\n                \"ALA\",\n                \"CYS\",\n                \"ASP\",\n                \"GLU\",\n                \"PHE\",\n                \"GLY\",\n                \"HIS\",\n                \"ILE\",\n                \"LYS\",\n                \"LEU\",\n                \"MET\",\n                \"ASN\",\n                \"PRO\",\n                \"GLN\",\n                \"ARG\",\n                \"SER\",\n                \"THR\",\n                \"VAL\",\n                \"TRP\",\n                \"TYR\",\n            ],\n            \"ACDEFGHIKLMNPQRSTVWY\",\n        )\n    )\n    # Pose indexing is ambiguous with ligands/water/missing residues; do not guess.\n    if any(r[\"resname\"] not in amino for r in info[\"residues\"]):\n        raise ConfigurationError(\n            \"cartesian_ddg requires a canonical protein-only PDB with verified pose indexing\"\n        )\n    count = 0\n    groups = 0\n    tags = []\n    i = 1\n    try:\n        while i < len(rows):\n            size = int(rows[i][0])\n            if len(rows[i]) != 1 or size < 1:\n                raise ValueError()\n            i += 1\n            group_positions = set()\n            tag_parts = []\n            for _ in range(size):\n                wt, position, mutant = rows[i]\n                n = int(position)\n                if (\n                    n < 1\n                    or n > len(info[\"residues\"])\n                    or n in group_positions\n                    or mutant not in amino.values()\n                    or mutant == wt\n                    or amino[info[\"residues\"][n - 1][\"resname\"]] != wt\n                ):\n                    raise ValueError()\n                group_positions.add(n)\n                tag_parts.append(\n                    str(n) + next(k for k, v in amino.items() if v == mutant)\n                )\n                i += 1\n                count += 1\n            groups += 1\n            tags.append(\"MUT_\" + \"_\".join(tag_parts))\n        if count != int(rows[0][1]) or groups == 0:\n            raise ValueError()\n    except (ValueError, IndexError):\n        raise ConfigurationError(\n            \"mut_file counts, WT identity or pose indices do not match input\"\n        ) from None\n    return {\n        \"groups\": groups,\n        \"mutations\": count,\n        \"expected_mutant_tags\": tags,\n        \"indexing\": \"canonical protein-only PDB residue order, 1-based\",\n    }\n\n\ndef variables(value):\n    pairs = shlex.split(value)\n    names = set()\n    for pair in pairs:\n        if not re.fullmatch(r\"[A-Za-z_][A-Za-z0-9_]*=.+\", pair):\n            raise ConfigurationError(\"XML variables require name=value tokens\")\n        name = pair.split(\"=\", 1)[0]\n        if name in names:\n            raise ConfigurationError(\"Duplicate XML variable: \" + name)\n        names.add(name)\n    return pairs, names\n\n\ndef argv_common(p, aux, seed):\n    args = [\n        \"-score:weights\",\n        p[\"score_weights\"],\n        \"-run:constant_seed\",\n        \"true\",\n        \"-run:jran\",\n        str(seed),\n        \"-ex1\",\n        str(p[\"ex1\"]).lower(),\n        \"-ex2\",\n        str(p[\"ex2\"]).lower(),\n        \"-use_input_sc\",\n        str(p[\"use_input_sc\"]).lower(),\n        \"-ignore_unrecognized_res\",\n        str(p[\"ignore_unrecognized_res\"]).lower(),\n    ]\n    for field, flag in [\n        (\"extra_res_fa\", \"-in:file:extra_res_fa\"),\n        (\"extra_res_cen\", \"-in:file:extra_res_cen\"),\n    ]:\n        if aux.get(field):\n            args += [flag, str(aux[field])]\n    if \"fa_max_dis\" in p:\n        args += [\"-fa_max_dis\", str(p[\"fa_max_dis\"])]\n    return args\n\n\ndef command(root, binary, inp, out, args, scorefile, nstruct=None):\n    argv = [\n        str(root / \"bin\" / (binary + \".default.linuxgccrelease\")),\n        \"-in:file:s\",\n        str(inp),\n        \"-out:path:all\",\n        str(out),\n        \"-out:file:scorefile\",\n        str(out / scorefile),\n    ]\n    if nstruct is not None:\n        argv += [\"-nstruct\", str(nstruct)]\n    return argv + args\n\n\ndef plan(raw, input_dir, output_dir, runtime_root):\n    p = normalize(raw)\n    mode = p[\"application\"]\n    inp, out, runtime = (\n        Path(input_dir).resolve(),\n        Path(output_dir).resolve(),\n        Path(runtime_root).resolve(),\n    )\n    if out == inp or out.is_relative_to(inp) or inp.is_relative_to(out):\n        raise ConfigurationError(\"Input and output directories must be separate\")\n    if out.exists() and any(out.iterdir()):\n        raise ConfigurationError(\n            \"Use a fresh empty output directory; existing results are never overwritten\"\n        )\n    inputs = sorted((inp / \"s\").rglob(\"*\"))\n    inputs = [\n        x\n        for x in inputs\n        if x.is_file() and x.suffix.lower() in [\".pdb\", \".cif\", \".mmcif\"]\n    ]\n    if not inputs:\n        raise ConfigurationError(\"No input structures on port s\")\n    if any(x.suffix.lower() != \".pdb\" for x in inputs):\n        raise ConfigurationError(\n            \"This audited release requires PDB input with explicit chain mapping; convert mmCIF before staging, preserving auth/label mapping\"\n        )\n    if p[\"seed\"] + len(inputs) * p[\"replicates\"] > 2147483647:\n        raise ConfigurationError(\"Seed range exceeds signed 32-bit integer\")\n    fields = [\n        \"extra_res_fa\",\n        \"extra_res_cen\",\n        \"constraints_file\",\n        \"movemap_file\",\n        \"relax_script\",\n        \"native_file\",\n        \"ddg_mut_file\",\n        \"parser_protocol\",\n        \"geometry_reference_file\",\n    ]\n    aux = {k: auxiliary(inp, p.get(k, \"\")) for k in fields}\n    xml_report = None\n    if mode == \"rosetta_scripts\":\n        value = aux[\"parser_protocol\"].read_text()\n        if (\n            \"<!DOCTYPE\" in value\n            or \"<!ENTITY\" in value\n            or \"xi:include\" in value\n            or \"XInclude\" in value\n        ):\n            raise ConfigurationError(\n                \"Use a self-contained XML without external entities/includes\"\n            )\n        pairs, names = variables(p[\"parser_script_vars\"])\n        needed = set(re.findall(r\"%%([A-Za-z_][A-Za-z0-9_]*)%%\", value))\n        if needed != names:\n            raise ConfigurationError(\n                \"XML placeholders and supplied variables must match exactly\"\n            )\n        try:\n            # Placeholder XML remains well formed because placeholders are string values.\n            tree = ET.fromstring(value)\n        except ET.ParseError as e:\n            raise ConfigurationError(\"Invalid XML: \" + str(e)) from None\n        if tree.tag != \"ROSETTASCRIPTS\":\n            raise ConfigurationError(\"Expected ROSETTASCRIPTS root\")\n        xml_report = [\n            {\"tag\": node.tag, \"attributes\": dict(node.attrib)} for node in tree.iter()\n        ]\n    entries = []\n    for i, path in enumerate(inputs):\n        if not path.resolve().is_relative_to((inp / \"s\").resolve()):\n            raise ConfigurationError(\"Structure symlink escapes input port\")\n        info = pdb_info(path)\n        if mode in [\"InterfaceAnalyzer\", \"relax_interface\", \"docking_protocol\"]:\n            check_partners(p.get(\"interface\", p.get(\"dock_partners\")), info[\"chains\"])\n        if mode in [\"InterfaceAnalyzer\", \"relax_interface\"] and p[\"geometry_contacts\"]:\n            if p[\"receptor_axis\"]:\n                interface_geometry(path, p)\n            if aux.get(\"geometry_reference_file\"):\n                ref_info = pdb_info(aux[\"geometry_reference_file\"])\n                check_partners(p[\"interface\"], ref_info[\"chains\"])\n                interface_geometry(aux[\"geometry_reference_file\"], p)\n        mutation = (\n            check_mutations(aux[\"ddg_mut_file\"], info)\n            if mode == \"cartesian_ddg\"\n            else None\n        )\n        for rep in range(p[\"replicates\"]):\n            seed = p[\"seed\"] + i * p[\"replicates\"] + rep\n            work = (\n                out\n                / \"runs\"\n                / f\"{i:04d}_{digest(path)[:10]}\"\n                / f\"replicate_{rep + 1:03d}\"\n            )\n            common = argv_common(p, aux, seed)\n            extra = []\n            if aux.get(\"constraints_file\"):\n                extra += [\n                    \"-constraints:cst_fa_file\",\n                    str(aux[\"constraints_file\"]),\n                    \"-constraints:cst_fa_weight\",\n                    str(p[\"constraint_weight\"]),\n                ]\n            binary = mode\n            if mode in [\"relax\", \"relax_interface\"]:\n                binary = \"relax\"\n                extra += [\n                    \"-relax:default_repeats\",\n                    str(p[\"relax_repeats\"]),\n                    \"-relax:cartesian\",\n                    str(p[\"relax_cartesian\"]).lower(),\n                    \"-relax:constrain_relax_to_start_coords\",\n                    str(p[\"constrain_start\"]).lower(),\n                    \"-relax:ramp_constraints\",\n                    str(p[\"ramp_constraints\"]).lower(),\n                ]\n                for k, flag in [\n                    (\"movemap_file\", \"-in:file:movemap\"),\n                    (\"relax_script\", \"-relax:script\"),\n                ]:\n                    if aux[k]:\n                        extra += [flag, str(aux[k])]\n            elif mode == \"InterfaceAnalyzer\":\n                extra += interface_args(p)\n            elif mode == \"docking_protocol\":\n                extra += [\n                    \"-in:file:fullatom\",\n                    \"true\",\n                    \"-docking:partners\",\n                    p[\"dock_partners\"],\n                ]\n                if p[\"dock_search\"] == \"global\":\n                    extra += [\n                        \"-docking:randomize1\",\n                        \"true\",\n                        \"-docking:randomize2\",\n                        \"true\",\n                    ]\n                else:\n                    extra += [\n                        \"-docking:dock_pert\",\n                        str(p[\"dock_translation\"]),\n                        str(p[\"dock_rotation\"]),\n                    ]\n                extra += [\n                    \"-docking:docking_local_refine\",\n                    str(p[\"dock_local_refine\"]).lower(),\n                ]\n                if aux[\"native_file\"]:\n                    extra += [\"-in:file:native\", str(aux[\"native_file\"])]\n            elif mode == \"cartesian_ddg\":\n                extra += [\n                    \"-ddg:mut_file\",\n                    str(aux[\"ddg_mut_file\"]),\n                    \"-ddg:iterations\",\n                    str(p[\"ddg_iterations\"]),\n                    \"-ddg:cartesian\",\n                    \"true\",\n                    \"-ddg:legacy\",\n                    \"false\",\n                    \"-ddg:bbnbrs\",\n                    str(p[\"ddg_bb_neighbors\"]),\n                    \"-ddg:dump_pdbs\",\n                    str(p[\"ddg_dump_pdbs\"]).lower(),\n                ]\n            elif mode == \"rosetta_scripts\":\n                extra += [\"-parser:protocol\", str(aux[\"parser_protocol\"])]\n                if pairs:\n                    extra += [\"-parser:script_vars\", *pairs]\n            stage = work / (\"relax\" if mode == \"relax_interface\" else \"primary\")\n            argv = command(\n                runtime,\n                binary,\n                path,\n                stage,\n                common + extra,\n                p[\"out_scorefile\"],\n                p.get(\"nstruct\"),\n            )\n            entries.append(\n                {\n                    \"input\": str(path),\n                    \"input_sha256\": digest(path),\n                    \"chains\": info[\"chains\"],\n                    \"replicate\": rep + 1,\n                    \"seed\": seed,\n                    \"work_dir\": str(work),\n                    \"stage_dir\": str(stage),\n                    \"argv\": argv,\n                    \"mutations\": mutation,\n                }\n            )\n    return {\n        \"schema_version\": 1,\n        \"plugin_version\": SPEC[\"plugin_version\"],\n        \"status\": \"generated_not_executed\",\n        \"parameters\": p,\n        \"mode_description\": SPEC[\"modes\"][mode],\n        \"runtime_root\": str(runtime),\n        \"output_dir\": str(out),\n        \"auxiliary_files\": {\n            k: {\"path\": str(v), \"sha256\": digest(v)} for k, v in aux.items() if v\n        },\n        \"xml_attribute_inventory\": xml_report,\n        \"entries\": entries,\n        \"deferred_stage\": \"InterfaceAnalyzer on every saved relaxed PDB, each with nstruct=1; actual argv recorded before execution\"\n        if mode == \"relax_interface\"\n        else None,\n        \"units\": {\n            \"Rosetta_energy\": \"REU; not physical kcal/mol or measured Kd\",\n            \"dSASA_int\": \"angstrom^2\",\n        },\n        \"scientific_validation\": \"not_established; software output completeness is not binding/activation validation\",\n    }\n\n\ndef interface_args(p):\n    a = [\n        \"-interface\",\n        p[\"interface\"],\n        \"-pack_input\",\n        str(p[\"pack_input\"]).lower(),\n        \"-pack_separated\",\n        str(p[\"pack_separated\"]).lower(),\n        \"-compute_packstat\",\n        str(p[\"compute_packstat\"]).lower(),\n        \"-tracer_data_print\",\n        \"false\",\n        \"-add_regular_scores_to_scorefile\",\n        \"true\",\n    ]\n    if p[\"compute_packstat\"]:\n        a += [\"-packstat:oversample\", str(p[\"packstat_oversample\"])]\n    return a\n\n\ndef score_rows(path):\n    header = None\n    rows = []\n    for line in path.read_text().splitlines():\n        tokens = line.split()\n        if not tokens or tokens[0] != \"SCORE:\":\n            continue\n        tokens = tokens[1:]\n        if \"description\" in tokens and not rows:\n            header = tokens\n            continue\n        if header and tokens == header:\n            continue\n        if header and len(tokens) == len(header):\n            row = dict(zip(header, tokens))\n            try:\n                converted = {}\n                numeric_required = {\n                    \"score\",\n                    \"total_score\",\n                    \"dG_separated\",\n                    \"dSASA_int\",\n                    \"packstat\",\n                }\n                for k, v in row.items():\n                    if k == \"description\":\n                        converted[k] = v\n                        continue\n                    try:\n                        number = float(v)\n                    except ValueError:\n                        if k in numeric_required:\n                            raise\n                        converted[k] = v  # XML string extra-scores remain raw text.\n                    else:\n                        if not math.isfinite(number):\n                            raise ValueError()\n                        converted[k] = number\n            except ValueError:\n                raise ConfigurationError(\n                    \"Invalid/nonfinite SCORE row: \" + str(path)\n                ) from None\n            rows.append(converted)\n    return rows\n\n\ndef interface_geometry(path, p):\n    \"\"\"Heavy-atom contacts in the exact scored input; oriented angles need explicit CA anchors.\"\"\"\n    left, right = p[\"interface\"].split(\"_\")\n    groups = [[], []]\n    ca = {}\n    for line in path.read_text().splitlines():\n        if not line.startswith((\"ATOM  \", \"HETATM\")) or line[16] not in (\" \", \"A\"):\n            continue\n        atom = line[12:16].strip()\n        element = line[76:78].strip() if len(line) >= 78 else \"\"\n        if (element or atom.lstrip(\"0123456789\")[:1]).upper() in (\"H\", \"D\"):\n            continue\n        chain, residue = line[21], line[22:27].strip()\n        xyz = tuple(float(line[a:b]) for a, b in [(30, 38), (38, 46), (46, 54)])\n        if not all(math.isfinite(x) for x in xyz):\n            raise ConfigurationError(\"Nonfinite PDB coordinate\")\n        record = {\n            \"chain\": chain,\n            \"residue\": residue,\n            \"resname\": line[17:20].strip(),\n            \"atom\": atom,\n            \"xyz\": xyz,\n        }\n        if chain in left:\n            groups[0].append(record)\n        elif chain in right:\n            groups[1].append(record)\n        if atom == \"CA\":\n            ca[chain + \":\" + residue] = xyz\n    if not all(groups):\n        raise ConfigurationError(\"Empty heavy-atom partner group\")\n    cutoff = p[\"contact_cutoff\"]\n    grid = {}\n    for atom in groups[1]:\n        key = tuple(math.floor(x / cutoff) for x in atom[\"xyz\"])\n        grid.setdefault(key, []).append(atom)\n    contacts = []\n    residue_min = {}\n    for a in groups[0]:\n        key = tuple(math.floor(x / cutoff) for x in a[\"xyz\"])\n        for dx in (-1, 0, 1):\n            for dy in (-1, 0, 1):\n                for dz in (-1, 0, 1):\n                    for b in grid.get((key[0] + dx, key[1] + dy, key[2] + dz), []):\n                        distance = math.dist(a[\"xyz\"], b[\"xyz\"])\n                        if distance <= cutoff:\n                            contact = {\n                                **{\n                                    \"receptor_\" + k: a[k]\n                                    for k in [\"chain\", \"residue\", \"resname\", \"atom\"]\n                                },\n                                **{\n                                    \"binder_\" + k: b[k]\n                                    for k in [\"chain\", \"residue\", \"resname\", \"atom\"]\n                                },\n                                \"distance_angstrom\": distance,\n                            }\n                            contacts.append(contact)\n                            rkey = (a[\"chain\"], a[\"residue\"], b[\"chain\"], b[\"residue\"])\n                            if (\n                                rkey not in residue_min\n                                or distance < residue_min[rkey][\"distance_angstrom\"]\n                            ):\n                                residue_min[rkey] = contact\n    centroids = [\n        tuple(sum(a[\"xyz\"][i] for a in group) / len(group) for i in range(3))\n        for group in groups\n    ]\n    angle = None\n    if p[\"receptor_axis\"] and p[\"binder_axis\"]:\n        axes = []\n        for field, permitted in [(\"receptor_axis\", left), (\"binder_axis\", right)]:\n            ids = p[field].split(\",\")\n            if len(ids) != 2 or any(\n                x not in ca or x.split(\":\")[0] not in permitted for x in ids\n            ):\n                raise ConfigurationError(\n                    field + \": both CA anchors must exist in the corresponding partner\"\n                )\n            vec = tuple(b - a for a, b in zip(ca[ids[0]], ca[ids[1]]))\n            norm = math.sqrt(sum(x * x for x in vec))\n            if norm < 1e-8:\n                raise ConfigurationError(\"Angle axis has zero length\")\n            axes.append(tuple(x / norm for x in vec))\n        angle = math.degrees(\n            math.acos(max(-1, min(1, sum(a * b for a, b in zip(*axes)))))\n        )\n    return {\n        \"coordinate_file\": str(path),\n        \"coordinate_sha256\": digest(path),\n        \"interface\": p[\"interface\"],\n        \"contact_cutoff_angstrom\": cutoff,\n        \"heavy_atom_counts\": [len(g) for g in groups],\n        \"centroid_distance_angstrom\": math.dist(*centroids),\n        \"contact_atom_pair_count\": len(contacts),\n        \"minimum_distance_within_cutoff_angstrom\": min(\n            (r[\"distance_angstrom\"] for r in contacts), default=None\n        ),\n        \"receptor_axis\": p[\"receptor_axis\"],\n        \"binder_axis\": p[\"binder_axis\"],\n        \"anchored_angle_degrees\": angle,\n        \"angle_status\": \"computed_from_explicit_CA_axes\"\n        if angle is not None\n        else \"not_computed; CA anchors not supplied\",\n        \"geometry_scope\": \"saved input coordinates; excludes unexported IA internal packing copies\",\n        \"atom_contacts\": contacts,\n        \"residue_pair_minima\": list(residue_min.values()),\n    }\n\n\ndef write_geometry(path, target, p, job):\n    report = interface_geometry(path, p)\n    ref = job[\"auxiliary_files\"].get(\"geometry_reference_file\")\n    if ref:\n        reference = interface_geometry(Path(ref[\"path\"]), p)\n        report[\"reference\"] = reference\n        report[\"reference_evidence_status\"] = (\n            \"user-supplied; not assumed to be an experimentally solved complex\"\n        )\n        report[\"centroid_distance_delta_angstrom\"] = (\n            report[\"centroid_distance_angstrom\"]\n            - reference[\"centroid_distance_angstrom\"]\n        )\n        report[\"anchored_angle_delta_degrees\"] = (\n            (report[\"anchored_angle_degrees\"] - reference[\"anchored_angle_degrees\"])\n            if report[\"anchored_angle_degrees\"] is not None\n            else None\n        )\n    save_json(target / \"interface-geometry.json\", report)\n    if report[\"atom_contacts\"]:\n        with (target / \"atom-contacts.csv\").open(\"w\", newline=\"\") as stream:\n            writer = csv.DictWriter(stream, fieldnames=list(report[\"atom_contacts\"][0]))\n            writer.writeheader()\n            writer.writerows(report[\"atom_contacts\"])\n\n\ndef save_json(path, value):\n    path.write_text(\n        json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + \"\\n\"\n    )\n\n\ndef run_process(argv, directory, evidence):\n    directory.mkdir(parents=True, exist_ok=False)\n    binary = Path(argv[0])\n    if not binary.is_file() or not os.access(binary, os.X_OK):\n        raise ConfigurationError(\"Rosetta executable not available: \" + str(binary))\n    evidence[\"executables\"][str(binary)] = digest(binary)\n    with (directory / \"rosetta.log\").open(\"w\") as log:\n        result = subprocess.run(\n            argv, cwd=directory, stdout=log, stderr=subprocess.STDOUT, check=False\n        )\n    if result.returncode:\n        raise ConfigurationError(\n            f\"Rosetta exit {result.returncode}: {directory}/rosetta.log\"\n        )\n\n\ndef execute(job):\n    out = Path(job[\"output_dir\"])\n    p = job[\"parameters\"]\n    mode = p[\"application\"]\n    evidence = {\n        \"status\": \"running\",\n        \"jobs\": [],\n        \"executables\": {},\n        \"energy_unit\": \"REU\",\n        \"runtime_root\": job[\"runtime_root\"],\n        \"metric_status\": {\n            \"packstat\": \"requested\"\n            if p.get(\"compute_packstat\")\n            else \"not_requested; any raw zero is not an evaluated packing score\"\n        },\n    }\n    rows = []\n    save_json(out / \"execution.json\", evidence)\n    try:\n        for entry in job[\"entries\"]:\n            stage = Path(entry[\"stage_dir\"])\n            item = {**entry, \"status\": \"running\"}\n            evidence[\"jobs\"].append(item)\n            save_json(out / \"execution.json\", evidence)\n            run_process(entry[\"argv\"], stage, evidence)\n            if mode == \"cartesian_ddg\":\n                ddgs = list(stage.glob(\"*.ddg\"))\n                if not ddgs or any(not f.read_text().strip() for f in ddgs):\n                    raise ConfigurationError(\n                        \"cartesian_ddg produced no nonempty .ddg output\"\n                    )\n                records = []\n                for f in ddgs:\n                    for line in f.read_text().splitlines():\n                        match = re.match(\n                            r\"^COMPLEX:\\s+Round(\\d+):\\s+(WT_?|MUT_[A-Za-z0-9_]+):\\s+(\\S+)\",\n                            line,\n                        )\n                        if match:\n                            energy = float(match[3])\n                            if not math.isfinite(energy):\n                                raise ConfigurationError(\n                                    \"Nonfinite Cartesian DDG energy\"\n                                )\n                            records.append(\n                                {\n                                    \"round\": int(match[1]),\n                                    \"tag\": match[2],\n                                    \"score\": energy,\n                                    \"source\": str(f),\n                                }\n                            )\n                tags = {r[\"tag\"] for r in records}\n                if not tags.intersection({\"WT\", \"WT_\"}) or not set(\n                    entry[\"mutations\"][\"expected_mutant_tags\"]\n                ).issubset(tags):\n                    raise ConfigurationError(\n                        \"Incomplete modern Cartesian DDG WT/mutant records\"\n                    )\n                save_json(\n                    stage / \"ddg-records.json\",\n                    {\n                        \"records\": records,\n                        \"unit\": \"REU\",\n                        \"requested_iterations\": p[\"ddg_iterations\"],\n                        \"note\": \"WT and each mutant present. Early termination/iteration counts require protocol review.\",\n                    },\n                )\n                item[\"ddg_files\"] = [str(f) for f in ddgs]\n                item[\"scientific_completeness\"] = (\n                    \"WT_and_each_mutant_present; not a validated physical stability measurement\"\n                )\n            else:\n                scored = (\n                    score_rows(stage / p[\"out_scorefile\"])\n                    if (stage / p[\"out_scorefile\"]).is_file()\n                    else []\n                )\n                if len(scored) < p[\"nstruct\"]:\n                    raise ConfigurationError(\"Fewer SCORE rows than requested nstruct\")\n                pdbs = sorted(stage.glob(\"*.pdb\"))\n                need_struct = (\n                    mode in [\"relax\", \"relax_interface\", \"docking_protocol\"]\n                    or mode == \"rosetta_scripts\"\n                    and p[\"xml_expected_output\"] == \"structure\"\n                )\n                if need_struct and len(pdbs) < p[\"nstruct\"]:\n                    raise ConfigurationError(\"Fewer output PDBs than requested nstruct\")\n                for row in scored:\n                    rows.append(\n                        {\n                            \"input_sha256\": entry[\"input_sha256\"],\n                            \"replicate\": entry[\"replicate\"],\n                            \"seed\": entry[\"seed\"],\n                            \"stage\": \"primary\",\n                            \"source_scorefile\": str(stage / p[\"out_scorefile\"]),\n                            **row,\n                        }\n                    )\n                if mode == \"relax_interface\":\n                    item[\"interface_commands\"] = []\n                    for j, pdb in enumerate(pdbs):\n                        target = Path(entry[\"work_dir\"]) / \"interface\" / f\"{j:05d}\"\n                        aux = {\n                            k: Path(v[\"path\"])\n                            for k, v in job[\"auxiliary_files\"].items()\n                            if k == \"extra_res_fa\"\n                        }\n                        argv = command(\n                            Path(job[\"runtime_root\"]),\n                            \"InterfaceAnalyzer\",\n                            pdb,\n                            target,\n                            argv_common(p, aux, entry[\"seed\"]) + interface_args(p),\n                            p[\"out_scorefile\"],\n                            1,\n                        )\n                        item[\"interface_commands\"].append(\n                            {\"argv\": argv, \"input_sha256\": digest(pdb)}\n                        )\n                        save_json(out / \"execution.json\", evidence)\n                        run_process(argv, target, evidence)\n                        ir = (\n                            score_rows(target / p[\"out_scorefile\"])\n                            if (target / p[\"out_scorefile\"]).is_file()\n                            else []\n                        )\n                        if not ir or any(\"dG_separated\" not in r for r in ir):\n                            raise ConfigurationError(\n                                \"Missing dG_separated interface rows\"\n                            )\n                        if p[\"geometry_contacts\"]:\n                            write_geometry(pdb, target, p, job)\n                        for row in ir:\n                            rows.append(\n                                {\n                                    \"input_sha256\": entry[\"input_sha256\"],\n                                    \"replicate\": entry[\"replicate\"],\n                                    \"seed\": entry[\"seed\"],\n                                    \"stage\": \"interface\",\n                                    \"source_scorefile\": str(\n                                        target / p[\"out_scorefile\"]\n                                    ),\n                                    \"scored_structure\": str(pdb),\n                                    \"scored_structure_sha256\": digest(pdb),\n                                    **row,\n                                }\n                            )\n                elif mode == \"InterfaceAnalyzer\" and any(\n                    \"dG_separated\" not in r for r in scored\n                ):\n                    raise ConfigurationError(\"Missing dG_separated interface metric\")\n            if mode == \"InterfaceAnalyzer\" and p[\"geometry_contacts\"]:\n                write_geometry(Path(entry[\"input\"]), stage, p, job)\n            item[\"status\"] = \"outputs_checked\"\n            save_json(out / \"execution.json\", evidence)\n        if rows:\n            columns = sorted(set().union(*(r.keys() for r in rows)))\n            with (out / \"scores.csv\").open(\"w\", newline=\"\") as stream:\n                writer = csv.DictWriter(stream, fieldnames=columns)\n                writer.writeheader()\n                writer.writerows(rows)\n        save_json(\n            out / \"scores.json\",\n            {\n                \"rows\": rows,\n                \"note\": \"All numeric score columns preserved; no inferred Kd or physical binding ΔG.\",\n            },\n        )\n        evidence[\"status\"] = \"execution_complete_raw_outputs_checked\"\n    except Exception as exc:\n        evidence[\"status\"] = \"failed\"\n        evidence[\"error\"] = str(exc)\n        save_json(out / \"execution.json\", evidence)\n        raise\n    save_json(out / \"execution.json\", evidence)\n    artifacts = [\n        {\"path\": str(f.relative_to(out)), \"size\": f.stat().st_size, \"sha256\": digest(f)}\n        for f in sorted(out.rglob(\"*\"))\n        if f.is_file() and f.name != \"checksums.json\"\n    ]\n    save_json(out / \"checksums.json\", artifacts)\n    return evidence\n\n\ndef materialize(job):\n    out = Path(job[\"output_dir\"])\n    out.mkdir(parents=True, exist_ok=True)\n    save_json(out / \"run-plan.json\", job)\n    props = SPEC[\"schema\"][\"properties\"]\n    lines = [\n        \"# 本次 Rosetta 参数说明\",\n        \"\",\n        \"状态：仅配置生成；是否执行以 execution.json 为准。\",\n        \"\",\n        job[\"mode_description\"],\n        \"\",\n    ]\n    for k, v in job[\"parameters\"].items():\n        s = props[k]\n        lines += [\n            f\"## {k} — {s['title']}\",\n            f\"值：`{json.dumps(v, ensure_ascii=False)}`；单位：{s['x-bda-unit']}；映射：`{s['x-bda-flag']}`\",\n            \"\",\n            s[\"description\"],\n            \"\",\n            f\"依据：{s['x-bda-source']}\",\n            \"\",\n        ]\n    if job[\"xml_attribute_inventory\"] is not None:\n        lines += [\n            \"## 自定义 XML 属性清单\",\n            \"属性的科学语义由所上传协议和对应 Rosetta XSD 定义；此清单不表示已验证全部 XML 功能。\",\n            \"\",\n            \"```json\",\n            json.dumps(job[\"xml_attribute_inventory\"], ensure_ascii=False, indent=2),\n            \"```\",\n        ]\n    (out / \"parameter-explanations.md\").write_text(\"\\n\".join(lines) + \"\\n\")\n    (out / \"commands.sh\").write_text(\n        \"#!/usr/bin/env bash\\n# Review only: working directories and output checks are managed by runner.py.\\n\"\n        + \"\\n\".join(shlex.join(e[\"argv\"]) for e in job[\"entries\"])\n        + \"\\n\"\n    )\n\n\ndef main(argv=None):\n    ap = argparse.ArgumentParser(description=__doc__)\n    ap.add_argument(\"action\", choices=[\"describe\", \"generate\", \"run\"])\n    ap.add_argument(\"--config\", type=Path)\n    ap.add_argument(\"--input-dir\", default=os.environ.get(\"BDA_INPUT_DIR\"))\n    ap.add_argument(\"--output-dir\", default=os.environ.get(\"BDA_OUTPUT_DIR\"))\n    ap.add_argument(\"--runtime-root\", default=os.environ.get(\"BDA_PLUGIN_ROOT\"))\n    args = ap.parse_args(argv)\n    if args.action == \"describe\":\n        print(json.dumps(SPEC, ensure_ascii=False, indent=2))\n        return 0\n    if not all([args.input_dir, args.output_dir, args.runtime_root]):\n        ap.error(\"input-dir, output-dir and runtime-root are required\")\n    try:\n        raw = json.loads(args.config.read_text()) if args.config else from_environment()\n        job = plan(raw, args.input_dir, args.output_dir, args.runtime_root)\n        materialize(job)\n        if args.action == \"run\":\n            execute(job)\n        print(\n            json.dumps(\n                {\n                    \"status\": \"executed_raw_outputs_checked\"\n                    if args.action == \"run\"\n                    else \"generated_not_executed\",\n                    \"output_dir\": job[\"output_dir\"],\n                },\n                ensure_ascii=False,\n            )\n        )\n        return 0\n    except (ValueError, OSError) as e:\n        print(\"Rosetta plugin: \" + str(e), file=sys.stderr)\n        return 2\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n\nBDA_ROSETTA_PLUGIN",
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "application": {
+        "type": "string",
+        "default": "score_jd2",
+        "title": "功能模式",
+        "description": "选择计算阶段；不同模式的分数不能混作同一种结合自由能。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "enum": [
+          "score_jd2",
+          "relax",
+          "InterfaceAnalyzer",
+          "relax_interface",
+          "docking_protocol",
+          "cartesian_ddg",
+          "rosetta_scripts"
+        ]
+      },
+      "nstruct": {
+        "type": "integer",
+        "default": 1,
+        "title": "每输入生成数",
+        "description": "每个输入、每个独立重复生成的 decoy 数；cartesian_ddg 使用 ddg_iterations，不使用本参数。",
+        "x-bda-unit": "个",
+        "x-bda-flag": "-nstruct",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 10000,
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "InterfaceAnalyzer",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "replicates": {
+        "type": "integer",
+        "default": 1,
+        "title": "独立重复数",
+        "description": "分别启动进程并使用不同随机种子；各重复保留原始结果，不只保存最优值。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "seed": {
+        "type": "integer",
+        "default": 111111,
+        "title": "起始随机种子",
+        "description": "启用 constant_seed；每个输入/重复的种子递增。固定种子利于复现，不证明采样收敛。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-run:constant_seed / -run:jran",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 1,
+        "maximum": 2000000000
+      },
+      "score_weights": {
+        "type": "string",
+        "default": "ref2015",
+        "title": "评分函数",
+        "description": "所有比较对象使用同一权重。Cartesian 模式必须选择 *_cart；REU 不能直接当 kcal/mol。",
+        "x-bda-unit": "Rosetta 权重集",
+        "x-bda-flag": "-score:weights",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "enum": [
+          "ref2015",
+          "ref2015_cart",
+          "beta_nov16",
+          "beta_nov16_cart"
+        ]
+      },
+      "out_scorefile": {
+        "type": "string",
+        "default": "score.sc",
+        "title": "评分文件名",
+        "description": "各输入/重复独立目录内的 .sc 文件名；不接受目录或路径穿越。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-out:file:scorefile",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*\\.sc$"
+      },
+      "ex1": {
+        "type": "boolean",
+        "default": false,
+        "title": "额外 χ1 旋转异构体",
+        "description": "扩大侧链 χ1 rotamer 采样；增加打包计算量，不是独立结构重复。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ex1",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "ex2": {
+        "type": "boolean",
+        "default": false,
+        "title": "额外 χ2 旋转异构体",
+        "description": "扩大侧链 χ2 rotamer 采样；仅在协议实际执行 packing 时影响采样。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ex2",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "use_input_sc": {
+        "type": "boolean",
+        "default": true,
+        "title": "保留输入侧链候选",
+        "description": "将输入侧链构象纳入 packing rotamer 候选集合。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-use_input_sc",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "ignore_unrecognized_res": {
+        "type": "boolean",
+        "default": false,
+        "title": "忽略无法识别的残基",
+        "description": "默认关闭。开启可能删除糖基、配体或特殊残基，改变体系；须检查运行日志和保存结构。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ignore_unrecognized_res",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "extra_res_fa": {
+        "type": "string",
+        "default": "",
+        "title": "全原子残基参数文件",
+        "description": "aux 端口下的 .params 相对文件名；为非标准残基提供全原子参数，不自动生成小分子参数。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:extra_res_fa",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list"
+      },
+      "extra_res_cen": {
+        "type": "string",
+        "default": "",
+        "title": "Centroid 残基参数文件",
+        "description": "aux 端口下的 .params 文件；对接低分辨率阶段使用非标准残基时需匹配 centroid 参数。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:extra_res_cen",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "x-bda-modes": [
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "constraints_file": {
+        "type": "string",
+        "default": "",
+        "title": "约束文件",
+        "description": "aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-constraints:cst_fa_file",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "constraint_weight": {
+        "type": "number",
+        "default": 1.0,
+        "title": "文件约束权重",
+        "description": "仅在提供 constraints_file 时传入；不等同于 Relax 自动坐标约束权重。",
+        "x-bda-unit": "权重",
+        "x-bda-flag": "-constraints:cst_fa_weight",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+        "minimum": 0,
+        "maximum": 1000,
+        "x-bda-modes": [
+          "score_jd2",
+          "relax",
+          "relax_interface",
+          "docking_protocol",
+          "rosetta_scripts"
+        ]
+      },
+      "pack_input": {
+        "type": "boolean",
+        "default": false,
+        "title": "先重排输入界面",
+        "description": "分析前是否对输入界面进行侧链 packing；这是评分内部分支，不会覆盖保存的 Relax 坐标。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-pack_input",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "pack_separated": {
+        "type": "boolean",
+        "default": true,
+        "title": "分离后重排界面",
+        "description": "计算 dG_separated 时，是否重排分離伙伴暴露界面的侧链。与 pack_input 分开控制。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-pack_separated",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "compute_packstat": {
+        "type": "boolean",
+        "default": false,
+        "title": "计算界面堆积统计",
+        "description": "启用有随机成分的 packstat；大界面可能较慢。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-compute_packstat",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "interface": {
+        "type": "string",
+        "default": "",
+        "title": "界面链分组",
+        "description": "必填，例如 AB_C 表示受体 A/B 与蛋白 C；天然双链配体可为 AB_CD。使用输入文件实际链标识，不能混淆 mmCIF label/auth ID。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-interface",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "packstat_oversample": {
+        "type": "integer",
+        "default": 100,
+        "title": "Packstat 过采样",
+        "description": "仅 compute_packstat=true 时生效；增加采样以降低随机波动。",
+        "x-bda-unit": "倍",
+        "x-bda-flag": "-packstat:oversample",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+        "minimum": 1,
+        "maximum": 1000,
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "relax_repeats": {
+        "type": "integer",
+        "default": 5,
+        "title": "Relax 内部循环",
+        "description": "一个 FastRelax 轨迹内的打包/最小化循环；不同于 nstruct 和独立重复。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "-relax:default_repeats",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "minimum": 1,
+        "maximum": 50,
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "relax_cartesian": {
+        "type": "boolean",
+        "default": false,
+        "title": "Cartesian Relax",
+        "description": "使用笛卡尔坐标最小化；必须选 ref2015_cart 或 beta_nov16_cart。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:cartesian",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "constrain_start": {
+        "type": "boolean",
+        "default": true,
+        "title": "约束到输入坐标",
+        "description": "由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:constrain_relax_to_start_coords",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "ramp_constraints": {
+        "type": "boolean",
+        "default": false,
+        "title": "渐弱坐标约束",
+        "description": "配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-relax:ramp_constraints",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "movemap_file": {
+        "type": "string",
+        "default": "",
+        "title": "Relax 自由度文件",
+        "description": "aux 端口下的 MoveMap 文件，控制骨架/侧链/jump 可动性。默认未提供时沿用该 relax 构建的自由度；不是受体自动固定。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:movemap",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "relax_script": {
+        "type": "string",
+        "default": "",
+        "title": "自定义 Relax 循环脚本",
+        "description": "aux 端口下的 Relax script；覆盖内部优化流程，需与 repeats/约束策略一起审阅。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-relax:script",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+        "x-bda-modes": [
+          "relax",
+          "relax_interface"
+        ]
+      },
+      "dock_partners": {
+        "type": "string",
+        "default": "",
+        "title": "对接伙伴链",
+        "description": "必填，例如 AB_C。对接分组与界面分析分组语法类似，但这是 docking:partners。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-docking:partners",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_search": {
+        "type": "string",
+        "default": "local",
+        "title": "对接搜索范围",
+        "description": "local 从现有姿态附近扰动；global 随机化两个伙伴取向，须充分采样；都不是物理 MD。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "enum": [
+          "local",
+          "global"
+        ],
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_translation": {
+        "type": "number",
+        "default": 3.0,
+        "title": "初始平移扰动",
+        "description": "local 模式 dock_pert 的平移幅度；不能据此推导结合距离或动力学。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "-docking:dock_pert [translation rotation]",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "minimum": 0,
+        "maximum": 100,
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_rotation": {
+        "type": "number",
+        "default": 8.0,
+        "title": "初始旋转扰动",
+        "description": "local 模式 dock_pert 的旋转幅度。",
+        "x-bda-unit": "度",
+        "x-bda-flag": "-docking:dock_pert [translation rotation]",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "minimum": 0,
+        "maximum": 180,
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "dock_local_refine": {
+        "type": "boolean",
+        "default": false,
+        "title": "仅高分辨率对接精修",
+        "description": "跳过低分辨率搜索，用于已有可信近邻姿态；不能与 global 搜索组合。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-docking:docking_local_refine",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "native_file": {
+        "type": "string",
+        "default": "",
+        "title": "参考复合物",
+        "description": "aux 中用于对接 RMSD 的参考结构，不自动作为位置约束；必须具有匹配的链/残基映射。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-in:file:native",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+        "x-bda-modes": [
+          "docking_protocol"
+        ]
+      },
+      "ddg_mut_file": {
+        "type": "string",
+        "default": "",
+        "title": "突变定义文件",
+        "description": "cartesian_ddg 必填的 aux mut_file。使用 Rosetta pose 编号；需要 WT 与突变定义校验，不能用 PDB 编号直接替代。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-ddg:mut_file",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_iterations": {
+        "type": "integer",
+        "default": 3,
+        "title": "WT/突变采样迭代",
+        "description": "每个突变定义的采样次数，不是 nstruct；输出的是协议相关折叠稳定性差分。",
+        "x-bda-unit": "次",
+        "x-bda-flag": "-ddg:iterations",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 1,
+        "maximum": 100,
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_cartesian": {
+        "type": "boolean",
+        "default": true,
+        "title": "DDG Cartesian 优化",
+        "description": "本插件只支持 Cartesian 协议，必须保持 true。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ddg:cartesian",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "enum": [
+          true
+        ],
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_bb_neighbors": {
+        "type": "integer",
+        "default": 1,
+        "title": "骨架邻居范围",
+        "description": "围绕突变位置允许处理的序列邻居范围；不是空间半径。",
+        "x-bda-unit": "残基数",
+        "x-bda-flag": "-ddg:bbnbrs",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 0,
+        "maximum": 10,
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "ddg_dump_pdbs": {
+        "type": "boolean",
+        "default": true,
+        "title": "保存 DDG 结构",
+        "description": "保存 WT/突变模型供原子级核查；关闭则仅保存原始分数与日志。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-ddg:dump_pdbs",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "x-bda-modes": [
+          "cartesian_ddg"
+        ]
+      },
+      "fa_max_dis": {
+        "type": "number",
+        "default": 9.0,
+        "title": "全原子作用距离截断",
+        "description": "Cartesian DDG 推荐协议的相互作用截断；须与 WT 预先 Cartesian Relax 的设置一致。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "-fa_max_dis",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+        "minimum": 3,
+        "maximum": 20,
+        "x-bda-modes": [
+          "relax",
+          "relax_interface",
+          "InterfaceAnalyzer",
+          "cartesian_ddg"
+        ]
+      },
+      "parser_protocol": {
+        "type": "string",
+        "default": "",
+        "title": "RosettaScripts XML",
+        "description": "rosetta_scripts 必填，aux 下的 XML 文件。平台不会猜测 XML 的科学阶段；生成时验证 XML 可解析，完整 schema 由实际 Rosetta 构建验证。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "-parser:protocol",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "parser_script_vars": {
+        "type": "string",
+        "default": "",
+        "title": "XML 变量",
+        "description": "空白分隔的 name=value；作为独立 argv 值传入，不运行 shell。所有变量名必须在 XML 的 %%name%% 中出现，所有占位符必须有值。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "-parser:script_vars",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "xml_expected_output": {
+        "type": "string",
+        "default": "score",
+        "title": "XML 最低输出契约",
+        "description": "score 要求至少 nstruct 个有效 SCORE 行；structure 还要求对应数量 PDB。自定义协议的完整科学输出仍由协议作者解释。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+        "enum": [
+          "score",
+          "structure"
+        ],
+        "x-bda-modes": [
+          "rosetta_scripts"
+        ]
+      },
+      "geometry_contacts": {
+        "type": "boolean",
+        "default": true,
+        "title": "计算界面原子距离",
+        "description": "从同一被评分的复合物坐标提取重原子接触和逐残基对最短距离；内部 packing 的临时姿态不在此几何文件中。",
+        "x-bda-unit": "无量纲",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "contact_cutoff": {
+        "type": "number",
+        "default": 4.5,
+        "title": "接触距离阈值",
+        "description": "输出此半径内的全部跨界面重原子对及其距离；没有接触不等于证明不结合。",
+        "x-bda-unit": "Å",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "minimum": 2,
+        "maximum": 10,
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "receptor_axis": {
+        "type": "string",
+        "default": "",
+        "title": "受体角度锚点",
+        "description": "可选，两枚 CA 的 chain:residue 标识，逗号分隔，如 A:10,A:100；方向从第一个指向第二个。须与 binder_axis 一起提供。",
+        "x-bda-unit": "PDB链:残基编号",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.acos",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "binder_axis": {
+        "type": "string",
+        "default": "",
+        "title": "配体蛋白角度锚点",
+        "description": "可选，两枚 CA 标识，如 C:1,C:50。报告此有向轴与受体轴的夹角；不是未经定义的“整体结合角”。",
+        "x-bda-unit": "PDB链:残基编号",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.acos",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      },
+      "geometry_reference_file": {
+        "type": "string",
+        "default": "",
+        "title": "天然参考复合物",
+        "description": "可选，aux 下同链分组的参考 PDB；计算其接触、质心距离与相同锚点定义夹角供比较。参考应记录是实验复合物还是对接假说；不同支架的接触编号不能直接当同源位点。",
+        "x-bda-unit": "文件",
+        "x-bda-flag": "BDA 控制参数，不直接作为 Rosetta flag",
+        "x-bda-source": "https://docs.python.org/3/library/math.html#math.dist",
+        "x-bda-modes": [
+          "InterfaceAnalyzer",
+          "relax_interface"
+        ]
+      }
+    },
+    "description": "BDA Rosetta 显式参数表；默认值是本插件默认，非所有 Rosetta 构建的默认。",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "enum": [
+                "InterfaceAnalyzer",
+                "relax_interface"
+              ]
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "interface"
+          ],
+          "properties": {
+            "interface": {
+              "minLength": 3
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "cartesian_ddg"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "ddg_mut_file",
+            "score_weights"
+          ],
+          "properties": {
+            "ddg_mut_file": {
+              "minLength": 1
+            },
+            "score_weights": {
+              "enum": [
+                "ref2015_cart",
+                "beta_nov16_cart"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "docking_protocol"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "dock_partners"
+          ],
+          "properties": {
+            "dock_partners": {
+              "minLength": 3
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "application": {
+              "const": "rosetta_scripts"
+            }
+          },
+          "required": [
+            "application"
+          ]
+        },
+        "then": {
+          "required": [
+            "parser_protocol"
+          ],
+          "properties": {
+            "parser_protocol": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "description": "Raw score/structure/log/config artifacts. No inferred Kd. Scientific validation remains separate."
+  },
+  "inputs": [
+    {
+      "name": "s",
+      "kind": "protein_structure",
+      "accepts": [
+        "backbone_set",
+        "candidate_structure",
+        "complex_structure",
+        "relaxed_structure",
+        "target_structure"
+      ],
+      "required": true,
+      "multiple": true
+    },
+    {
+      "name": "aux",
+      "kind": "params",
+      "required": false,
+      "multiple": true,
+      "description": "XML, mut_file, native PDB, constraints, MoveMap or residue params; paths are relative to this port."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "structures",
+      "kind": "protein_structure",
+      "artifact_type": "candidate_structure",
+      "filename_glob": "runs/**/*.pdb"
+    },
+    {
+      "name": "score_table",
+      "kind": "tabular",
+      "artifact_type": "score_table",
+      "filename_glob": "*.csv"
+    },
+    {
+      "name": "raw_score_table",
+      "kind": "tabular",
+      "artifact_type": "score_table",
+      "filename_glob": "runs/**/*.sc"
+    },
+    {
+      "name": "raw_ddg",
+      "kind": "opaque",
+      "artifact_type": "data",
+      "filename_glob": "runs/**/*.ddg"
+    },
+    {
+      "name": "run_evidence",
+      "kind": "opaque",
+      "artifact_type": "data",
+      "filename_glob": "*.json"
+    },
+    {
+      "name": "parameter_guide",
+      "kind": "opaque",
+      "artifact_type": "data",
+      "filename_glob": "parameter-explanations.md"
+    },
+    {
+      "name": "run_logs",
+      "kind": "opaque",
+      "artifact_type": "data",
+      "filename_glob": "runs/**/*.log"
+    },
+    {
+      "name": "command_preview",
+      "kind": "opaque",
+      "artifact_type": "data",
+      "filename_glob": "commands.sh"
+    }
+  ],
+  "resources": {
+    "cpus": 1,
+    "gpu": false,
+    "memory_gb": 4,
+    "walltime_minutes": 240
+  },
+  "runtime": {
+    "mode": "module",
+    "reference": "site://rosetta/2024.09",
+    "image_digest": null,
+    "setup": []
+  },
+  "output_parser": null,
+  "input_adapter": null,
+  "checksum_sha256": "dc70b3c668125547aa3f1fed10bbe4b90bad8db55dcc7036c04672d3741ed51a"
+}

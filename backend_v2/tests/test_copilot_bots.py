@@ -107,9 +107,9 @@ def test_a_bot_cannot_reach_a_capability_the_project_disabled() -> None:
 
 
 def test_a_project_with_everything_enabled_still_only_gets_what_the_bot_declares() -> None:
-    resolved = bots.capabilities_for_bot("structuralist", ALL_CAPABILITIES)
+    resolved = bots.capabilities_for_bot("runner", ALL_CAPABILITIES)
 
-    assert resolved == {"project-read", "structure-analysis", "chain-messaging"}
+    assert resolved == {"project-read", "workflow-planning", "agent-orchestration", "failure-diagnosis", "chain-messaging"}
     granted = tools_for_capabilities(resolved)
     assert "start_literature_search" not in granted
     assert "create_compute_draft" not in granted
@@ -128,7 +128,7 @@ def test_unknown_bot_hint_yields_nothing_rather_than_everything() -> None:
 
 
 def test_two_hints_in_one_turn_are_denied_rather_than_merged() -> None:
-    merged = bots.narrow(ALL_CAPABILITIES, skill_hint="compute-drafting", bot_hint="librarian")
+    merged = bots.narrow(ALL_CAPABILITIES, skill_hint="compute-drafting", bot_hint="researcher")
 
     assert merged == set()
 
@@ -265,7 +265,7 @@ def test_no_reviewer_can_repair_what_it_finds() -> None:
 def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
     """A handover with no channel is the defect the channel was added to fix.
 
-    An operator whose charter says "hand this to medic" while holding no way to
+    An operator whose charter says "hand this to runner" while holding no way to
     record what it is handing over describes a step the platform cannot take.
     """
     for bot in bots.all_bots():
@@ -299,7 +299,7 @@ def test_orchestration_and_review_powers_belong_to_one_stance_each() -> None:
 def test_no_two_operators_claim_the_same_trigger() -> None:
     """A tie routes to nobody, so a shared token makes both unroutable.
 
-    `librarian` and `auditor` both claimed "review" for one commit - one meaning
+    `researcher` and `auditor` both claimed "review" for one commit - one meaning
     a review article, the other the act - and the word that names each of them
     stopped naming either.
     """
@@ -329,12 +329,12 @@ def test_a_trigger_containing_another_operators_trigger_is_deliberate() -> None:
     }
 
     assert nested == {
-        ("review article", "librarian", "review", "auditor"),
-        ("literature review", "librarian", "review", "auditor"),
+        ("review article", "researcher", "review", "auditor"),
+        ("literature review", "researcher", "review", "auditor"),
         # 链 is one character and sits inside 全链条; the director wins, which is
         # right - "全链条" is a request to run the chain, not to read a chain of
         # a structure.
-        ("全链条", "conductor", "链", "structuralist"),
+        ("全链条", "conductor", "链", "planner"),
     }
 
 
@@ -345,17 +345,17 @@ def test_a_trigger_containing_another_operators_trigger_is_deliberate() -> None:
         # here so the merge is provably not a loss of routing.
         ("Adjust the workflow threshold", "planner"),
         ("调整工作流阈值", "planner"),
-        ("请补齐 Research target 的 gaps", "scout"),
-        ("run the target intelligence", "scout"),
-        ("跑一下靶点情报", "scout"),
+        ("请补齐 Research target 的 gaps", "researcher"),
+        ("run the target intelligence", "researcher"),
+        ("跑一下靶点情报", "researcher"),
         ("create a compute draft", "planner"),
         ("生成计算草稿", "planner"),
         ("How should RFdiffusion connect to a protein workflow?", "planner"),
         ("Interpret the BLI experiment", "analyst"),
-        ("save this to knowledge", "archivist"),
-        ("保存到知识库", "archivist"),
-        ("整理一下这些文献", "librarian"),
-        ("find the reference", "librarian"),
+        ("save this to knowledge", "analyst"),
+        ("保存到知识库", "analyst"),
+        ("整理一下这些文献", "researcher"),
+        ("find the reference", "researcher"),
     ],
 )
 def test_the_retired_skill_registrys_routing_still_resolves(message: str, expected: str) -> None:
@@ -385,7 +385,7 @@ def test_no_trigger_is_a_bare_common_verb() -> None:
 
     `runner` claimed "run" for one commit, which is the verb in nearly every
     imperative a user types - so "run the target intelligence" tied `runner`
-    against `scout` and routed to neither. The vocabulary has to name each
+    against `researcher` and routed to neither. The vocabulary has to name each
     operator's subject, not the act of asking.
     """
     swamping = {"run", "do", "get", "make", "show", "find", "use", "set", "add", "go"}
@@ -446,13 +446,14 @@ def _run(session: Session, project: Project, user: User, **payload_fields):
 def test_a_run_created_for_a_bot_gets_exactly_that_bots_tools(session: Session) -> None:
     project, user = _project(session, enabled_skills=["research"])
 
-    run = _run(session, project, user, bot="structuralist")
+    run = _run(session, project, user, bot="planner")
 
     assert set(run.allowed_tools) == tools_for_capabilities(
-        {"project-read", "structure-analysis", "chain-messaging"}
+        set(bots.require("planner").capabilities) & normalize_capabilities(["research"])
     )
     assert "analyse_structure" in run.allowed_tools
-    assert "create_compute_draft" not in run.allowed_tools
+    # Another producer's write stays with that producer.
+    assert "start_literature_search" not in run.allowed_tools
 
 
 def test_a_bot_run_cannot_exceed_what_the_project_enabled(session: Session) -> None:
@@ -499,10 +500,10 @@ def test_a_bot_whose_capabilities_are_all_disabled_is_refused_not_silently_empty
     reporting the reason as "no capability enabled for this bot" is what tells
     the user which switch to turn on.
     """
-    project, user = _project(session, enabled_skills=["project-read"])
+    project, user = _project(session, enabled_skills=["wetlab-read"])
 
     with pytest.raises(DomainError) as error:
-        _run(session, project, user, bot="librarian")
+        _run(session, project, user, bot="researcher")
 
     assert error.value.error_code == "copilot_capability_disabled"
     assert error.value.status_code == 422
@@ -587,6 +588,14 @@ def _spec(**overrides) -> bots.BotSpec:
             _spec(stance="review", capabilities=("review-audit",), reviews=("ghost",)),
             "unknown operator",
         ),
+        (_spec(task_services=("not-a-service",)), "unknown task service"),
+        (
+            _spec(stance="review", capabilities=("review-audit",), reviews=("planner",), task_services=("brief",)),
+            "only a producer delivers",
+        ),
+        # Owning a recipe whose steps the owner cannot call would be a task that
+        # is assigned to someone and can never be delivered by them.
+        (_spec(task_services=("planning",)), "cannot reach its steps"),
     ],
 )
 def test_a_broken_roster_fails_at_import_rather_than_at_use(
@@ -601,13 +610,72 @@ def test_a_broken_roster_fails_at_import_rather_than_at_use(
         bots._validate_roster()
 
 
+def test_every_guided_task_has_exactly_one_producing_owner() -> None:
+    from backend_v2.app.copilot.task_contracts import SERVICES
+
+    owners = {kind: [bot.id for bot in bots.BOTS if kind in bot.task_services] for kind in SERVICES}
+
+    assert all(len(ids) == 1 for ids in owners.values()), owners
+    assert {bots.get(ids[0]).stance for ids in owners.values()} == {"produce"}  # type: ignore[union-attr]
+
+
+def test_a_recipe_with_two_owners_fails_at_import(monkeypatch: pytest.MonkeyPatch) -> None:
+    rival = _spec(id="rival", capabilities=("project-read", "research-read"), task_services=("brief",))
+    monkeypatch.setattr(bots, "BOTS", (*bots.BOTS, rival))
+    monkeypatch.setattr(bots, "_BY_ID", {**bots._BY_ID, rival.id: rival})
+
+    with pytest.raises(ValueError, match="exactly one owning bot"):
+        bots._validate_roster()
+
+
+def test_an_owner_is_offered_only_the_writes_it_can_be_granted() -> None:
+    # Per owned recipe: the researcher answers for both the brief (no writes) and
+    # the literature review (search and pending-review notes); a reviewer owns none.
+    assert bots.task_write_tools(bots.require("researcher")) == {
+        "brief": [],
+        "literature": ["start_literature_search", "create_knowledge_draft"],
+    }
+    assert bots.task_write_tools(bots.require("auditor")) == {}
+
+
+def test_retired_ids_resolve_for_history_but_cannot_be_addressed() -> None:
+    # A run or handover recorded under a retired id keeps an operator to read...
+    assert bots.get("scout") is bots.require("researcher")
+    assert bots.absorbed_by("researcher") == ["briefing", "librarian", "scout"]
+    # ...but nothing new starts under the old name, and the refusal says where to go.
+    with pytest.raises(DomainError) as error:
+        bots.require("medic")
+    assert error.value.error_code == "copilot_bot_retired"
+    assert "runner" in str(error.value.detail)
+    # A retired hint narrows to nothing rather than to its successor's wider set.
+    assert bots.narrow(ALL_CAPABILITIES, bot_hint="structuralist") == set()
+
+
+def test_a_guided_task_assigned_to_a_non_owner_is_refused(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend_v2.app.copilot import qualification
+
+    monkeypatch.setattr(qualification, "readiness", lambda *a: {"eligible_services": ["literature", "planning"]})
+    project, user = _project(session, enabled_skills=["research"])
+
+    with pytest.raises(DomainError) as error:
+        _run(session, project, user, bot="planner", service_kind="literature")
+    assert error.value.error_code == "copilot_task_owner_mismatch"
+    assert error.value.status_code == 422
+
+    run = _run(session, project, user, bot="researcher", service_kind="literature", authorized_writes=[])
+    assert run.bot == "researcher"
+    assert run.task_contract["service_kind"] == "literature"
+
+
 def test_get_returns_the_spec_or_none_without_raising() -> None:
     """`get` is what a replayed message context is resolved through.
 
     It must answer "no such bot" rather than raise, because a stale hint on an
     old row is data, not a caller error.
     """
-    assert bots.get("medic") is not None
+    assert bots.get("runner") is not None
     assert bots.get("ghost") is None
 
 
@@ -621,7 +689,7 @@ def test_a_bot_run_carries_its_charter_into_every_turn(session: Session) -> None
     share a tool set become the same operator - which is most of the roster.
     """
     project, user = _project(session, enabled_skills=["research"])
-    run = _run(session, project, user, bot="medic")
+    run = _run(session, project, user, bot="runner")
 
     system = [
         message
@@ -629,7 +697,7 @@ def test_a_bot_run_carries_its_charter_into_every_turn(session: Session) -> None
         if message["role"] == "system"
     ]
 
-    assert any("medic bot" in message["content"] for message in system)
+    assert any("runner bot" in message["content"] for message in system)
     assert any("invented cause" in message["content"] for message in system)
     # And it narrows the loop policy rather than replacing it.
     assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
@@ -660,9 +728,9 @@ def test_a_bot_removed_from_the_roster_leaves_an_undifferentiated_run(session: S
 
 
 def test_a_subagent_inherits_its_parents_charter(session: Session) -> None:
-    """A child doing part of the medic's work is still bound by the medic's refusals."""
+    """A child doing part of the runner's work is still bound by the runner's refusals."""
     project, user = _project(session, enabled_skills=["research"])
-    parent = _run(session, project, user, bot="medic")
+    parent = _run(session, project, user, bot="runner")
 
     child = agent_runs.create_run(
         session,
@@ -673,13 +741,13 @@ def test_a_subagent_inherits_its_parents_charter(session: Session) -> None:
         parent_run_id=parent.id,
     )
 
-    assert child.bot == "medic"
+    assert child.bot == "runner"
 
 
 def test_the_structuralist_can_reach_a_structure_to_analyse() -> None:
     """Its only route to an artifact id is `project-read`.
 
-    `structuralist` deliberately has no `research-read`, so nothing else in its
+    `planner` deliberately has no `research-read`, so nothing else in its
     tool set returns an artifact id. Trimming `project-read` off it would leave
     three structure tools that need an `artifact_id` and no way to obtain one -
     a bot that looks configured and can never do anything. The ids it needs are
@@ -687,7 +755,7 @@ def test_the_structuralist_can_reach_a_structure_to_analyse() -> None:
     and `complex_artifact_id`, the latter being what an interface question is
     actually asked about).
     """
-    granted = tools_for_capabilities(bots.capabilities_for_bot("structuralist", ALL_CAPABILITIES))
+    granted = tools_for_capabilities(bots.capabilities_for_bot("planner", ALL_CAPABILITIES))
 
     assert {"list_project_targets", "list_project_candidates"} <= granted
     assert {"analyse_structure", "list_structure_contacts", "describe_structure_site"} <= granted

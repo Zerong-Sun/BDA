@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './styles/science-workspace.css'
 import App from './App.tsx'
 import { bootstrapHashRouterProjectParam } from './lib/bootstrapHashRouter'
 import { initTheme } from './lib/theme/initTheme'

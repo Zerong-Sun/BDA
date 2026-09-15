@@ -32,6 +32,9 @@ DECLARATION_FIELDS = (
 
 def plugin_declaration_fingerprint(plugin: Any) -> str:
     payload = {field: getattr(plugin, field, None) for field in DECLARATION_FIELDS}
+    site = getattr(plugin, "site_overrides", None)
+    if site:
+        payload["site_overrides"] = site
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

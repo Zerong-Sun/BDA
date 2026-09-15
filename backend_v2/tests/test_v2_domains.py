@@ -471,6 +471,8 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "result-interpretation",
         "knowledge-authoring",
         "literature-search",
+        "patent-search",
+        "druggability-assessment",
         "target-intelligence",
         "research-gap-repair",
         "wetlab-read",
@@ -480,6 +482,8 @@ def test_registry_copilot_delivery_compute_draft_and_ligand(domain_client, monke
         "compute-drafting",
         "agent-orchestration",
         "structure-analysis",
+        "structure-interaction",
+        "sequence-analysis",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -1082,7 +1086,7 @@ def test_artifact_upload_and_target_structure_contract(domain_client, monkeypatc
         def read_bytes(self, key: str, *, max_bytes: int) -> bytes:
             return self.data
 
-        def promote(self, source: str, target: str) -> None:
+        def put_bytes(self, key: str, body: bytes, content_type: str) -> None:
             return None
 
         def remove(self, key: str) -> None:
@@ -1205,10 +1209,20 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
     bots = roster.json()
     assert [bot["phase"] for bot in bots] == sorted(bot["phase"] for bot in bots)
     by_id = {bot["id"]: bot for bot in bots}
-    assert {"briefing", "librarian", "structuralist", "medic", "archivist"} <= set(by_id)
-    assert by_id["structuralist"]["capabilities"] == [
+    assert {"conductor", "researcher", "planner", "runner", "analyst", "auditor"} == set(by_id)
+    assert by_id["planner"]["capabilities"] == [
         "project-read",
+        "research-read",
         "structure-analysis",
+        # Reading residues and pointing at them are the same operator's work.
+        # No other bot holds this: a reviewer that could propose a hotspot set
+        # would be repairing what it reviewed.
+        "structure-interaction",
+        # Reading a sequence for liabilities is the same operator's work as
+        # reading a structure for residues: both answer "is this worth making".
+        "sequence-analysis",
+        "workflow-planning",
+        "compute-drafting",
         "chain-messaging",
     ]
     # Every handoff resolves, so the model is never told to call for an operator
@@ -1227,13 +1241,13 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
 
     assert client.put(
         f"/api/v2/copilot/projects/{project_id}/config",
-        json={"llm_provider_id": None, "settings": {}, "enabled_skills": ["structure"]},
+        json={"llm_provider_id": None, "settings": {}, "enabled_skills": ["structure-analysis"]},
     ).status_code == 200
 
     # A bot the project cannot support, an unknown bot, and two hints at once.
     assert client.post(
         "/api/v2/copilot/chat",
-        json={"project_id": project_id, "message": "Find papers", "bot": "librarian"},
+        json={"project_id": project_id, "message": "Find papers", "bot": "researcher"},
     ).status_code == 422
     assert client.post(
         "/api/v2/copilot/chat",
@@ -1244,7 +1258,7 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
         json={
             "project_id": project_id,
             "message": "Hello",
-            "bot": "structuralist",
+            "bot": "planner",
             "skill": "project-read",
         },
     ).status_code == 422
@@ -1254,8 +1268,8 @@ def test_copilot_bot_roster_is_served_and_narrows_a_chat_turn(
         json={
             "project_id": project_id,
             "message": "Which residues of chain A contact chain B?",
-            "bot": "structuralist",
+            "bot": "planner",
         },
     )
     assert accepted.status_code == 202
-    assert accepted.json()["message"]["context"]["bot_hint"] == "structuralist"
+    assert accepted.json()["message"]["context"]["bot_hint"] == "planner"

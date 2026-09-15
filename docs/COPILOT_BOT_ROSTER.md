@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-13（Asia/Shanghai；本轮新增 bot 名册、结构分析与故障诊断能力，并加入 stance 轴、交接通道与 conductor/steward/auditor）
+最后核验：2026-09-14（Asia/Shanghai；名册由 12 个合并为 6 个：researcher、planner、runner、analyst 吸收原有产出型 bot，auditor 吸收 steward；退役 id 仅用于读取历史。本轮新增 `structure-interaction` 能力（planner 独有）与 `request_decision` 工具（随 `chain-messaging` 授予全员））
 
 权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
 
@@ -40,36 +40,44 @@ hint, generalised from one to a set. It is what stops “select the planner bot�
 from becoming a privilege-escalation path, and it is the property the adversarial
 tests exist to attack.
 
-## The chain and its twelve operators
+## The chain and its six operators
 
-The phases run in order, but the chain is a loop, not a line: `medic` sends work
-back to `planner`, and `archivist` sends the next question back to `briefing`.
+On 2026-09-14 the roster was consolidated from twelve operators to six. The
+first version split each producer's phase into the narrowest job a charter could
+state — question, literature, target, structure, route, wait, failure, result,
+record — which gave people a team they had to learn before they could ask for
+anything, and put handovers between operators that were one piece of work: a
+brief and its literature, a structure and the route designed against it, a run
+and its failure, a result and the decision it supported. The merge keeps every
+refusal those charters stated and every rule `_validate_roster` enforces.
 
-Nine of the twelve *produce*: they own a phase. The other three do not do the
-work at all — `conductor` decides who works next, and `steward` and `auditor`
-judge what a producer claimed. That is the `stance` axis, and it is enforced at
-import rather than stated in a charter; the argument for it, and the rules it
-imposes, are in [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
+The chain is a loop, not a line: `runner` sends a failure back to `planner`, and
+`analyst` sends the next question back to `researcher`.
 
-Every operator that hands off also holds `chain-messaging`. Before that, a
-charter could say "hand this to medic" while the platform had no way to carry
-anything across the boundary, which made the handoff a sentence rather than a
-step.
+Four of the six *produce*: they own a phase. `conductor` decides who works next
+and `auditor` judges what a producer claimed, including a compute draft's
+declared resources. That is the `stance` axis, enforced at import rather than
+stated in a charter; the argument and its rules are in
+[Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
 
-| # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to |
-| --- | --- | --- | --- | --- | --- | --- |
-| — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` |
-| 0 | `briefing` | 选题起草 | produce | Turning an intent into a stated, falsifiable research question with success criteria | `project-read`, `research-read`, `knowledge-authoring`, `chain-messaging` | `librarian`, `scout` |
-| 1 | `librarian` | 文献整理 | produce | Finding, ingesting and organising literature with retrievable provenance | `research-read`, `literature-search`, `chain-messaging` | `briefing`, `scout` |
-| 2 | `scout` | 靶点情报 | produce | Target identity, target intelligence, and closing retrievable Research gaps | `project-read`, `research-read`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `structuralist`, `planner` |
-| 3 | `structuralist` | 结构与残基 | produce | Reading structures: chains, residues, gaps, contacts, sites, confidence | `project-read`, `structure-analysis`, `chain-messaging` | `planner`, `analyst` |
-| 4 | `planner` | 路线规划 | produce | Choosing the route and drafting the compute that implements it | `project-read`, `research-read`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner` |
-| 4 | `steward` | 资源守门 | review | Checking a plugin's declared resources against what the chosen queue will actually give it | `project-read`, `review-audit`, `chain-messaging` | `planner` |
-| 5 | `runner` | 步骤推进 | produce | Carrying a confirmed run across its waits and reporting what settled | `project-read`, `workflow-planning`, `agent-orchestration`, `chain-messaging` | `medic`, `analyst` |
-| 6 | `medic` | 故障诊断 | produce | Explaining why a job failed, in terms of what was declared versus what ran | `project-read`, `failure-diagnosis`, `chain-messaging` | `planner`, `runner` |
-| 7 | `analyst` | 结果解读 | produce | Interpreting recorded computational and bench results without inventing any | `project-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `chain-messaging` | `archivist`, `structuralist` |
-| 8 | `archivist` | 记录归档 | produce | Attaching evidence to research goals and drafting the record of what was decided | `research-read`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `briefing` |
-| — | `auditor` | 复核 | review | Ruling on an operator's claims against the evidence it produced and the charter it works under | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor` |
+| # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to | Absorbed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
+| 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
+| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
+| 3 | `runner` | 执行与排障 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
+| 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
+| — | `auditor` | 复核 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
+
+Retired ids are listed in `bots.RETIRED`. Runs and handoffs recorded under them
+are history and are not rewritten: `bots.get` resolves a retired id to its
+successor so an in-flight run keeps a charter (its tools were fixed when it
+started, so the successor's charter widens nothing), `/copilot/bots` serves each
+operator's `absorbs`, and the frontend groups and links that history under the
+successor. `bots.require` refuses a retired id with `copilot_bot_retired`, naming
+the successor, so nothing new is started or addressed under an old name, and a
+retired chat hint narrows to nothing. Later sections that name retired operators
+describe how the roster got here and are kept as that record.
 
 ### What each bot must refuse
 
@@ -77,59 +85,42 @@ A bot's charter is mostly a list of refusals, because that is the part a
 capability set cannot express. These go into the `charter` string and reach the
 model verbatim.
 
-- `briefing` — must not answer the research question it is drafting. Its output
-  is a question, its success criteria and its unknowns, saved as a pending-review
-  note. A brief that already contains the conclusion was written backwards.
-- `librarian` — must not summarise a paper it has not retrieved. A queued search
-  is queued, not done; a citation without a checksum-backed excerpt is a lead,
-  not evidence.
-- `scout` — must not invent target identity. Composite or modified molecular
+- `researcher` — must not answer the question it is drafting: a brief states the
+  question, what would answer or falsify it, constraints and unknowns, never the
+  finding. Must not summarise a paper it has not retrieved: a queued search is
+  queued, not done, and a citation without a checksum-backed excerpt is a lead,
+  not evidence. Must not invent target identity: composite or modified
   identities stay `requires_review` until one exact entity maps to a UniProt
-  accession. Scientific gaps are not “repaired”; only retrievable ones are.
-- `structuralist` — must not infer function from geometry. It reports residues,
-  distances, gaps and confidence. “These residues are within 4.5 Å” is a
-  measurement; “this is the active site” is a claim that needs evidence from
-  `librarian` or a recorded experiment. It must state model confidence whenever
-  the structure is predicted, because a contact list computed from a
-  low-confidence loop is arithmetic on noise.
-- `planner` — must not confirm or submit. It produces a draft and the reasons for
-  it, including the reasons against the routes it did not pick.
-- `runner` — must not poll, must not assume an outcome, and does not advance
-  anything itself: the run moves because the platform moves it, and the bot's job
-  is to wait correctly and report what settled. A failed job is a result to
-  report, not an error to retry silently.
-- `medic` — must not guess. Every diagnosis names the evidence it rests on and
-  says plainly when that evidence does not determine the cause.
-- `analyst` — must not invent measurements, and must not rank by a score whose
-  mechanism it has not checked. It reports what was recorded, with units and the
-  analysis version that produced it.
-- `archivist` — must not decide, and cannot close a goal. Marking a goal answered
-  is a scientific judgement and stays with a person; the bot says which linked
-  result it thinks answers a goal and leaves the call to the reader. The charter
-  originally instructed it to mark goals answered, which was an instruction to do
-  something no tool exposes — the failure mode being a model that reports having
-  done it.
+  accession, and only retrievable gaps are "repaired".
+- `planner` — must not infer function from geometry, and must state model
+  confidence before any contact list from a predicted structure. Must not confirm
+  or submit: it produces a draft and the reasons for it, including the reasons
+  against the routes it did not pick, and states the resources the draft
+  declares and why.
+- `runner` — must not poll, must not assume an outcome, and does not submit,
+  confirm or resubmit anything: the run moves because the platform moves it. A
+  failed job is a result, and its diagnosis names the evidence it rests on and
+  says plainly when that evidence does not determine the cause; the fix goes to
+  `planner` as a change to the draft.
+- `analyst` — must not invent measurements, must not rank by a score whose
+  mechanism it has not checked, and reports units and analysis versions. Must not
+  decide and cannot close a goal: marking a goal answered stays with a person, so
+  it says which linked result it thinks answers a goal and leaves the call to the
+  reader.
 - `conductor` — must not do the work, and must not authorise it. It holds no
   capability that changes the research record, and delegating is not a way to
   reach one: the delegated operator runs under its own charter and its own
   capabilities. It also cannot supply the user's words — a delegated run's write
   gate reads the *originating* request, so an instruction the director wrote can
   steer work but never unlock a write.
-- `steward` — must not edit the draft it reviews and must not confirm it. It
-  reports the two numbers that disagree and hands the finding to `planner`. It
-  must also approve when the declaration is sound, because a review that only
-  ever objects stops being read. Its charter named four numbers — slots,
-  per-host span, thread budget, GPU — that no tool exposed: `get_compute_status`
-  returns a draft's free-form specification, while the numbers that reach LSF
-  come from the plugin registry row and from the queue chosen on the `bsub`
-  command line. `review_compute_declaration` reads them the way the cluster
-  does, so the charter stopped naming work the platform could not do — the same
-  defect `archivist` had, caught the same way.
 - `auditor` — must not repair what it finds. Its output is a verdict per claim
   (`supported` / `unsupported` / `contradicted` / `outside_charter`), ruled on
-  what the operator actually called rather than on what it said it did. A claim
+  what the operator actually called rather than on what it said it did; a claim
   citing nothing is `unsupported`, and a handover with no run behind it is
-  *unreviewable* rather than clean.
+  *unreviewable* rather than clean. For a compute draft it compares slots,
+  per-host span, thread budget and GPU declaration through
+  `review_compute_declaration`, reports the two numbers that disagree, and says
+  so plainly when the declaration is sound.
 
 ### Handoff protocol
 
@@ -154,7 +145,7 @@ The one exception to "the client selects" is `conductor`, whose
 child's tools are `target.capabilities ∩ project.enabled_skills` — the project's
 bound, not the director's. Intersecting against the parent, the way
 `spawn_subagent` does, would be wrong here rather than merely strict: a director
-holds none of a librarian's literature tools, so the intersection removes
+holds none of a researcher's literature tools, so the intersection removes
 `start_literature_search` and hands back a child that reads like an operator
 that failed. The invariant that matters is that both runs stay inside what the
 project authorised, and that the director executes none of the child's tools.
@@ -187,12 +178,14 @@ and no module descriptor. Structures arrive as artifacts, which are already
 write-once and checksummed; a second table would only be somewhere for a copy to
 go stale.
 
-Three tools:
+Five tools:
 
 | Tool | Answers |
 | --- | --- |
 | `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, ligands and solvent counted separately, disulfides, and a pLDDT or B-factor summary |
 | `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
+| `measure_structure_interface` | How much surface two chains bury and what the contact is made of: buried area per side, the conventional interface area, per-residue burial, hydrogen bonds (donor/acceptor distance, no angle term - hydrogens are absent), salt bridges, hydrophobic fraction. Buried area is not an affinity |
+| `compare_structures` | Fit one structure onto another: C-alpha RMSD before and after the fit, the residues that moved most, and a TM-score where its formula is defined. Residues are paired by author numbering, so a file missing a loop still compares; the TM-score is evaluated on this superposition and is not TM-align |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
 `structuralist` pairs this with `project-read` and nothing else, and the pairing
@@ -291,22 +284,22 @@ grants tools. After this change the full list is:
 | --- | --- | --- | --- |
 | `agent-orchestration` | read (async) | `await_compute_job`, `spawn_subagent` | runner |
 | `chain-orchestration` | read (async) | `list_operators`, `delegate_to_operator` | conductor |
-| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | medic |
-| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, briefing, scout, structuralist, planner, steward, runner, medic, analyst, auditor |
-| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, briefing, librarian, scout, planner, archivist, auditor |
+| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | runner |
+| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, researcher, planner, runner, analyst, auditor |
+| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, researcher, planner, analyst, auditor |
 | `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
-| `review-audit` | read | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | steward, auditor |
-| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | structuralist |
+| `review-audit` | read | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | auditor |
+| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | planner |
 | `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
-| `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, briefing, librarian, scout, structuralist, planner, steward, runner, medic, analyst, archivist, auditor |
+| `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, researcher, planner, runner, analyst, auditor |
 | `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
-| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | briefing, archivist |
-| `research-trace-authoring` | draft | `attach_to_research_goal` | archivist |
+| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | researcher, analyst |
+| `research-trace-authoring` | draft | `attach_to_research_goal` | analyst |
 | `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
 | `workflow-planning` | draft | `get_workflow_status` | planner, runner |
-| `literature-search` | queue | `start_literature_search` | librarian |
-| `research-gap-repair` | queue | `resolve_research_gaps` | scout |
-| `target-intelligence` | queue | `start_target_intelligence` | scout |
+| `literature-search` | queue | `start_literature_search` | researcher |
+| `research-gap-repair` | queue | `resolve_research_gaps` | researcher |
+| `target-intelligence` | queue | `start_target_intelligence` | researcher |
 
 Everything in that table is reachable over MCP except the two async ones.
 `agent-orchestration` and `chain-orchestration` are excluded by construction:
@@ -323,6 +316,29 @@ which is the conservative set and includes `post_handoff`. The narrower
 `user_intent_write_ids()` — the set the chat intent gate filters — is the one
 that excludes it, and it has to be asked for by name.
 
+## Guided task ownership
+
+A guided task is assigned to an operator, not to a recipe. Each recipe in
+`task_contracts.SERVICES` has exactly one owner, declared in `task_services` on
+the bot and checked at import; one operator may own several:
+
+| Recipe | Owner |
+| --- | --- |
+| `brief` | `researcher` |
+| `literature` | `researcher` |
+| `planning` | `planner` |
+| `execution` | `runner` |
+| `interpretation` | `analyst` |
+
+The owner must be a producer and must be able to call every step of its recipe
+through `bot.capabilities ∩ recipe.capabilities`. `/copilot/bots` serves
+`task_services` and, per recipe, `task_write_tools` — the recipe's optional writes
+the owner can be granted; the researcher is offered both external search and
+pending-review notes for a literature task. Starting a recipe with a bot that
+does not own it is refused with `copilot_task_owner_mismatch`; a run with no bot
+keeps the previous recipe-only behaviour. `conductor` and `auditor` own no recipe
+and work through conversation, handoffs and delegation.
+
 ## Surfaces
 
 One declaration, three surfaces, no duplication:
@@ -332,8 +348,8 @@ One declaration, three surfaces, no duplication:
   that response rather than restating it: the hand-written skill registry it sits
   beside kept its own copy of the backend's capability list, and a copy is what
   drifts. The picker groups by stance rather than by phase, because a director is
-  not the step before `briefing` and a reviewer is not the step after
-  `archivist`, which is what one ordered list would say.
+  not the step before `researcher` and a reviewer is not the step after
+  `analyst`, which is what one ordered list would say.
 - `GET /copilot/projects/{id}/handoffs` returns the chain's handovers, newest
   first, with each claim's evidence reference and confidence, and the Copilot
   drawer's **Chain** tab renders them. A record only the operators could read
@@ -364,7 +380,7 @@ charter said the day it started. An id the roster no longer knows contributes
 nothing, which leaves an undifferentiated run rather than a broken one.
 
 A subagent inherits its parent's bot unless given one. A child doing part of the
-medic's work is still doing the medic's work, and a child that silently lost its
+runner's work is still doing the runner's work, and a child that silently lost its
 parent's refusals would be the one place the roster stopped applying.
 `delegate_to_operator` is the exception that gives one, and it is why a director
 needs a tool of its own rather than a flag on `spawn_subagent`.
@@ -383,7 +399,7 @@ would be authoring the user's half of the conversation. The same hole existed in
   bilingual triggers, plus a `systemPrompt` field nothing ever read — is retired.
   Its vocabulary now sits on the operators that own it, and matching resolves
   specificity by containment: a matched token loses to another matched token that
-  contains it, which is what lets "literature review" reach `librarian` without
+  contains it, which is what lets "literature review" reach `researcher` without
   `auditor`'s bare "review" turning it into a tie. See
   [Copilot bot governance](COPILOT_BOT_GOVERNANCE.md).
 - **An Autopilot stage names the operator accountable for it**
@@ -475,3 +491,161 @@ Gates run for this change, on `bda-public/main`:
 The flow matrix is unchanged because `structures` declares no table: a structure
 reaches it as an artifact, which is already write-once and checksummed, and a
 second table would only be somewhere for a derived residue list to go stale.
+
+## `structure-interaction` — 指着结构说话，以及把选择交回给人
+
+`structure-analysis` 回答「那里有什么」，本能力回答「我说的是哪一块，以及这该由谁定」。
+三个工具，分工是设计本身：
+
+| 工具 | 模式 | 语义 |
+| --- | --- | --- |
+| `render_structure_view` | read | 返回一份 [MolViewSpec](https://molstar.org/mol-view-spec-docs/) 场景（`.mvsj` 树），把指定残基挑出来。**只展示，不下结论**：传进去的残基是操作员已经量过的那些 |
+| `propose_hotspot_set` | draft | 写一条 `proposed` 的位点集合（残基 + 理由 + 证据引用）。**不能确认** |
+| `request_residue_selection` | draft | 用候选集合开一条决策请求，由人在选项之间做选择 |
+
+**确认不是工具。** `target_hotspot_sets.origin` 用的是与 `project_timeline_entries.decided_by`
+完全相同的三态词汇：操作员提出记为 `agent`/`proposed`，人自己选的记为 `human`/`confirmed`，
+人接受了操作员的提案则变成 `agent_proposed_human_confirmed`。确认走
+`POST /hotspot-sets/{id}/confirmations`（`require_command`），任何工具都到不了它——
+而**只有已确认的集合**会被工作流节点表单固定为 `constrained` 参数
+（RFdiffusion 的 `ppi.hotspot_res`、BindCraft 的 `target_hotspot_residues`）。
+
+能力只给 `planner`：它在合并后拥有残基级的结构阅读，指着结构说话是同一件事的延伸。
+reviewer 拿到它就等于能修自己审的东西。
+
+## `request_decision` — 把一个只有人能定的选择交出去
+
+随 `chain-messaging` 授予（与 `post_handoff`、`read_handoffs` 同一能力），因此每个会交接的
+operator 都能用，包括 conductor 与 auditor：**问一个问题既不是修复自己发现的问题，也不是替人做事**。
+判据沿用 `autopilot/gates.py` 已有的两条——是否不可逆、是价值问题还是经验问题——不另造分类。
+回答由人通过 `POST /copilot/decision-requests/{id}/answers` 写入，并落成一条
+`decided_by=agent_proposed_human_confirmed` 的 timeline 记录，记录里写明**未被选中的分支**。
+
+## `sequence-analysis` — 下单之前先看这条序列会不会坑你
+
+平台一直能算分子量与消光系数（浓度测量需要它们），但没有任何东西回答"这个构建体值不值得做"。
+一个带游离半胱氨酸、界面上压着 N-糖基化位点、或者有九残基疏水斑块的设计，
+会在台面上耗掉一个月——而仓库里搜不到 `pI`、liability、codon 任何一个词。
+
+单个只读工具 `analyse_sequence`，接受 `candidate_id` / `target_id` / `protein_id` **三选一**
+（候选物的序列就在 `properties["sequence"]`，与 `wetlab.service` 推上台面时读的是同一个键）。
+**工具不接受直接粘贴的序列**：`test_sequences_are_unreachable_through_any_tool` 禁止任何工具带
+`sequence` 参数，而理由比参数表更硬——工具调用的参数会被写进对话记录
+（`copilot_messages.tool_calls`、`copilot_agent_turns`），接受残基等于在那里留下第二份明文。
+服务层仍保留 `sequence=` 入口，供已经持有文本的调用方使用。
+
+- **位点**：N-X-S/T 糖基化（排除 N-P-X）、NG/NS 脱酰胺、D-G/S/T 异构化、Asp-Pro 断裂、
+  M/W 氧化、半胱氨酸配对（奇数即有游离）、RGD、Q/N 低复杂度段、疏水斑块（窗口与阈值随结果一起返回）；
+- **性质**：pI、pH 7.4 与 6.0 下的净电荷、GRAVY、芳香性、不稳定指数、分子量与消光系数
+  （后两者直接调用 `wetlab/kernels/calculators.py`，不另写一份）。
+
+两条纪律写进了代码而不是注释：位点一律 **1-based 闭区间**，因为这些数字会被直接抄进引物；
+以及**结果里永远没有序列本身**——`wetlab.models.Protein` 明写它的 `sequence` 是唯一的明文副本、
+API 只对外给 sha256，一个把明文回传给模型的工具会一行之内把这条约定作废。
+
+第二个只读工具 `analyse_conservation` 回答"哪些位点动不得"：读项目里已上传的比对文件
+（FASTA / a3m / Stockholm，**按 artifact id**，同样不接受粘贴的比对——粘进来的比对第一条就是查询序列本身），
+按查询序列的 1-based 编号给出每列的保守度、熵、gap 比例与有效深度，并返回最保守与最可变的若干位点。
+三个判断写在 `app/sequences/conservation.py` 里：**默认做 Henikoff 加权**，
+否则 500 条近乎相同的直系同源读起来处处高度保守；**gap 不算第二十一种残基**，
+它被排除在残基分布之外、单独报 `gap_fraction`，因为"90% 是 gap、10% 是色氨酸"不是保守的色氨酸；
+**结果里不含查询序列的残基字母**，逐位回传它等于把序列重新拼出来。
+有效深度低于 3 的列标 `shallow`——那种数字是算术，不是证据。
+
+能力给 `planner`（它设计构建体）与 `analyst`（它解读结果），两者都是 produce，且这是只读能力。
+
+## `patent-search` — 专利问题终于能拿证据回答
+
+平台的策略一直禁止模型给出专利结论：`policy.py` 不允许没有证据支撑的"专利风险"判断，
+`research_agent` 的质检还会按模式拦下"USPTO 检索未见"这类说法。规则是对的，但留了个洞——
+没有任何办法把证据交进来，于是专利问题只能靠模型的记忆回答，而那正是规则禁止的。
+
+现在专利走和论文**同一条管线**：`researcher` 持有 `patent-search`，
+`start_patent_search` 排队一次 Europe PMC 专利索引检索（`SRC:PAT`，覆盖 CN、US、EP、WO、JP、KR；
+仅 CN 就有五十余万条公开文本），每条命中存成一篇文献文档，带检索轨迹与带校验和的摘要索引。
+被引用的专利因此带着和论文一样的证据标签（document_id / chunk_id / checksum / retrieval_trace_id），
+能通过原有的证据质检，而不是绕开它。两处设置和文献检索不同：没有全文可取；**不做 claim 抽取**——
+抽取器是为论文里的科学论断写的，套在专利摘要上会把专利措辞归档成文献论断。
+
+`summarise_patent_landscape` 只读已保存的专利，不在读时发起检索：按局（CN/US/EP/WO/JP/KR）、
+按阶段（申请 / 授权 / PCT / 实用新型 / 外观设计）、主要申请人、IPC 小类、优先权年份与估算期限计数，
+列出的每条记录都带 document_id 与 retrieval_trace_id。三件事写进了代码：
+
+- **申请不是授权。** 大多数公开文本是申请；把 CN…A 或 US…A1 读成授权专利会高估受保护的范围。
+  阶段按局和文献种类代码判定，判不准就返回 `unknown`，不猜。
+- **申请人不是发明人。** 权利人在 `affiliation`，发明人在 `authorString`，两者分开保存。
+- **Europe PMC 不带法律状态。** 这个来源不带法律状态，所以结果里的期限只是"申请日 + 20 年"的**估算**，
+  不计 PTE/SPC、年费失效与各国差异；格局随结果附带这些限制，读到数字就读到限制。
+  它不是自由实施（FTO）或有效性意见，找不到也不代表不存在。
+
+**EPO OPS（2026-09-15 接入）**补上了 Europe PMC 没有的两样东西。`start_patent_search` 可选 `database="epo_ops"`，
+检索 DOCDB 全球文献，每条带同族号；两个源都可以用 `jurisdictions` 按局限定，限定在查询翻译之后施加。
+`start_patent_legal_status_lookup` 对已保存的专利（每次至多 25 件）查询同族与 INPADOC 法律事件，
+每件一条检索轨迹、原始响应存为制品；它有自己的请求词表——"检索专利"不授权它，要问到"法律状态""同族"才行。
+`summarise_patent_landscape` 随之给出不同族数，两个源重复保存的同一公开文本只计一次，
+并对已查的记录列出**每个国家最近一条带标记的事件**。事件挂在申请上而不是公开文本上，
+欧洲专利的事件按指定国分开，所以没有"这件专利有效/失效"这种字段；`researcher` 的 charter 也写明了：
+逐条报事件、国家和日期，绝不据此下有效性结论。没配置凭据时，OPS 检索与事件查询在排队前就以 503 拒绝并说明原因。
+
+## `druggability-assessment` — 成药性：给证据，不给概率
+
+"成药性"常被要成一个数：这个靶点、或针对它的分子，成药的概率是多少。平台背后没有任何经过校准的数据集
+能支撑这样一个百分比，而一个没人能验证的数字会被读成它并不具备的确定性。所以这项能力只汇报一个人手工
+也会去收集的证据，每一条注明来源，缺什么就写缺什么，而不是把缺口折进一个分数里。
+
+`researcher` 持有它。`start_druggability_assessment` 对一个**确切的**项目靶点排队一次评估，
+`get_druggability_assessment` 读回结果。靶点必须有 UniProt accession，否则直接 422：
+标识链是 UniProt → UniProt 自己交叉引用的 Open Targets ID，从不按基因名去搜——
+名字相近的旁系同源物会产出一份言之凿凿、却关于另一个蛋白的报告。
+
+报告四段，每段对应一条带审计记录（工具、请求体、时间、响应校验和）的证据行，均为待审核：
+
+- **可成药性**：Open Targets 按模态（小分子、抗体、PROTAC、其他临床模态）列出，并保留为真的具体证据标签。
+  "因已有获批药物而抗体可成药"和"因信号肽预测而抗体可成药"是两种不同的判断；从未评估的模态与评估为否的模态分开标注。
+- **药物与临床候选**：按最远临床阶段排序；来源里未识别的阶段保留并标为未排序，不丢弃也不猜。
+- **安全性风险**：Open Targets 已记录的事件。空列表的解读直接写进结果——"Open Targets 中未记录，不代表靶点安全"。
+- **临床试验活跃度**：ClinicalTrials.gov 在服务端按阶段计数；某个阶段没取到就是 `None`，不是 0——两者对"赛道有多拥挤"的含义正好相反。
+
+- **本项目已保存的证据**（`literature_signal`）：已保存的论文数、专利数与最近几条文献的 document_id。
+  前四段说的是这个领域已经确立了什么，这一段说的是**本项目自己能引用什么**——一条回答要带
+  document_id 与检索记录才算有据，而那些只能来自项目已保存的文献。措辞刻意保守：
+  **保存不等于读过**，更不等于支持成药性；一条都没有时，缺口里直接写"先做一次检索"。
+
+失败按"什么失败了"命名：UniProt 取不到与 UniProt 没有交叉引用会把人引向相反的结论，二者分开报告。
+单个数据源失败记成缺口、评估照常完成；**整个检索过程崩掉**则把运行标记为 `failed` 并写一条说明原因的
+报告行——`IntelligenceRun` 没有 error 字段，原因落在报告里，读的人照常取得到。没有这层兜底，
+运行会永远停在 `running`：没有报告、没有错误，读的人无从判断该等还是重跑。
+
+`late_stage`（晚期试验数）只在 PHASE3 与 PHASE4 **都取到**时给出和值，否则为 `None`：
+只求和其中取到的那个，等于把"取不到"当成 0，正是分期计数里 `phases_unavailable` 要防的错误。
+
+报告写明：不给成药概率、可成药性描述的是靶点而不是某个分子、试验数是匹配检索词的登记数、市场规模不评估。
+
+"市场前景"是第五段 `market_landscape`，按能数清的东西诚实拆开：靶点上的获批药物与临床阶段分布、
+近 8 年按研究开始年份的试验登记数（当年标为未满一年）、申办方构成（最多 5 页，没取全标 `complete: false`，
+不外推）、以及本项目**已保存**专利的优先权年份——评估不会替人发起专利检索，没有已保存专利就在缺口里写明。
+它是竞争格局，不是市场预测：不出市场规模、价格、收入或份额的数字。
+
+## `triage_candidates` — 把路线自己写下的门槛真正套到候选物上
+
+`route_catalog` 从写下来那天起就带着验收门槛（`{"pae_interaction": "< 15", "binder_plddt": "> 70", …}`），
+但没有任何代码读它：人是用眼睛对的，而这既是分诊里最慢的一步，也是最容易看错数字的一步。
+
+工具 `triage_candidates`（只读，归 `result-interpretation`，即 analyst 的能力）接受一个
+`route_id` 和至多 25 个候选物 id，套用**那条路线自己声明的**门槛，逐条给出结论。
+
+设计上只有一个决定，但它贯穿全部：**一条判据有三种结果，不是两种。**
+
+| 结果 | 含义 |
+| --- | --- |
+| `pass` | 指标已记录且满足门槛 |
+| `fail` | 指标已记录且不满足 |
+| `missing` | **从来没有人测过这一项** |
+
+把 `missing` 并进 `fail` 是这个模块存在的理由。一个没有 Rosetta 分数的设计不是"没通过 Rosetta 门"，
+而是没人跑过 Rosetta；两者报成一样，会让人把**还没评估过的工作**当作被否决的工作扔掉——
+而这恰好最常发生在某个流水线阶段被跳过的时候，也就是最需要有人注意到的时候。
+
+另外两条：判据会带上**是哪一行指标定的**（method 与 assessor），所以"设计模型给自己打的分"
+不会被洗成独立验证；一条不声明任何 tier 的路线（比如 structure-acquisition，它约束的是
+ensemble 大小而不是 binder 质量）会被明确拒绝，而不是返回一个读起来像"全过"的空结论。

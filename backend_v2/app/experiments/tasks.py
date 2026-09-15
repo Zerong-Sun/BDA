@@ -10,13 +10,21 @@ import csv
 import io
 import json
 import uuid
+from collections.abc import Sequence
 
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.database import SessionFactory, session_scope
+from .schemas import ExperimentResultCreate
+
+
+def _validate_headers(headers: Sequence[str]) -> None:
+    if any(not header.strip() for header in headers) or len(set(headers)) != len(headers):
+        raise ValueError("experiment_headers_must_be_nonempty_and_unique")
 
 
 def _experiment_rows(filename: str, content_type: str, data: bytes) -> list[dict]:
@@ -27,20 +35,26 @@ def _experiment_rows(filename: str, content_type: str, data: bytes) -> list[dict
             raise ValueError("experiment_json_must_contain_result_objects")
         return rows
     if content_type == "text/csv" or filename.lower().endswith(".csv"):
-        return list(csv.DictReader(io.StringIO(data.decode("utf-8-sig"))))
+        reader = csv.DictReader(io.StringIO(data.decode("utf-8-sig")))
+        _validate_headers(reader.fieldnames or [])
+        return list(reader)
     if filename.lower().endswith(".xlsx"):
         from openpyxl import load_workbook  # type: ignore[import-untyped]
 
         workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        sheet = workbook.active
-        if sheet is None:
-            raise ValueError("experiment_workbook_has_no_sheet")
-        values = sheet.iter_rows(values_only=True)
-        header_row = next(values, None)
-        if header_row is None:
-            raise ValueError("experiment_workbook_empty")
-        headers = [str(value or "").strip() for value in header_row]
-        return [dict(zip(headers, row, strict=False)) for row in values]
+        try:
+            sheet = workbook.active
+            if sheet is None:
+                raise ValueError("experiment_workbook_has_no_sheet")
+            values = sheet.iter_rows(values_only=True)
+            header_row = next(values, None)
+            if header_row is None:
+                raise ValueError("experiment_workbook_empty")
+            headers = [str(value or "").strip() for value in header_row]
+            _validate_headers(headers)
+            return [dict(zip(headers, row, strict=False)) for row in values]
+        finally:
+            workbook.close()
     raise ValueError("experiment_format_unsupported")
 
 
@@ -58,6 +72,8 @@ EXPERIMENT_IMPORT_COLUMNS = {
 
 def _coerce_experiment_row(row: dict, index: int) -> tuple[dict | None, dict | None]:
     """Validate one row. Returns (values, error) with exactly one of them set."""
+    if None in row:
+        return None, {"row": index, "column": "", "message": "row has more columns than the header"}
     values = {key: row.get(key) for key in EXPERIMENT_IMPORT_COLUMNS if row.get(key) not in ("", None)}
     if not values.get("experiment_type"):
         return None, {"row": index, "column": "experiment_type", "message": "experiment_type is required"}
@@ -73,8 +89,12 @@ def _coerce_experiment_row(row: dict, index: int) -> tuple[dict | None, dict | N
                 "column": "value",
                 "message": f"'{raw_value}' is not a number",
             }
-    values["pass_status"] = values.get("pass_status") or "unknown"
-    return values, None
+    try:
+        validated = ExperimentResultCreate.model_validate(values)
+    except ValidationError as exc:
+        error = exc.errors()[0]
+        return None, {"row": index, "column": str(error["loc"][0]), "message": error["msg"]}
+    return validated.model_dump(include=EXPERIMENT_IMPORT_COLUMNS), None
 
 
 @celery_app.task(name="bda_v2.experiment_results_import")
@@ -105,7 +125,7 @@ def experiment_results_import(artifact_id: str, dry_run: bool = False) -> dict:
     if len(rows) > 10000:
         raise ValueError("experiment_import_too_many_rows")
 
-    seen_columns = {key for row in rows for key in row}
+    seen_columns = {key for row in rows for key in row if isinstance(key, str)}
     ignored_columns = sorted(seen_columns - EXPERIMENT_IMPORT_COLUMNS)
     prepared: list[tuple[int, dict]] = []
     errors: list[dict] = []

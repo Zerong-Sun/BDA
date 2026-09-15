@@ -51,7 +51,11 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Interpret recorded candidate and experiment results without changing them",
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_project_candidates", "list_experiment_results"],
+        "chat_tools": [
+            "list_project_candidates",
+            "list_experiment_results",
+            "triage_candidates",
+        ],
     },
     {
         "id": "structure-analysis",
@@ -66,8 +70,41 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "chat_tools": [
             "analyse_structure",
             "list_structure_contacts",
+            "measure_structure_interface",
+            "compare_structures",
             "describe_structure_site",
         ],
+    },
+    {
+        "id": "structure-interaction",
+        "title": "Structure interaction",
+        "description": (
+            "Show a structure with named residues picked out, propose a hotspot "
+            "set for review, and ask a person to choose residues on the model. "
+            "Proposing is not choosing: a set an operator wrote stays pending "
+            "until a person confirms it."
+        ),
+        "async_execution": False,
+        "execution_mode": "draft",
+        "chat_tools": [
+            "render_structure_view",
+            "propose_hotspot_set",
+            "request_residue_selection",
+        ],
+    },
+    {
+        "id": "sequence-analysis",
+        "title": "Sequence analysis",
+        "description": (
+            "Read a designed or registered sequence at residue level: "
+            "glycosylation sequons, deamidation and isomerisation sites, "
+            "oxidation-prone and unpaired cysteines, hydrophobic patches, pI, "
+            "charge and extinction coefficient. Reports positions and numbers, "
+            "never a verdict, and never returns the sequence itself."
+        ),
+        "async_execution": False,
+        "execution_mode": "read",
+        "chat_tools": ["analyse_sequence", "analyse_conservation"],
     },
     {
         "id": "failure-diagnosis",
@@ -95,6 +132,33 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Queue an auditable Europe PMC search and save retrievable content",
         "execution_mode": "queue",
         "chat_tools": ["start_literature_search"],
+        "requires_explicit_request": True,
+    },
+    {
+        "id": "patent-search",
+        "title": "Patent search",
+        "description": (
+            "Queue an audited patent search of Europe PMC (CN, US, EP, WO, JP, KR) or EPO "
+            "OPS (worldwide, with families), look up saved patents' families and INPADOC "
+            "legal events through EPO OPS, and summarise the patents already saved: "
+            "offices, stages, applicants, classes, families, an estimated term and the "
+            "latest event per country. Events are not a status, and none of it is a "
+            "freedom-to-operate opinion."
+        ),
+        "execution_mode": "queue",
+        "chat_tools": ["start_patent_search", "start_patent_legal_status_lookup", "summarise_patent_landscape"],
+        "requires_explicit_request": True,
+    },
+    {
+        "id": "druggability-assessment",
+        "title": "Druggability assessment",
+        "description": (
+            "Queue an audited assessment of one project Target from public sources - Open "
+            "Targets tractability, drugs and clinical candidates, safety liabilities, and "
+            "ClinicalTrials.gov activity - and read it back. Evidence and gaps, no probability."
+        ),
+        "execution_mode": "queue",
+        "chat_tools": ["start_druggability_assessment", "get_druggability_assessment"],
         "requires_explicit_request": True,
     },
     {
@@ -175,13 +239,14 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "id": "chain-messaging",
         "title": "Chain handover",
         "description": (
-            "Leave a structured handover for the next operator and read the ones "
-            "addressed to you. Copilot bookkeeping: it changes no research record, "
+            "Leave a structured handover for the next operator, read the ones "
+            "addressed to you, and ask the person to settle a choice you may not "
+            "settle yourself. Copilot bookkeeping: it changes no research record, "
             "which is why its write does not need the user to ask for it by name."
         ),
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["post_handoff", "read_handoffs"],
+        "chat_tools": ["post_handoff", "read_handoffs", "request_decision"],
     },
     {
         "id": "chain-orchestration",
@@ -241,6 +306,14 @@ CAPABILITY_ALIASES = {
         "research-trace-authoring",
         "agent-orchestration",
         "structure-analysis",
+        # These three were declared, granted to roster operators, and left out
+        # of this set - so a project on default skills never saw them, with
+        # nothing failing to say so. `test_default_skills_reach_every_roster_capability`
+        # now fails if a bot holds a capability the default cannot reach.
+        "structure-interaction",
+        "sequence-analysis",
+        "patent-search",
+        "druggability-assessment",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -248,6 +321,8 @@ CAPABILITY_ALIASES = {
     },
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
+    "patents": {"research-read", "patent-search"},
+    "druggability": {"project-read", "druggability-assessment"},
     "intelligence": {
         "project-read",
         "research-read",

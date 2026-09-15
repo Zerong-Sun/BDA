@@ -1,6 +1,6 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { lazy, Suspense, useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { Topbar } from './components/ui/Topbar'
 import { PipelineRail } from './components/ui/PipelineRail'
 import { Toast } from './components/ui/Toast'
@@ -49,6 +49,9 @@ const TimelinePage = lazy(() => import('./app/Timeline'))
 const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: module.FAQPage })))
 const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
 const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
+const BotsPage = lazy(() => import('./app/Bots').then((module) => ({ default: module.BotsPage })))
+const BotDetailPage = lazy(() => import('./app/BotDetail').then((module) => ({ default: module.BotDetailPage })))
+const InboxPage = lazy(() => import('./app/Inbox').then((module) => ({ default: module.InboxPage })))
 
 function RouteFallback() {
   return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
@@ -106,6 +109,14 @@ export function AppShell() {
   const location = useLocation()
   const { projectId, activeProject } = useProjectContext()
   const showRail = Boolean(activeProject) && railRoutes.some((route) => location.pathname.startsWith(route))
+  // `<main>` is the scroll container and outlives every route, so without this a
+  // new page opens at whatever depth the previous one was scrolled to.
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [location.pathname])
 
   useEffect(() => {
     if (appMode === 'demo' && activeProject && !isDemoProject(activeProject)) {
@@ -124,7 +135,7 @@ export function AppShell() {
       `project_status=${activeProject?.status ?? 'unknown'}`,
     ]
     if (location.pathname === '/research') {
-      entries.push(`research_tab=${search.get('tab') || 'evidence'}`)
+      entries.push(`research_tab=${search.get('tab') || 'goals'}`)
       entries.push(...copilotSelectedEntityIds.map((entityId) => `entity=${encodeURIComponent(entityId)}`))
     }
     if (activeProject?.summary) {
@@ -140,9 +151,9 @@ export function AppShell() {
     >
       <Topbar />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {showRail ? <PipelineRail /> : null}
-          <div className="mx-auto max-w-[1480px] px-6 py-6">
+          <div className="app-content mx-auto max-w-[1600px] px-6 py-6">
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>
@@ -173,6 +184,9 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
+                <Route path="/inbox" element={<InboxPage />} />
+                <Route path="/bots" element={<BotsPage />} />
+                <Route path="/bots/:botId" element={<BotDetailPage />} />
                 {/* The page was always labelled "Projects"; only the URL said
                     otherwise. Kept as a redirect so existing links and
                     bookmarks still land, rather than 404ing on a rename. */}

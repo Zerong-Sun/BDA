@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import { Button } from '../../components/ui/Button'
-import { useCopilotBots, type CopilotBot } from './bots/registry'
+import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { useCopilotHandoffs } from './handoffs'
 
 /**
@@ -47,12 +47,15 @@ function confidenceLabel(
 }
 
 function operatorName(id: string, bots: readonly CopilotBot[], zh: boolean): string {
-  const bot = bots.find((entry) => entry.id === id)
+  const bot = resolveBot(id, bots)
   if (!bot) return id
-  return zh ? bot.title_zh : bot.title
+  const name = zh ? bot.title_zh : bot.title
+  // Recorded under a retired id: name the operator that now answers for it, and
+  // keep the recorded id visible so the row still says what it was written as.
+  return bot.id === id ? name : zh ? `${name}（原 ${id}）` : `${name} (formerly ${id})`
 }
 
-function HandoffCard({
+export function HandoffCard({
   handoff,
   bots,
   onSelectOperator,

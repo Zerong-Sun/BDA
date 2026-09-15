@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select'
 import { ApiState } from '../../components/ui/ApiState'
 import { useI18n } from '../../lib/i18n'
+import { useAppStore } from '../../lib/store/appStore'
+import { currentRole } from './jsonHelpers'
 import { useToastStore } from '../../components/ui/toastStore'
 import {
   buildGoalTree,
@@ -50,6 +52,8 @@ interface ResearchGoalsPanelProps {
 export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
   const { t, format } = useI18n()
   const copy = t.research.goals
+  const demo = useAppStore((s) => s.appMode === 'demo')
+  const readOnly = demo || currentRole() === 'viewer'
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const [title, setTitle] = useState('')
@@ -78,12 +82,36 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
     onError: (err) => fail(err, copy.createFailed),
   })
 
+  // The one write here that shows its result immediately. Marking a goal done
+  // is reversible, spends nothing and calls nothing outside this platform, so
+  // waiting for the round trip buys no safety - it only makes the checkbox feel
+  // broken. Creating, deleting and detaching stay server-confirmed: the first
+  // two change what exists, and a row that appears and then vanishes is worse
+  // than a row that takes a moment to appear.
   const setStatus = useMutation({
     mutationFn: ({ goal, status }: { goal: ResearchGoal; status: GoalStatus }) =>
       updateResearchGoal(goal.id, goal.version, { status }),
-    onSuccess: () => void invalidate(),
-    // 412 is the interesting one: the goal moved under us, so re-read rather than insist.
-    onError: (err) => fail(err, copy.updateFailed),
+    onMutate: async ({ goal, status }) => {
+      // Stop an in-flight read from landing on top of the optimistic value.
+      await queryClient.cancelQueries({ queryKey: ['research-goals', projectId] })
+      const previous = queryClient.getQueryData<ResearchGoal[]>(['research-goals', projectId])
+      queryClient.setQueryData<ResearchGoal[]>(['research-goals', projectId], (current) =>
+        (current ?? []).map((item) => (item.id === goal.id ? { ...item, status } : item)),
+      )
+      return { previous }
+    },
+    onError: (err, _variables, context) => {
+      // Put the server's version back rather than leaving a checkbox showing a
+      // state the record does not have.
+      if (context?.previous) {
+        queryClient.setQueryData(['research-goals', projectId], context.previous)
+      }
+      fail(err, copy.updateFailed)
+    },
+    // 412 is the interesting one: the goal moved under us, so re-read rather
+    // than insist. Settled rather than success, so the re-read happens whether
+    // the write landed or was rolled back.
+    onSettled: () => void invalidate(),
   })
 
   const removeGoal = useMutation({
@@ -109,11 +137,12 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
     return (
     <li key={node.goal.id} style={{ marginInlineStart: `${node.depth * 1.25}rem` }}>
       <div className="flex flex-wrap items-baseline gap-2 rounded-md border border-border-soft bg-bg-app px-3 py-2">
-        <span className="min-w-0 flex-1 truncate text-text-primary">{node.goal.title}</span>
+        <span className="min-w-0 flex-1 break-words text-text-primary">{node.goal.title}</span>
         <Select
+          disabled={readOnly || setStatus.isPending}
           value={node.goal.status}
           onValueChange={(next) => {
-            if (next) setStatus.mutate({ goal: node.goal, status: next as GoalStatus })
+            if (next && !readOnly) setStatus.mutate({ goal: node.goal, status: next as GoalStatus })
           }}
         >
           <SelectTrigger
@@ -135,6 +164,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
           size="sm"
           variant="outline"
           aria-label={format(copy.addChildTo, { title: node.goal.title })}
+          disabled={readOnly}
           onClick={() => setParentId(node.goal.id)}
         >
           <PlusIcon aria-hidden="true" />
@@ -144,6 +174,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
           size="sm"
           variant="outline"
           aria-label={format(copy.deleteGoal, { title: node.goal.title })}
+          disabled={readOnly || removeGoal.isPending}
           onClick={() => removeGoal.mutate(node.goal)}
         >
           <TrashIcon aria-hidden="true" />
@@ -167,6 +198,7 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
                 size="sm"
                 className="h-4 w-4 p-0 text-text-muted"
                 aria-label={format(copy.detachLink, { type: link.resource_type })}
+                disabled={readOnly || detach.isPending}
                 onClick={() => detach.mutate({ goalId: node.goal.id, linkId: link.id })}
               >
                 ×
@@ -195,12 +227,13 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
         className="flex flex-wrap items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault()
-          if (title.trim()) addGoal.mutate()
+          if (title.trim() && !readOnly && !addGoal.isPending) addGoal.mutate()
         }}
       >
         <Input
           className="min-w-0 flex-1"
           value={title}
+          disabled={readOnly}
           placeholder={parentTitle ? format(copy.childPlaceholder, { title: parentTitle }) : copy.placeholder}
           aria-label={copy.placeholder}
           onChange={(event) => setTitle(event.target.value)}
@@ -210,13 +243,14 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
             {copy.clearParent}
           </Button>
         ) : null}
-        <Button type="submit" size="sm" disabled={!title.trim() || addGoal.isPending}>
+        <Button type="submit" size="sm" disabled={readOnly || !title.trim() || addGoal.isPending}>
           {addGoal.isPending ? copy.adding : copy.add}
         </Button>
       </form>
 
       <ApiState
         isLoading={goalsQuery.isLoading}
+        isError={goalsQuery.isError}
         error={goalsQuery.error}
         onRetry={() => void goalsQuery.refetch()}
       >

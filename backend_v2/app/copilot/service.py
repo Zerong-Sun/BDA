@@ -585,6 +585,13 @@ def start_agent_run(
     from .task_contracts import SERVICES, build_contract
 
     recipe = SERVICES.get(payload.service_kind)
+    if recipe and payload.bot and payload.service_kind not in bot_roster.require(payload.bot).task_services:
+        owner = bot_roster.owner_of_service(payload.service_kind)
+        raise DomainError(
+            "copilot_task_owner_mismatch",
+            f"{payload.service_kind!r} tasks are owned by {owner.id if owner else 'no operator'!r}, not {payload.bot!r}.",
+            status_code=422,
+        )
     if recipe:
         from .qualification import readiness
         if payload.service_kind not in readiness(session, project.id)["eligible_services"]:

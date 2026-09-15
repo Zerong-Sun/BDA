@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import uuid
@@ -92,54 +93,44 @@ def complete_upload(
         raise DomainError("upload_expired", "Artifact upload is no longer active", status_code=409)
     upload_id = upload.id
     object_key = upload.object_key
-    session.commit()  # release the request connection before MinIO inspection/promotion
+    filename, content_type, project_id = upload.filename, upload.content_type, project.id
+    session.commit()  # release the request connection before object I/O
     storage = ObjectStorage()
-    try:
-        size, checksum = storage.inspect_and_hash(object_key)
-    except Exception as exc:
+
+    def mark_failed(code: str) -> None:
         failed = repo.upload(upload_id, for_update=True)
         if failed and failed.status == "uploading":
             failed.status = "failed"
-            failed.error = "upload_object_missing"
+            failed.error = code
             failed.version += 1
-            session.commit()
+        session.commit()
+
+    # Hash, validate and persist one bounded snapshot: a still-valid PUT URL can
+    # overwrite staging at any time, so a later copy cannot be trusted to match it.
+    try:
+        body = storage.read_bytes(object_key, max_bytes=get_settings().max_upload_bytes)
+    except Exception as exc:
+        if isinstance(exc, ValueError) and str(exc) == "object_too_large":
+            mark_failed("file_too_large")
+            raise DomainError("file_too_large", "Uploaded object exceeds the size limit", status_code=413) from exc
+        mark_failed("upload_object_missing")
         raise DomainError("upload_object_missing", "Uploaded object could not be inspected", status_code=409) from exc
-    if size > get_settings().max_upload_bytes:
-        failed = repo.upload(upload_id, for_update=True)
-        if failed:
-            failed.status = "failed"
-            failed.error = "file_too_large"
-            failed.version += 1
-            session.commit()
-        raise DomainError("file_too_large", "Uploaded object exceeds the size limit", status_code=413)
+    size, checksum = len(body), hashlib.sha256(body).hexdigest()
     if checksum.lower() != payload.checksum_sha256.lower():
         ARTIFACT_CHECKSUM_FAILURES.labels("upload").inc()
-        failed = repo.upload(upload_id, for_update=True)
-        if failed:
-            failed.status = "failed"
-            failed.error = "checksum_mismatch"
-            failed.version += 1
-            session.commit()
+        mark_failed("checksum_mismatch")
         raise DomainError("checksum_mismatch", "Uploaded object checksum does not match", status_code=409)
     try:
-        _validate_artifact_content(
-            upload.filename,
-            upload.content_type,
-            storage.read_bytes(object_key, max_bytes=get_settings().max_upload_bytes),
-        )
+        _validate_artifact_content(filename, content_type, body)
     except Exception as exc:
-        failed = repo.upload(upload_id, for_update=True)
-        if failed:
-            failed.status = "failed"
-            failed.error = "artifact_format_invalid"
-            failed.version += 1
-            session.commit()
-        storage.remove(object_key)
+        mark_failed("artifact_format_invalid")
         raise DomainError(
             "artifact_format_invalid", "Uploaded object does not match its declared format", status_code=422
         ) from exc
-    target_key = f"projects/{project.id}/sha256/{checksum}"
-    storage.promote(object_key, target_key)
+    target_key = f"projects/{project_id}/sha256/{checksum}"
+    storage.put_bytes(target_key, body, content_type)
+    # Retain staging until the orphan reconciler removes it. Deleting before the
+    # database commit would make a rolled-back completion impossible to retry.
     refreshed_upload = repo.upload(upload_id, for_update=True)
     if refreshed_upload is None:
         raise DomainError("upload_not_found", "Artifact upload disappeared during completion", status_code=409)
@@ -147,6 +138,14 @@ def complete_upload(
     existing = repo.artifact_for_upload(upload.id)
     if existing:
         return existing
+    if upload.status != "uploading":
+        raise DomainError("upload_expired", "Artifact upload is no longer active", status_code=409)
+    edges_seen: set[tuple[uuid.UUID, str]] = set()
+    for edge in payload.lineage_edges:
+        pair = (edge.parent_artifact_id, edge.relation)
+        if pair in edges_seen:
+            raise DomainError("lineage_duplicate", "A lineage parent and relation cannot be repeated", status_code=422)
+        edges_seen.add(pair)
     artifact = Artifact(
         project_id=project.id,
         upload_id=upload.id,

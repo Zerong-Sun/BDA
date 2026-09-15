@@ -500,3 +500,35 @@ def test_mcp_respects_task_steps_and_explicit_scope_over_goal_words(session: Ses
     names = {spec.id for spec in mcp.available_tools(session, grant)}
     assert not (names & REGISTRY.user_intent_write_ids())
     assert not mcp.tool_context(session, grant).actions.request_allows("create_knowledge_draft")
+
+
+# --- The cluster, over the same registry -------------------------------------
+
+
+def test_compute_reads_reach_an_unbound_grant_through_the_registry(session: Session) -> None:
+    """Cluster work needs no MCP-specific tool; it is already in the registry.
+
+    Worth pinning because the obvious way to "add a cluster job MCP" is to write
+    job tools for MCP, which would be the fourth place a tool is declared - the
+    drift `registry.py` exists to end. What a grant may do with a job follows
+    from its capabilities here exactly as it does in chat.
+    """
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user, capabilities=["failure-diagnosis"])
+
+    listed = {spec.id: spec for spec in mcp.available_tools(session, grant)}
+
+    assert "get_compute_status" in listed
+    assert "diagnose_compute_failure" in listed
+    assert all(spec.execution_mode == "read" for spec in listed.values())
+
+
+def test_an_unbound_grant_is_offered_no_compute_draft(session: Session) -> None:
+    """A draft spends cluster time, and a grant with no live run has no mandate."""
+    project, user = _project(session)
+    grant, _ = _grant(session, project, user, capabilities=["compute-drafting"])
+
+    names = {spec.id for spec in mcp.available_tools(session, grant)}
+
+    assert "get_compute_status" in names
+    assert "create_compute_draft" not in names

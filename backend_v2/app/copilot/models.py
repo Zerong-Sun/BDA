@@ -33,6 +33,12 @@ class CopilotMessage(UUIDVersionMixin, Base):
         ForeignKey("copilot_conversations.id", ondelete="CASCADE"), index=True
     )
     role: Mapped[str] = mapped_column(String(40))
+    #: The roster operator that produced this message, or None for the
+    #: undifferentiated Copilot. The id and not the charter, exactly as
+    #: `copilot_agent_runs.bot` holds it: the charter is read from the roster
+    #: each turn, and a transcript that cannot say who answered cannot be read
+    #: as a room where several operators speak.
+    bot: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(40), default="pending")
     citations: Mapped[list] = mapped_column(JSON, default=list)
@@ -302,3 +308,71 @@ class CopilotHandoff(UUIDVersionMixin, Base):
         ForeignKey("copilot_agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+
+
+class CopilotDecisionRequest(UUIDVersionMixin, Base):
+    """A question an operator may not answer itself, put to a person.
+
+    The decision inbox worked by *inference*: an unreviewed delivery, an
+    unconfirmed draft, a claim citing nothing. Inference has a ceiling - it can
+    report a state, and it can never carry a question. An operator that has
+    narrowed a choice to three hotspot sets had nowhere to say so and no way to
+    attach what each rests on.
+
+    Two columns carry the design. `options` is a bounded list of
+    `{key, label, rationale, evidence_refs}`: bounded because a reviewer who
+    cannot hold the list stops choosing and starts accepting, and structured
+    because "which one, and why not the others" is the part of a decision worth
+    the most later. `decision_entry_id` points at the timeline entry the answer
+    produced, attributed `agent_proposed_human_confirmed` - the operator drafted
+    the options, the person made the call, and neither "human" nor "agent" is
+    true of that entry on its own.
+
+    There is no path from a tool to an answer. `decisions.answer` requires a
+    `User`, and the tool surface only reaches `decisions.record`.
+    """
+
+    __tablename__ = "copilot_decision_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('open', 'answered', 'withdrawn')",
+            name="ck_copilot_decision_request_status",
+        ),
+        CheckConstraint(
+            "(status = 'answered') = (answered_by is not null and answered_at is not null)",
+            name="ck_copilot_decision_request_answered",
+        ),
+        # The inbox read is "still open, in this project, newest first".
+        Index("ix_copilot_decision_requests_open", "project_id", "status", "created_at"),
+        Index("ix_copilot_decision_requests_run_id", "run_id"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    #: The run that asked, when a durable task did. Answering does not resume
+    #: it: the run is suspended by whatever tool suspended it, and a question
+    #: that could wake work would make two mechanisms own one transition.
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("copilot_agent_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    #: A roster bot id, validated on insert. Not a foreign key, for the reason
+    #: `CopilotHandoff` states: the roster is code, and a retired operator must
+    #: not take its history with it.
+    asked_by: Mapped[str] = mapped_column(String(80))
+    question: Mapped[str] = mapped_column(Text)
+    #: `[{key, label, rationale, evidence_refs}]`, two to six of them.
+    options: Mapped[list] = mapped_column(JSON, default=list)
+    #: The operator's own suggestion, which must name one of the options.
+    recommended: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="open")
+    #: The key of the option chosen. Free text is not an answer: the options are
+    #: what the operator undertook to act on.
+    answer: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    answer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("project_timeline_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    #: The person the asking operator was working for. Who answered is a
+    #: separate column, because they are often not the same person.
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))

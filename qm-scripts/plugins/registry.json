@@ -272,19 +272,21 @@
       "slug": "rosetta",
       "versions": [
         "2024.09",
-        "2026.06"
+        "2026.06",
+        "2024.09-bda.1"
       ],
       "state": "enabled",
       "submission_authorized": true,
-      "renderer": "qm_job",
-      "qm_job_model": "rosetta",
-      "example": "qm-scripts/library/examples/05-scoring-and-refinement/rosetta-interface.json",
+      "renderer": "platform",
+      "qm_job_model": null,
+      "example": null,
       "runtime": "QM dispatch must prefer /work/bme-liz/software/rosetta and serial .default.linuxgccrelease binaries; the 2026.06 container is a placeholder.",
       "resources": "CPU only, 1 slot with ptile=1; memory/walltime depend on the selected registered version",
       "rules": [
-        "Stage PDB/mmCIF inputs on port s and select the binary only through the application parameter.",
+        "The native BDA 2024.09-bda.1 workbench supports seven modes and 45 documented parameters; see [PLUGIN_GUIDE.md](./PLUGIN_GUIDE.md). It requires single-model PDB with explicit chain mapping; legacy format support is version-specific.",
         "The reviewed binary is non-MPI and must not request extra CPU slots without measured parallel work outside the binary.",
-        "Count decoys and score rows before run_complete; LSF Successfully completed is not sufficient."
+        "Count decoys and score rows before run_complete; LSF Successfully completed is not sufficient.",
+        "The new native runner exports per-run parameter explanations, raw metrics and optional interface geometry; runtime status remains unproven until a real Rosetta run verifies this exact declaration."
       ],
       "observations": []
     },

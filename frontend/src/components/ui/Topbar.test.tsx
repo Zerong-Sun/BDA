@@ -15,6 +15,9 @@ describe('Topbar logout', () => {
       activeProjectId: 'proj_live',
       language: 'zh',
       copilotOpen: false,
+      settingsOpen: false,
+      activityOpen: false,
+      tourMenuOpen: false,
     })
     server.use(
       http.get('/api/v2/operations', () => HttpResponse.json({ items: [], next_cursor: null })),
@@ -75,6 +78,13 @@ describe('Topbar logout', () => {
     expect(window.location.hash).toContain('/login')
   })
 
+  it('shows the active project name before the dropdown has been opened', async () => {
+    renderWithProviders(<Topbar />)
+    const selector = await screen.findByRole('combobox')
+    await waitFor(() => expect(selector).toHaveTextContent('Live Project'))
+    expect(selector).not.toHaveTextContent('proj_live')
+  })
+
   it('renders mobile-accessible primary navigation links', async () => {
     useAppStore.setState({ language: 'en' })
 
@@ -99,5 +109,18 @@ describe('Topbar logout', () => {
 
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /log\s*out/i })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['Application settings', 'settingsOpen'],
+    ['Interface tour', 'tourMenuOpen'],
+  ] as const)('keeps %s reachable from the compact utility menu', (label, stateKey) => {
+    useAppStore.setState({ language: 'en' })
+    renderWithProviders(<Topbar />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'More workspace actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: label }))
+
+    expect(useAppStore.getState()[stateKey]).toBe(true)
   })
 })

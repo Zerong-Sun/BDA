@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from .patents import is_patent_row, patent_details
+
 
 def europe_pmc_results(payload: dict[str, Any], *, limit: int) -> list[dict[str, Any]]:
     rows = (payload.get("resultList") or {}).get("result") or []
@@ -33,6 +35,11 @@ def europe_pmc_results(payload: dict[str, Any], *, limit: int) -> list[dict[str,
                 "in_epmc": str(row.get("inEPMC") or "").upper() == "Y",
                 "cited_by_count": row.get("citedByCount"),
                 "publication_types": row.get("pubTypeList") or {},
+                # Patent hits carry their office, kind code, applicant, dates and
+                # classes; a paper carries None here. Read off the same record
+                # rather than fetched again, so the saved details are the ones
+                # the audited search returned.
+                "patent": patent_details(row) if is_patent_row(row) else None,
             }
         )
     return results

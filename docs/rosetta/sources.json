@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-09-14",
+  "scope": "BDA Rosetta七类常用生成模式的参数与科学解释；不是全部Rosetta覆盖",
+  "verification": "官方文档在线读取；固定commit的options源码及FastRelax.cc直接读取。未执行Rosetta或模拟。",
+  "catalog_snapshot_before_parent_expansion": {
+    "path": "qm-scripts/library/catalog.json",
+    "sha256": "09aa9ebd0b7d216e3eb54627ba5f02b2a8f6cac2cb026885729ece7a0fe61d78",
+    "rosetta_parameter_entries": 47,
+    "declared_parameter_count": 36,
+    "empty_help_entries": 36,
+    "pinned_commit": "bbb6a2d27c70be05b2fb2409f3920b5894967d60",
+    "note": "仅记录只读审查起点，非最终插件字段统计。"
+  },
+  "sources": [
+    {
+      "id": "score_commands",
+      "title": "Score Commands",
+      "url": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/score-commands",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "score_jd2只评分的默认用途",
+        "score_app:linmin会在评分前最小化",
+        "scorefile/权重/参考结构"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "relax_application",
+      "title": "Relax application",
+      "url": "https://docs.rosettacommons.org/docs/latest/application_documentation/structure_prediction/relax",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "standalone Relax的约束包装选项",
+        "局部repack/minimize，不是MD",
+        "MoveMap、resfile与Cartesian要求"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "interface_analyzer",
+      "title": "InterfaceAnalyzer application",
+      "url": "https://docs.rosettacommons.org/docs/latest/application_documentation/analysis/interface-analyzer",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "蛋白–蛋白范围，不是蛋白–小分子界面分析",
+        "CLI compute_packstat、pack_input、pack_separated和use_resfile",
+        "dG_separated、dG_cross、SASA及占位输出说明"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "docking_protocol",
+      "title": "RosettaDock docking protocol",
+      "url": "https://docs.rosettacommons.org/docs/latest/application_documentation/docking/docking-protocol",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "centroid与高分辨率阶段",
+        "docking_local_refine、partners、dock_pert和随机化",
+        "norepack与sc_min区别"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "cartesian_ddg",
+      "title": "Cartesian ddG",
+      "url": "https://docs.rosettacommons.org/docs/latest/cartesian-ddG",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "WT/MUT稳定性评分差",
+        "ddg:mut_file、iterations、force_iterations、score_cutoff",
+        "ref2015_cart、fa_max_dis及匹配预处理",
+        "现代协议ddg:legacy false、ddg:bbnbrs",
+        "界面应用的基准限制"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "rosetta_scripts",
+      "title": "RosettaScripts",
+      "url": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/RosettaScripts",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "SCOREFXNS/MOVERS/PROTOCOLS/OUTPUT",
+        "XML定义协议及输出，不保证所有CLI都生效"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "fast_relax_mover",
+      "title": "FastRelaxMover",
+      "url": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/Movers/movers_pages/FastRelaxMover",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "XML属性scorefxn/repeats/cartesian/disable_design/relaxscript/ramp_down_constraints",
+        "XML不会照搬standalone Relax的坐标约束flags",
+        "MoveMap限制minimization不自动禁止packing",
+        "Cartesian cart_bonded与pro_close"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "interface_analyzer_xsd",
+      "title": "InterfaceAnalyzerMover XSD",
+      "url": "https://docs.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/xsd/mover_InterfaceAnalyzerMover_type",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "XML packstat而非CLI compute_packstat",
+        "interface/pack_input/pack_separated/scorefxn",
+        "XML resfile为布尔值、不是路径",
+        "interface_sc/tracer/scorefile_reporting_prefix"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "relax_tutorial",
+      "title": "Relax Tutorial",
+      "url": "https://docs.rosettacommons.org/demos/latest/tutorials/Relax_Tutorial/Relax",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "repeats与nstruct不同",
+        "局部优化及输出解释"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "scoring_tutorial",
+      "title": "Scoring Tutorial",
+      "url": "https://docs.rosettacommons.org/demos/latest/tutorials/scoring/scoring",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "Rosetta评分函数与REU",
+        "能量项权重、体系及版本影响可比性"
+      ],
+      "version_caveat": "latest文档可能随时间变化；必须以安装版本schema/help为准。"
+    },
+    {
+      "id": "full_options_2021",
+      "title": "Archived full options list (2021.07.61567)",
+      "url": "https://docs.rosettacommons.org/manuals/archive/rosetta_2021.07.61567_user_guide/all_else/d5/d10/full_options_list.html",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "renumber_pdb与per_chain_renumbering的输出编号语义；不是当前版本默认值依据"
+      ],
+      "version_caveat": "归档/固定commit来源，不能将其默认值直接当作其他版本默认值。"
+    },
+    {
+      "id": "parser_options_2023",
+      "title": "Archived parser options (2023.10.341)",
+      "url": "https://docs.rosettacommons.org/manuals/archive/rosetta_2023.10.341_user_guide/all_else/d0/dd5/namespaceparser.html",
+      "publisher": "RosettaCommons",
+      "type": "official_documentation",
+      "accessed": "2026-09-14",
+      "supports": [
+        "script_vars为StringVector",
+        "validate_and_exit为schema/解析验证而非科学验证"
+      ],
+      "version_caveat": "归档/固定commit来源，不能将其默认值直接当作其他版本默认值。"
+    },
+    {
+      "id": "pinned_options",
+      "title": "Rosetta options source at catalog-pinned commit",
+      "url": "https://github.com/RosettaCommons/rosetta/blob/bbb6a2d27c70be05b2fb2409f3920b5894967d60/source/src/basic/options/options_rosetta.py",
+      "publisher": "RosettaCommons",
+      "type": "official_source_code",
+      "accessed": "2026-09-14",
+      "supports": [
+        "relax:ramp_constraints默认false",
+        "ddg:legacy默认true",
+        "ddg:bbnbrs正式键名",
+        "relax:default_repeats默认5且自定义script可覆盖",
+        "fa_max_dis默认6",
+        "script_vars/packing:repack_only/beta类型与语义"
+      ],
+      "version_caveat": "归档/固定commit来源，不能将其默认值直接当作其他版本默认值。"
+    },
+    {
+      "id": "pinned_fast_relax",
+      "title": "FastRelax.cc at catalog-pinned commit",
+      "url": "https://github.com/RosettaCommons/rosetta/blob/bbb6a2d27c70be05b2fb2409f3920b5894967d60/source/src/protocols/relax/FastRelax.cc",
+      "publisher": "RosettaCommons",
+      "type": "official_source_code",
+      "accessed": "2026-09-14",
+      "supports": [
+        "直接getOption读取disable_design/repeats/cartesian/ramp_down_constraints",
+        "repeats回退relax:default_repeats"
+      ],
+      "version_caveat": "归档/固定commit来源，不能将其默认值直接当作其他版本默认值。"
+    }
+  ],
+  "local_execution_validation_required": [
+    "实际安装的各executable -help",
+    "生成XML的安装版本schema检查",
+    "最小有效输入运行及scorefile非占位输出验证",
+    "链映射、非标准残基处理、输出序列和可动范围验证"
+  ],
+  "scientific_boundaries": [
+    "常规Rosetta能量记REU，不自动转换kcal/mol或Kd。",
+    "InterfaceAnalyzer工作模式为PPI，不提供通用蛋白–小分子评分。",
+    "cartesian_ddg推荐模式为折叠稳定性，不能命名为已验证的结合ΔΔG。",
+    "Relax/对接不是物理时间MD。",
+    "XML FastRelax必须另行正确配置坐标约束，不能依赖standalone Relax包装flags。"
+  ]
+}

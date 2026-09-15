@@ -1,0 +1,2047 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "Rosetta",
+  "slug": "rosetta",
+  "summary": "评分、Relax、界面分析、对接与稳定性 ΔΔG；不是时间分辨的分子动力学。新版 2024.09-bda.1 使用明确的 7 模式与 45 参数。",
+  "sources": [
+    {
+      "id": "bda",
+      "scope": "本次实时 BDA 声明；不是上游功能或运行成功证明",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream",
+      "url": "https://docs.rosettacommons.org/docs/latest/",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "rosetta_options",
+      "url": "https://docs.rosettacommons.org/docs/latest/full-options-list",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "workbench",
+      "path": "qm-scripts/plugins/rosetta/options.json",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runner",
+      "path": "qm-scripts/plugins/rosetta/runner.py",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "science",
+      "path": "docs/rosetta/SCIENTIFIC_MODES.md",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "score_jd2",
+      "title": "score_jd2",
+      "purpose": "单点评分：对输入结构评分，不进行 Relax，不等于界面结合能。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "score_jd2"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "relax",
+      "title": "relax",
+      "purpose": "FastRelax：侧链重排与局部最小化；不是纳秒分子动力学。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "relax"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "InterfaceAnalyzer",
+      "title": "InterfaceAnalyzer",
+      "purpose": "蛋白–蛋白界面分析：已有复合物的界面能、埋藏面积和氢键等。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "InterfaceAnalyzer"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "relax_interface",
+      "title": "relax_interface",
+      "purpose": "先用 relax 优化并保存坐标，再对每个优化后的复合物运行 InterfaceAnalyzer。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "relax_interface"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "docking_protocol",
+      "title": "docking_protocol",
+      "purpose": "RosettaDock：蛋白–蛋白刚体/侧链采样；需要已有组装与明确伙伴链。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "docking_protocol"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "cartesian_ddg",
+      "title": "cartesian_ddg",
+      "purpose": "Cartesian ΔΔG：匹配 WT/突变体的折叠稳定性分数差；不是结合 ΔΔG。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "cartesian_ddg"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    },
+    {
+      "id": "rosetta_scripts",
+      "title": "rosetta_scripts",
+      "purpose": "使用上传的 XML 协议；XML 的 mover/filter 参数与输出由该协议定义。",
+      "required_inputs": [
+        "structure: PDB；按模式额外提供 aux 文件"
+      ],
+      "parameters": {
+        "application": "rosetta_scripts"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "workbench"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "application",
+      "type": "string",
+      "description": "选择计算阶段；不同模式的分数不能混作同一种结合自由能。",
+      "unit": "无量纲",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "application"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "enum": [
+          "score_jd2",
+          "relax",
+          "InterfaceAnalyzer",
+          "relax_interface",
+          "docking_protocol",
+          "cartesian_ddg",
+          "rosetta_scripts"
+        ]
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": "score_jd2"
+    },
+    {
+      "key": "nstruct",
+      "type": "integer",
+      "description": "每个输入、每个独立重复生成的 decoy 数；cartesian_ddg 使用 ddg_iterations，不使用本参数。",
+      "unit": "个",
+      "flag_or_mapping": "-nstruct",
+      "bda_keys": [
+        "nstruct"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 10000
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 1
+    },
+    {
+      "key": "replicates",
+      "type": "integer",
+      "description": "分别启动进程并使用不同随机种子；各重复保留原始结果，不只保存最优值。",
+      "unit": "次",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "replicates"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 100
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 1
+    },
+    {
+      "key": "seed",
+      "type": "integer",
+      "description": "启用 constant_seed；每个输入/重复的种子递增。固定种子利于复现，不证明采样收敛。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-run:constant_seed / -run:jran",
+      "bda_keys": [
+        "seed"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 2000000000
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 111111
+    },
+    {
+      "key": "score_weights",
+      "type": "string",
+      "description": "所有比较对象使用同一权重。Cartesian 模式必须选择 *_cart；REU 不能直接当 kcal/mol。",
+      "unit": "Rosetta 权重集",
+      "flag_or_mapping": "-score:weights",
+      "bda_keys": [
+        "score_weights"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "enum": [
+          "ref2015",
+          "ref2015_cart",
+          "beta_nov16",
+          "beta_nov16_cart"
+        ]
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": "ref2015"
+    },
+    {
+      "key": "out_scorefile",
+      "type": "string",
+      "description": "各输入/重复独立目录内的 .sc 文件名；不接受目录或路径穿越。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-out:file:scorefile",
+      "bda_keys": [
+        "out_scorefile"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*\\.sc$"
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": "score.sc"
+    },
+    {
+      "key": "ex1",
+      "type": "boolean",
+      "description": "扩大侧链 χ1 rotamer 采样；增加打包计算量，不是独立结构重复。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ex1",
+      "bda_keys": [
+        "ex1"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "ex2",
+      "type": "boolean",
+      "description": "扩大侧链 χ2 rotamer 采样；仅在协议实际执行 packing 时影响采样。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ex2",
+      "bda_keys": [
+        "ex2"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "use_input_sc",
+      "type": "boolean",
+      "description": "将输入侧链构象纳入 packing rotamer 候选集合。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-use_input_sc",
+      "bda_keys": [
+        "use_input_sc"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "ignore_unrecognized_res",
+      "type": "boolean",
+      "description": "默认关闭。开启可能删除糖基、配体或特殊残基，改变体系；须检查运行日志和保存结构。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ignore_unrecognized_res",
+      "bda_keys": [
+        "ignore_unrecognized_res"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "extra_res_fa",
+      "type": "string",
+      "description": "aux 端口下的 .params 相对文件名；为非标准残基提供全原子参数，不自动生成小分子参数。",
+      "unit": "文件",
+      "flag_or_mapping": "-in:file:extra_res_fa",
+      "bda_keys": [
+        "extra_res_fa"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "InterfaceAnalyzer",
+        "relax_interface",
+        "docking_protocol",
+        "cartesian_ddg",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "extra_res_cen",
+      "type": "string",
+      "description": "aux 端口下的 .params 文件；对接低分辨率阶段使用非标准残基时需匹配 centroid 参数。",
+      "unit": "文件",
+      "flag_or_mapping": "-in:file:extra_res_cen",
+      "bda_keys": [
+        "extra_res_cen"
+      ],
+      "modes": [
+        "docking_protocol",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "constraints_file",
+      "type": "string",
+      "description": "aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。",
+      "unit": "文件",
+      "flag_or_mapping": "-constraints:cst_fa_file",
+      "bda_keys": [
+        "constraints_file"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "relax_interface",
+        "docking_protocol",
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "constraint_weight",
+      "type": "number",
+      "description": "仅在提供 constraints_file 时传入；不等同于 Relax 自动坐标约束权重。",
+      "unit": "权重",
+      "flag_or_mapping": "-constraints:cst_fa_weight",
+      "bda_keys": [
+        "constraint_weight"
+      ],
+      "modes": [
+        "score_jd2",
+        "relax",
+        "relax_interface",
+        "docking_protocol",
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "minimum": 0,
+        "maximum": 1000
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 1.0
+    },
+    {
+      "key": "pack_input",
+      "type": "boolean",
+      "description": "分析前是否对输入界面进行侧链 packing；这是评分内部分支，不会覆盖保存的 Relax 坐标。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-pack_input",
+      "bda_keys": [
+        "pack_input"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "pack_separated",
+      "type": "boolean",
+      "description": "计算 dG_separated 时，是否重排分離伙伴暴露界面的侧链。与 pack_input 分开控制。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-pack_separated",
+      "bda_keys": [
+        "pack_separated"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "compute_packstat",
+      "type": "boolean",
+      "description": "启用有随机成分的 packstat；大界面可能较慢。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-compute_packstat",
+      "bda_keys": [
+        "compute_packstat"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "interface",
+      "type": "string",
+      "description": "必填，例如 AB_C 表示受体 A/B 与蛋白 C；天然双链配体可为 AB_CD。使用输入文件实际链标识，不能混淆 mmCIF label/auth ID。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-interface",
+      "bda_keys": [
+        "interface"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$"
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "packstat_oversample",
+      "type": "integer",
+      "description": "仅 compute_packstat=true 时生效；增加采样以降低随机波动。",
+      "unit": "倍",
+      "flag_or_mapping": "-packstat:oversample",
+      "bda_keys": [
+        "packstat_oversample"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 100
+    },
+    {
+      "key": "relax_repeats",
+      "type": "integer",
+      "description": "一个 FastRelax 轨迹内的打包/最小化循环；不同于 nstruct 和独立重复。",
+      "unit": "次",
+      "flag_or_mapping": "-relax:default_repeats",
+      "bda_keys": [
+        "relax_repeats"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 50
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 5
+    },
+    {
+      "key": "relax_cartesian",
+      "type": "boolean",
+      "description": "使用笛卡尔坐标最小化；必须选 ref2015_cart 或 beta_nov16_cart。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-relax:cartesian",
+      "bda_keys": [
+        "relax_cartesian"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "constrain_start",
+      "type": "boolean",
+      "description": "由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-relax:constrain_relax_to_start_coords",
+      "bda_keys": [
+        "constrain_start"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "ramp_constraints",
+      "type": "boolean",
+      "description": "配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-relax:ramp_constraints",
+      "bda_keys": [
+        "ramp_constraints"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "movemap_file",
+      "type": "string",
+      "description": "aux 端口下的 MoveMap 文件，控制骨架/侧链/jump 可动性。默认未提供时沿用该 relax 构建的自由度；不是受体自动固定。",
+      "unit": "文件",
+      "flag_or_mapping": "-in:file:movemap",
+      "bda_keys": [
+        "movemap_file"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "relax_script",
+      "type": "string",
+      "description": "aux 端口下的 Relax script；覆盖内部优化流程，需与 repeats/约束策略一起审阅。",
+      "unit": "文件",
+      "flag_or_mapping": "-relax:script",
+      "bda_keys": [
+        "relax_script"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "dock_partners",
+      "type": "string",
+      "description": "必填，例如 AB_C。对接分组与界面分析分组语法类似，但这是 docking:partners。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-docking:partners",
+      "bda_keys": [
+        "dock_partners"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {
+        "pattern": "^$|^[A-Za-z0-9]+_[A-Za-z0-9]+$"
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "dock_search",
+      "type": "string",
+      "description": "local 从现有姿态附近扰动；global 随机化两个伙伴取向，须充分采样；都不是物理 MD。",
+      "unit": "无量纲",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "dock_search"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {
+        "enum": [
+          "local",
+          "global"
+        ]
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": "local"
+    },
+    {
+      "key": "dock_translation",
+      "type": "number",
+      "description": "local 模式 dock_pert 的平移幅度；不能据此推导结合距离或动力学。",
+      "unit": "Å",
+      "flag_or_mapping": "-docking:dock_pert [translation rotation]",
+      "bda_keys": [
+        "dock_translation"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {
+        "minimum": 0,
+        "maximum": 100
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 3.0
+    },
+    {
+      "key": "dock_rotation",
+      "type": "number",
+      "description": "local 模式 dock_pert 的旋转幅度。",
+      "unit": "度",
+      "flag_or_mapping": "-docking:dock_pert [translation rotation]",
+      "bda_keys": [
+        "dock_rotation"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {
+        "minimum": 0,
+        "maximum": 180
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 8.0
+    },
+    {
+      "key": "dock_local_refine",
+      "type": "boolean",
+      "description": "跳过低分辨率搜索，用于已有可信近邻姿态；不能与 global 搜索组合。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-docking:docking_local_refine",
+      "bda_keys": [
+        "dock_local_refine"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "native_file",
+      "type": "string",
+      "description": "aux 中用于对接 RMSD 的参考结构，不自动作为位置约束；必须具有匹配的链/残基映射。",
+      "unit": "文件",
+      "flag_or_mapping": "-in:file:native",
+      "bda_keys": [
+        "native_file"
+      ],
+      "modes": [
+        "docking_protocol"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "ddg_mut_file",
+      "type": "string",
+      "description": "cartesian_ddg 必填的 aux mut_file。使用 Rosetta pose 编号；需要 WT 与突变定义校验，不能用 PDB 编号直接替代。",
+      "unit": "文件",
+      "flag_or_mapping": "-ddg:mut_file",
+      "bda_keys": [
+        "ddg_mut_file"
+      ],
+      "modes": [
+        "cartesian_ddg"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "ddg_iterations",
+      "type": "integer",
+      "description": "每个突变定义的采样次数，不是 nstruct；输出的是协议相关折叠稳定性差分。",
+      "unit": "次",
+      "flag_or_mapping": "-ddg:iterations",
+      "bda_keys": [
+        "ddg_iterations"
+      ],
+      "modes": [
+        "cartesian_ddg"
+      ],
+      "constraints": {
+        "minimum": 1,
+        "maximum": 100
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 3
+    },
+    {
+      "key": "ddg_cartesian",
+      "type": "boolean",
+      "description": "本插件只支持 Cartesian 协议，必须保持 true。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ddg:cartesian",
+      "bda_keys": [
+        "ddg_cartesian"
+      ],
+      "modes": [
+        "cartesian_ddg"
+      ],
+      "constraints": {
+        "enum": [
+          true
+        ]
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "ddg_bb_neighbors",
+      "type": "integer",
+      "description": "围绕突变位置允许处理的序列邻居范围；不是空间半径。",
+      "unit": "残基数",
+      "flag_or_mapping": "-ddg:bbnbrs",
+      "bda_keys": [
+        "ddg_bb_neighbors"
+      ],
+      "modes": [
+        "cartesian_ddg"
+      ],
+      "constraints": {
+        "minimum": 0,
+        "maximum": 10
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 1
+    },
+    {
+      "key": "ddg_dump_pdbs",
+      "type": "boolean",
+      "description": "保存 WT/突变模型供原子级核查；关闭则仅保存原始分数与日志。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-ddg:dump_pdbs",
+      "bda_keys": [
+        "ddg_dump_pdbs"
+      ],
+      "modes": [
+        "cartesian_ddg"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "fa_max_dis",
+      "type": "number",
+      "description": "Cartesian DDG 推荐协议的相互作用截断；须与 WT 预先 Cartesian Relax 的设置一致。",
+      "unit": "Å",
+      "flag_or_mapping": "-fa_max_dis",
+      "bda_keys": [
+        "fa_max_dis"
+      ],
+      "modes": [
+        "relax",
+        "relax_interface",
+        "InterfaceAnalyzer",
+        "cartesian_ddg"
+      ],
+      "constraints": {
+        "minimum": 3,
+        "maximum": 20
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 9.0
+    },
+    {
+      "key": "parser_protocol",
+      "type": "string",
+      "description": "rosetta_scripts 必填，aux 下的 XML 文件。平台不会猜测 XML 的科学阶段；生成时验证 XML 可解析，完整 schema 由实际 Rosetta 构建验证。",
+      "unit": "文件",
+      "flag_or_mapping": "-parser:protocol",
+      "bda_keys": [
+        "parser_protocol"
+      ],
+      "modes": [
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "parser_script_vars",
+      "type": "string",
+      "description": "空白分隔的 name=value；作为独立 argv 值传入，不运行 shell。所有变量名必须在 XML 的 %%name%% 中出现，所有占位符必须有值。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-parser:script_vars",
+      "bda_keys": [
+        "parser_script_vars"
+      ],
+      "modes": [
+        "rosetta_scripts"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "xml_expected_output",
+      "type": "string",
+      "description": "score 要求至少 nstruct 个有效 SCORE 行；structure 还要求对应数量 PDB。自定义协议的完整科学输出仍由协议作者解释。",
+      "unit": "无量纲",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "xml_expected_output"
+      ],
+      "modes": [
+        "rosetta_scripts"
+      ],
+      "constraints": {
+        "enum": [
+          "score",
+          "structure"
+        ]
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": "score"
+    },
+    {
+      "key": "geometry_contacts",
+      "type": "boolean",
+      "description": "从同一被评分的复合物坐标提取重原子接触和逐残基对最短距离；内部 packing 的临时姿态不在此几何文件中。",
+      "unit": "无量纲",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "geometry_contacts"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "contact_cutoff",
+      "type": "number",
+      "description": "输出此半径内的全部跨界面重原子对及其距离；没有接触不等于证明不结合。",
+      "unit": "Å",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "contact_cutoff"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {
+        "minimum": 2,
+        "maximum": 10
+      },
+      "source_refs": [
+        "workbench"
+      ],
+      "default": 4.5
+    },
+    {
+      "key": "receptor_axis",
+      "type": "string",
+      "description": "可选，两枚 CA 的 chain:residue 标识，逗号分隔，如 A:10,A:100；方向从第一个指向第二个。须与 binder_axis 一起提供。",
+      "unit": "PDB链:残基编号",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "receptor_axis"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "binder_axis",
+      "type": "string",
+      "description": "可选，两枚 CA 标识，如 C:1,C:50。报告此有向轴与受体轴的夹角；不是未经定义的“整体结合角”。",
+      "unit": "PDB链:残基编号",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "binder_axis"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "geometry_reference_file",
+      "type": "string",
+      "description": "可选，aux 下同链分组的参考 PDB；计算其接触、质心距离与相同锚点定义夹角供比较。参考应记录是实验复合物还是对接假说；不同支架的接触编号不能直接当同源位点。",
+      "unit": "文件",
+      "flag_or_mapping": "BDA 控制参数，不直接作为 Rosetta flag",
+      "bda_keys": [
+        "geometry_reference_file"
+      ],
+      "modes": [
+        "InterfaceAnalyzer",
+        "relax_interface"
+      ],
+      "constraints": {},
+      "source_refs": [
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "s",
+      "type": "artifact_ref",
+      "description": "Rosetta 输入 PDB 路径；BDA 新版由 structure 端口 staging 决定，不能沿用本机绝对路径。",
+      "unit": "无量纲",
+      "flag_or_mapping": "s",
+      "bda_keys": [
+        "s"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "parser:protocol",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。rosetta_scripts 必填，aux 下的 XML 文件。平台不会猜测 XML 的科学阶段；生成时验证 XML 可解析，完整 schema 由实际 Rosetta 构建验证。 新版对应键：parser_protocol。",
+      "unit": "无量纲",
+      "flag_or_mapping": "parser:protocol",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "parser:script_vars",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。空白分隔的 name=value；作为独立 argv 值传入，不运行 shell。所有变量名必须在 XML 的 %%name%% 中出现，所有占位符必须有值。 新版对应键：parser_script_vars。",
+      "unit": "无量纲",
+      "flag_or_mapping": "parser:script_vars",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "score:weights",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。所有比较对象使用同一权重。Cartesian 模式必须选择 *_cart；REU 不能直接当 kcal/mol。 新版对应键：score_weights。",
+      "unit": "无量纲",
+      "flag_or_mapping": "score:weights",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": "ref2015"
+    },
+    {
+      "key": "resfile",
+      "type": "artifact_ref",
+      "description": "控制各残基允许氨基酸/重排策略的 Rosetta resfile；只有协议读取时生效，新插件不以通用 resfile 表单承诺任意设计。",
+      "unit": "无量纲",
+      "flag_or_mapping": "resfile",
+      "bda_keys": [
+        "resfile"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "constraints:cst_fa_file",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。 新版对应键：constraints_file。",
+      "unit": "无量纲",
+      "flag_or_mapping": "constraints:cst_fa_file",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "out:path:all",
+      "type": "string",
+      "description": "Rosetta 全部输出的目录；新版按输入/重复隔离生成，禁止不同任务共用目录。",
+      "unit": "无量纲",
+      "flag_or_mapping": "out:path:all",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": "output"
+    },
+    {
+      "key": "out:file:scorefile",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。各输入/重复独立目录内的 .sc 文件名；不接受目录或路径穿越。 新版对应键：out_scorefile。",
+      "unit": "无量纲",
+      "flag_or_mapping": "out:file:scorefile",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": "score.sc"
+    },
+    {
+      "key": "out:suffix",
+      "type": "string",
+      "description": "输出结构和 tag 后缀，用于区分样本；不改变氨基酸序列。",
+      "unit": "无量纲",
+      "flag_or_mapping": "out:suffix",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "beta",
+      "type": "boolean",
+      "description": "使用 beta 权重相关设置的旧开关；不可与显式 score:weights 混用推断最终权重，需看 scorefile。",
+      "unit": "无量纲",
+      "flag_or_mapping": "beta",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "overwrite",
+      "type": "boolean",
+      "description": "允许覆盖既有 Rosetta 输出文件；复现实验应使用新任务目录避免覆盖证据。",
+      "unit": "无量纲",
+      "flag_or_mapping": "overwrite",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "renumber_pdb",
+      "type": "boolean",
+      "description": "写 PDB 时重新编号残基，改变编号映射而不是序列；与输入和参考比较前保留映射。",
+      "unit": "无量纲",
+      "flag_or_mapping": "renumber_pdb",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "per_chain_renumbering",
+      "type": "boolean",
+      "description": "各链独立开始 PDB 残基编号；只有结合实际输出编号选项才有意义。",
+      "unit": "无量纲",
+      "flag_or_mapping": "per_chain_renumbering",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "constant_seed",
+      "type": "boolean",
+      "description": "启用固定随机种子以便复现，需同时记录 jran；新版统一由 seed 控制。",
+      "unit": "无量纲",
+      "flag_or_mapping": "constant_seed",
+      "bda_keys": [
+        "constant_seed"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "jran",
+      "type": "integer",
+      "description": "固定伪随机种子值；新版为每输入和独立重复生成不同 seed。",
+      "unit": "无量纲",
+      "flag_or_mapping": "jran",
+      "bda_keys": [
+        "jran"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": 1111111
+    },
+    {
+      "key": "relax:constrain_relax_to_start_coords",
+      "type": "boolean",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。 新版对应键：constrain_start。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax:constrain_relax_to_start_coords",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "relax:ramp_constraints",
+      "type": "boolean",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。 新版对应键：ramp_constraints。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax:ramp_constraints",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "relax:script",
+      "type": "string",
+      "description": "选择或给出 Relax 步骤脚本；不同脚本改变重排/最小化流程和约束方案。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax:script",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "relax:default_repeats",
+      "type": "integer",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。一个 FastRelax 轨迹内的打包/最小化循环；不同于 nstruct 和独立重复。 新版对应键：relax_repeats。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax:default_repeats",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "packing:repack_only",
+      "type": "boolean",
+      "description": "限制为侧链重排而不更改序列身份；需协议真的执行 packing，不能仅设置字段宣称生效。",
+      "unit": "无量纲",
+      "flag_or_mapping": "packing:repack_only",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "mute",
+      "type": "string",
+      "description": "关闭指定 Rosetta tracer 的日志；可能隐藏诊断信息，首轮验证不宜全静音。",
+      "unit": "无量纲",
+      "flag_or_mapping": "mute",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "unmute",
+      "type": "string",
+      "description": "启用指定 tracer 日志，用于检查协议阶段和参数读取。",
+      "unit": "无量纲",
+      "flag_or_mapping": "unmute",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "database",
+      "type": "string",
+      "description": "Rosetta 化学/打分数据库目录；需与可执行版本匹配，与搜索结构参考库不同。",
+      "unit": "无量纲",
+      "flag_or_mapping": "database",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "in:file:extra_res_fa",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。aux 端口下的 .params 相对文件名；为非标准残基提供全原子参数，不自动生成小分子参数。 新版对应键：extra_res_fa。",
+      "unit": "无量纲",
+      "flag_or_mapping": "in:file:extra_res_fa",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "ddg:iterations",
+      "type": "integer",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。每个突变定义的采样次数，不是 nstruct；输出的是协议相关折叠稳定性差分。 新版对应键：ddg_iterations。",
+      "unit": "无量纲",
+      "flag_or_mapping": "ddg:iterations",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "ddg:dump_pdbs",
+      "type": "boolean",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。保存 WT/突变模型供原子级核查；关闭则仅保存原始分数与日志。 新版对应键：ddg_dump_pdbs。",
+      "unit": "无量纲",
+      "flag_or_mapping": "ddg:dump_pdbs",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "ddg:cartesian",
+      "type": "boolean",
+      "description": "旧配置中的 Cartesian 开关；固定 cartesian_ddg 可执行程序及 *_cart 权重才是新版入口，不假设所有应用接受此键。",
+      "unit": "无量纲",
+      "flag_or_mapping": "ddg:cartesian",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:partners",
+      "type": "string",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。必填，例如 AB_C。对接分组与界面分析分组语法类似，但这是 docking:partners。 新版对应键：dock_partners。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:partners",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "docking_local_refine",
+      "type": "bool",
+      "description": "请求局部高分辨率对接 refinement；对应新版 dock_local_refine，仍需指定正确初始伙伴位置。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking_local_refine",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:randomize1",
+      "type": "bool",
+      "description": "全局初始对接随机化伙伴 1 的朝向；新版通过 dock_search 模式控制，不能当作MD。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:randomize1",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:randomize2",
+      "type": "bool",
+      "description": "全局初始对接随机化伙伴 2 的朝向；会改变初始位姿分布。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:randomize2",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:spin",
+      "type": "bool",
+      "description": "绕伙伴分离轴随机旋转对接伙伴的初始化设置，不能单独表示自由方向全局搜索。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:spin",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:dock_pert",
+      "type": "list",
+      "description": "刚体扰动幅度，通常由平移 Å 和旋转度数组成；新版拆为 dock_translation 和 dock_rotation。",
+      "unit": "[Å, 度]",
+      "flag_or_mapping": "docking:dock_pert",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "docking:docking_centroid_inner_cycles",
+      "type": "integer",
+      "description": "低分辨率 centroid 对接的内层采样次数；改变计算预算，非 MD 时间步。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:docking_centroid_inner_cycles",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "docking:sc_min",
+      "type": "bool",
+      "description": "启用对接侧链最小化；实际阶段取决于所用 docking 协议。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:sc_min",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:norepack1",
+      "type": "bool",
+      "description": "禁止伙伴组 1 的侧链 packing；不等于固定全部受体自由度，骨架/侧链最小化和刚体 jump 需独立控制。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:norepack1",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "docking:norepack2",
+      "type": "bool",
+      "description": "禁止伙伴组 2 的侧链重排，会改变界面采样自由度。",
+      "unit": "无量纲",
+      "flag_or_mapping": "docking:norepack2",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "in:file:native",
+      "type": "string",
+      "description": "用于比较的参考/native PDB；仅有文件不意味着自动计算所有 RMSD/接触或角度。",
+      "unit": "无量纲",
+      "flag_or_mapping": "in:file:native",
+      "bda_keys": [],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": null
+    },
+    {
+      "key": "relax_constrain_to_start_coords",
+      "type": "boolean",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。由 relax 可执行文件建立起始坐标约束，减少大幅漂移；不作为 XML FastRelax 的通用开关。 新版对应键：constrain_start。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax_constrain_to_start_coords",
+      "bda_keys": [
+        "relax_constrain_to_start_coords"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": true
+    },
+    {
+      "key": "relax_ramp_constraints",
+      "type": "boolean",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。配合 constrain_start。false 显式传给 Rosetta，在优化中保留约束；true 渐弱。 新版对应键：ramp_constraints。",
+      "unit": "无量纲",
+      "flag_or_mapping": "relax_ramp_constraints",
+      "bda_keys": [
+        "relax_ramp_constraints"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": false
+    },
+    {
+      "key": "cst_fa_file",
+      "type": "artifact_ref",
+      "description": "历史 CLI/表单键的语义对照，不是新版自动接受的别名；新版 normalize 会拒绝未声明旧键。aux 端口下的 Rosetta .cst 文件；其中残基编号须对应输入 pose。约束能改变评分，不能与无约束能量混排。 新版对应键：constraints_file。",
+      "unit": "无量纲",
+      "flag_or_mapping": "cst_fa_file",
+      "bda_keys": [
+        "cst_fa_file"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "out_suffix",
+      "type": "string",
+      "description": "输出结构和 tag 后缀，用于区分样本；不改变氨基酸序列。",
+      "unit": "无量纲",
+      "flag_or_mapping": "out_suffix",
+      "bda_keys": [
+        "out_suffix"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": ""
+    },
+    {
+      "key": "protocol",
+      "type": "string",
+      "description": "2026.06 占位表单的协议选择（interface_analyzer/fast_relax/relax_then_analyze）；命令仍读取 application，不消费本键。",
+      "unit": "无量纲",
+      "flag_or_mapping": "protocol",
+      "bda_keys": [
+        "protocol"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": "interface_analyzer"
+    },
+    {
+      "key": "score_function",
+      "type": "string",
+      "description": "2026.06 占位表单的权重选择；命令实际读取 score_weights，本键没有映射，不能认为选择已生效。",
+      "unit": "无量纲",
+      "flag_or_mapping": "score_function",
+      "bda_keys": [
+        "score_function"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": "beta_nov16"
+    },
+    {
+      "key": "compute_sap",
+      "type": "boolean",
+      "description": "2026.06 占位表单的 SAP 计算请求；未找到该命令对应计算步骤，不能宣称会生成 SAP。",
+      "unit": "无量纲",
+      "flag_or_mapping": "compute_sap",
+      "bda_keys": [
+        "compute_sap"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "rosetta_options",
+        "bda",
+        "workbench"
+      ],
+      "default": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "total_score",
+      "meaning": "所用权重下结构加权总能量",
+      "unit": "REU",
+      "interpretation": "只在同协议/权重/组成下比较",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "dG_separated",
+      "meaning": "InterfaceAnalyzer 的复合态与分离态能量差",
+      "unit": "REU",
+      "interpretation": "不是实验结合自由能或 Kd；分离态重排选项影响结果",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "dSASA_int",
+      "meaning": "复合形成埋藏的溶剂可及面积",
+      "unit": "Å²",
+      "interpretation": "界面大小指标，不能单独证明高亲和力",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "sc_value",
+      "meaning": "界面形状互补性",
+      "unit": "通常 0–1",
+      "interpretation": "结合其他指标与原始结构使用",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "hbonds_int",
+      "meaning": "按 Rosetta 几何/能量定义的跨界面氢键数",
+      "unit": "个",
+      "interpretation": "不是仅凭重原子距离定义的接触数",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "delta_unsatHbonds",
+      "meaning": "结合后埋藏未满足极性原子的指标",
+      "unit": "计数",
+      "interpretation": "需注明协议和原子定义",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "derived stability ΔΔG（当前未自动汇总）",
+      "meaning": "配对 WT/MUT 稳定性分数的 MUT−WT 差值；本 runner 只保存原始 WT/MUT 记录，尚不自动生成该汇总",
+      "unit": "REU",
+      "interpretation": "需在相同协议下按明确重复聚合规则另行计算；正值通常更不利于稳定性，不是结合 ΔΔG",
+      "source_refs": [
+        "science"
+      ]
+    },
+    {
+      "name": "score.sc: 所有动态列",
+      "meaning": "完整保留 Rosetta 分数项、约束项、协议添加列和原始 tag",
+      "unit": "依项定义",
+      "interpretation": "自定义 XML 可新增列；未知列保留并标未解释，不自动纳入筛选",
+      "source_refs": [
+        "runner"
+      ]
+    },
+    {
+      "name": "contacts / minimum_distance_within_cutoff_angstrom",
+      "meaning": "阈值内重原子接触及这些接触中的最小距离；没有阈值内接触时最小距离为 null",
+      "unit": "Å / 个",
+      "interpretation": "不是无条件全局最近原子距离；接触也不是氢键定义",
+      "source_refs": [
+        "runner"
+      ]
+    },
+    {
+      "name": "anchored_angle_degrees",
+      "meaning": "由显式定义的 CA 轴锚点计算的方向角；未给锚点为 null",
+      "unit": "度",
+      "interpretation": "缺锚点时为缺失；与同一参考和映射比较",
+      "source_refs": [
+        "runner"
+      ]
+    },
+    {
+      "name": "run_manifest / run_plan / metrics",
+      "meaning": "实际 argv、种子、输入摘要、阶段目录、原始结果及汇总",
+      "unit": "JSON",
+      "interpretation": "具体文件名与字段以 runner 和七模式说明为准",
+      "source_refs": [
+        "runner"
+      ]
+    },
+    {
+      "name": "ddg-records.json / 原始 .ddg",
+      "meaning": "各 Round 的 WT/WT_ 和每个 MUT_ 标签原始有限分数；检查所有预期突变都出现",
+      "unit": "REU",
+      "interpretation": "原始记录，不是已聚合的 ΔΔG；保留原文件与突变编号映射",
+      "source_refs": [
+        "runner"
+      ]
+    },
+    {
+      "name": "centroid_distance_angstrom",
+      "meaning": "所选伙伴重原子几何中心间距离",
+      "unit": "Å",
+      "interpretation": "不是接触间距；与同一链选择和原子集比较",
+      "source_refs": [
+        "runner"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择本页明确版本和功能模式，按模式绑定输入，核对链号、序列和原子完整性。",
+    "输入参数后预览最终命令/生成配置；未映射字段不能视为生效，未接入模式需先补适配。",
+    "运行条件验证后检查全部原始输出、失败样本和缺失值；保存所用版本、配置、输入输出哈希。"
+  ],
+  "pitfalls": [],
+  "gaps": [
+    "2024.09-bda.1 声明/本地测试已通过，但真实 QM Rosetta 运行未验证。",
+    "2026.06 的 protocol/score_function/compute_sap 与旧命令存在映射缺口，不应作为可用增强版。",
+    "2024.09 旧声明与 library 的默认权重、ex1/ex2 等不一定相同，应查各版本默认表。",
+    "新 runner 在 root/bin 解析可执行文件，旧命令使用 root/source/bin；远端实际目录或站点 root 配置必须核验后再运行。",
+    "新插件只支持 PDB 入口；mmCIF 必须显式转换并保存链/编号映射。",
+    "Rosetta 任意 XML mover/filter 的参数集合不在本有限表中；使用自定义协议必须附 XML、所用组件参数定义及新增输出列说明。"
+  ]
+}

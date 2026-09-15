@@ -221,3 +221,118 @@ def test_draft_validation_rejects_unknown_nodes_and_citation_closure() -> None:
     )
     assert {issue["kind"] for issue in issues} == {"unknown_node", "unknown_reference"}
     assert coverage == 0.5
+
+
+# --- Druggability and trial-landscape sources --------------------------------
+
+
+def _tools(handler) -> EvidenceToolService:
+    return EvidenceToolService(client=httpx.Client(transport=httpx.MockTransport(handler)), max_retries=2)
+
+
+def test_the_open_targets_query_is_fixed_and_its_body_is_in_the_audit() -> None:
+    """For GraphQL the body is the question; an audit with only the URL records nothing."""
+    import json as _json
+
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(_json.loads(request.content))
+        return httpx.Response(200, json={"data": {"target": {"id": "ENSG00000188389"}}})
+
+    tools = _tools(handler)
+    result = tools.get_open_targets_druggability("ensg00000188389")
+
+    assert bodies[0]["variables"] == {"ensemblId": "ENSG00000188389"}
+    assert bodies[0]["query"] == EvidenceToolService.OPEN_TARGETS_DRUGGABILITY_QUERY
+    assert result.audit["query"]["body"] == bodies[0]
+    assert result.audit["status"] == "completed"
+    assert len(result.audit["response_checksum_sha256"]) == 64
+
+
+def test_a_graphql_error_is_a_failure_and_is_not_retried() -> None:
+    """GraphQL answers 200 with errors; saving that as evidence would record an empty report."""
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"errors": [{"message": "Cannot query field"}]})
+
+    tools = _tools(handler)
+    with pytest.raises(RuntimeError, match="open_targets.druggability_failed"):
+        tools.get_open_targets_druggability("ENSG00000188389")
+
+    assert calls == 1
+    assert tools.audits[-1]["status"] == "failed"
+    assert "graphql_error" in tools.audits[-1]["error"]
+
+
+def test_a_server_error_on_post_is_retried_then_recorded() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, json={"error": "busy"})
+
+    tools = _tools(handler)
+    with pytest.raises(RuntimeError):
+        tools.get_open_targets_druggability("ENSG00000188389")
+
+    assert calls == 3
+    assert tools.audits[-1]["attempts"] == 3
+
+
+def test_an_identifier_that_is_not_an_ensembl_gene_is_refused_before_any_call() -> None:
+    tools = _tools(lambda request: pytest.fail("no request should be made"))
+
+    with pytest.raises(ValueError, match="invalid_ensembl_gene_identifier"):
+        tools.get_open_targets_druggability("ENST00000334409")
+
+
+def test_trial_counts_are_filtered_server_side_by_phase_and_by_start_year() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"totalCount": 7})
+
+    tools = _tools(handler)
+    tools.count_clinical_trials("PD-1", phase="PHASE3")
+    tools.count_clinical_trials("PD-1", start_year=2023)
+
+    assert seen[0].url.params["filter.advanced"] == "AREA[Phase]PHASE3"
+    assert seen[0].url.params["pageSize"] == "1"
+    assert seen[1].url.params["filter.advanced"] == "AREA[StartDate]RANGE[2023-01-01,2023-12-31]"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error"),
+    [
+        ({"intervention": "PD-1", "phase": "PHASE9"}, "invalid_clinical_trials_phase"),
+        ({"intervention": "PD-1", "start_year": 1850}, "invalid_clinical_trials_year"),
+        ({"intervention": "   "}, "invalid_clinical_trials_query"),
+    ],
+)
+def test_malformed_trial_count_requests_are_refused(kwargs, error) -> None:
+    tools = _tools(lambda request: pytest.fail("no request should be made"))
+
+    with pytest.raises(ValueError, match=error):
+        tools.count_clinical_trials(**kwargs)
+
+
+def test_sponsor_pages_ask_only_for_sponsor_fields_and_validate_the_token() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"studies": [], "nextPageToken": None})
+
+    tools = _tools(handler)
+    tools.list_clinical_trial_sponsors("PD-1", page_token="NF0g5JKDlvQ")
+
+    assert seen[0].url.params["fields"] == "NCTId,LeadSponsorName,LeadSponsorClass"
+    assert seen[0].url.params["pageToken"] == "NF0g5JKDlvQ"
+    with pytest.raises(ValueError, match="invalid_clinical_trials_page_token"):
+        tools.list_clinical_trial_sponsors("PD-1", page_token="../../etc")

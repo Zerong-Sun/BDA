@@ -2,10 +2,12 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from ..core.config import get_settings
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
+from .epo_ops_client import credential_available
 from .models import (
     LiteratureClaim,
     LiteratureDocument,
@@ -63,10 +65,19 @@ def create_search(
     payload: LiteratureSearchCreate,
     user: User,
 ) -> LiteratureSearchRun:
+    if "epo_ops_patents" in payload.sources and not credential_available(get_settings().epo_ops_credential_ref):
+        # Refused before queueing: a run that can only fail is not a search.
+        raise DomainError(
+            "epo_ops_not_configured",
+            "EPO Open Patent Services is not configured on this server. Search Europe PMC's "
+            "patent index instead, or set BDA_V2_EPO_OPS_CREDENTIAL_REF.",
+            status_code=503,
+        )
     row = LiteratureSearchRun(
         project_id=project.id,
         query=payload.query,
         sources=list(payload.sources),
+        jurisdictions=list(payload.jurisdictions),
         requested_limit=payload.limit,
         fetch_full_text=payload.fetch_full_text,
         extract_claims=payload.extract_claims,

@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
@@ -15,7 +15,7 @@ from ..knowledge.models import KnowledgeEntry
 from ..literature.models import LiteratureDocument
 from ..projects.models import Project
 from ..targets.models import Target
-from .models import ResearchBrief, ResearchFinding
+from .models import PROGRESS_NOTE_STATUS, ResearchBrief, ResearchFinding
 from .schemas import (
     LocalizedResearchText,
     ResearchWorkspaceFinding,
@@ -42,6 +42,11 @@ KNOWLEDGE_TITLES = {
     "search_log": {"zh": "检索日志", "en": "Search Log", "default": "Search Log"},
     "field_dictionary": {"zh": "字段字典", "en": "Field Dictionary", "default": "Field Dictionary"},
     "ontology_relations": {"zh": "本体关系", "en": "Ontology Relations", "default": "Ontology Relations"},
+}
+CONFIRMED_REVIEW_STATUS = {
+    "accepted",
+    "human_directed_correction",
+    "human_directed_design_correction",
 }
 BOILERPLATE_FINDING_CONTENT = {
     "Treat the review as an operating contract: every downstream workflow choice should cite the application need, the target evidence, and the validation readout it is meant to improve.",
@@ -129,6 +134,26 @@ def _review_document(brief: ResearchBrief | None) -> ResearchWorkspaceReviewDocu
     )
 
 
+def _unconfirmed_last(item: ResearchWorkspaceFinding) -> int:
+    """Rank a review finding by whether a reviewer settled it.
+
+    Two tiers, not a graded scale, because two tiers is what these rows carry:
+    ``review_status`` is set on most findings that reach a review section, while
+    ``assertion_class`` is set on very few of them. Ordering by assertion class
+    (``established_fact`` / ``hypothesis`` / ...) was the first plan and is wrong here -
+    it would reorder almost nothing while implying every finding had been graded. That
+    vocabulary belongs to the evidence-relation rows, which do carry it and are already
+    filterable by it.
+
+    ``human_directed_correction`` ranks with ``accepted``: a correction a person directed
+    is settled, and sorting it below an untouched row would bury the row that supersedes
+    the others. Sorting is stable and the input arrives in ``created_at`` order, so
+    findings within one tier stay chronological.
+    """
+    status = _text((item.evidence or {}).get("review_status"))
+    return 0 if status in CONFIRMED_REVIEW_STATUS else 1
+
+
 def _review_sections(findings: list[ResearchFinding]) -> list[ResearchWorkspaceSection]:
     grouped: OrderedDict[str, list[ResearchWorkspaceFinding]] = OrderedDict()
     for row in findings:
@@ -140,7 +165,10 @@ def _review_sections(findings: list[ResearchFinding]) -> list[ResearchWorkspaceS
         if row.finding_type in {"evidence_entity", "evidence_statement"}:
             continue
         grouped.setdefault(row.finding_type, []).append(_workspace_finding(row))
-    return [ResearchWorkspaceSection(track=track, items=items) for track, items in grouped.items()]
+    return [
+        ResearchWorkspaceSection(track=track, items=sorted(items, key=_unconfirmed_last))
+        for track, items in grouped.items()
+    ]
 
 
 def _evidence_relationships(
@@ -460,10 +488,45 @@ def _knowledge(rows: list[KnowledgeEntry]) -> tuple[list[ResearchWorkspaceKnowle
     return methods, datasets
 
 
-def build_research_workspace(session: Session, project: Project) -> ResearchWorkspaceResponse:
-    brief = session.scalar(
-        select(ResearchBrief).where(ResearchBrief.project_id == project.id).order_by(ResearchBrief.created_at.desc())
+def preferred_review_brief(session: Session, project_id: uuid.UUID) -> ResearchBrief | None:
+    """The brief that is this project's review document.
+
+    Ordering by ``created_at`` alone answered "which brief is newest", which is not the
+    same question. Each automated progress round appends another ``draft`` brief, so the
+    newest brief is a status note of a few hundred characters, and it hid the
+    multi-thousand-character review a person had accepted. ``status`` already records
+    which brief is canonical; ``created_at`` only breaks ties within one status.
+
+    Only ``accepted`` is treated as canonical, and everything else falls back to newest.
+    ``reviewed`` deliberately gets no precedence. In practice it can mark the short
+    placeholder shells a project was seeded with, so ranking it above drafts replaces a
+    project's real note with a stub and shows less than before. ``accepted`` is the
+    terminal status, and it is the one a person has to set.
+
+    A project with nothing accepted still gets its newest brief, which is what it shows
+    today: this ordering can only promote an accepted review, never demote a project to
+    less than it already displayed.
+    """
+    return session.scalar(
+        select(ResearchBrief)
+        .where(ResearchBrief.project_id == project_id)
+        .order_by(
+            case(
+                (ResearchBrief.status == "accepted", 0),
+                (ResearchBrief.status == PROGRESS_NOTE_STATUS, 2),
+                else_=1,
+            ),
+            ResearchBrief.created_at.desc(),
+            # Two briefs can share a created_at - the PD-1 pair left by the 2026-09-07
+            # consolidation has byte-identical content - and without a total order the
+            # page would show either one from request to request.
+            ResearchBrief.id.desc(),
+        )
     )
+
+
+def build_research_workspace(session: Session, project: Project) -> ResearchWorkspaceResponse:
+    brief = preferred_review_brief(session, project.id)
     findings = list(
         session.scalars(
             select(ResearchFinding).where(ResearchFinding.project_id == project.id).order_by(ResearchFinding.created_at)

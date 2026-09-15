@@ -63,8 +63,8 @@ def test_agent_run_tools_are_never_offered_in_chat() -> None:
 def test_the_structure_and_diagnosis_tools_are_reachable_from_chat() -> None:
     """Named explicitly because their absence made two bots inert.
 
-    `structuralist` resolved its capabilities, passed the narrowing law and
-    appeared in the picker while having none of its tools; `medic` kept
+    `planner` resolved its capabilities, passed the narrowing law and
+    appeared in the picker while having none of its tools; `runner` kept
     `get_compute_status` and lost the tool that says *why* a job failed.
     """
     offered = _names()
@@ -131,10 +131,22 @@ def test_the_only_writes_outside_the_intent_gate_are_copilot_bookkeeping() -> No
     that reads the user's words has nothing to protect. Pinning the membership
     here makes adding a second exemption a deliberate edit with this test in
     front of it, rather than a default a new spec falls into.
+
+    The other two were added with that edit, and both write the same kind of
+    row. `request_decision` writes a question for a person to answer;
+    `request_residue_selection` writes one whose options are residue sets. In
+    both cases no research record moves - the timeline entry is written later by
+    `decisions.answer`, which requires a `User` and is unreachable from any tool
+    - and asking somebody a question is not an action taken on their behalf,
+    which is what the intent gate exists to stop.
+
+    Note what is *not* here: `propose_hotspot_set` writes a domain row and is
+    gated, even though the row it writes is inert until a person confirms it.
+    "Pending" is not the same as "changes nothing".
     """
     exempt = REGISTRY.write_ids() - REGISTRY.user_intent_write_ids()
 
-    assert exempt == {"post_handoff"}
+    assert exempt == {"post_handoff", "request_decision", "request_residue_selection"}
 
 
 def test_the_conservative_write_set_is_what_a_read_only_surface_gets() -> None:

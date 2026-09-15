@@ -50,7 +50,7 @@ def test_existing_feature_head_upgrades_and_downgrades(previous, monkeypatch):
         command.upgrade(config, "head")
         with Session(engine) as session:
             assert session.scalar(select(User.display_name).where(User.username == "migration-canary")) == "Keep this row"
-            assert session.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0064_public_integration"
+            assert session.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0069_patent_search_jurisdictions"
         assert {"workflow_results", "workflow_gate_evaluations"} <= set(inspect(engine).get_table_names())
         command.check(config)
         command.downgrade(config, "base")

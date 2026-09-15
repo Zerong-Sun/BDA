@@ -1,13 +1,13 @@
 """What a plugin declares it needs, against what the cluster will actually give it.
 
-`steward` is the review stance applied to resource declarations, and its charter
+`auditor`'s resource review is the review stance applied to resource declarations, and its charter
 names four things that must agree: the slot count, the per-host span, the thread
 count the tool will really start, and the GPU declaration. None of those were
 readable through any copilot tool - `get_compute_status` returns a draft's
 free-form specification, while the numbers that reach LSF come from the plugin
 registry row and from the queue chosen on the `bsub` command line. A charter
 instructing a comparison its operator cannot make is the same defect the roster
-already fixed once, in `archivist`.
+already fixed once, in `archivist` (now part of `analyst`).
 
 So this module reads the declaration the way the cluster does. It is deliberately
 the same knowledge `backend_v2/scripts/check_plugin_cpu_declarations.py` and
@@ -204,7 +204,7 @@ def review(
             for item in findings
         ],
         # Said explicitly rather than left as an empty list. A review that never
-        # approves is one that stops being read, and `steward`'s charter requires
+        # approves is one that stops being read, and `auditor`'s resource-review charter requires
         # it to say so when the declaration is sound.
         "verdict": (
             "violation"

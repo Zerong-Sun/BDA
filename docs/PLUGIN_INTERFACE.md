@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
+最后核验：2026-09-15（Asia/Shanghai；补充文档规范、当前 manifest 部署入口与运行证据边界）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -12,9 +12,15 @@
 
 How to make a new model or method runnable in the workbench.
 
-A plugin is a row in `model_plugins`. Registering one requires no backend code: the
+A plugin is a row in `model_plugins`. A declaration-driven model may require no new backend code when its command, adapters and parsers are already supported. The
 platform reads its declarations to validate parameters, wire workflow edges, render the
 submitted script, and interpret its outputs.
+
+## 0. Documentation and production deployment
+
+每个模型/方法插件及草稿必须遵循 [插件解释与使用规范](plugins/STANDARD.md)，提供 [全量插件手册](plugins/INDEX.md) 所列的模式、输入/派生/输出参数、版本映射与未解决缺口。界面存在字段、enabled 或旧 proven 标签不代表当前参数生效或已验证。
+
+For production deployments, select a checksum-addressed manifest from `GET /api/v2/registry/model-plugin-manifests` and deploy it through `POST /api/v2/registry/model-plugin-deployments` with its manifest ID, version, checksum and site overrides. Preserve immutable executable declarations; a documentation-only update does not replace the manifest or reset runtime evidence. See `backend_v2/scripts/deploy_rosetta_workbench.py` for a domain-service example. The mutable registration example below is a legacy/development contract, not the preferred production deployment path.
 
 ## 1. Declare the plugin
 
@@ -301,8 +307,17 @@ def parse(ctx: ParseContext) -> ParsedOutputs:
 ```
 
 Import it in `parsers/__init__.py` and set `"output_parser": "my_model"`.
+Forgetting the import is the quiet failure: the decorator never runs, the name
+resolves to `manifest_metadata`, and the plugin appears to work while reading
+nothing.
+
 `backend_v2/app/compute/parsers/proteinmpnn.py` is a worked example that reads
-ProteinMPNN's FASTA score headers.
+ProteinMPNN's FASTA score headers. `alphafold3.py` is the fuller one: it reads
+AF3's per-seed `*_summary_confidences.json`, keeps every seed as its own metric
+row rather than averaging them, skips the duplicate summary AF3 writes at the
+job root, and records the numbers as `assessor="independent_model"` because a
+predictor scoring somebody else's design is not that design model's own
+confidence.
 
 ## 5. Adding a compute backend
 

@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-13（Asia/Shanghai；本轮引入 stance 轴、交接通道与 conductor/auditor/steward）
+最后核验：2026-09-14（Asia/Shanghai；名册合并为 6 个 operator，stance 规则、复核与交接协议不变；steward 并入 auditor）
 
 权威范围：bot 的职责轴（stance）、决定权与拒绝的机械约束、bot 之间的交接协议与委派规则。
 
@@ -28,6 +28,20 @@ three properties of the code say so plainly:
 
 Nine names, one responsibility structure: *the assistant, holding a smaller
 toolbox this turn*.
+
+## Consolidation to six operators (2026-09-14)
+
+The stance axis fixed the missing relationships, but the roster still split
+producers along tool boundaries: nine producers for what a person experiences
+as four pieces of work. The roster is now `conductor` (direct), `researcher`,
+`planner`, `runner`, `analyst` (produce) and `auditor` (review). Everything this
+document requires still holds and is still enforced at import: three stances,
+no writes outside producers, every producer reviewed, review and delegation
+terminating on producers, one owner per guided recipe. `steward`'s resource
+review is part of `auditor`, which already held `review-audit`. Retired ids and
+how their history is read are described in the
+[roster](COPILOT_BOT_ROSTER.md#the-chain-and-its-six-operators); sections below
+that name retired operators record how the design arrived here.
 
 ## What a capability list cannot say
 
@@ -153,7 +167,7 @@ Capabilities: `project-read`, `research-read`, `chain-orchestration`,
   `target.capabilities ∩ project.enabled_skills`: the project's bound, not the
   director's. `spawn_subagent` intersects against the parent because a subagent
   is the same operator splitting its own work; doing that here would strip each
-  operator's defining tool — a delegated `librarian` would lose
+  operator's defining tool — a delegated `researcher` would lose
   `start_literature_search` — and produce a child indistinguishable from one
   that failed.
 
@@ -193,7 +207,7 @@ or `outside_charter` — the last meaning the operator did something its own
 charter forbids, which is the check nothing performed before. It cannot fix
 what it finds; it posts the verdict back to the operator that made the claim.
 
-### `steward` — 资源守门 (stance: `review`)
+### `steward` — 资源守门 (stance: `review`; merged into `auditor` on 2026-09-14)
 
 Capabilities: `project-read`, `review-audit`, `chain-messaging`. Zero writes.
 

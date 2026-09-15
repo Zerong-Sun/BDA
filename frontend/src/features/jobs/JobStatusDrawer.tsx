@@ -1,5 +1,5 @@
 import { ModelResultGuide } from '../results/ModelResultGuide'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowsClockwise, Download, StopCircle, Terminal } from '@phosphor-icons/react'
 import { cancelJob, getJobLogs, listWorkflowJobs, retryJob, syncJobResult } from '../../lib/api/jobs'
@@ -38,11 +38,19 @@ interface JobStatusDrawerProps {
   readOnly?: boolean
 }
 
+/** How often to ask when nothing is streaming, and when something is. */
+const POLL_WHILE_BLIND_MS = 3000
+const POLL_BEHIND_STREAM_MS = 15_000
+
 export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeId }: JobStatusDrawerProps) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const queryClient = useQueryClient()
   const showToast = useToastStore((s) => s.show)
   const { t, format } = useI18n()
+  // The timer reads this rather than the flag directly: the queries below are
+  // declared before the stream they depend on, and a poll is a floor whose
+  // exact period nobody is waiting on - an effect updates it in time.
+  const pollMs = useRef(POLL_WHILE_BLIND_MS)
 
   const { data: jobs = [] } = useQuery({
     queryKey: ['workflow-jobs', workflowRunId],
@@ -53,7 +61,7 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
       // Anything not terminal is still moving. The previous list named 'staging' and
       // 'collecting_outputs', which no longer exist, and omitted 'pending', 'dispatching'
       // and 'collecting' - so the list stopped refreshing exactly while work was starting.
-      return data.some((job) => isCancellableJob(job.status)) ? 3000 : false
+      return data.some((job) => isCancellableJob(job.status)) ? pollMs.current : false
     },
   })
 
@@ -64,15 +72,25 @@ export function JobStatusDrawer({ workflowRunId, readOnly = false, selectedNodeI
 
   const selectedJob = visibleJobs.find((job) => job.id === selectedJobId) ?? null
 
-  // The job's own event stream, which nothing consumed until now. Polling below is
-  // still the floor; this only shortens the gap between a state change and seeing it.
-  useJobEventStream(selectedJob && isCancellableJob(selectedJob.status) ? selectedJob.id : null, workflowRunId)
+  // Every job that is still moving, not only the one on screen: a run's other
+  // stages change the canvas and the list too, and watching one of eight left
+  // the rest on the timer. Polling below is still the floor.
+  const liveJobIds = useMemo(
+    () => jobs.filter((job) => isCancellableJob(job.status)).map((job) => job.id),
+    [jobs],
+  )
+  const streaming = useJobEventStream(liveJobIds, workflowRunId)
+  useEffect(() => {
+    pollMs.current = streaming ? POLL_BEHIND_STREAM_MS : POLL_WHILE_BLIND_MS
+  }, [streaming])
 
   const { data: logPayload } = useQuery({
     queryKey: ['job-logs', selectedJob?.id],
     queryFn: () => getJobLogs(selectedJob!.id),
     enabled: Boolean(selectedJob?.id),
-    refetchInterval: selectedJob && isCancellableJob(selectedJob.status) ? 3000 : false,
+    // A callback, like the jobs query's: the period is read when the timer is
+    // scheduled, not during render.
+    refetchInterval: () => (selectedJob && isCancellableJob(selectedJob.status) ? pollMs.current : false),
   })
 
   const cancel = useMutation({

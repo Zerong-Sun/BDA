@@ -1,0 +1,374 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "Foldseek",
+  "slug": "foldseek",
+  "summary": "结构数据库搜索；命中和结构相似性需与比对模式、覆盖率和数据库版本一起解释。",
+  "sources": [
+    {
+      "id": "bda",
+      "scope": "本次实时 BDA 声明；不是上游功能或运行成功证明",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream",
+      "url": "https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/README.md",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15",
+      "commit": "e1a766e82d6e3049471fcbd647852f162960a182"
+    },
+    {
+      "id": "convertalis",
+      "url": "https://github.com/steineggerlab/foldseek/blob/e1a766e82d6e3049471fcbd647852f162960a182/src/strucclustutils/structureconvertalis.cpp",
+      "commit": "e1a766e82d6e3049471fcbd647852f162960a182",
+      "scope": "alntmscore 实际归一化实现",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "search",
+      "title": "easy-search",
+      "purpose": "一批结构对参考数据库搜索",
+      "required_inputs": [
+        "structures: PDB/mmCIF",
+        "reference_db: 完整 Foldseek 数据库前缀及伴随文件"
+      ],
+      "parameters": {
+        "alignment_type": 2,
+        "evalue": 0.001
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "tmalign",
+      "title": "TMalign 重比对",
+      "purpose": "全局 TM 比对已预筛命中",
+      "required_inputs": [
+        "查询结构",
+        "完整参考数据库"
+      ],
+      "parameters": {
+        "alignment_type": 1
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "输出 evalue 列在该模式不再是统计 E-value；当前预筛设置可能遗漏远缘结构"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "createdb",
+      "title": "createdb",
+      "purpose": "从结构集构建可重用数据库",
+      "required_inputs": [
+        "结构文件集合"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "cluster",
+      "title": "easy-cluster",
+      "purpose": "结构聚类与代表结构输出",
+      "required_inputs": [
+        "结构集合"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "multimer",
+      "title": "多链结构搜索/聚类",
+      "purpose": "上游 easy-multimersearch / easy-multimercluster",
+      "required_inputs": [
+        "多链结构和对应数据库"
+      ],
+      "parameters": {},
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "format_output",
+      "type": "string",
+      "description": "逗号分隔输出列及顺序；解析器需与列设置一致；自定义字段需补定义。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--format-output",
+      "bda_keys": [
+        "format_output"
+      ],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": "query,target,fident,alntmscore,evalue,prob"
+    },
+    {
+      "key": "evalue",
+      "type": "number",
+      "description": "在默认 3Di+AA 模式下报告命中的 E-value 上限；不是结合置信度。alignment-type=1 时输出 evalue 列改作两种长度 TM-score 的平均，不能沿用统计 E-value 解释。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-e",
+      "bda_keys": [
+        "evalue"
+      ],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": 0.001
+    },
+    {
+      "key": "alignment_type",
+      "type": "integer",
+      "description": "结构比对算法：0 为 3Di 局部，1 为全局 TMalign，2 为 3Di+AA 局部；当前上游还列 3 LoLalign，部署版本支持情况待核验。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--alignment-type",
+      "bda_keys": [
+        "alignment_type"
+      ],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": 2
+    },
+    {
+      "key": "max_seqs",
+      "type": "integer",
+      "description": "送入精细比对的预筛候选数量上限；不是保证返回的最终命中条数。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--max-seqs",
+      "bda_keys": [
+        "max_seqs"
+      ],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": 1000
+    },
+    {
+      "key": "threads",
+      "type": "integer",
+      "description": "并行 CPU 线程数，由 BDA_CPUS 生成，应与申请的 CPU 一致。",
+      "unit": "个",
+      "flag_or_mapping": "--threads",
+      "bda_keys": [],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "coverage",
+      "type": "number",
+      "description": "覆盖比例下限，需同时指定覆盖率归一化对象。",
+      "unit": "0–1",
+      "flag_or_mapping": "-c",
+      "bda_keys": [],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "cov_mode",
+      "type": "integer",
+      "description": "0 查询和目标均满足覆盖；1 目标；2 查询。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--cov-mode",
+      "bda_keys": [],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "key": "sensitivity",
+      "type": "number",
+      "description": "预筛灵敏度与速度权衡；GPU 预筛的适用性以版本为准。",
+      "unit": "无量纲",
+      "flag_or_mapping": "-s",
+      "bda_keys": [],
+      "modes": [
+        "search",
+        "tmalign"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "query,target",
+      "meaning": "输入和命中数据库记录 ID；不是序列",
+      "unit": "无量纲",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "fident",
+      "meaning": "比对位点中的序列一致性比例",
+      "unit": "0–1",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "alntmscore",
+      "meaning": "按较短对齐跨度归一化的 TM-score；固定实现使用 min(qEndPos−qStartPos, dbEndPos−dbStartPos)，不等同于无缺口比对残基对数或全长归一化",
+      "unit": "0–1",
+      "interpretation": "不是全长相似性或专利自由实施判断；历史上游版本有该字段问题，应以固定版本输出核验",
+      "source_refs": [
+        "upstream",
+        "bda",
+        "convertalis"
+      ]
+    },
+    {
+      "name": "evalue",
+      "meaning": "默认结构局部搜索的统计显著性；TMalign 模式此列为两种归一化 TM-score 的平均；上游 alignment-type=3 LoLalign 时该列为归一化 LoLscore，部署支持待核验",
+      "unit": "依 alignment_type",
+      "interpretation": "越小并不在所有模式都越好；必须保存 alignment_type",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "prob",
+      "meaning": "Foldseek 估计的同源性概率",
+      "unit": "0–1",
+      "interpretation": "是同源性模型输出，不是受体结合概率",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "qtmscore,ttmscore",
+      "meaning": "分别按查询/目标全长归一化的 TM-score",
+      "unit": "0–1",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "foldseek_hits.m8",
+      "meaning": "按 format_output 指定顺序生成的结果表",
+      "unit": "按列定义",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择本页明确版本和功能模式，按模式绑定输入，核对链号、序列和原子完整性。",
+    "输入参数后预览最终命令/生成配置；未映射字段不能视为生效，未接入模式需先补适配。",
+    "运行条件验证后检查全部原始输出、失败样本和缺失值；保存所用版本、配置、输入输出哈希。"
+  ],
+  "pitfalls": [],
+  "gaps": [
+    "现有界面把 max_seqs 叫 Max hits，会误导为最终条数，应按预筛上限理解。",
+    "旧 help 将 TM < 0.40 当 IP gate；结构分数不能单独证明新颖性或知识产权结论。",
+    "reference_db 按目录首个文件猜前缀，不能保证配套数据库文件齐全或选择正确；需要显式前缀与完整性校验。",
+    "createdb/聚类/多链模式未接入当前 BDA；不能仅改参数启用。",
+    "旧结果解析器须按 alignment_type 和列设置复核；自定义输出列未验证前不得用于自动筛选。"
+  ]
+}

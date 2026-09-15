@@ -20,6 +20,8 @@ import { AppFrame } from '../../components/ui/AppFrame'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { Button } from '../../components/ui/Button'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { useAppStore } from '../../lib/store/appStore'
+import { buildDecisionCopilotPrompt } from './decisionCopilotPrompt'
 import {
   Select,
   SelectContent,
@@ -94,8 +96,10 @@ function EntryCard({
   /** Absent in read-only contexts; the card then renders exactly as it used to. */
   onEdit?: (entry: TimelineEntry) => void
 }) {
-  const { t } = useI18n()
+  const { t, format } = useI18n()
   const [open, setOpen] = useState(false)
+  const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
+  const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
   const tl = t.timeline
   const refs = provenanceRefs(entry)
   const typeLabel = tl.type[entry.entry_type as keyof typeof tl.type] ?? entry.entry_type
@@ -160,6 +164,37 @@ function EntryCard({
         <div className="mt-2 whitespace-pre-wrap rounded-md border border-border-soft bg-surface-2 p-3 text-xs text-text-secondary">
           {entry.body}
         </div>
+      ) : null}
+
+      {/* A decision is the row a reader most often wants explained, and this is the
+          "let the Bot explain it" entry point. It deliberately does not select the entry
+          as a Copilot entity: `copilot/research_context.py` flattens findings, references,
+          datasets, structures and literature evidence and knows nothing about timeline
+          entries, so passing this row's id would filter to nothing and ground the answer
+          in no evidence at all. The decision's own recorded text goes into the question
+          instead, which is content that exists. */}
+      {entry.entry_type === 'decision' ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-2 px-0 text-xs"
+          onClick={() => {
+            setCopilotDraft(
+              buildDecisionCopilotPrompt(entry, {
+                intro: format(tl.copilotPromptIntro, { decision: entry.decision_ref || entry.title }),
+                evidenceRule: tl.copilotPromptEvidence,
+                output: tl.copilotPromptOutput,
+                evidenceLabel: tl.evidence,
+                outcomeHeading: tl.outcomeHeading,
+                outcomeLabel: outcomeLabel,
+              }),
+            )
+            setCopilotOpen(true)
+          }}
+        >
+          {tl.askCopilot}
+        </Button>
       ) : null}
 
       {onEdit ? (

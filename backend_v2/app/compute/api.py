@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..core.sse import observed_sse
@@ -222,17 +222,22 @@ def retry_failed_job(
 @router.get("/jobs/{job_id}/events")
 def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> EventSourceResponse:
     with SessionFactory() as session:
+        set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
         job = ComputeRepository(session).job(job_id)
         if job is None:
             raise DomainError("job_not_found", "Job was not found", status_code=404)
         require_project(session, job.project_id, user)
 
     async def stream() -> AsyncIterator[dict[str, str]]:
-        cursor: datetime | None = None
+        cursor: tuple[datetime, uuid.UUID] | None = None
         while True:
             with SessionFactory() as event_session:
-                events = ComputeRepository(event_session).events_after(job_id, cursor)
+                set_request_rls_context(event_session, user_id=user.id, is_global_admin=user.role == "admin")
                 current = ComputeRepository(event_session).job(job_id)
+                if current is None:
+                    return
+                require_project(event_session, current.project_id, user)
+                events = ComputeRepository(event_session).events_after(job_id, cursor)
                 payloads = [
                     {
                         "id": str(item.id),
@@ -242,10 +247,13 @@ def job_events(job_id: uuid.UUID, user: User = Depends(streaming_user)) -> Event
                     for item in events
                 ]
                 if events:
-                    cursor = events[-1].created_at
-                terminal = current is None or current.status in {"succeeded", "failed", "cancelled"}
+                    cursor = (events[-1].created_at, events[-1].id)
+                terminal = current.status in {"succeeded", "failed", "cancelled"}
             for payload in payloads:
                 yield payload
+            # Drain full batches before announcing completion, including timestamp ties.
+            if len(events) == 100:
+                continue
             if terminal:
                 yield {"event": "done", "data": json.dumps({"job_id": str(job_id)})}
                 return

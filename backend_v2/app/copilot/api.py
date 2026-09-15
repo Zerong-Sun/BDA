@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from ..core.config import get_settings
-from ..core.database import SessionFactory, get_session
+from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.etag import etag, parse_if_match
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
@@ -19,7 +19,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, handoffs, mcp
+from . import agent_runs, decisions, handoffs, mcp, room
 from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
@@ -48,6 +48,9 @@ from .schemas import (
     CopilotConfigResponse,
     CopilotConfigTestResponse,
     CopilotConfigUpdate,
+    DecisionAnswerCreate,
+    DecisionRequestPage,
+    DecisionRequestResponse,
     HandoffPage,
     HandoffResponse,
     InterpretationCreate,
@@ -58,6 +61,8 @@ from .schemas import (
     McpSessionResponse,
     MessagePage,
     MessageResponse,
+    RoomEvent,
+    RoomPage,
     RoutePlanCreate,
     RoutePlanResponse,
     SkillResponse,
@@ -105,6 +110,9 @@ BOTS = [
         directs=list(bot.directs),
         reviewed_by=[other.id for other in bot_roster.reviewers_of(bot.id)],
         triggers=list(bot.triggers),
+        task_services=list(bot.task_services),
+        task_write_tools=bot_roster.task_write_tools(bot),
+        absorbs=bot_roster.absorbed_by(bot.id),
     )
     for bot in bot_roster.all_bots()
 ]
@@ -247,6 +255,117 @@ def list_handoffs(
     return HandoffPage(items=[HandoffResponse(**handoffs.to_json_model(row)) for row in rows])
 
 
+def _require_decision(session: Session, request_id: uuid.UUID, user: User):
+    """The question, checked against the caller's access to its project."""
+    row = decisions.require(session, request_id)
+    require_project(session, row.project_id, user)
+    return row
+
+
+@router.get("/projects/{project_id}/decision-requests", response_model=DecisionRequestPage)
+def list_decision_requests(
+    project_id: uuid.UUID,
+    status_filter: str | None = Query(default=None, alias="status", max_length=24),
+    limit: int = Query(default=decisions.DEFAULT_LIMIT, ge=1, le=decisions.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> DecisionRequestPage:
+    """The questions operators have put to a person in this project.
+
+    Answered ones are returned too, and by default: a question and its answer
+    are one record, and a list that dropped the answered half would make the
+    room's history disappear as soon as somebody acted on it.
+    """
+    require_project(session, project_id, user)
+    rows = decisions.requests(session, project_id=project_id, status=status_filter, limit=limit)
+    return DecisionRequestPage(
+        items=[DecisionRequestResponse(**decisions.to_json_model(row)) for row in rows]
+    )
+
+
+@router.post(
+    "/decision-requests/{request_id}/answers",
+    response_model=DecisionRequestResponse,
+    openapi_extra={"x-permission": "timeline.create"},
+)
+def answer_decision_request(
+    request_id: uuid.UUID,
+    payload: DecisionAnswerCreate,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionRequestResponse:
+    """Settle one question, which writes the decision record it produced.
+
+    `timeline.create` is the permission because that is what this does: the
+    answer is a decision entry attributed `agent_proposed_human_confirmed`, and
+    the permission should name the record being written rather than the surface
+    the click happened on.
+    """
+    row = _require_decision(session, request_id, user)
+    if parse_if_match(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the question before answering it.", status_code=412
+        )
+    project = require_project(session, row.project_id, user)
+    decisions.answer(
+        session, row, project=project, user=user, choice=payload.choice, note=payload.note
+    )
+    return DecisionRequestResponse(**decisions.to_json_model(row))
+
+
+@router.post(
+    "/decision-requests/{request_id}/withdrawals",
+    response_model=DecisionRequestResponse,
+    openapi_extra={"x-permission": "copilot.chat"},
+)
+def withdraw_decision_request(
+    request_id: uuid.UUID,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> DecisionRequestResponse:
+    """Close a question the work moved past, leaving it readable.
+
+    Not a delete, and not an answer: nothing is written to the record, which is
+    why this is a copilot command rather than a timeline write.
+    """
+    row = _require_decision(session, request_id, user)
+    if parse_if_match(if_match) != row.version:
+        raise DomainError(
+            "version_conflict", "Reload the question before withdrawing it.", status_code=412
+        )
+    decisions.withdraw(session, row)
+    return DecisionRequestResponse(**decisions.to_json_model(row))
+
+
+@router.get("/projects/{project_id}/room", response_model=RoomPage)
+def read_room(
+    project_id: uuid.UUID,
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=room.DEFAULT_LIMIT, ge=1, le=room.MAX_LIMIT),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> RoomPage:
+    """What happened in this project, in one order.
+
+    A read projection over three tables that each already have their own
+    endpoint. It exists because the three lists were only ever read together and
+    interleaving them by eye is the reader's job today; it writes nothing, so a
+    room entry can never disagree with the record it came from.
+
+    Ordered by when each entry happened, newest first, on a keyset cursor: a
+    room paged by row id would reorder itself as soon as two entries shared an
+    instant, and a conversation that reorders is not readable.
+    """
+    require_project(session, project_id, user)
+    entries, next_cursor = room.events(session, project_id=project_id, limit=limit, cursor=cursor)
+    return RoomPage(
+        items=[RoomEvent.model_validate(entry) for entry in entries],
+        next_cursor=next_cursor,
+    )
+
+
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
 def get_conversation(
     conversation_id: uuid.UUID,
@@ -290,6 +409,7 @@ def stream_messages(
     user: User = Depends(streaming_user),
 ) -> EventSourceResponse:
     with SessionFactory() as session:
+        set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
         conversation = CopilotRepository(session).conversation(conversation_id)
         if conversation is None:
             raise DomainError("conversation_not_found", "Conversation was not found", status_code=404)
@@ -299,6 +419,8 @@ def stream_messages(
         seen: set[uuid.UUID] = set()
         if after_message_id is not None:
             with SessionFactory() as session:
+                set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
+                require_project(session, conversation.project_id, user)
                 rows = CopilotRepository(session).all_messages(conversation_id)
                 for row in rows:
                     seen.add(row.id)
@@ -306,6 +428,8 @@ def stream_messages(
                         break
         while True:
             with SessionFactory() as session:
+                set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
+                require_project(session, conversation.project_id, user)
                 rows = CopilotRepository(session).all_messages(conversation_id)
                 payloads = [MessageResponse.model_validate(x).model_dump(mode="json") for x in rows if x.id not in seen]
                 seen.update(x.id for x in rows)

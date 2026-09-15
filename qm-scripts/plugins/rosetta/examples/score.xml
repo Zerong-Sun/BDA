@@ -1,0 +1,5 @@
+<ROSETTASCRIPTS>
+  <SCOREFXNS><ScoreFunction name="selected" weights="%%weights%%"/></SCOREFXNS>
+  <PROTOCOLS/>
+  <OUTPUT scorefxn="selected"/>
+</ROSETTASCRIPTS>

@@ -1,0 +1,1927 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "RFdiffusion3",
+  "slug": "rfdiffusion3",
+  "summary": "RFdiffusion3 是 Foundry 的全原子条件生成模型；输入条件写在 design_spec JSON，作业参数经 rfd3 design 传入。逐项覆盖8个 library 键和6个 BDA 字段，并补充官方固定 commit 的设计条件与关键采样参数。上游当前接口与站点2025安装并未证明一致。",
+  "sources": [
+    {
+      "id": "live",
+      "scope": "当前 base 与 authoring 草稿的字段、实际 command、输入输出与验证标签",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "scope": "手工提交库参数清单；不是 BDA command 已转发的证据",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/rfdiffusion3/README.md",
+      "scope": "旧集群 runbook；历史记录与当前声明证明边界",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "readme",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/README.md",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "RFD3 任务、输出与官方使用入口",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "input",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/input.md",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "当前 InputSpecification 与 CLI 参数说明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "config",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/rfdiffusion3.yaml",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "当前 inference engine 默认参数",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "base_config",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/configs/inference_engine/base.yaml",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "seed 与基础输入必填项",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parser",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/inference/input_parsing.py",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "真实 Pydantic 字段及 select_unfixed_sequence 默认解析；文档文字有矛盾时以代码为准",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "symmetry",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/symmetry.md",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "C/D 对称模式与 sampler.kind 要求",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "examples",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/docs/examples/demo.json",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "indexed/unindexed、部分扩散、核酸上下文示例",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "entrypoint",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/run_inference.py",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "CLI config 处理入口",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "engine",
+      "url": "https://github.com/RosettaCommons/foundry/blob/b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c/models/rfd3/src/rfd3/engine.py",
+      "commit": "b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c",
+      "scope": "最终结构默认cif.gz写出与metadata/seed记录",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter_env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "scope": "参数环境导出：标量小写键、bool为1/空字符串、array/object不导出",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "unconditional",
+      "title": "无条件全原子生成",
+      "purpose": "用长度定义从噪声生成蛋白。",
+      "required_inputs": [
+        "design_spec JSON，例如 {\"design\":{\"length\":100}}"
+      ],
+      "parameters": {
+        "n_batches": 1,
+        "diffusion_batch_size": 5,
+        "ckpt_path": "rfd3"
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "每个 JSON 顶层设计键应生成 n_batches×diffusion_batch_size 个最终结构；检查有效链长与残基。"
+      ],
+      "limitations": [
+        "模式状态描述声明或配置覆盖；不等于该模式在当前 BDA 声明上已跑通。"
+      ],
+      "source_refs": [
+        "input",
+        "config",
+        "live"
+      ]
+    },
+    {
+      "id": "binder",
+      "title": "蛋白靶标/hotspot 条件",
+      "purpose": "在靶标上下文周围生成结合候选。",
+      "required_inputs": [
+        "design_spec.input 指向实际可访问 PDB/CIF；contig 与 select_hotspots"
+      ],
+      "parameters": {
+        "design_spec": {
+          "binder": {
+            "input": "/staged/target.cif",
+            "contig": "50-80,/0,A1-100",
+            "select_hotspots": "A45,A60"
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "逐原子最短热点距离、靶标链身份和严重碰撞；记录实际解析条件，而非只看 exit=0。"
+      ],
+      "limitations": [
+        "design_spec 文件是 BDA 可声明输入，但所有嵌套条件必须匹配站点安装版本。",
+        "hotspot 近接是模型偏好，不能证明实验结合、受体激活或 ΔG。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "live"
+      ]
+    },
+    {
+      "id": "indexed_motif",
+      "title": "固定序号 motif 原子条件",
+      "purpose": "保留 motif 原子几何及指定序列位置关系。",
+      "required_inputs": [
+        "PDB/CIF；contig 与 select_fixed_atoms 字典"
+      ],
+      "parameters": {
+        "design_spec": {
+          "motif": {
+            "input": "/staged/motif.pdb",
+            "contig": "30,A10,40,A25,30",
+            "select_fixed_atoms": {
+              "A10": "CA,CB,OG",
+              "A25": "BKBN"
+            }
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "对照 input 原子名和映射逐项检查 motif 保留；保留全部失败样本。"
+      ],
+      "limitations": [
+        "live 标记曾有10样本原子几何 smoke evidence，但没有在此审计证明当前完整声明的 fingerprint 匹配，不外推到其他条件模式。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "live"
+      ]
+    },
+    {
+      "id": "unindexed_motif",
+      "title": "不固定序号的 motif 几何",
+      "purpose": "保持指定原子的空间关系，同时允许重新安排序列位置。",
+      "required_inputs": [
+        "input；unindex；select_fixed_atoms；总 length"
+      ],
+      "parameters": {
+        "design_spec": {
+          "motif": {
+            "input": "/staged/motif.pdb",
+            "unindex": "A10,A25",
+            "length": "100-120",
+            "select_fixed_atoms": {
+              "A10": "TIP",
+              "A25": "BKBN"
+            }
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "unindexed 的位置变化必须读取输出映射，不能按原位置序号直接算错误的 RMSD。",
+        "站点旧输入方言可能使用不同键名；当前 dialect2 的 unindex/contig 不自动等同旧接口。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "live"
+      ]
+    },
+    {
+      "id": "partial",
+      "title": "以 Å 噪声作部分扩散",
+      "purpose": "给已知结构加入有限坐标噪声再生成变化。",
+      "required_inputs": [
+        "input PDB/CIF 与 partial_t；如保留非蛋白组分需明确指定"
+      ],
+      "parameters": {
+        "design_spec": {
+          "partial": {
+            "input": "/staged/start.cif",
+            "partial_t": 2.0
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "保留输入对齐方式、CA RMSD、固定原子误差和实际噪声配置；不能称为物理时间轨迹。"
+      ],
+      "limitations": [
+        "partial_t 为 Å 噪声标准差，绝不是 RFD1 的 diffuser.partial_T 步数。",
+        "实际逆扩散步数由噪声截断调度决定；num_timesteps 不等于部分扩散实际步数。",
+        "2 Å 是官方渐增探索起点示例，不是通过阈值；当前源码 ge=0，建议范围不是硬上限。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "live"
+      ]
+    },
+    {
+      "id": "small_molecule",
+      "title": "配体与氢键/埋藏条件",
+      "purpose": "围绕明确化学组分构建蛋白环境。",
+      "required_inputs": [
+        "含目标配体的完整 PDB/CIF；ligand 与原子级条件"
+      ],
+      "parameters": {
+        "design_spec": {
+          "ligand_design": {
+            "input": "/staged/ligand.cif",
+            "ligand": "LIG",
+            "length": 150,
+            "select_hbond_donor": {
+              "LIG": "O1"
+            }
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "氢键标签是生成条件，不是实测氢键、催化活性、结合能或选择性。",
+        "核实质子化/化学组分与实际原子名；不把错误配体几何当作高质量约束。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples"
+      ]
+    },
+    {
+      "id": "sequence_sidechain",
+      "title": "固定骨架/序列/侧链的条件组合",
+      "purpose": "通过独立的坐标和序列遮罩进行逆折叠或侧链重建。",
+      "required_inputs": [
+        "input 与显式 select_fixed_atoms/select_unfixed_sequence"
+      ],
+      "parameters": {
+        "design_spec": {
+          "inverse_folding": {
+            "input": "/staged/backbone.pdb",
+            "contig": "A1-100",
+            "select_fixed_atoms": {
+              "A1-100": "BKBN"
+            },
+            "select_unfixed_sequence": true
+          }
+        }
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "True 表示选择所有可解锁序列区域；官方说明中 True/False 默认文字互相矛盾，实际 parser 默认 False；必须从输出确认。",
+        "RFD3 sequence head 输出不等同已完成 ProteinMPNN 或独立 refolding 验证。"
+      ],
+      "source_refs": [
+        "readme",
+        "parser",
+        "input"
+      ]
+    },
+    {
+      "id": "symmetry",
+      "title": "全原子 C/D 对称生成",
+      "purpose": "使用对称 sampler 与 symmetry 配置生成多亚基结构。",
+      "required_inputs": [
+        "design_spec.symmetry 与额外 inference_sampler.kind=symmetry"
+      ],
+      "parameters": {
+        "inference_sampler.kind": "symmetry",
+        "diffusion_batch_size": 1,
+        "design_spec": {
+          "oligomer": {
+            "length": 100,
+            "symmetry": {
+              "id": "C3"
+            }
+          }
+        }
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "BDA command 未转发 inference_sampler.kind；仅上传 symmetry JSON 不能声称完整模式已接通。",
+        "当前官方文档仅C/D；对称 motif 需预先对称化，不可照搬 RFD1 tetrahedral。"
+      ],
+      "source_refs": [
+        "symmetry",
+        "input",
+        "live"
+      ]
+    },
+    {
+      "id": "expert_sampling",
+      "title": "高级采样与诊断",
+      "purpose": "记录当前官方采样器、输出和检查设置以准备独立配置评审。",
+      "required_inputs": [
+        "与站点安装匹配的配置"
+      ],
+      "parameters": {
+        "inference_sampler.num_timesteps": 200,
+        "prevalidate_inputs": true
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对请求参数与输出元数据一致；保留失败样本与实际产物数。"
+      ],
+      "limitations": [
+        "当前 BDA 只转发6个作业 fields 和 inputs/out_dir；其他 CLI 配置未暴露，不能直接在任务参数中填了就认为生效。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "inputs",
+      "type": "any",
+      "description": "承载各个设计任务条件的 JSON/YAML 文件路径；BDA 仅从 design_spec 端口读取首个排序 *.json。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "inputs=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "实际 BDA 绑定 design_spec 端口；JSON 内的 input 路径不会在 command 中重写。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": null
+    },
+    {
+      "key": "out_dir",
+      "type": "any",
+      "description": "最终结构与元数据目录；BDA command 固定为 BDA_OUTPUT_DIR。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "out_dir=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "当前上游为必填 ???；library 的 ./output 是本地设置。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": "./output"
+    },
+    {
+      "key": "n_batches",
+      "type": "integer",
+      "description": "每个输入 JSON 顶层设计键的批次数。",
+      "unit": "个",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "n_batches=<value>",
+      "bda_keys": [
+        "n_batches"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 n_batches 的声明：{\"type\":\"integer\",\"default\":1}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": 1
+    },
+    {
+      "key": "diffusion_batch_size",
+      "type": "integer",
+      "description": "每批独立 diffusion 样本数；与 n_batches 相乘决定每个输入键的设计数。",
+      "unit": "个",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "diffusion_batch_size=<value>",
+      "bda_keys": [
+        "diffusion_batch_size"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "BDA/library=5；当前官方 config=8。正整数，按显存调整，不能把5当模型固有常数。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 diffusion_batch_size 的声明：{\"type\":\"integer\",\"default\":5}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": 5
+    },
+    {
+      "key": "ckpt_path",
+      "type": "any",
+      "description": "模型 checkpoint 注册名或文件路径；BDA 默认 rfd3，必须保存实际解析文件与 SHA。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "ckpt_path=<value>",
+      "bda_keys": [
+        "ckpt_path"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 ckpt_path 的声明：{\"type\":\"string\",\"default\":\"rfd3\"}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": "rfd3"
+    },
+    {
+      "key": "seed",
+      "type": "integer",
+      "description": "整个运行的随机种子；固定源码 base config 默认 null，BDA UI 默认0且会传入0，不应套用 ProteinMPNN 的0随机语义。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "seed=<value>",
+      "bda_keys": [
+        "seed"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 seed 的声明：{\"type\":\"integer\",\"default\":0}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input"
+      ],
+      "default": null
+    },
+    {
+      "key": "low_memory_mode",
+      "type": "boolean",
+      "description": "使用省显存 tokenization，可能降低吞吐；不是低精度或改变物理噪声。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "low_memory_mode=<value>",
+      "bda_keys": [
+        "low_memory_mode"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "library=null；当前官方与BDA字段默认false；环境层必须把false导出为空，避免 shell ${var:+...} 将非空 false 当 true。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 low_memory_mode 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input",
+        "parameter_env"
+      ],
+      "default": null
+    },
+    {
+      "key": "dump_trajectories",
+      "type": "boolean",
+      "description": "保存加噪/去噪中间原子结构；含虚拟原子时不能当作最终蛋白候选。",
+      "unit": "无",
+      "modes": [
+        "unconditional",
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "dump_trajectories=<value>",
+      "bda_keys": [
+        "dump_trajectories"
+      ],
+      "constraints": [
+        "library 默认值来自站点登记，未证明等于当前固定 commit 默认值。",
+        "library=null；当前官方与BDA字段默认false；环境层必须把false导出为空，避免 shell ${var:+...} 将非空 false 当 true。",
+        "BDA RFdiffusion3@foundry-2025-12-01 字段 dump_trajectories 的声明：{\"type\":\"boolean\",\"default\":false}；仅记录声明，不等于命令已执行该值。"
+      ],
+      "source_refs": [
+        "library",
+        "live",
+        "config",
+        "base_config",
+        "input",
+        "parameter_env"
+      ],
+      "default": null
+    },
+    {
+      "key": "specification.input",
+      "type": "string",
+      "description": "实际结构 PDB/CIF 路径；不是 BDA artifact id，必须能从计算节点访问。",
+      "unit": "路径",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].input",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.contig",
+      "type": "string",
+      "description": "保留输入序号关系的 motif 与生成长度片段；当前方言用逗号分隔和 /0 断链，例如 50-80,/0,A1-100。",
+      "unit": "残基/链标识",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].contig",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.unindex",
+      "type": "string|object",
+      "description": "指定保留空间几何但允许重新安排序列位置的输入片段；不能和 contig 固定片段重叠。",
+      "unit": "残基/原子选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].unindex",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.length",
+      "type": "integer|string",
+      "description": "生成系统的长度约束，可为固定长度或 min-max；与 contig 同时使用时需一致，不能套用 RFD1 斜杠语法。",
+      "unit": "残基",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].length",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.ligand",
+      "type": "string",
+      "description": "按输入化学组分名称或索引选择要纳入设计的配体；未指定的组分不可假定自动保留。",
+      "unit": "化学组分标识",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].ligand",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.allow_ligand_on_existing_chain",
+      "type": "boolean",
+      "description": "允许配体沿用已有链ID，默认false以防链ID信息泄露；需要结构编号审阅。",
+      "unit": "无",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].allow_ligand_on_existing_chain",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.cif_parser_args",
+      "type": "object",
+      "description": "CIF读取选项（缓存、缺失原子、氢处理、移除CCD等）；改变这些会改变实际参与条件的原子集合。",
+      "unit": "混合",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].cif_parser_args",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.extra",
+      "type": "object",
+      "description": "输出附带的自定义来源/记录元数据，非模型条件或任意 CLI 转发入口。",
+      "unit": "无",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].extra",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.dialect",
+      "type": "integer",
+      "description": "输入方言版本；当前固定源码默认2，1为旧兼容模式。站点2025安装必须另确认支持集。",
+      "unit": "版本号",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].dialect",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_fixed_atoms",
+      "type": "boolean|string|object",
+      "description": "选中的输入原子固定坐标；True为所有输入原子，字典支持 ALL/BKBN/TIP 或明确原子名。",
+      "unit": "原子选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_fixed_atoms",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_unfixed_sequence",
+      "type": "boolean|string|object",
+      "description": "选中的蛋白区域解除序列身份限制；True选中全部可选区域、False不解锁，默认解析为False。坐标固定与序列固定是独立条件。",
+      "unit": "残基选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_unfixed_sequence",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。",
+        "官方文档与字段 description 的布尔默认文字存在互相矛盾；parser 设置默认 False，并用 inverse mask 标记 fixed sequence，以实际代码为准。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_buried",
+      "type": "string|object",
+      "description": "为指定原子/残基施加埋藏 RASA 条件；与其他暴露等级不可重叠。",
+      "unit": "选择；不是已测面积",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_buried",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_partially_buried",
+      "type": "string|object",
+      "description": "施加部分埋藏 RASA 条件；是生成目标，不是输出已满足证据。",
+      "unit": "选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_partially_buried",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_exposed",
+      "type": "string|object",
+      "description": "施加暴露 RASA 条件；需要后验溶剂可及面积检查。",
+      "unit": "选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_exposed",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_hbond_donor",
+      "type": "object",
+      "description": "在指定原子上标记氢键供体条件；应核实该原子的化学角色。",
+      "unit": "原子选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_hbond_donor",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_hbond_acceptor",
+      "type": "object",
+      "description": "在指定原子上标记氢键受体条件；需独立检查距离、角度和质子化。",
+      "unit": "原子选择",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_hbond_acceptor",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.select_hotspots",
+      "type": "string|object",
+      "description": "蛋白界面 hotspot 原子或残基选择；官方描述通常希望距设计重原子约4.5 Å内，不能当硬保证。",
+      "unit": "选择；距离解释用Å",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].select_hotspots",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.redesign_motif_sidechains",
+      "type": "boolean|string",
+      "description": "固定 motif 骨架并允许侧链重新设计的快捷设置；其默认逻辑与显式 selections 应一起检查。",
+      "unit": "无",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].redesign_motif_sidechains",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.symmetry",
+      "type": "object",
+      "description": "包含 id、is_unsym_motif、is_symmetric_motif 的对称配置；还需要 symmetry sampler。",
+      "unit": "群标识/选择",
+      "modes": [
+        "symmetry"
+      ],
+      "flag_or_mapping": "design_spec[design_name].symmetry",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.ori_token",
+      "type": "array[number]",
+      "description": "指定 [x,y,z] 生成区域中心引导坐标；必须在输入坐标系中解释。",
+      "unit": "Å",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].ori_token",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.infer_ori_strategy",
+      "type": "string",
+      "description": "未显式给 ori_token 时从输入质心 com 或热点 hotspots 推断生成中心的策略。",
+      "unit": "枚举",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].infer_ori_strategy",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.plddt_enhanced",
+      "type": "boolean",
+      "description": "启用训练中使用的 pLDDT 增强条件；不是已经测得的输出 pLDDT。",
+      "unit": "无",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].plddt_enhanced",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.is_non_loopy",
+      "type": "boolean|null",
+      "description": "全局更少/更多loop的条件；null不施加该偏好。",
+      "unit": "无",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].is_non_loopy",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.partial_t",
+      "type": "number|null",
+      "description": "部分扩散所加坐标噪声标准差，null关闭；不是时间步数或MD时长。",
+      "unit": "Å",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].partial_t",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。",
+        "当前源码要求 >=0；官方文本既列5–15 Å经验范围，也建议2 Å渐增探索，均非必须通过阈值。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification.atom_array_input",
+      "type": "internal",
+      "description": "程序内预加载 AtomArray 对象，不能通过 JSON 上传 Python 对象；BDA文件模式应使用 input。",
+      "unit": "内部对象",
+      "modes": [
+        "binder",
+        "indexed_motif",
+        "unindexed_motif",
+        "partial",
+        "small_molecule",
+        "sequence_sidechain"
+      ],
+      "flag_or_mapping": "design_spec[design_name].atom_array_input",
+      "bda_keys": [],
+      "constraints": [
+        "位于 design_spec 的每个设计键下面；当前 BDA 无对应独立表单 field。",
+        "这里说明固定 upstream commit 的接口；站点 foundry-2025-12-01 是否同方言必须验证。"
+      ],
+      "source_refs": [
+        "input",
+        "parser",
+        "examples",
+        "symmetry"
+      ]
+    },
+    {
+      "key": "specification",
+      "type": "object",
+      "description": "覆盖各输入设计的 InputSpecification 字段；BDA command 当前不转发该对象。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "specification=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": {}
+    },
+    {
+      "key": "json_keys_subset",
+      "type": "array|null",
+      "description": "只执行输入文件中列出的顶层设计键。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "json_keys_subset=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "skip_existing",
+      "type": "boolean",
+      "description": "跳过已存在产物的设计，重跑时需防止把旧输出误作新样本。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "skip_existing=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "global_prefix",
+      "type": "string|null",
+      "description": "覆盖输出文件名前缀；不改变 out_dir。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "global_prefix=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "prevalidate_inputs",
+      "type": "boolean",
+      "description": "推理前预验证输入规格与原子选择；不替代后验条件检查。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "prevalidate_inputs=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference_sampler.kind",
+      "type": "string",
+      "description": "选择常规或 symmetry 采样器；对称JSON还需要设置此值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling",
+        "symmetry"
+      ],
+      "flag_or_mapping": "inference_sampler.kind=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": "default"
+    },
+    {
+      "key": "inference_sampler.num_timesteps",
+      "type": "integer",
+      "description": "逆扩散调度的离散步数；partial_t会截取调度，非物理时间。",
+      "unit": "步",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.num_timesteps=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 200
+    },
+    {
+      "key": "inference_sampler.n_recycle",
+      "type": "integer|null",
+      "description": "每个去噪步的网络recycle数；null使用checkpoint默认。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.n_recycle=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference_sampler.step_scale",
+      "type": "number",
+      "description": "扩散更新步长倍率；官方描述增大倾向降低多样性、提高可设计性，须按任务比较。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.step_scale=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.5
+    },
+    {
+      "key": "inference_sampler.noise_scale",
+      "type": "number",
+      "description": "推理噪声倍率；改变样本分布，不是结构误差阈值。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.noise_scale=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.003
+    },
+    {
+      "key": "inference_sampler.p",
+      "type": "number",
+      "description": "控制sigma调度形状的指数。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.p=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 7
+    },
+    {
+      "key": "inference_sampler.gamma_0",
+      "type": "number",
+      "description": "采样随机扰动强度参数；降低会改变多样性，0对应ODE采样设置。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.gamma_0=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 0.6
+    },
+    {
+      "key": "inference_sampler.gamma_min",
+      "type": "number",
+      "description": "启用gamma扰动的噪声/时间区间界点。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.gamma_min=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.0
+    },
+    {
+      "key": "inference_sampler.center_option",
+      "type": "string",
+      "description": "以all/motif/diffuse指定采样坐标重居中的原子集合。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.center_option=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": "all"
+    },
+    {
+      "key": "inference_sampler.s_trans",
+      "type": "number",
+      "description": "采样坐标平移增强的噪声尺度。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.s_trans=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.0
+    },
+    {
+      "key": "inference_sampler.allow_realignment",
+      "type": "boolean",
+      "description": "允许依据motif对加噪结构再次对齐；默认关闭。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.allow_realignment=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference_sampler.s_jitter_origin",
+      "type": "number",
+      "description": "对motif/ORI偏移施加高斯抖动的标准差。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.s_jitter_origin=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 0.0
+    },
+    {
+      "key": "inference_sampler.cfg_features",
+      "type": "array",
+      "description": "classifier-free guidance 对照步中清零的条件特征列表。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.cfg_features=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": [
+        "active_donor",
+        "active_acceptor",
+        "ref_atomwise_rasa"
+      ]
+    },
+    {
+      "key": "inference_sampler.use_classifier_free_guidance",
+      "type": "boolean",
+      "description": "开启对条件/无条件预测差异的引导；不是额外训练分类器。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.use_classifier_free_guidance=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": false
+    },
+    {
+      "key": "inference_sampler.cfg_t_max",
+      "type": "number|null",
+      "description": "使用classifier-free guidance的最大调度时间/噪声界点。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.cfg_t_max=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": null
+    },
+    {
+      "key": "inference_sampler.cfg_scale",
+      "type": "number",
+      "description": "classifier-free guidance强度倍率。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.cfg_scale=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.5
+    },
+    {
+      "key": "inference_sampler.inference_noise_scaling_factor",
+      "type": "number",
+      "description": "配置中存在但已核对官方输入文档明确提示未找到消费实现；不能宣称改变它会影响结果。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "inference_sampler.inference_noise_scaling_factor=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": 1.0
+    },
+    {
+      "key": "cleanup_guideposts",
+      "type": "boolean",
+      "description": "清除unindexed motif引导原子链；诊断可保留，但不是最终蛋白的一部分。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "cleanup_guideposts=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "cleanup_virtual_atoms",
+      "type": "boolean",
+      "description": "去掉侧链扩散用的虚拟原子；保留用于诊断时不能参与最终原子统计。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "cleanup_virtual_atoms=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "read_sequence_from_sequence_head",
+      "type": "boolean",
+      "description": "使用网络序列头确定输出氨基酸身份；官方不建议随意修改。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "read_sequence_from_sequence_head=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "output_full_json",
+      "type": "boolean",
+      "description": "输出完整规格与来源信息，支持核对实际条件。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "output_full_json=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "dump_prediction_metadata_json",
+      "type": "boolean",
+      "description": "保存每个预测的元数据JSON。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "dump_prediction_metadata_json=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": true
+    },
+    {
+      "key": "align_trajectory_structures",
+      "type": "boolean",
+      "description": "对齐输出轨迹结构以便可视化；对齐后的坐标不可用于未经说明的绝对位移比较。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "align_trajectory_structures=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": false
+    },
+    {
+      "key": "compile_model",
+      "type": "boolean",
+      "description": "当前官方配置的torch.compile性能选项；站点2025版本未证明存在。",
+      "unit": "无量纲/见说明",
+      "modes": [
+        "expert_sampling"
+      ],
+      "flag_or_mapping": "compile_model=<value>",
+      "bda_keys": [],
+      "constraints": [
+        "当前 BDA command 未转发；新增参数前需验证安装版本与预览渲染。"
+      ],
+      "source_refs": [
+        "config",
+        "input",
+        "live"
+      ],
+      "default": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "*_model_*.cif[.gz]",
+      "meaning": "最终设计的全原子坐标与氨基酸身份",
+      "unit": "Å",
+      "interpretation": "需清除/区分guideposts和虚拟原子；结构生成不等于独立预测通过。",
+      "source_refs": [
+        "readme",
+        "input",
+        "engine"
+      ]
+    },
+    {
+      "name": "*_model_*.json",
+      "meaning": "实际设计条件、sampled_contig、计数与预测元数据",
+      "unit": "混合",
+      "interpretation": "读取具体键才解释指标；不能笼统称 confidence_record 为已计算结合置信度。",
+      "source_refs": [
+        "input",
+        "parser",
+        "config",
+        "engine"
+      ]
+    },
+    {
+      "name": "ca_rmsd_to_input",
+      "meaning": "部分扩散输出与输入CA对齐后的RMSD（存在时）",
+      "unit": "Å",
+      "interpretation": "衡量偏离输入骨架程度；必须说明匹配位置和对齐方式，不代表受体结合好坏。",
+      "source_refs": [
+        "input",
+        "engine"
+      ]
+    },
+    {
+      "name": "noisy/denoised trajectories",
+      "meaning": "逆扩散中间坐标帧",
+      "unit": "Å与离散步",
+      "interpretation": "可能没有最终序列标签且含虚拟原子；不是物理MD轨迹或额外候选。",
+      "source_refs": [
+        "input",
+        "config",
+        "engine"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择具体插件版本并冻结输入文件、序列/结构编号映射、配置和权重校验值。",
+    "按下列模式检查输入条件；先 render/preview，对照实际命令检查每个参数被接收。",
+    "按站点流程 validate → render/preview → review → stage → review → submit。",
+    "执行后核对输出数量、参数回显、随机种子、条件几何与残基保留，再将结构和元数据一并入库。"
+  ],
+  "pitfalls": [
+    "RFdiffusion3 partial_t（Å）、RFdiffusion diffuser.partial_T（步数）不能互换。",
+    "RFD3 当前输入主键是 contig/unindex；不要把RFD1 contigmap.*或旧 runbook 的 contigs 复数盲目复制。",
+    "坐标固定不等于序列固定；必须同时审阅 select_fixed_atoms 与 select_unfixed_sequence。",
+    "来自JSON的input路径必须在计算节点真实存在；绑定input_structure端口并不会自动把JSON中的本地路径改写。",
+    "原子近接、motif保留或模型置信度均不能当受体激活、催化或结合自由能。"
+  ],
+  "gaps": [
+    "覆盖前：library8键、BDA6字段；已逐项覆盖8/8与6/6，另补25个设计规格字段及29个当前官方高级配置。",
+    "当前官方来源固定commit b02eed6a6bdf8f44d14a80cc36e3da13c9f2291c；live 插件版本 foundry-2025-12-01 与 library 的 site-install:<SITE_PATH> 不是Git commit。安装源码/权重SHA未知，不能声称当前接口与站点完全相同。",
+    "旧catalog repo指向 RosettaCommons/rfdiffusion3；本审计实际核对的是官方 Foundry models/rfd3，不将其冒称RFD1升级。",
+    "BDA command仅转发n_batches/diffusion_batch_size/ckpt_path/seed/low_memory_mode/dump_trajectories；inputs和out_dir由端口/运行目录确定。",
+    "design_spec只扫描JSON首文件，虽然当前上游支持YAML；input_structure端口未有input_adapter/JSON路径重写逻辑，必须在staging后检查JSON引用。",
+    "当前官方diffusion_batch_size默认8，BDA/library默认5；当前out_dir/inputs必填，library的out_dir默认./output只是本地包装约定。",
+    "官方 select_unfixed_sequence 描述文字有 True/False矛盾；本档依据实际parser默认False与fixed-sequence反掩码解释，不把矛盾文字照抄为功能。",
+    "symmetry还需要inference_sampler.kind，BDA没有此CLI入口；当前文档仅C/D，不能把RFD1四面体支持归给RFD3。",
+    "live 有曾记录job4137799的10个motif样本几何smoke说明，旧runbook尚无该记录；该局部证据不覆盖所有模式，且本审计没有验证当前声明fingerprint。",
+    "BDA输出glob仅*.cif，而当前官方可产生*.cif.gz；需确认站点实际压缩形式和collector是否分类正确。此任务只补文档，未改collector/输出端口或启动计算。"
+  ]
+}

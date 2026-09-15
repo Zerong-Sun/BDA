@@ -7,7 +7,12 @@ from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.deps import require_command
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project, ProjectMember
-from backend_v2.app.projects.service import require_project, require_project_permission
+from backend_v2.app.projects.service import (
+    PROJECT_PERMISSION_MINIMUMS,
+    project_access,
+    require_project,
+    require_project_permission,
+)
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -81,5 +86,54 @@ def test_project_permissions_are_deny_first_and_capped_by_organization_role() ->
 
             with pytest.raises(DomainError, match="cannot access"):
                 require_project(session, project.id, outsider)
+    finally:
+        drop_all(engine, Base.metadata)
+
+
+def test_project_access_reports_the_role_the_server_authorizes_with() -> None:
+    engine = enforce_foreign_keys(
+        create_engine("sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    )
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine, expire_on_commit=False) as session:
+            organization = Organization(name="Access Org")
+            admin = User(username="access-admin", display_name="Admin", role="admin")
+            researcher = User(username="access-researcher", display_name="Researcher", role="researcher")
+            narrowed = User(username="access-narrowed", display_name="Narrowed", role="researcher")
+            stranger = User(username="access-stranger", display_name="Stranger", role="researcher")
+            session.add_all([organization, admin, researcher, narrowed, stranger])
+            session.flush()
+            session.add_all([
+                OrganizationMember(organization_id=organization.id, user_id=researcher.id, role="researcher"),
+                OrganizationMember(organization_id=organization.id, user_id=narrowed.id, role="researcher"),
+            ])
+            project = Project(organization_id=organization.id, owner_id=admin.id, name="Access Project", project_type="protein_design")
+            session.add(project)
+            session.flush()
+            session.add(ProjectMember(project_id=project.id, user_id=narrowed.id, role="viewer"))
+            session.flush()
+
+            # Every answer must agree with the check that actually authorizes the action.
+            for user in (admin, researcher, narrowed):
+                access = project_access(session, project.id, user)
+                assert set(access["permissions"]) == set(PROJECT_PERMISSION_MINIMUMS)
+                for action, allowed in access["permissions"].items():
+                    if allowed:
+                        assert require_project_permission(session, project.id, user, action) is project
+                    else:
+                        with pytest.raises(DomainError):
+                            require_project_permission(session, project.id, user, action)
+
+            assert project_access(session, project.id, admin)["role"] == "owner"
+            assert project_access(session, project.id, researcher)["role"] == "researcher"
+            narrowed_access = project_access(session, project.id, narrowed)
+            assert narrowed_access["role"] == "viewer"
+            assert narrowed_access["permissions"]["read"] is True
+            assert narrowed_access["permissions"]["write"] is False
+
+            # A project the caller cannot read reveals nothing about itself.
+            with pytest.raises(DomainError):
+                project_access(session, project.id, stranger)
     finally:
         drop_all(engine, Base.metadata)

@@ -130,7 +130,7 @@ export const zh: TranslationDict = {
   pipeline: {
     eyebrow: '设计闭环',
     stepOf: '第 {index} / {total} 步',
-    currentBadge: '当前位置',
+    currentBadge: '你在这里',
     lockedHint: '完成当前步骤后即可解锁此阶段。',
     nextStep: '下一步',
     continueTo: '前往{stage}',
@@ -284,7 +284,7 @@ export const zh: TranslationDict = {
     subtitle: '浏览、搜索并切换所有研究项目。',
     searchPlaceholder: '按名称、ID 或摘要搜索…',
     sortBy: '排序方式',
-    sortRecent: '最近创建',
+    sortRecent: '最近更新',
     sortStatus: '状态优先',
     sortName: '名称 (A–Z)',
     filterStatus: '按状态筛选',

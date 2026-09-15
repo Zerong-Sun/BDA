@@ -28,10 +28,13 @@ CORE_THRESHOLDS = {
 
 
 def combined_percentage(files: dict, prefix: str) -> float:
-    selected = [summary["summary"] for name, summary in files.items() if name.startswith(prefix)]
+    selected = [
+        summary["summary"] for name, summary in files.items()
+        if name == prefix or (prefix.endswith("/") and name.startswith(prefix))
+    ]
     statements = sum(item["num_statements"] for item in selected)
     covered = sum(item["covered_lines"] for item in selected)
-    return 100.0 if statements == 0 else covered * 100.0 / statements
+    return 0.0 if statements == 0 else covered * 100.0 / statements
 
 
 def db_tests_ran() -> bool:

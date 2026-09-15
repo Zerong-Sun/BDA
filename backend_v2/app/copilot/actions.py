@@ -19,6 +19,7 @@ from ..intelligence.schemas import IntelligenceCreate
 from ..intelligence.service import create_run as create_intelligence_run
 from ..knowledge.schemas import KnowledgeCreate
 from ..knowledge.service import create_entry as create_knowledge_entry
+from ..literature.patent_service import create_legal_status_lookup
 from ..literature.schemas import LiteratureSearchCreate
 from ..literature.service import create_search as create_literature_search
 from ..projects.models import Project
@@ -63,6 +64,68 @@ _ACTION_REQUEST_TERMS = {
             "搜索",
         },
     },
+    # Patent words only as domains. The literature entry above accepts the
+    # generic 检索/搜索 as a domain, so any "please search X" authorises it; a
+    # patent search is narrower on purpose, and must be asked for as one.
+    "start_patent_search": {
+        "domains": {
+            "patent",
+            "patents",
+            "prior art",
+            "专利",
+            "现有技术",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "search",
+            "find",
+            "look up",
+            "运行",
+            "启动",
+            "排队",
+            "检索",
+            "搜索",
+            "查询",
+            "查找",
+        },
+    },
+    # Legal events and families are a lookup of patents already saved, and asked
+    # for as such: "what is the status of these patents" is the request, and a
+    # bare "patent" is not - that authorises a search, not a lookup.
+    "start_patent_legal_status_lookup": {
+        "domains": {
+            "legal status",
+            "legal event",
+            "legal events",
+            "patent family",
+            "patent families",
+            "inpadoc",
+            "法律状态",
+            "法律事件",
+            "专利族",
+            "同族",
+            "专利状态",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "check",
+            "look up",
+            "lookup",
+            "query",
+            "运行",
+            "启动",
+            "排队",
+            "查询",
+            "查找",
+            "核查",
+            "检查",
+            "查",
+        },
+    },
     "start_target_intelligence": {
         "domains": {
             "target",
@@ -81,6 +144,32 @@ _ACTION_REQUEST_TERMS = {
             "启动",
             "排队",
             "创建",
+        },
+    },
+    "start_druggability_assessment": {
+        "domains": {
+            "druggability",
+            "druggable",
+            "tractability",
+            "tractable",
+            "developability",
+            "成药性",
+            "可成药",
+            "成药",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "assess",
+            "evaluate",
+            "analyse",
+            "analyze",
+            "运行",
+            "启动",
+            "排队",
+            "评估",
+            "分析",
         },
     },
     "create_knowledge_draft": {
@@ -313,6 +402,81 @@ class CopilotActionService:
             execute,
         )
 
+    def start_patent_search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        database: str = "europe_pmc",
+        jurisdictions: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        """Queue an audited patent search of Europe PMC's patent index or EPO OPS.
+
+        The same pipeline as a literature search, so a saved patent carries a
+        retrieval trace and a checksummed abstract. Two settings differ, on
+        purpose: there is no full text to fetch for a patent record, and claim
+        extraction is off - the extractor finds scientific claims in paper
+        prose, and running it over patent abstracts would file claim-shaped
+        patent language as literature claims.
+        """
+        self._require_explicit("start_patent_search")
+        sources = {"europe_pmc": "europe_pmc_patents", "epo_ops": "epo_ops_patents"}
+        if database not in sources:
+            raise ValueError("patent_database_unknown")
+        payload = LiteratureSearchCreate.model_validate({
+            "query": query,
+            "sources": [sources[database]],
+            "limit": limit,
+            "fetch_full_text": False,
+            "extract_claims": False,
+            "jurisdictions": list(jurisdictions),
+        })
+
+        def execute() -> dict[str, Any]:
+            row = create_literature_search(
+                self.session,
+                self.project,
+                payload,
+                self.user,
+            )
+            return _awaitable(
+                self.session,
+                {
+                    "search_run_id": str(row.id),
+                    "status": "pending",
+                    "database": payload.sources[0],
+                    "query": row.query,
+                    "jurisdictions": list(payload.jurisdictions),
+                },
+                row.id,
+            )
+
+        return self._once(
+            "start_patent_search",
+            payload.model_dump(mode="json"),
+            execute,
+        )
+
+    def start_patent_legal_status_lookup(self, document_ids: list[str]) -> dict[str, Any]:
+        """Queue an audited EPO OPS lookup of saved patents' families and legal events.
+
+        Only documents this project saved as patents, and only when the user
+        asked about their legal status or family in so many words. The ids are
+        parsed here so a malformed one is refused before anything is queued.
+        """
+        self._require_explicit("start_patent_legal_status_lookup")
+        parsed = [uuid.UUID(str(item)) for item in document_ids]
+
+        def execute() -> dict[str, Any]:
+            result = create_legal_status_lookup(self.session, self.project, parsed, self.user)
+            return _awaitable(self.session, result, uuid.UUID(result["lookup_id"]))
+
+        return self._once(
+            "start_patent_legal_status_lookup",
+            {"document_ids": sorted(str(item) for item in parsed)},
+            execute,
+        )
+
     def start_target_intelligence(
         self,
         target_id: str,
@@ -355,6 +519,50 @@ class CopilotActionService:
             payload.model_dump(mode="json"),
             execute,
         )
+
+    def start_druggability_assessment(
+        self,
+        target_id: str,
+        *,
+        trial_term: str = "",
+    ) -> dict[str, Any]:
+        """Queue a druggability assessment of one exact project target.
+
+        Public evidence only - Open Targets tractability, drugs and clinical
+        candidates, safety liabilities, and ClinicalTrials.gov activity - with
+        every call audited. It reports evidence and gaps, never a probability.
+        """
+        self._require_explicit("start_druggability_assessment")
+        from ..intelligence.druggability_service import create_druggability_run
+
+        try:
+            parsed_target_id = uuid.UUID(target_id)
+        except ValueError as exc:
+            raise ValueError("invalid_target_id") from exc
+        term = trial_term.strip()
+        payload = {"target_id": str(parsed_target_id), "trial_term": term}
+
+        def execute() -> dict[str, Any]:
+            row = create_druggability_run(
+                self.session,
+                self.project,
+                parsed_target_id,
+                self.user,
+                trial_term=term,
+                source={"source": "copilot", "source_message_id": str(self.source_message_id)},
+            )
+            return _awaitable(
+                self.session,
+                {
+                    "intelligence_run_id": str(row.id),
+                    "target_id": str(row.target_id),
+                    "kind": "druggability",
+                    "status": "pending",
+                },
+                row.id,
+            )
+
+        return self._once("start_druggability_assessment", payload, execute)
 
     def create_knowledge_draft(
         self,

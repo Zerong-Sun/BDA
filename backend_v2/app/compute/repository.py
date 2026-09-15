@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
@@ -66,11 +66,11 @@ class ComputeRepository:
             )
         )
 
-    def events_after(self, job_id: uuid.UUID, after: datetime | None) -> list[JobEvent]:
+    def events_after(self, job_id: uuid.UUID, after: tuple[datetime, uuid.UUID] | None) -> list[JobEvent]:
         query = select(JobEvent).where(JobEvent.job_id == job_id)
         if after:
-            query = query.where(JobEvent.created_at > after)
-        return list(self.session.scalars(query.order_by(JobEvent.created_at).limit(100)))
+            query = query.where(tuple_(JobEvent.created_at, JobEvent.id) > after)
+        return list(self.session.scalars(query.order_by(JobEvent.created_at, JobEvent.id).limit(100)))
 
     def events_page(self, job_id: uuid.UUID, *, after: uuid.UUID | None, limit: int) -> list[JobEvent]:
         query = select(JobEvent).where(JobEvent.job_id == job_id)

@@ -1,0 +1,1048 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "DiffAb",
+  "slug": "diffab",
+  "summary": "抗体CDR的序列/结构联合设计、局部优化及固定骨架/固定序列模式。官方模式可以查证，但BDA目前disabled，命令仅python run.py，不能把下列上游能力标作BDA已接入。",
+  "sources": [
+    {
+      "id": "live",
+      "commit": null,
+      "scope": "审计时BDA注册字段、命令、输入输出端口、enabled及runtime_validation_status",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "catalog",
+      "path": "qm-scripts/library/catalog.json",
+      "commit": null,
+      "scope": "历史参数库的类型和默认值，不等同运行时有效设置",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "renderer",
+      "path": "qm-scripts/library/qm_job.py",
+      "commit": null,
+      "scope": "手工配置生成器的参数映射，区别于live ModelPlugin命令",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/diffab/README.md",
+      "commit": null,
+      "scope": "旧运行手册的状态记录；不是安装或运行成功证明",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-readme",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/README.md",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "官方五类模式、抗原单独输入需HDOCK和抗体框架",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-runner",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/diffab/tools/runner/design_for_pdb.py",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "复合物入口、参数解析、CDR选择、seed和结构保存",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-dock",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/design_dock.py",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "抗原+抗体框架先对接的入口及依赖",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-single",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_single.yml",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "单CDR共设计配置",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-multi",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/codesign_multicdrs.yml",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "多CDR共设计配置",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-opt",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/abopt_singlecdr.yml",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "局部优化扰动步数列表",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-fixbb",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/fixbb.yml",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "固定骨架序列设计配置",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "da-strpred",
+      "url": "https://github.com/luost26/diffab/blob/c3e2966601bf8025025ab87717b31b08fdd4834e/configs/test/strpred.yml",
+      "commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+      "scope": "固定序列结构预测配置",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "codesign_single",
+      "title": "单CDR序列和结构共设计",
+      "purpose": "逐个选定CDR分别采样，框架与抗原作为上下文。",
+      "required_inputs": [
+        "抗体–抗原复合物PDB及heavy/light链映射",
+        "相应config YAML和匹配checkpoint",
+        "AbNumber/ANARCI等编号依赖"
+      ],
+      "parameters": {
+        "mode": "single_cdr",
+        "sampling.sample_structure": true,
+        "sampling.sample_sequence": true,
+        "sampling.num_samples": 100,
+        "sampling.cdrs": [
+          "H_CDR3"
+        ]
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对输出每个variant的CDR掩码和sample计数",
+        "验证框架/未设计序列保留与残基编号映射",
+        "保留元数据和原始PDB"
+      ],
+      "limitations": [
+        "BDA disabled且无这些config入口；不能用当前python run.py执行这些模式",
+        "同一个num_samples按variant重复，不保证全任务总数等于该值",
+        "生成结构不等于已Relax或验证结合",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "id": "codesign_multiple",
+      "title": "多CDR同时共设计",
+      "purpose": "在同一次样本中联合重设计选定CDRs。",
+      "required_inputs": [
+        "抗体–抗原复合物PDB及heavy/light链映射",
+        "相应config YAML和匹配checkpoint",
+        "AbNumber/ANARCI等编号依赖"
+      ],
+      "parameters": {
+        "mode": "multiple_cdrs",
+        "sampling.sample_structure": true,
+        "sampling.sample_sequence": true,
+        "sampling.num_samples": 100,
+        "sampling.cdrs": [
+          "H_CDR3"
+        ]
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对输出每个variant的CDR掩码和sample计数",
+        "验证框架/未设计序列保留与残基编号映射",
+        "保留元数据和原始PDB"
+      ],
+      "limitations": [
+        "BDA disabled且无这些config入口；不能用当前python run.py执行这些模式",
+        "同一个num_samples按variant重复，不保证全任务总数等于该值",
+        "生成结构不等于已Relax或验证结合",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-multi",
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "id": "abopt",
+      "title": "已有CDR局部优化",
+      "purpose": "对已有CDR按不同optimize_steps扰动深度再去噪；不是亲和力保证。",
+      "required_inputs": [
+        "抗体–抗原复合物PDB及heavy/light链映射",
+        "相应config YAML和匹配checkpoint",
+        "AbNumber/ANARCI等编号依赖"
+      ],
+      "parameters": {
+        "mode": "abopt",
+        "sampling.sample_structure": true,
+        "sampling.sample_sequence": true,
+        "sampling.num_samples": 100,
+        "sampling.cdrs": [
+          "H_CDR3"
+        ],
+        "sampling.optimize_steps": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64
+        ]
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对输出每个variant的CDR掩码和sample计数",
+        "验证框架/未设计序列保留与残基编号映射",
+        "保留元数据和原始PDB"
+      ],
+      "limitations": [
+        "BDA disabled且无这些config入口；不能用当前python run.py执行这些模式",
+        "同一个num_samples按variant重复，不保证全任务总数等于该值",
+        "生成结构不等于已Relax或验证结合",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-opt",
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "id": "fixbb",
+      "title": "固定骨架序列设计",
+      "purpose": "保留选定CDR骨架，只重新采样氨基酸类别。",
+      "required_inputs": [
+        "抗体–抗原复合物PDB及heavy/light链映射",
+        "相应config YAML和匹配checkpoint",
+        "AbNumber/ANARCI等编号依赖"
+      ],
+      "parameters": {
+        "mode": "single_cdr",
+        "sampling.sample_structure": false,
+        "sampling.sample_sequence": true,
+        "sampling.num_samples": 100,
+        "sampling.cdrs": [
+          "H_CDR3"
+        ]
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对输出每个variant的CDR掩码和sample计数",
+        "验证框架/未设计序列保留与残基编号映射",
+        "保留元数据和原始PDB"
+      ],
+      "limitations": [
+        "BDA disabled且无这些config入口；不能用当前python run.py执行这些模式",
+        "同一个num_samples按variant重复，不保证全任务总数等于该值",
+        "生成结构不等于已Relax或验证结合",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-fixbb",
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "id": "strpred",
+      "title": "固定序列结构预测",
+      "purpose": "保留CDR序列，仅采样其三维结构。",
+      "required_inputs": [
+        "抗体–抗原复合物PDB及heavy/light链映射",
+        "相应config YAML和匹配checkpoint",
+        "AbNumber/ANARCI等编号依赖"
+      ],
+      "parameters": {
+        "mode": "single_cdr",
+        "sampling.sample_structure": true,
+        "sampling.sample_sequence": false,
+        "sampling.num_samples": 100,
+        "sampling.cdrs": [
+          "H_CDR3"
+        ]
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "核对输出每个variant的CDR掩码和sample计数",
+        "验证框架/未设计序列保留与残基编号映射",
+        "保留元数据和原始PDB"
+      ],
+      "limitations": [
+        "BDA disabled且无这些config入口；不能用当前python run.py执行这些模式",
+        "同一个num_samples按variant重复，不保证全任务总数等于该值",
+        "生成结构不等于已Relax或验证结合",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-strpred",
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "id": "dock_then_design",
+      "title": "无复合物时先对接框架",
+      "purpose": "官方design_dock.py以抗原和抗体框架经HDOCK产生起始复合物，再执行CDR设计。",
+      "required_inputs": [
+        "抗原PDB",
+        "抗体模板PDB（官方有默认示例但需科学选择）",
+        "HDOCK/createpl可执行文件",
+        "设计YAML与checkpoint"
+      ],
+      "parameters": {
+        "antigen": "antigen.pdb",
+        "antibody": "framework.pdb",
+        "num_docks": 10,
+        "config": "configs/test/codesign_multicdrs.yml"
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查每个对接pose的链映射和框架位置",
+        "分别记录对接分数与CDR生成结果"
+      ],
+      "limitations": [
+        "抗原PDB单独不足以完成受控框架设计",
+        "BDA没有antibody/config/HDOCK映射，epitope字段也未绑定到此入口",
+        "parameters是上游JSON/YAML/CLI语义的配置片段，不是完整可执行命令；示例路径、链号和位置须替换为实际输入，并按所述BDA绑定状态使用。"
+      ],
+      "source_refs": [
+        "da-dock",
+        "da-readme",
+        "live"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "antigen_pdb",
+      "type": "artifact_ref",
+      "description": "页面声明的抗原结构。已组装复合物对应上游pdb_path；只有抗原则需design_dock.py --antigen、框架模板和HDOCK，当前命令没有传递此字段。",
+      "unit": "PDB文件",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "无实际映射；候选上游pdb_path或--antigen",
+      "bda_keys": [
+        "antigen_pdb"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": ""
+    },
+    {
+      "key": "epitope_residues",
+      "type": "string",
+      "description": "页面拟表达引导接触的抗原残基；本次检查官方design_for_pdb/design_dock未找到同名epitope参数，不得宣称填写后形成约束。",
+      "unit": "链/残基集合",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "未绑定且无已核验上游同名入口",
+      "bda_keys": [
+        "epitope_residues"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": ""
+    },
+    {
+      "key": "cdr_loops",
+      "type": "string",
+      "description": "拟选择要重设计的CDR。页面H1/H2/H3/L1/L2/L3与上游H_CDR1等名称不同，需明确转换及抗体编号规则。",
+      "unit": "CDR名称列表",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "未绑定；上游sampling.cdrs",
+      "bda_keys": [
+        "cdr_loops"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": "H1,H2,H3,L1,L2,L3"
+    },
+    {
+      "key": "num_designs",
+      "type": "integer",
+      "description": "拟设采样数量；上游sampling.num_samples作用于每个variant，可因CDR或优化步数组合产生更多总样本。",
+      "unit": "样本数/variant",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "未绑定；上游sampling.num_samples",
+      "bda_keys": [
+        "num_designs"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。",
+        "BDA声明min=1",
+        "BDA声明max=100000"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": 100
+    },
+    {
+      "key": "sampling_steps",
+      "type": "integer",
+      "description": "页面声明的扩散采样步数；该值没有传入命令。不能直接等同abopt optimize_steps（局部扰动起点），完整扩散调度来自模型/配置。",
+      "unit": "扩散步（未绑定）",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "未绑定；无已核验一一对应",
+      "bda_keys": [
+        "sampling_steps"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。",
+        "BDA声明min=1",
+        "BDA声明max=1000"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": 100
+    },
+    {
+      "key": "seed",
+      "type": "integer",
+      "description": "拟设随机数种子。上游代码将显式0作为固定种子0；None才回退config.sampling.seed，页面“0自动随机”的说明无源码支持。",
+      "unit": "整数种子",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "未绑定；上游--seed优先于sampling.seed",
+      "bda_keys": [
+        "seed"
+      ],
+      "constraints": [
+        "插件disabled；python run.py没有参数映射或input_adapter。",
+        "BDA声明min=0"
+      ],
+      "source_refs": [
+        "live",
+        "da-runner",
+        "da-dock"
+      ],
+      "default": 0
+    },
+    {
+      "key": "pdb_path",
+      "type": "string",
+      "description": "已组装抗体–抗原PDB，design_pdb.py的位置参数；与抗原单独文件区分。",
+      "unit": "PDB路径",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "位置参数",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ]
+    },
+    {
+      "key": "heavy",
+      "type": "string",
+      "description": "抗体重链ID；未指定时由上游编号工具识别，须核验结果。",
+      "unit": "链ID",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--heavy",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "light",
+      "type": "string",
+      "description": "抗体轻链ID；未指定时由上游识别，不能把抗原链误识别为轻链。",
+      "unit": "链ID",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--light",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": null
+    },
+    {
+      "key": "no_renumber",
+      "type": "boolean",
+      "description": "跳过默认抗体重新编号；只有输入符合模型/CDR识别编号时使用。",
+      "unit": "布尔",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--no_renumber",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": false
+    },
+    {
+      "key": "config",
+      "type": "string",
+      "description": "设计配置YAML，决定CDR模式、采样和checkpoint；当前BDA缺此入口。",
+      "unit": "YAML路径",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--config",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": "./configs/test/codesign_single.yml"
+    },
+    {
+      "key": "out_root",
+      "type": "string",
+      "description": "生成结果根目录；须与BDA输出收集路径对应。",
+      "unit": "目录",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--out_root",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": "./results"
+    },
+    {
+      "key": "tag",
+      "type": "string",
+      "description": "输出任务附加标识，不是氨基酸标签或表达标签。",
+      "unit": "文本",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--tag",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": ""
+    },
+    {
+      "key": "device",
+      "type": "string",
+      "description": "模型运行设备，需与PyTorch/GPU环境匹配。",
+      "unit": "设备标识",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--device",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": "cuda"
+    },
+    {
+      "key": "batch_size",
+      "type": "integer",
+      "description": "同一批并行推理的样本数，主要影响显存和吞吐；不是总样本数。",
+      "unit": "样本/批",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--batch_size",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": 16
+    },
+    {
+      "key": "model.checkpoint",
+      "type": "string",
+      "description": "模型权重文件；fixbb和strpred示例使用不同checkpoint，不能只切布尔而沿用错误权重。",
+      "unit": "checkpoint路径",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:model.checkpoint",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-fixbb",
+        "da-strpred"
+      ],
+      "default": "./trained_models/codesign_single.pt"
+    },
+    {
+      "key": "mode",
+      "type": "string",
+      "description": "variant生成模式，single_cdr逐环、multiple_cdrs联合、abopt局部优化。",
+      "unit": "枚举",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:mode",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-runner"
+      ],
+      "default": "single_cdr"
+    },
+    {
+      "key": "sampling.seed",
+      "type": "integer",
+      "description": "未给CLI --seed时使用的配置随机种子；0同样是固定数值。",
+      "unit": "整数种子",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.seed",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-runner"
+      ],
+      "default": 2022
+    },
+    {
+      "key": "sampling.sample_structure",
+      "type": "boolean",
+      "description": "是否去除待设计CDR结构信息并采样骨架；false用于固定骨架。",
+      "unit": "布尔",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.sample_structure",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-fixbb"
+      ],
+      "default": true
+    },
+    {
+      "key": "sampling.sample_sequence",
+      "type": "boolean",
+      "description": "是否去除待设计CDR序列信息并采样AA；false用于固定序列结构预测。",
+      "unit": "布尔",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.sample_sequence",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-strpred"
+      ],
+      "default": true
+    },
+    {
+      "key": "sampling.cdrs",
+      "type": "array",
+      "description": "上游CDR名称集合，与实际识别CDR取交集；遗漏/错误名称可能改变设计范围。",
+      "unit": "CDR集合",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.cdrs",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-runner"
+      ],
+      "default": [
+        "H_CDR1",
+        "H_CDR2",
+        "H_CDR3",
+        "L_CDR1",
+        "L_CDR2",
+        "L_CDR3"
+      ]
+    },
+    {
+      "key": "sampling.num_samples",
+      "type": "integer",
+      "description": "每个设计variant重复采样数量；逐CDR或多个优化步数会增大总生成数量。",
+      "unit": "样本/variant",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.num_samples",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-single",
+        "da-runner"
+      ],
+      "default": 100
+    },
+    {
+      "key": "sampling.optimize_steps",
+      "type": "array",
+      "description": "abopt每个局部优化variant使用的扩散扰动深度列表；不是物理时间，非一般采样总步数。",
+      "unit": "扩散步列表",
+      "modes": [
+        "codesign_single",
+        "codesign_multiple",
+        "abopt",
+        "fixbb",
+        "strpred",
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "config:sampling.optimize_steps",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-opt",
+        "da-runner"
+      ],
+      "default": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    {
+      "key": "antibody",
+      "type": "string",
+      "description": "抗原单独入口用于初始对接的抗体框架模板；选择会影响CDR环境和可达表面。",
+      "unit": "PDB路径",
+      "modes": [
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--antibody",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-dock"
+      ],
+      "default": "./data/examples/3QHF_Fv.pdb"
+    },
+    {
+      "key": "num_docks",
+      "type": "integer",
+      "description": "传给对接入口保留/处理的起始框架pose数量，不是每pose的CDR样本数。",
+      "unit": "对接pose数",
+      "modes": [
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--num_docks",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-dock"
+      ],
+      "default": 10
+    },
+    {
+      "key": "hdock_bin",
+      "type": "string",
+      "description": "HDOCK程序路径，抗原单独设计前置依赖。",
+      "unit": "程序路径",
+      "modes": [
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--hdock_bin",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-dock"
+      ],
+      "default": "./bin/hdock"
+    },
+    {
+      "key": "createpl_bin",
+      "type": "string",
+      "description": "HDOCK pose提取程序路径，与HDOCK版本匹配。",
+      "unit": "程序路径",
+      "modes": [
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "--createpl_bin",
+      "bda_keys": [],
+      "constraints": [
+        "官方参考入口已核验，BDA当前未暴露/绑定；此处默认值为上游示例或CLI值。"
+      ],
+      "source_refs": [
+        "da-dock"
+      ],
+      "default": "./bin/createpl"
+    },
+    {
+      "key": "antigen",
+      "type": "string",
+      "description": "design_dock.py必需的抗原PDB路径，与抗体框架一起先做HDOCK对接；只有BDA antigen_pdb声明而无当前adapter。",
+      "unit": "PDB路径",
+      "modes": [
+        "dock_then_design"
+      ],
+      "flag_or_mapping": "上游--antigen；BDA当前未绑定",
+      "bda_keys": [],
+      "constraints": [
+        "上游required=True，未定义用户可用默认路径。",
+        "不替代antibody框架与config/checkpoint。"
+      ],
+      "source_refs": [
+        "da-dock",
+        "live"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "variant/sample PDB",
+      "meaning": "按CDR选择/优化深度保存的生成复合物结构",
+      "unit": "Å坐标",
+      "interpretation": "核对设计区域与保留区域；不是运行过Rosetta Relax的证明。",
+      "source_refs": [
+        "da-runner"
+      ]
+    },
+    {
+      "name": "metadata.json",
+      "meaning": "任务、结构/设计信息与原配置路径等元数据；源码仅记录配置路径，不自动复制 YAML 配置",
+      "unit": "元数据",
+      "interpretation": "另行保存实际解析后的配置及原 YAML，不能把路径字符串当作已归档配置内容",
+      "source_refs": [
+        "da-runner",
+        "live"
+      ]
+    },
+    {
+      "name": "score_table（BDA声明）",
+      "meaning": "可选生成/评价统计",
+      "unit": "方法相关",
+      "interpretation": "采样流程未自动保证亲和力或Rosetta能量输出；额外评价需单独运行并注明方法。",
+      "source_refs": [
+        "live",
+        "da-readme"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "当前仅审阅文档和配置，保持disabled状态如实展示。",
+    "选择已有复合物还是抗原+框架先对接；准备链ID、CDR编号和对应checkpoint。",
+    "选择五种上游YAML模式之一；检查sampling.cdrs、sample_structure和sample_sequence。",
+    "修复BDA实际命令、输入/输出adapter和运行环境后，先检查最小案例的参数确认、样本数和CDR范围。",
+    "将额外Relax/界面分析与生成阶段分开记录；生成分数不当作实测亲和力。"
+  ],
+  "pitfalls": [
+    "BDA schema valid与disabled/unproven可以同时存在，前者不是可运行结论。",
+    "上游显式seed=0为固定种子，与BDA旧帮助矛盾。",
+    "H_CDR3等名称依赖抗体编号，不能直接用一般蛋白残基列表替代。",
+    "antigen_pdb单独输入不等于从零生成完整抗体；框架与起始复合物处理是必要条件。",
+    "epitope_residues和sampling_steps目前只是未绑定声明，不能假定产生真实接触约束或调度改动。"
+  ],
+  "gaps": [
+    "无官方或本地已核验的run.py adapter；当前6个BDA字段全部未接入命令。",
+    "缺checkpoint/config、抗体框架、链ID/编号转换、HDOCK依赖和已验证运行环境。",
+    "输出filename_glob均为*且无parser，产物类型/计数未验证。",
+    "没有qm-scripts library DiffAb条目；此文档补充官方模式和参数说明，不声称生成器已支持。"
+  ],
+  "audit_snapshot": {
+    "date": "2026-09-15",
+    "enabled": false,
+    "runtime_validation_status": "unproven",
+    "binding_note": "参数声明/配置生成/实际运行必须分开；本审计未执行模型。",
+    "upstream_reference_commit": "c3e2966601bf8025025ab87717b31b08fdd4834e",
+    "upstream_reference_note": "2026-09-15从官方归档仓库main解析的固定参考；不是BDA安装版本证明。"
+  }
+}

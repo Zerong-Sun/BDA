@@ -1,0 +1,379 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "APBS+PDB2PQR",
+  "slug": "apbs-pdb2pqr",
+  "summary": "从全原子结构准备 PQR 并计算连续介质静电势；当前入口是 PDB2PQR → APBS 单条流程。",
+  "sources": [
+    {
+      "id": "bda",
+      "scope": "本次实时 BDA 声明；不是上游功能或运行成功证明",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream",
+      "url": "https://pdb2pqr.readthedocs.io/en/latest/using/index.html",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "potential",
+      "url": "https://apbs.readthedocs.io/en/latest/using/input/old/elec/write.html",
+      "scope": "功能与参数定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "apbs_input",
+      "url": "https://apbs.readthedocs.io/en/latest/using/input/old/elec/index.html",
+      "scope": "APBS ELEC 物理参数、网格与边界定义",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "inputgen",
+      "url": "https://pdb2pqr.readthedocs.io/en/latest/_modules/pdb2pqr/inputgen.html",
+      "scope": "自动生成 APBS 网格/介质控制文件的逻辑；实际默认以安装版本运行文件为准",
+      "retrieved_on": "2026-09-15"
+    }
+  ],
+  "modes": [
+    {
+      "id": "electrostatics",
+      "title": "PQR 准备与静电势",
+      "purpose": "为可比构象生成电荷/半径与势场",
+      "required_inputs": [
+        "structure: 一个全原子 PDB"
+      ],
+      "parameters": {
+        "forcefield": "AMBER",
+        "keep_chain": true
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "ph",
+      "title": "指定 pH 质子化",
+      "purpose": "借助 PROPKA 设置质子化状态后求解",
+      "required_inputs": [
+        "structure: 一个全原子 PDB"
+      ],
+      "parameters": {
+        "with_ph": 7.0
+      },
+      "bda_status": "declared",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "id": "custom_pb",
+      "title": "自定义 PB 网格/介质/盐条件",
+      "purpose": "自定义 APBS .in 的网格和物理边界",
+      "required_inputs": [
+        "已准备 PQR",
+        "APBS 输入文件"
+      ],
+      "parameters": {
+        "pdie": 2.0,
+        "sdie": 78.54
+      },
+      "bda_status": "not_exposed",
+      "output_checks": [
+        "检查退出状态、日志、非空输出及参数实际读取记录"
+      ],
+      "limitations": [
+        "此为参数片段，输入文件和运行环境需独立绑定；未暴露模式不能直接在当前 BDA 运行"
+      ],
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "forcefield",
+      "type": "string",
+      "description": "PDB2PQR 分配原子电荷和半径使用的参数集；AMBER、CHARMM、PARSE 等以所装版本 --help 为准。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--ff",
+      "bda_keys": [
+        "forcefield"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": "AMBER"
+    },
+    {
+      "key": "with_ph",
+      "type": "number",
+      "description": "指定 PROPKA 质子化处理的 pH；null 时包装器不追加该步骤，不应解释为显式求得 pH 7 的状态。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--titration-state-method propka --with-ph",
+      "bda_keys": [
+        "with_ph"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": null
+    },
+    {
+      "key": "keep_chain",
+      "type": "boolean",
+      "description": "保留 PQR 中链 ID，利于追溯输入结构；不保证下游所有输出都保留链信息。",
+      "unit": "无量纲",
+      "flag_or_mapping": "--keep-chain",
+      "bda_keys": [
+        "keep_chain"
+      ],
+      "modes": [],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ],
+      "default": true
+    },
+    {
+      "key": "pdie",
+      "type": "number",
+      "description": "溶质内部相对介电常数；仅可在自定义 APBS 输入中配置，当前 BDA 表单不暴露。",
+      "unit": "无量纲",
+      "flag_or_mapping": "APBS ELEC pdie",
+      "bda_keys": [],
+      "modes": [
+        "custom_pb"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "key": "sdie",
+      "type": "number",
+      "description": "溶剂相对介电常数；比较时与温度、离子强度一起固定。",
+      "unit": "无量纲",
+      "flag_or_mapping": "APBS ELEC sdie",
+      "bda_keys": [],
+      "modes": [
+        "custom_pb"
+      ],
+      "constraints": "按所选版本检查；上游扩展键不自动进入 BDA 命令",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "*.pqr",
+      "meaning": "原子坐标及电荷、半径；核对原子/残基变化和质子化",
+      "unit": "Å；电荷 e；半径 Å",
+      "interpretation": "保留原始值；不作为结合亲和力证据",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "*.in",
+      "meaning": "PDB2PQR 自动生成的 APBS 配置：网格点数/中心/边长、介电常数、温度及离子定义",
+      "unit": "各键单独定义",
+      "interpretation": "必须随势场一起保留，不能仅保存 DX；实际值由该次生成文件读取",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "*.dx",
+      "meaning": "空间静电势网格；write pot 使用 kBT/e",
+      "unit": "kBT/e",
+      "interpretation": "不是总结合自由能；比较时统一网格、温度、介质和盐条件",
+      "source_refs": [
+        "potential"
+      ]
+    },
+    {
+      "name": "apbs.log",
+      "meaning": "求解日志和可能的能量/收敛条目",
+      "unit": "字段依 APBS 版本",
+      "interpretation": "日志能量需注明计算条件与对应计算块，不从势场颜色推导亲和力",
+      "source_refs": [
+        "upstream",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: dime",
+      "meaning": "有限差分网格每维点数；需满足所用多重网格层级约束",
+      "unit": "整数三元组",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: cglen / fglen",
+      "meaning": "粗/细网格三维物理边长；决定覆盖范围与网格间距",
+      "unit": "Å 三元组",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: cgcent / fgcent",
+      "meaning": "粗/细网格中心，可由分子 mol 编号或显式坐标指定",
+      "unit": "Å 或 mol 选择",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: pdie / sdie",
+      "meaning": "溶质/溶剂相对介电常数；与力场和溶剂假设共同影响势场",
+      "unit": "无量纲",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: temp",
+      "meaning": "计算温度；决定 kBT/e 的实际电势换算",
+      "unit": "K",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: ion charge / conc / radius",
+      "meaning": "移动离子电荷数、体相浓度及离子半径；逐离子物种记录",
+      "unit": "e / M / Å",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: bcfl / lpbe / npbe",
+      "meaning": "边界条件以及线性/非线性 Poisson–Boltzmann 方程选择",
+      "unit": "枚举",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: srfm / srad / swin / chgm",
+      "meaning": "介电表面定义、溶剂探针半径、表面平滑窗口及原子电荷网格分配方式",
+      "unit": "枚举 / Å / Å / 枚举",
+      "interpretation": "从本次实际 .in 提取；当前 BDA 未提供独立可调表单，不推定固定默认值。",
+      "source_refs": [
+        "apbs_input",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: method mg-auto / mg-para",
+      "meaning": "自动聚焦/并行聚焦网格计算方式，生成器可能根据内存估计选择",
+      "unit": "枚举",
+      "interpretation": "保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。",
+      "source_refs": [
+        "inputgen",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: mol",
+      "meaning": "本计算块使用 READ 部分中哪一个 PQR 分子",
+      "unit": "从 1 开始的分子编号",
+      "interpretation": "保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。",
+      "source_refs": [
+        "inputgen",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: sdens",
+      "meaning": "用于部分表面模型的球面离散点密度；是否使用由 srfm 决定",
+      "unit": "点/Å²",
+      "interpretation": "保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。",
+      "source_refs": [
+        "inputgen",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: calcenergy / calcforce",
+      "meaning": "是否以及以 total/comps 等形式输出能量/力的控制；取值和单位需查实际日志",
+      "unit": "枚举",
+      "interpretation": "保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。",
+      "source_refs": [
+        "inputgen",
+        "bda"
+      ]
+    },
+    {
+      "name": "generated .in: write pot dx / print elecEnergy",
+      "meaning": "势场文件类型/输出前缀和电势能计算块组合表达式",
+      "unit": "输出控制",
+      "interpretation": "保留实际 .in；当前 BDA 不额外转发这些表单参数，不从工具名称推断值。",
+      "source_refs": [
+        "inputgen",
+        "bda"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "选择本页明确版本和功能模式，按模式绑定输入，核对链号、序列和原子完整性。",
+    "输入参数后预览最终命令/生成配置；未映射字段不能视为生效，未接入模式需先补适配。",
+    "运行条件验证后检查全部原始输出、失败样本和缺失值；保存所用版本、配置、输入输出哈希。"
+  ],
+  "pitfalls": [
+    "同一颜色/势值不证明结合；质子化状态与构象均会改变结果。"
+  ],
+  "gaps": [
+    "当前仅取 structure 目录排序后的第一个 PDB；多文件应拆开提交，否则不能声称全部计算。",
+    "缺少显式网格、介电常数、盐强度和温度表单；派生 .in 文件未列为独立输出端口，需补归档收集后支持严格比较。",
+    "内置侧链原子 grep 仅能发现部分 backbone-only 输入，不能代替全原子/配体参数完整性检查。"
+  ]
+}

@@ -247,9 +247,11 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
             "delivery.build": "bda_v2.delivery_build",
             "literature.ingest": "bda_v2.literature_ingest",
             "literature.search": "bda_v2.literature_search",
+            "literature.patent_legal_status": "bda_v2.patent_legal_status",
             "literature.subscription.run": "bda_v2.subscription_run",
             "intelligence.run": "bda_v2.intelligence_run",
             "intelligence.export": "bda_v2.intelligence_export",
+            "intelligence.druggability": "bda_v2.druggability_assessment",
             "copilot.respond": "bda_v2.copilot_respond",
             "copilot.agent_step": "bda_v2.copilot_agent_step",
             "project.prompt_generate": "bda_v2.project_prompt_generate",
@@ -296,7 +298,7 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                 continue
             try:
                 args: list[object] = [str(event.aggregate_id)]
-                if event.topic in {"target.structure.import", "research.gaps.resolve"}:
+                if event.topic in {"target.structure.import", "research.gaps.resolve", "literature.patent_legal_status"}:
                     args.append(event.payload)
                 elif event.topic == "experiment_results.import":
                     args.append(bool(event.payload.get("dry_run")))

@@ -2,6 +2,8 @@
 
 React 19 + TypeScript + Vite frontend for the native `/api/v2` contract. It uses generated OpenAPI types, Zod at dynamic research boundaries, TanStack Query, Zustand, React Flow, and Mol*.
 
+Use Node.js 22.22 or newer in the 22.x line, or Node.js 24+. The locked router and API generator require newer Node releases than early 22.x installations.
+
 ```bash
 npm ci
 npm run generate:api

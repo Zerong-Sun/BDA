@@ -1,0 +1,1375 @@
+{
+  "schema_version": "bda-plugin-documentation.v1",
+  "plugin_key": "AlphaFold2",
+  "slug": "alphafold2",
+  "summary": "区分官方AF2单体/多聚体与BDA initial-guess包装；两条同名插件的输入、权重和参数消费并不相同。",
+  "sources": [
+    {
+      "id": "registry",
+      "commit": null,
+      "scope": "2026-09-15 BDA声明、command、schema、ports快照；声明不是运行成功证明",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "runbook",
+      "path": "qm-scripts/plugins/alphafold2/README.md",
+      "commit": null,
+      "scope": "2026-08-30历史QM运行手册；与当前声明不同处需单列",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "library",
+      "path": "qm-scripts/library/catalog.json",
+      "commit": "c77e5d2a8961d1a353632c462914ff0a32a950f6",
+      "scope": "手工提交library的alphafold2参数提取，默认值不是BDA默认值",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "parameter-env",
+      "path": "backend_v2/app/compute/scripts.py",
+      "commit": null,
+      "scope": "parameter_environment将boolean true/false导出为1/空字符串；字符串不按boolean解释",
+      "retrieved_on": "2026-09-15"
+    },
+    {
+      "id": "upstream-0",
+      "url": "https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/run_alphafold.py",
+      "commit": "c77e5d2a8961d1a353632c462914ff0a32a950f6",
+      "scope": "run_alphafold.py；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    },
+    {
+      "id": "upstream-1",
+      "url": "https://github.com/google-deepmind/alphafold/blob/c77e5d2a8961d1a353632c462914ff0a32a950f6/README.md",
+      "commit": "c77e5d2a8961d1a353632c462914ff0a32a950f6",
+      "scope": "README.md；上游源码快照，不证明QM安装代码完全相同",
+      "retrieved_on": "2026-09-15",
+      "classification": "private",
+      "sha256": "c08339c22854cce7f1735573212d2beda76cc71340311d7f9e848d9cd30074a4"
+    }
+  ],
+  "modes": [
+    {
+      "id": "monomer",
+      "title": "官方AF2单体",
+      "purpose": "使用单链FASTA与单体权重",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "model_preset": "monomer"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "monomer_ptm",
+      "title": "单体pTM",
+      "purpose": "单体折叠并输出pTM",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "model_preset": "monomer_ptm"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "monomer_casp14",
+      "title": "CASP14 ensemble",
+      "purpose": "使用额外ensemble配置",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "model_preset": "monomer_casp14"
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "multimer",
+      "title": "官方AF2-Multimer",
+      "purpose": "多链同一目标联合预测",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "model_preset": "multimer",
+        "num_multimer_predictions_per_model": 5
+      },
+      "bda_status": "configuration_only",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "结构置信度不是实验结合/活性证据"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    },
+    {
+      "id": "initial_guess_wrapper",
+      "title": "BDA predict.py初始坐标包装",
+      "purpose": "仅文档化现有2.3.2包装，不能视作官方AF2入口",
+      "required_inputs": [
+        "经核对的分子输入文件及可用模型权重"
+      ],
+      "parameters": {
+        "initial_guess": true,
+        "recycles": 3,
+        "models": 1,
+        "db_preset": "reduced_dbs"
+      },
+      "bda_status": "unverified",
+      "output_checks": [
+        "逐输入/模型/种子核对输出数量、原始置信度和输入序列SHA",
+        "对比实际日志与请求参数，不用成功退出替代科学结果验证"
+      ],
+      "limitations": [
+        "本快照包装命令及容器身份不同于官方入口，未取得实际predict.py源码",
+        "ensemble_predictions未出现在command"
+      ],
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "key": "benchmark",
+      "type": "boolean",
+      "description": "重复JAX评估以区分编译耗时与推理耗时；不会增加独立实验数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --benchmark；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "benchmark"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Run multiple JAX model evaluations to obtain a timing that excludes the compilation time, which should be more indicative of the time required for inferencing many proteins.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    },
+    {
+      "key": "bfd_database_path",
+      "type": "string",
+      "description": "bfd数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --bfd_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the BFD database for use by HHblits.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "data_dir",
+      "type": "string",
+      "description": "AF2支持数据及模型参数根目录；必须与其余数据库路径配套。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --data_dir；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "data_dir"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to directory of supporting data.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "/data/alphafold",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "db_preset",
+      "type": "string",
+      "description": "MSA数据库方案：full_dbs与reduced_dbs使用不同数据库集合，不是是否启用MSA的开关。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --db_preset；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志；AlphaFold2@2.3.2: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "db_preset"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Choose preset MSA database configuration - smaller genetic database config (reduced_dbs) or full genetic database config  (full_dbs)",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "reduced_dbs",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "full_dbs",
+              "reduced_dbs"
+            ]
+          },
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.2",
+            "enabled": true,
+            "default": "reduced_dbs",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "reduced_dbs",
+              "full_dbs"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": "full_dbs"
+    },
+    {
+      "key": "ensemble_predictions",
+      "type": "integer",
+      "description": "BDA AF2 initial-guess包装声明的每输入种子数；command不消费此键，不能据UI值计算实际输出数。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；AlphaFold2@2.3.2: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "ensemble_predictions"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.2",
+            "enabled": true,
+            "default": 1,
+            "minimum": 1,
+            "maximum": 100,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "fasta_paths",
+      "type": "list",
+      "description": "按逗号分隔的FASTA文件路径；每个文件是一个预测目标，文件basename应唯一，多链目标需选择multimer模型。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --fasta_paths；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "fasta_paths"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Paths to FASTA files, each containing a prediction target that will be folded one after another. If a FASTA file contains multiple sequences, then it will be folded as a multimer. Paths should be separated by commas. All FASTA paths must have a unique basename as the basename is used to name the output directories for each prediction.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hhblits_binary_path",
+      "type": "string",
+      "description": "hhblits搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hhblits_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the HHblits executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hhsearch_binary_path",
+      "type": "string",
+      "description": "hhsearch搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hhsearch_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the HHsearch executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hhsearch_n_cpu",
+      "type": "integer",
+      "description": "hhsearch搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与LSF分配协调。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hhsearch_n_cpu；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "hhsearch_n_cpu"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of CPUs to use for HHsearch. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": 8,
+            "minimum": 1,
+            "maximum": 256,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hmmbuild_binary_path",
+      "type": "string",
+      "description": "hmmbuild搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hmmbuild_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the hmmbuild executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hmmsearch_binary_path",
+      "type": "string",
+      "description": "hmmsearch搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hmmsearch_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the hmmsearch executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "hmmsearch_n_cpu",
+      "type": "integer",
+      "description": "hmmsearch搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与LSF分配协调。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --hmmsearch_n_cpu；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "hmmsearch_n_cpu"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of CPUs to use for HMMsearch. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": 8,
+            "minimum": 1,
+            "maximum": 256,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "initial_guess",
+      "type": "boolean",
+      "description": "用输入结构坐标初始化AF2包装的预测；属于有坐标条件预测，不能当完全独立的从序列验证。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；AlphaFold2@2.3.2: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "initial_guess"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.2",
+            "enabled": true,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": true
+    },
+    {
+      "key": "jackhmmer_binary_path",
+      "type": "string",
+      "description": "jackhmmer搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --jackhmmer_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the JackHMMER executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "jackhmmer_n_cpu",
+      "type": "integer",
+      "description": "jackhmmer搜索线程数；未指定时上游可按min(cpu_count,8)选择，需与LSF分配协调。",
+      "unit": "计数",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --jackhmmer_n_cpu；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "jackhmmer_n_cpu"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Number of CPUs to use for Jackhmmer. Defaults to min(cpu_count, 8). Going above 8 CPUs provides very little additional speedup.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": 8,
+            "minimum": 1,
+            "maximum": 256,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "kalign_binary_path",
+      "type": "string",
+      "description": "kalign搜索/比对程序的可执行文件路径；须检查版本与执行权限。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --kalign_binary_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Kalign executable.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "max_template_date",
+      "type": "string",
+      "description": "模板发布日期上限，格式YYYY-MM-DD；用于限制结构信息泄漏。AF3还会据此限制CCD参考构象回退。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --max_template_date；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "max_template_date"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Maximum template release date to consider. Important if folding historical test sets.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "2026-01-01",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "mgnify_database_path",
+      "type": "string",
+      "description": "mgnify数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --mgnify_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to the MGnify database for use by JackHMMER.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "model_preset",
+      "type": "string",
+      "description": "AF2权重/推理配置：monomer、monomer_casp14、monomer_ptm或multimer；多条链不是自动等价于已选multimer模型。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --model_preset；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "model_preset"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Choose preset model configuration - the monomer model, the monomer model with extra ensembling, monomer model with pTM head, or multimer model",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "multimer",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "monomer",
+              "monomer_casp14",
+              "monomer_ptm",
+              "multimer"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": "monomer"
+    },
+    {
+      "key": "models",
+      "type": "integer",
+      "description": "选择模型权重；superfold接受all或1–5列表，另一个predict.py包装声明整数1–5，不能混用。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；AlphaFold2@2.3.2: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "models"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.2",
+            "enabled": true,
+            "default": 1,
+            "minimum": 1,
+            "maximum": 5,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 1
+    },
+    {
+      "key": "models_to_relax",
+      "type": "string",
+      "description": "AF2输出Amber几何优化范围all/best/none；relax不计算结合自由能，也不是长时间MD。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --models_to_relax；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "models_to_relax"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The models to run the final relaxation step on. If `all`, all models are relaxed, which may be time consuming. If `best`, only the most confident model is relaxed. If `none`, relaxation is not run. Turning off relaxation might result in predictions with distracting stereochemical violations but might help in case you are having issues with the relaxation stage.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "best",
+            "minimum": null,
+            "maximum": null,
+            "enum": [
+              "all",
+              "best",
+              "none"
+            ]
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": "BEST"
+    },
+    {
+      "key": "num_multimer_predictions_per_model",
+      "type": "integer",
+      "description": "每套multimer模型的随机种子采样次数，总数还需乘模型套数；单体模式不适用。",
+      "unit": "计数",
+      "modes": [
+        "multimer"
+      ],
+      "flag_or_mapping": "官方CLI --num_multimer_predictions_per_model；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "num_multimer_predictions_per_model"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "How many predictions (each with a different random seed) will be generated per model. E.g. if this is 2 and there are 5 models then there will be 10 predictions per input. Note: this FLAG only applies if model_preset=multimer",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": 5
+    },
+    {
+      "key": "obsolete_pdbs_path",
+      "type": "string",
+      "description": "失效PDB编号到替代编号的映射文件。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --obsolete_pdbs_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to file containing a mapping from obsolete PDB IDs to the PDB IDs of their replacements.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "output_dir",
+      "type": "string",
+      "description": "输出目录；BDA通常以作业隔离的BDA_OUTPUT_DIR接管，不能假定界面值决定实际路径。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --output_dir；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "output_dir"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to a directory that will store the results.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": "outputs/alphafold",
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "pdb70_database_path",
+      "type": "string",
+      "description": "pdb70数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --pdb70_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the PDB70 database for use by HHsearch.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "pdb_seqres_database_path",
+      "type": "string",
+      "description": "pdb_seqres数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --pdb_seqres_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Full filepath to the PDB seqres database file (not just the directory) for use by hmmsearch.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "random_seed",
+      "type": "integer",
+      "description": "随机种子。官方AF2未指定才自动生成；0是有效种子，不等于自动模式；GPU过程也未必完全确定。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --random_seed；AlphaFold2@2.3.0: schema声明但command未引用（可能硬编码/未接通），不保证生效",
+      "bda_keys": [
+        "random_seed"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "The random seed for the data pipeline. By default, this is randomly generated. Note that even if this is set, Alphafold may still not be deterministic, because processes like GPU inference are nondeterministic.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": 0,
+            "minimum": 0,
+            "maximum": null,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "recycles",
+      "type": "integer",
+      "description": "BDA predict.py包装的循环数，映射-recycles；不是官方run_alphafold.py通用CLI。",
+      "unit": "计数",
+      "modes": [
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "BDA包装字段；不是同名官方CLI参数；AlphaFold2@2.3.2: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "recycles"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.2",
+            "enabled": true,
+            "default": 3,
+            "minimum": 0,
+            "maximum": 20,
+            "enum": null
+          }
+        ]
+      },
+      "source_refs": [
+        "registry",
+        "upstream-0"
+      ],
+      "default": 3
+    },
+    {
+      "key": "small_bfd_database_path",
+      "type": "string",
+      "description": "small_bfd数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --small_bfd_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the small version of BFD used with the \"reduced_dbs\" preset.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "template_mmcif_dir",
+      "type": "string",
+      "description": "模板结构mmCIF目录，文件按PDB编号组织；不是initial_guess坐标输入。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --template_mmcif_dir；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to a directory with template mmCIF structures, each named <pdb_id>.cif",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "uniprot_database_path",
+      "type": "string",
+      "description": "uniprot数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --uniprot_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the Uniprot database for use by JackHMMer.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "uniref30_database_path",
+      "type": "string",
+      "description": "uniref30数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --uniref30_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Path to the UniRef30 database for use by HHblits.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "uniref90_database_path",
+      "type": "string",
+      "description": "uniref90数据库文件/索引路径；核对对应版本、发布日期及工具要求，不能用目录名替代特定文件。",
+      "unit": "路径",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --uniref90_database_path；",
+      "bda_keys": [],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Path to the Uniref90 database for use by JackHMMER.",
+        "bda_variants": []
+      },
+      "source_refs": [
+        "library",
+        "upstream-0"
+      ],
+      "default": null
+    },
+    {
+      "key": "use_gpu_relax",
+      "type": "boolean",
+      "description": "是否在GPU执行AF2的Amber几何优化；需有可用GPU且核对布尔开关渲染。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --use_gpu_relax；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "use_gpu_relax"
+      ],
+      "constraints": {
+        "library_required": true,
+        "library_help": "Whether to relax on GPU. Relax on GPU can be much faster than CPU, so it is recommended to enable if possible. GPUs must be available if this setting is enabled.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": true,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": null
+    },
+    {
+      "key": "use_precomputed_msas",
+      "type": "boolean",
+      "description": "读取输出目录已有MSA，跳过相应搜索；上游不会自动核对旧MSA与新序列/数据库配置的一致性。",
+      "unit": "无量纲/不适用",
+      "modes": [
+        "monomer",
+        "monomer_ptm",
+        "monomer_casp14",
+        "multimer",
+        "initial_guess_wrapper"
+      ],
+      "flag_or_mapping": "官方CLI --use_precomputed_msas；AlphaFold2@2.3.0: command引用此变量；仍需验证运行日志",
+      "bda_keys": [
+        "use_precomputed_msas"
+      ],
+      "constraints": {
+        "library_required": false,
+        "library_help": "Whether to read MSAs that have been written to disk instead of running the MSA tools. The MSA files are looked up in the output directory, so it must stay the same between multiple runs that are to reuse the MSAs. WARNING: This will not check if the sequence, database or configuration have changed.",
+        "bda_variants": [
+          {
+            "plugin_key": "AlphaFold2",
+            "version": "2.3.0",
+            "enabled": false,
+            "default": false,
+            "minimum": null,
+            "maximum": null,
+            "enum": null
+          }
+        ],
+        "bda_environment": "true→1, false→空字符串；${flag:+--flag}与正常BDA布尔值兼容"
+      },
+      "source_refs": [
+        "library",
+        "registry",
+        "upstream-0",
+        "parameter-env"
+      ],
+      "default": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "predicted_structure / complex",
+      "meaning": "预测原子坐标及链/残基映射",
+      "unit": "Å",
+      "interpretation": "坐标是假说；保留精确输入实体、模型与seed；不能推断实验结合。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pLDDT",
+      "meaning": "局部结构置信度",
+      "unit": "通常0–100；Boltz/Protein-Hunter原始汇总常0–1",
+      "interpretation": "逐文件核对尺度，不是概率或亲和力。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "pTM / ipTM",
+      "meaning": "整体折叠/多链相对构象置信度",
+      "unit": "0–1",
+      "interpretation": "单体没有真实跨链接口ipTM；不要将零占位或对角线当结合分数。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    },
+    {
+      "name": "PAE",
+      "meaning": "对齐后的相对位置预测误差矩阵",
+      "unit": "Å",
+      "interpretation": "保留链映射、非对角块和聚合定义；不能单独证明结合位点。",
+      "source_refs": [
+        "upstream-0",
+        "registry"
+      ]
+    }
+  ],
+  "usage_steps": [
+    "先按模型与版本确认输入实体、链ID、序列SHA、MSA/模板来源；区分预测、设计与亲和力。",
+    "从当前BDA快照核对enabled、command和ports；文档中的configuration_only/not_exposed不是可执行能力承诺。",
+    "填写对应模式配置，检查参数最终进入命令或结构化输入；数据库/权重需已存在且记录版本。",
+    "预览任务脚本和实际输入文件，核对CPU/GPU、布尔false、输出目录及样本总数；本次审计不提交任务。",
+    "完成后逐输入/seed/model核对文件、原始指标和失败样本；声明、成功退出、解析成功及科学结论分开记录。"
+  ],
+  "pitfalls": [
+    "pLDDT/ipTM/RMSD不等于ΔG/ΔΔG/Kd或生物活性。",
+    "template、initial_guess、空MSA和真实MSA是不同证据条件；不能混成独立交叉验证。",
+    "未消费的UI参数不可写入报告为已执行条件；本地catalog默认、BDA默认、命令回退和安装默认要区分。",
+    "官方2.3.0条目disabled；2.3.2是另一个predict.py包装，不是官方run_alphafold.py运行证明。",
+    "2.3.0 command从sequences目录找FASTA，但声明端口是fasta_paths，需查adapter或修复staging映射。",
+    "benchmark/random_seed/搜索CPU字段未被2.3.0 command消费；data_dir/output_dir硬编码。",
+    "2.3.2 ensemble_predictions未消费；正常BDA boolean正确序列化为1/空字符串，手工脚本不得将false写成非空字符串。",
+    "官方AF2无initial_guess CLI；本地包装的代码commit/安装可用性未取得一致性证明。"
+  ],
+  "gaps": [
+    "官方2.3.0条目disabled；2.3.2是另一个predict.py包装，不是官方run_alphafold.py运行证明。",
+    "2.3.0 command从sequences目录找FASTA，但声明端口是fasta_paths，需查adapter或修复staging映射。",
+    "benchmark/random_seed/搜索CPU字段未被2.3.0 command消费；data_dir/output_dir硬编码。",
+    "2.3.2 ensemble_predictions未消费；正常BDA boolean正确序列化为1/空字符串，手工脚本不得将false写成非空字符串。",
+    "官方AF2无initial_guess CLI；本地包装的代码commit/安装可用性未取得一致性证明。"
+  ]
+}

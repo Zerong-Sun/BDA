@@ -17,6 +17,7 @@ from ..core.problem import DomainError
 from ..core.statuses import TERMINAL_JOB_STATUSES, JobStatus, WorkflowRunStatus
 from ..identity.models import User
 from ..projects.models import Project
+from ..registry.site_runtime import resolve_plugin_runtime
 from ..workflows.models import WorkflowNode, WorkflowRun
 from ..workflows.repository import WorkflowRepository
 from .binding import BindingError, resolve_artifact_bindings, resolve_pending_inputs
@@ -246,6 +247,7 @@ def create_submission(
         if getattr(node, "execution_mode", "dispatch") == "manual":
             continue
         plugin_snapshot = None
+        resolved_runtime = None
         plugin = None
         if node.model_plugin_id:
             from ..registry.models import ModelPlugin
@@ -271,6 +273,15 @@ def create_submission(
                 "input_adapter": plugin.input_adapter,
                 "runtime_setup": plugin.runtime_setup,
             }
+            resolved_runtime = resolve_plugin_runtime(
+                plugin,
+                image=node.container_image,
+                queue=node.queue,
+                default_queue=get_settings().lsf_queue,
+                backend=backend,
+            )
+            plugin_snapshot["site_overrides"] = resolved_runtime["site_overrides"]
+            plugin_snapshot["resolved_runtime"] = resolved_runtime
             plugin_snapshot["checksum_sha256"] = hashlib.sha256(
                 json.dumps(plugin_snapshot, sort_keys=True, separators=(",", ":")).encode()
             ).hexdigest()
@@ -306,7 +317,7 @@ def create_submission(
             runtime_spec={
                 "parameters": node.parameters,
                 "node_key": node.node_key,
-                "image": node.container_image,
+                "image": resolved_runtime["image"] if resolved_runtime else node.container_image,
                 # The plugin owns the command; a node created through the UI never carries
                 # one, and dispatching that as an empty command ran `true` instead of the
                 # model. Same precedence as the preview endpoint, so what a scientist
@@ -318,7 +329,7 @@ def create_submission(
                 "configuration": node.configuration or {},
                 "workflow_edges": workflow.graph.get("edges", []),
                 "timeout_minutes": payload.timeout_minutes,
-                "queue": node.queue,
+                "queue": resolved_runtime["queue"] if resolved_runtime else node.queue,
                 "plugin_snapshot": plugin_snapshot,
                 "manifest_version": "1",
                 "input_manifest_template": {

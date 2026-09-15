@@ -9,7 +9,7 @@ from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
-from .models import ResearchBrief, ResearchFinding
+from .models import PROGRESS_NOTE_STATUS, ROUND_NOTE_SCOPE_KEY, ResearchBrief, ResearchFinding
 from .schemas import (
     BriefCreate,
     BriefUpdate,
@@ -85,7 +85,26 @@ def request_gap_resolution(
 
 
 def create_brief(session: Session, project: Project, payload: BriefCreate, user: User) -> ResearchBrief:
+    """Create a brief, recording what kind of brief it is rather than trusting the default.
+
+    Review-round scripts create one brief per project per round and, in the same
+    transaction, write that same round to `project_timeline_entries`. The brief is a
+    duplicate of a timeline entry living in the table the Research page reads for a
+    project's review document, which is how a few hundred characters of round status came
+    to stand in for a review many times its length. On a long-running deployment most of a
+    project's briefs can end up being these notes.
+
+    Rejecting them was the other option and is worse: those scripts create the brief
+    before the timeline entry, so a 422 here would abort the round and lose the record
+    that does belong on the timeline. Classifying instead keeps every writer working while
+    making the row honest about what it is; `preferred_review_brief` ranks this status
+    last. Existing rows are left alone - several archived projects have nothing but round
+    notes, and demoting those would show a seeded stub instead.
+    """
     row = ResearchBrief(project_id=project.id, created_by=user.id, **payload.model_dump())
+    scope = row.scope if isinstance(row.scope, dict) else {}
+    if scope.get(ROUND_NOTE_SCOPE_KEY):
+        row.status = PROGRESS_NOTE_STATUS
     session.add(row)
     session.flush()
     return row
