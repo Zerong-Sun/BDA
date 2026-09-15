@@ -1123,6 +1123,12 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
   add('GET', `/api/v2/jobs/job_browser`, {}, () => ok(jobFixture(scenario)))
+  // The job drawer now streams every job that is still moving, so a running job
+  // opens this on mount. The fixture answers with a body that carries no SSE
+  // frames: the stream ends at once, which is the degrade path the hook is
+  // built for - it drops back to polling - and the one worth pinning, since a
+  // stream a proxy closes early is the common case in production.
+  add('GET', `/api/v2/jobs/job_browser/events`, {}, () => ok({}))
   add('GET', '/api/v2/jobs/job_browser/logs', { limit: '200' }, () => ok({
     items: [
       { id: 'log_1', job_id: 'job_browser', level: 'info', message: 'Browser job started.', created_at: NOW },

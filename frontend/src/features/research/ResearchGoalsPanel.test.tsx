@@ -145,6 +145,51 @@ describe('ResearchGoalsPanel', () => {
     sessionStorage.removeItem('bda_user')
   })
 
+  it('shows the new status before the server answers', async () => {
+    // Marking a goal answered is reversible and spends nothing, so the screen
+    // does not wait for the round trip. The update is left unresolved here, so
+    // anything visible is the optimistic value and nothing else.
+    api.update.mockImplementation(() => new Promise(() => {}))
+    renderWithProviders(<ResearchGoalsPanel projectId="project-one" />)
+    await screen.findByText('Can this bind CBD?')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Status of Can this bind CBD?' }))
+    const answered = await screen.findByRole('option', { name: 'answered' })
+    // The same pointer sequence the version test uses: this select commits on
+    // pointer release, and a bare click selects nothing.
+    fireEvent.pointerDown(answered, { button: 0 })
+    fireEvent.pointerUp(answered, { button: 0 })
+    fireEvent.click(answered)
+
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('root', 1, { status: 'answered' }))
+    expect(screen.getByRole('combobox', { name: 'Status of Can this bind CBD?' })).toHaveTextContent(
+      'answered',
+    )
+  })
+
+  it('puts the old status back when the write is refused', async () => {
+    // A checkbox left showing a state the record does not have is worse than
+    // one that never moved, so a rejection rolls the value back.
+    api.update.mockRejectedValueOnce(new Error('Someone else answered this first'))
+    renderWithProviders(<ResearchGoalsPanel projectId="project-one" />)
+    await screen.findByText('Can this bind CBD?')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Status of Can this bind CBD?' }))
+    const answered = await screen.findByRole('option', { name: 'answered' })
+    fireEvent.pointerDown(answered, { button: 0 })
+    fireEvent.pointerUp(answered, { button: 0 })
+    fireEvent.click(answered)
+
+    // Asserted first, or this test would pass without anything having happened:
+    // "still open" is also what a selection that never fired looks like.
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith('root', 1, { status: 'answered' }))
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Status of Can this bind CBD?' })).toHaveTextContent(
+        'open',
+      ),
+    )
+  })
+
   it('shows a retryable error rather than an empty goal tree on network failure', async () => {
     api.list.mockRejectedValueOnce(new Error('Goal service unavailable'))
     renderWithProviders(<ResearchGoalsPanel projectId="project-one" />)

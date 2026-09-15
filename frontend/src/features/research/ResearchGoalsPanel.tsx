@@ -82,12 +82,36 @@ export function ResearchGoalsPanel({ projectId }: ResearchGoalsPanelProps) {
     onError: (err) => fail(err, copy.createFailed),
   })
 
+  // The one write here that shows its result immediately. Marking a goal done
+  // is reversible, spends nothing and calls nothing outside this platform, so
+  // waiting for the round trip buys no safety - it only makes the checkbox feel
+  // broken. Creating, deleting and detaching stay server-confirmed: the first
+  // two change what exists, and a row that appears and then vanishes is worse
+  // than a row that takes a moment to appear.
   const setStatus = useMutation({
     mutationFn: ({ goal, status }: { goal: ResearchGoal; status: GoalStatus }) =>
       updateResearchGoal(goal.id, goal.version, { status }),
-    onSuccess: () => void invalidate(),
-    // 412 is the interesting one: the goal moved under us, so re-read rather than insist.
-    onError: (err) => fail(err, copy.updateFailed),
+    onMutate: async ({ goal, status }) => {
+      // Stop an in-flight read from landing on top of the optimistic value.
+      await queryClient.cancelQueries({ queryKey: ['research-goals', projectId] })
+      const previous = queryClient.getQueryData<ResearchGoal[]>(['research-goals', projectId])
+      queryClient.setQueryData<ResearchGoal[]>(['research-goals', projectId], (current) =>
+        (current ?? []).map((item) => (item.id === goal.id ? { ...item, status } : item)),
+      )
+      return { previous }
+    },
+    onError: (err, _variables, context) => {
+      // Put the server's version back rather than leaving a checkbox showing a
+      // state the record does not have.
+      if (context?.previous) {
+        queryClient.setQueryData(['research-goals', projectId], context.previous)
+      }
+      fail(err, copy.updateFailed)
+    },
+    // 412 is the interesting one: the goal moved under us, so re-read rather
+    // than insist. Settled rather than success, so the re-read happens whether
+    // the write landed or was rolled back.
+    onSettled: () => void invalidate(),
   })
 
   const removeGoal = useMutation({
