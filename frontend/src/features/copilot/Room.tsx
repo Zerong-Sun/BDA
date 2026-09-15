@@ -60,7 +60,7 @@ export function Room({
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
-  const { projectId } = useProjectContext()
+  const { projectId, projectsLoading, projectsError } = useProjectContext()
   const queryClient = useQueryClient()
   const readOnly = useCopilotReadOnly()
   const bots = useCopilotBots()
@@ -73,6 +73,13 @@ export function Room({
   )
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
   const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
+  const draft = useAppStore((state) => state.copilotDraft)
+  const clearDraft = useAppStore((state) => state.setCopilotDraft)
+  useEffect(() => {
+    if (!draft || !projectId || projectsLoading || projectsError) return
+    setSessionInput(projectId, draft)
+    clearDraft('')
+  }, [draft, projectId, projectsLoading, projectsError, setSessionInput, clearDraft])
   // What the next message carries. Pages that ask the team about something -
   // a structure, a finding - select it; until now that selection travelled
   // with the message invisibly, so a person could not tell what the team

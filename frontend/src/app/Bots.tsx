@@ -86,7 +86,7 @@ function BotProjectWorkspace() {
       {!activeProject ? <div className="science-empty"><BotAvatar id="director" stance="direct" /><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><p>{zh ? '任务、证据和对话会保存在同一个项目里。' : 'Tasks, evidence and conversations stay together in the same project.'}</p><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>
         {settings && canConfigure ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
         <div className="bot-workspace-grid">
-          <BotRoster projectId={projectId} autoActive={view === 'chat' && !selectedId} onAuto={() => selectBot(null)} />
+          <BotRoster projectId={projectId} autoActive={view === 'room' && !selectedId} onAuto={() => selectBot(null)} />
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
               <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? '研究团队视图' : 'Research team views'}>

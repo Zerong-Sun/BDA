@@ -60,8 +60,13 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     }
     if (chatFixture && path === '/api/v2/copilot/conversations/qa-stream/stream') {
       await new Promise((resolve) => { chatFixture.release = resolve; chatFixture.ready() })
+      chatFixture.completed = true
       const message = { id: 'qa-reply', role: 'assistant', content: 'Synthetic streaming reply after navigation.', citations: [], tool_calls: [] }
       await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `event: message\ndata: ${JSON.stringify(message)}\n\nevent: done\ndata: {}\n\n` })
+      return
+    }
+    if (chatFixture && path.endsWith('/room')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: chatFixture.completed ? [{ kind: 'message', id: 'qa-reply', occurred_at: '2026-09-16T00:00:00Z', bot: null, message: { id: 'qa-reply', role: 'assistant', content: 'Synthetic streaming reply after navigation.', citations: [], tool_calls: [] } }] : [], next_cursor: null }) })
       return
     }
     if (method !== 'GET') writes.push({ method, path })
@@ -127,8 +132,8 @@ try {
   checks.push('Open reaches the project brief in one click; no decorative project images; source-derived questions are visible without saved goals')
   await screenshot(page, 'brief-en-light')
   await page.getByRole('button', { name: 'Discuss with a Bot: Which structures and sources support ligand recognition and antibody binding?', exact: true }).click()
-  await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
-  await page.waitForFunction(() => document.querySelector('input[aria-label="Ask the Copilot a question"]')?.value.includes('Which structures and sources'))
+  await page.getByRole('tab', { name: 'Research room', selected: true }).waitFor()
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Say something in the room"]')?.value.includes('Which structures and sources'))
   assert.equal(writes.length, 0)
   await page.goBack()
   await page.getByRole('region', { name: 'Project brief' }).waitFor()
@@ -159,10 +164,10 @@ try {
   await screenshot(page, 'structures-mobile')
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
-  await page.getByRole('tab', { name: 'Conversation', exact: true }).waitFor()
+  await page.getByRole('tab', { name: 'Research room', exact: true }).waitFor()
   assert.ok(page.url().includes('/bots?project=proj_browser&view=chat'))
-  await page.waitForFunction(() => document.querySelector('input[aria-label="Ask the Copilot a question"]')?.value.includes('DEMO-2'))
-  const drafted = await page.getByLabel('Ask the Copilot a question', { exact: true }).inputValue()
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Say something in the room"]')?.value.includes('DEMO-2'))
+  const drafted = await page.getByLabel('Say something in the room', { exact: true }).inputValue()
   assert.ok(drafted.includes('DEMO-1') && drafted.includes('DEMO-2'))
   assert.equal(writes.length, 0, 'Selecting a structure or Bot must not send or execute anything')
   checks.push('Both synthetic structures render; comparison transfers both source IDs to an unsent Bot draft')
@@ -173,7 +178,7 @@ try {
   await page.getByRole('button', { name: 'Single structure', exact: true }).waitFor()
   assert.equal(await page.locator('.structure-comparison-pane').count(), 2)
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
-  await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
+  await page.getByRole('tab', { name: 'Research room', selected: true }).waitFor()
   checks.push('Structure A/B selection survives Bot round trips and full page reloads')
   await page.locator('.bot-roster-item', { hasText: 'Planner' }).click()
   await page.getByRole('heading', { level: 1, name: 'Planner', exact: true }).waitFor()
@@ -222,11 +227,11 @@ try {
   await page.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Researcher.*Research the evidence/ }).click()
   await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).check()
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).focus()
-  await page.keyboard.press('ArrowRight')
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Conversation')
+  await page.keyboard.press('ArrowLeft')
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Research room')
   await page.keyboard.press('Enter')
-  await page.getByRole('tab', { name: 'Conversation', selected: true }).waitFor()
-  assert.equal(await page.getByLabel('Ask the Copilot a question', { exact: true }).inputValue(), drafted)
+  await page.getByRole('tab', { name: 'Research room', selected: true }).waitFor()
+  assert.equal(await page.getByLabel('Say something in the room', { exact: true }).inputValue(), drafted)
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
   assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
   assert.ok(await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).isChecked())
@@ -286,8 +291,8 @@ try {
   await zh.getByText(task.outcome.summary, { exact: true }).waitFor()
   assert.ok(await zh.getByRole('button', { name: '继续此任务', exact: true }).isDisabled())
   assert.ok(await zh.getByRole('button', { name: '保存为待审核计划记录', exact: true }).isDisabled())
-  await zh.getByRole('tab', { name: '对话', exact: true }).click()
-  assert.ok(await zh.locator('.bot-chat-surface input[placeholder]').isDisabled())
+  await zh.getByRole('tab', { name: '研究室', exact: true }).click()
+  assert.ok(await zh.locator('.room input[placeholder]').isDisabled())
   checks.push('Viewer can inspect task deliveries and chat history without command controls')
 
   let streamReady
@@ -295,17 +300,17 @@ try {
   const chatFixture = { requests: [], ready: streamReady, release: null }
   const streaming = await newPage('en', 'light', 'populated', chatFixture)
   await streaming.goto(`${origin}/#/bots?project=proj_browser&view=chat`)
-  await streaming.getByLabel('Ask the Copilot a question', { exact: true }).fill('Check the synthetic source summary?')
-  await streaming.getByRole('button', { name: 'Send message', exact: true }).click()
+  await streaming.getByLabel('Say something in the room', { exact: true }).fill('Check the synthetic source summary?')
+  await streaming.getByRole('button', { name: 'Send', exact: true }).click()
   await waitingForStream
   await streaming.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
-  await streaming.getByRole('tab', { name: 'Conversation', exact: true }).click()
-  assert.ok(await streaming.getByLabel('Ask the Copilot a question', { exact: true }).isDisabled())
-  assert.ok(await streaming.getByRole('button', { name: 'Send message', exact: true }).isDisabled())
+  await streaming.getByRole('tab', { name: 'Research room', exact: true }).click()
+  assert.ok(await streaming.getByLabel('Say something in the room', { exact: true }).isDisabled())
+  assert.ok(await streaming.getByRole('button', { name: 'Send', exact: true }).isDisabled())
   assert.equal(chatFixture.requests.length, 1)
   chatFixture.release()
   await streaming.getByText('Synthetic streaming reply after navigation.', { exact: true }).waitFor()
-  assert.ok(await streaming.getByLabel('Ask the Copilot a question', { exact: true }).isEnabled())
+  assert.ok(await streaming.getByLabel('Say something in the room', { exact: true }).isEnabled())
   assert.equal(chatFixture.requests[0].project_id, 'proj_browser')
   checks.push('Delayed synthetic SSE reply stays locked across tabs and completes in its original project')
 
@@ -359,7 +364,7 @@ try {
 
   failRoster = true
   const errorPage = await newPage()
-  await errorPage.goto(`${origin}/#/bots?project=proj_browser`)
+  await errorPage.goto(`${origin}/#/bots?project=proj_browser&view=tasks`)
   await errorPage.getByText('Roster unavailable for this test').waitFor()
   await errorPage.getByText('The task owner roster could not be loaded, so work cannot be assigned yet.', { exact: true }).waitFor()
   failRoster = false

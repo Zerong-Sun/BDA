@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/handlers'
@@ -79,6 +79,19 @@ function stub(items: unknown[]) {
 }
 
 describe('Room', () => {
+  it('receives a project question as an unsent editable draft and consumes it once', async () => {
+    stub([])
+    useAppStore.setState({ copilotDraft: 'Compare the selected structures using their evidence.' })
+    const first = renderWithProviders(<Room />)
+    const input = await screen.findByRole('textbox', { name: 'Say something in the room' })
+    await waitFor(() => expect(input).toHaveValue('Compare the selected structures using their evidence.'))
+    expect(useAppStore.getState().copilotDraft).toBe('')
+    fireEvent.change(input, { target: { value: 'My revised question, still unsent.' } })
+    first.unmount()
+    renderWithProviders(<Room />)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('My revised question, still unsent.'))
+  })
+
   it('names the operator that produced a message', async () => {
     stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message() }])
     renderWithProviders(<Room />)
