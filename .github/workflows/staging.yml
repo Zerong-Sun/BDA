@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0068_alphafold3_parser
+            BDA_SCHEMA_REVISION=0069_patent_search_jurisdictions
           provenance: mode=max
           sbom: true
       - id: frontend

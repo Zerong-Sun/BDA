@@ -409,16 +409,30 @@ _register(
     ToolSpec(
         id="start_patent_search",
         description=(
-            "Queue an audited search of Europe PMC's patent index - Chinese (CN), US, "
-            "European (EP), PCT (WO), Japanese and Korean publications - and save each "
-            "hit with its retrieval trace. Report it as queued: it is not done until the "
-            "results are saved, and only saved patents can be cited. A search returns the "
-            "most relevant publications, not every one, and finding none does not show "
-            "that none exist."
+            "Queue an audited patent search and save each hit with its retrieval trace. "
+            "database 'europe_pmc' (the default) searches Europe PMC's patent index - "
+            "Chinese (CN), US, European (EP), PCT (WO), Japanese and Korean publications - "
+            "with the query in Europe PMC syntax. 'epo_ops' searches EPO Open Patent "
+            "Services, the worldwide DOCDB collection with a patent family id on every "
+            "record; write its query as OPS CQL (for example: ta all \"PD-1 antibody\" and "
+            "pa=merck) or as plain words, which become an all-words title/abstract search. "
+            "jurisdictions restricts either one to those offices. Report it as queued: it "
+            "is not done until the results are saved, and only saved patents can be cited. "
+            "A search returns the most relevant publications, not every one, and finding "
+            "none does not show that none exist."
         ),
         parameters={
             "type": "object",
-            "properties": {"query": {"type": "string"}, "limit": _limit(25, 10)},
+            "properties": {
+                "query": {"type": "string"},
+                "limit": _limit(25, 10),
+                "database": {"type": "string", "enum": ["europe_pmc", "epo_ops"]},
+                "jurisdictions": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["CN", "US", "EP", "WO", "JP", "KR"]},
+                    "maxItems": 6,
+                },
+            },
             "required": ["query"],
             "additionalProperties": False,
         },
@@ -428,7 +442,42 @@ _register(
         awaits="operation",
         audit=True,
         handler=lambda ctx, args: ctx.actions.start_patent_search(
-            _arg_str(args, "query"), limit=_arg_int(args, "limit", 10)
+            _arg_str(args, "query"),
+            limit=_arg_int(args, "limit", 10),
+            database=_arg_str(args, "database", "europe_pmc"),
+            jurisdictions=tuple(str(code) for code in (args.get("jurisdictions") or [])),
+        ),
+    )
+)
+
+_register(
+    ToolSpec(
+        id="start_patent_legal_status_lookup",
+        description=(
+            "Queue an audited EPO Open Patent Services lookup of up to 25 patents this "
+            "project has already saved: each one's DOCDB patent family (its publications "
+            "by office) and the INPADOC legal events of its application, per country, with "
+            "dates. Use document_id values from summarise_patent_landscape. Report it as "
+            "queued; once it has run, summarise_patent_landscape shows the events. An "
+            "event is not a status: report the event, its country and its date, never call "
+            "a patent in force, lapsed, expired or valid from events, and never present "
+            "them as a freedom-to-operate opinion."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "document_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 25},
+            },
+            "required": ["document_ids"],
+            "additionalProperties": False,
+        },
+        capability="patent-search",
+        execution_mode="queue",
+        requires="actions",
+        awaits="operation",
+        audit=True,
+        handler=lambda ctx, args: ctx.actions.start_patent_legal_status_lookup(
+            [str(item) for item in (args.get("document_ids") or [])]
         ),
     )
 )
@@ -454,10 +503,12 @@ _register(
             "Summarise the patents this project has already saved: publications by office "
             "(CN, US, EP, WO, JP, KR), by stage (application, granted, PCT, utility model), "
             "top applicants, IPC subclasses, priority years and an estimated-term count, "
-            "with each listed record's document and retrieval trace. It reads saved "
-            "patents only and runs no search. Legal status is not available from this "
-            "source: never call a patent in force, expired or granted-and-valid from this "
-            "result, and never present it as a freedom-to-operate opinion."
+            "distinct patent families, with each listed record's document and retrieval "
+            "trace. A publication saved by both indexes is counted once. It reads saved "
+            "patents only and runs no search. Legal events appear only for records looked "
+            "up with start_patent_legal_status_lookup, as the latest event per country: "
+            "never call a patent in force, expired or granted-and-valid from this result, "
+            "and never present it as a freedom-to-operate opinion."
         ),
         parameters={
             "type": "object",

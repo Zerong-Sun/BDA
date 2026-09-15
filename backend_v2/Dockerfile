@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0068_alphafold3_parser
+ARG BDA_SCHEMA_REVISION=0069_patent_search_jurisdictions
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)

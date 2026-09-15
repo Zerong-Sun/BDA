@@ -169,6 +169,19 @@ def patent_details(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def jurisdiction_codes(jurisdictions: Sequence[str]) -> list[str]:
+    """Office codes, validated and de-duplicated in the order they were given."""
+    codes: list[str] = []
+    for code in jurisdictions:
+        normalised = str(code or "").strip().upper()
+        if normalised not in JURISDICTIONS:
+            known = ", ".join(sorted(JURISDICTIONS))
+            raise PatentQueryError(f"Unknown jurisdiction {code!r}. Known: {known}.")
+        if normalised not in codes:
+            codes.append(normalised)
+    return codes
+
+
 def patent_query(topic: str, jurisdictions: Sequence[str] = ()) -> str:
     """A Europe PMC query restricted to patents, and optionally to offices.
 
@@ -179,14 +192,7 @@ def patent_query(topic: str, jurisdictions: Sequence[str] = ()) -> str:
     text = (topic or "").strip()
     if not text:
         raise PatentQueryError("A patent search needs a topic.")
-    codes: list[str] = []
-    for code in jurisdictions:
-        normalised = str(code or "").strip().upper()
-        if normalised not in JURISDICTIONS:
-            known = ", ".join(sorted(JURISDICTIONS))
-            raise PatentQueryError(f"Unknown jurisdiction {code!r}. Known: {known}.")
-        if normalised not in codes:
-            codes.append(normalised)
+    codes = jurisdiction_codes(jurisdictions)
     query = f"SRC:PAT AND ({text})"
     if codes:
         query += " AND (" + " OR ".join(f"EXT_ID:{code}*" for code in codes) + ")"

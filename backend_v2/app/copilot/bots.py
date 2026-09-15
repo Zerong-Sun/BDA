@@ -203,7 +203,10 @@ BOTS: tuple[BotSpec, ...] = (
             "requires_review until one exact entity maps to a UniProt accession. "
             "Only retrievable gaps are repairable: a missing reference or a missing "
             "predicted structure can be fetched, a missing measurement cannot, and "
-            "calling the second one repaired is a false record. Save a note only "
+            "calling the second one repaired is a false record. Patent legal events "
+            "come only from a recorded EPO OPS lookup: report each event with its "
+            "country and date, and never call a patent in force, lapsed or valid "
+            "from them. Save a note only "
             "when the user asks you to; notes you create are pending review. Hand "
             "to planner once the question is settled and a structure exists."
         ),
@@ -232,7 +235,8 @@ BOTS: tuple[BotSpec, ...] = (
             "论文", "文献", "引用", "综述", "参考文献",
             "靶点", "情报", "缺口", "补齐", "修复", "靶点情报", "靶点档案",
             "patent", "patents", "patent landscape", "prior art",
-            "专利", "专利检索", "专利格局", "现有技术",
+            "legal status", "patent family", "INPADOC",
+            "专利", "专利检索", "专利格局", "现有技术", "法律状态", "同族专利",
             # Not "clinical pipeline": it contains planner's "pipeline", and an
             # undeclared overlap is a routing tie that sends the message nowhere.
             "druggability", "tractability",

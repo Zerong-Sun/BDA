@@ -355,7 +355,7 @@ def druggability_assessment(run_id: str) -> dict:
         # reason the patent years are: an assessment reports the evidence that
         # exists, and must not start a search nobody asked for to create some.
         from ..literature.models import LiteratureDocument
-        from ..literature.patent_service import PATENT_SOURCE
+        from ..literature.patent_service import PATENT_SOURCES
 
         by_source: dict[str, int] = {
             str(source): int(count)
@@ -371,15 +371,15 @@ def druggability_assessment(run_id: str) -> dict:
                 select(LiteratureDocument)
                 .where(
                     LiteratureDocument.project_id == run.project_id,
-                    LiteratureDocument.source != PATENT_SOURCE,
+                    LiteratureDocument.source.not_in(PATENT_SOURCES),
                 )
                 .order_by(LiteratureDocument.created_at.desc())
                 .limit(5)
             )
         ]
         literature_counts = {
-            "papers": sum(count for source, count in by_source.items() if source != PATENT_SOURCE),
-            "patents": by_source.get(PATENT_SOURCE, 0),
+            "papers": sum(count for source, count in by_source.items() if source not in PATENT_SOURCES),
+            "patents": sum(by_source.get(source, 0) for source in PATENT_SOURCES),
         }
         run.status = "running"
         run.version += 1
