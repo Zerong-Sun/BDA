@@ -321,3 +321,56 @@ def test_briefs_sharing_a_timestamp_resolve_to_one_stable_choice() -> None:
             assert picked == {max(first.id, second.id)}
     finally:
         drop_all(engine, Base.metadata)
+
+
+def test_the_project_summary_shows_the_same_brief_as_the_research_page() -> None:
+    """Two endpoints must not disagree about which brief is the project's brief.
+
+    The literature panel reads `brief.scope.source_material` from the project research
+    summary and project search indexes its title and content, so a summary that returned
+    the newest status note fed both of those from the wrong row.
+    """
+    from backend_v2.app.projects.service import project_research_summary
+
+    engine = enforce_foreign_keys(
+        create_engine(
+            "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+    )
+    Base.metadata.create_all(engine)
+    try:
+        with sessionmaker(engine, expire_on_commit=False)() as session:
+            user = User(username="sum-owner", display_name="Sum Owner", role="admin", enabled=True)
+            organization = Organization(name="Sum Org")
+            session.add_all([user, organization])
+            session.flush()
+            project = Project(
+                organization_id=organization.id, owner_id=user.id,
+                name="Summarized project", project_type="research",
+            )
+            session.add(project)
+            session.flush()
+            opened = datetime(2026, 9, 1, tzinfo=UTC)
+            session.add_all([
+                ResearchBrief(
+                    project_id=project.id, created_by=user.id, title="Accepted review",
+                    content="# Project Review", status="accepted", created_at=opened,
+                    scope={"source_material": [{"id": "S1"}]},
+                ),
+                ResearchBrief(
+                    project_id=project.id, created_by=user.id, title="Latest status note",
+                    content="Round status.", status="draft",
+                    created_at=opened + timedelta(days=13),
+                    scope={"portfolio_review_key": "review-round-1"},
+                ),
+            ])
+            session.commit()
+
+            summary = project_research_summary(session, project)
+
+            assert summary.brief is not None
+            assert summary.brief["title"] == "Accepted review"
+            # The field the literature panel actually reads survives the change.
+            assert summary.brief["scope"]["source_material"] == [{"id": "S1"}]
+    finally:
+        drop_all(engine, Base.metadata)

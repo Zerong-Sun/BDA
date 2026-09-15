@@ -18,7 +18,8 @@ from ..intelligence.models import IntelligenceRun
 from ..knowledge.models import KnowledgeEntry
 from ..literature.models import LiteratureDocument
 from ..platform.operations import enqueue_operation
-from ..research.models import ResearchBrief, ResearchFinding
+from ..research.models import ResearchFinding
+from ..research.workspace import preferred_review_brief
 from ..targets.repository import TargetRepository
 
 # Through the timeline domain's own service, never into its table: a prompt rewrite is
@@ -367,9 +368,19 @@ def project_overview(session: Session, project: Project) -> ProjectOverviewRespo
 
 
 def project_research_summary(session: Session, project: Project) -> ProjectResearchSummaryResponse:
-    brief = session.scalar(
-        select(ResearchBrief).where(ResearchBrief.project_id == project.id).order_by(ResearchBrief.created_at.desc())
-    )
+    """Summarize a project's research, using the same brief the Research page shows.
+
+    This used to run its own ``created_at desc`` query, which is the defect
+    ``preferred_review_brief`` was written to fix - fixed in one caller and left in this
+    one, so two endpoints could disagree about which brief is the project's brief. That is
+    not cosmetic here: the literature panel reads ``brief.scope.source_material`` from this
+    response, and a round status note's scope carries no source material at all, so the
+    source list came from the wrong brief; project search indexes ``brief.title`` and
+    ``brief.content`` from it and matched the status note instead of the review.
+
+    One function now answers "which brief is this project's brief" for every caller.
+    """
+    brief = preferred_review_brief(session, project.id)
     findings = list(
         session.scalars(
             select(ResearchFinding)
