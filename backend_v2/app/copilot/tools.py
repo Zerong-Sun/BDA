@@ -480,6 +480,69 @@ _register(
 
 _register(
     ToolSpec(
+        id="start_druggability_assessment",
+        description=(
+            "Queue a druggability assessment of one exact project Target (it must have a "
+            "UniProt accession): Open Targets tractability by modality with the evidence "
+            "behind each, drugs and clinical candidates with their furthest stage, recorded "
+            "safety liabilities, and ClinicalTrials.gov registrations by phase for a search "
+            "term (default: the target's name). Every call is audited and saved with the "
+            "report. It gives evidence and named gaps, never a druggability probability, and "
+            "no market size. Report it as queued until it finishes."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "target_id": {"type": "string"},
+                "trial_term": {"type": "string", "maxLength": 200},
+            },
+            "required": ["target_id"],
+            "additionalProperties": False,
+        },
+        capability="druggability-assessment",
+        execution_mode="queue",
+        requires="actions",
+        awaits="operation",
+        audit=True,
+        handler=lambda ctx, args: ctx.actions.start_druggability_assessment(
+            _arg_str(args, "target_id"), trial_term=str(args.get("trial_term") or "")
+        ),
+    )
+)
+
+
+def _get_druggability_assessment(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from ..intelligence import druggability_service
+
+    return druggability_service.read_assessment(
+        ctx.session, _project_of(ctx), uuid.UUID(_arg_str(args, "intelligence_run_id"))
+    )
+
+
+_register(
+    ToolSpec(
+        id="get_druggability_assessment",
+        description=(
+            "Read a saved druggability assessment by its intelligence run id: tractability, "
+            "clinical candidates, safety liabilities, trial activity, the gaps and limits, and "
+            "the audited retrieval behind each section. An empty safety list means none "
+            "recorded in Open Targets, never that a target is safe."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"intelligence_run_id": {"type": "string"}},
+            "required": ["intelligence_run_id"],
+            "additionalProperties": False,
+        },
+        capability="druggability-assessment",
+        execution_mode="read",
+        requires="session",
+        handler=_get_druggability_assessment,
+    )
+)
+
+_register(
+    ToolSpec(
         id="start_target_intelligence",
         description="Queue a target intelligence run.",
         parameters={

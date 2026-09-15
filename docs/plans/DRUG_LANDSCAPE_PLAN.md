@@ -1,6 +1,6 @@
 # 专利、成药性与市场格局：规划与分期
 
-状态（2026-09-15）：P1 专利检索与格局已实现；P2 成药性证据、P3 竞争格局未开始。
+状态（2026-09-15）：P1 专利检索与格局、P2 成药性证据已实现；P3 竞争格局未开始。
 
 ## 为什么要做，以及为什么不能交给语言模型
 
@@ -39,9 +39,18 @@
 **未做**：检索时按局过滤（需要新列与迁移，且中文查询在翻译时可能丢掉过滤条件——目前检索覆盖全部局，
 按局查看在格局里筛选）；专利族合并；法律状态（需接 EPO OPS INPADOC，要 key）。
 
-## P2 成药性证据（未开始）
+## P2 成药性证据（已实现）
 
-对一个项目靶点（有 UniProt / Ensembl 映射）排队一次评估，经审计的请求取回：
+实现：`researcher` 持有 `druggability-assessment`；`start_druggability_assessment` 在
+`intelligence.druggability` 主题上排队，`druggability_assessment` 任务经 `EvidenceToolService`
+（新增经审计的 POST，GraphQL 请求体写进审计）取回证据，存为 `IntelligenceReport` 与每段一条
+`IntelligenceEvidence`（引用即检索审计，待审核）；`get_druggability_assessment` 读回。
+靶点无 UniProt accession 时在排队前拒绝。对 PD-1（Q15116）的实测：映射到 ENSG00000188389，
+26 个药物与临床候选（9 个获批），抗体模态以已获批药物为证据可成药，试验按阶段计数全部取到，无缺口。
+
+**未做**：若指定候选物时合并序列成药性指标（下面第四条）——需要把候选物 ID 带进运行，留作下一步。
+
+原计划如下，对一个项目靶点（有 UniProt / Ensembl 映射）排队一次评估，经审计的请求取回：
 
 - Open Targets 可成药性分档（小分子、抗体、PROTAC、其他模态），逐项保留其证据来源名；
 - 该靶点上的药物与临床候选及其最高临床阶段；

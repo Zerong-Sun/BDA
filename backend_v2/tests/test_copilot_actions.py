@@ -383,3 +383,55 @@ def test_patent_search_is_refused_unless_a_patent_search_was_asked_for(
         instance.start_patent_search("PD-1 antibody")
 
     assert audits == []
+
+
+def test_druggability_assessment_is_explicit_pending_and_audited(
+    monkeypatch,
+    action_environment,
+) -> None:
+    from backend_v2.app.intelligence import druggability_service
+
+    instance, _, audits = service(monkeypatch, action_environment, "请评估这个靶点的成药性。")
+    target_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    captured: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        druggability_service,
+        "create_druggability_run",
+        lambda session, project, parsed_target_id, user, **kwargs: (
+            captured.append({"target_id": parsed_target_id, **kwargs})
+            or SimpleNamespace(id=run_id, target_id=parsed_target_id)
+        ),
+    )
+
+    result = instance.start_druggability_assessment(str(target_id), trial_term="PD-1")
+
+    assert result == {
+        "intelligence_run_id": str(run_id),
+        "target_id": str(target_id),
+        "kind": "druggability",
+        "status": "pending",
+    }
+    assert captured[0]["target_id"] == target_id
+    assert captured[0]["trial_term"] == "PD-1"
+    assert audits[0]["action"] == "copilot.action.start_druggability_assessment"
+
+
+def test_asking_about_druggability_does_not_start_an_assessment(
+    monkeypatch,
+    action_environment,
+) -> None:
+    """A question is not a request, and an assessment spends external calls."""
+    instance, _, audits = service(monkeypatch, action_environment, "这个靶点的成药性怎么样？")
+
+    with pytest.raises(ValueError, match="copilot_action_requires_explicit_user_request"):
+        instance.start_druggability_assessment(str(uuid.uuid4()))
+
+    assert audits == []
+
+
+def test_a_malformed_target_id_is_refused(monkeypatch, action_environment) -> None:
+    instance, _, _ = service(monkeypatch, action_environment, "Please assess the druggability of this target.")
+
+    with pytest.raises(ValueError, match="invalid_target_id"):
+        instance.start_druggability_assessment("not-a-uuid")

@@ -213,6 +213,7 @@ BOTS: tuple[BotSpec, ...] = (
             "knowledge-authoring",
             "literature-search",
             "patent-search",
+            "druggability-assessment",
             "target-intelligence",
             "research-gap-repair",
             "chain-messaging",
@@ -232,6 +233,10 @@ BOTS: tuple[BotSpec, ...] = (
             "靶点", "情报", "缺口", "补齐", "修复", "靶点情报", "靶点档案",
             "patent", "patents", "patent landscape", "prior art",
             "专利", "专利检索", "专利格局", "现有技术",
+            # Not "clinical pipeline": it contains planner's "pipeline", and an
+            # undeclared overlap is a routing tie that sends the message nowhere.
+            "druggability", "tractability",
+            "成药性", "可成药", "临床管线",
         ),
     ),
     BotSpec(

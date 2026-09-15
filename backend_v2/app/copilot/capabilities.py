@@ -147,6 +147,18 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "requires_explicit_request": True,
     },
     {
+        "id": "druggability-assessment",
+        "title": "Druggability assessment",
+        "description": (
+            "Queue an audited assessment of one project Target from public sources - Open "
+            "Targets tractability, drugs and clinical candidates, safety liabilities, and "
+            "ClinicalTrials.gov activity - and read it back. Evidence and gaps, no probability."
+        ),
+        "execution_mode": "queue",
+        "chat_tools": ["start_druggability_assessment", "get_druggability_assessment"],
+        "requires_explicit_request": True,
+    },
+    {
         "id": "target-intelligence",
         "title": "Target intelligence",
         "description": "Queue target intelligence for one exact project Target",
@@ -298,6 +310,7 @@ CAPABILITY_ALIASES = {
         "structure-interaction",
         "sequence-analysis",
         "patent-search",
+        "druggability-assessment",
         "failure-diagnosis",
         "chain-messaging",
         "chain-orchestration",
@@ -306,6 +319,7 @@ CAPABILITY_ALIASES = {
     "knowledge": {"project-read", "research-read", "knowledge-authoring"},
     "literature": {"research-read", "literature-search"},
     "patents": {"research-read", "patent-search"},
+    "druggability": {"project-read", "druggability-assessment"},
     "intelligence": {
         "project-read",
         "research-read",

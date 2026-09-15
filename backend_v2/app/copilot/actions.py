@@ -110,6 +110,32 @@ _ACTION_REQUEST_TERMS = {
             "创建",
         },
     },
+    "start_druggability_assessment": {
+        "domains": {
+            "druggability",
+            "druggable",
+            "tractability",
+            "tractable",
+            "developability",
+            "成药性",
+            "可成药",
+            "成药",
+        },
+        "verbs": {
+            "run",
+            "start",
+            "queue",
+            "assess",
+            "evaluate",
+            "analyse",
+            "analyze",
+            "运行",
+            "启动",
+            "排队",
+            "评估",
+            "分析",
+        },
+    },
     "create_knowledge_draft": {
         "domains": {"knowledge", "note", "notes", "知识", "笔记", "记录"},
         "verbs": {
@@ -430,6 +456,50 @@ class CopilotActionService:
             payload.model_dump(mode="json"),
             execute,
         )
+
+    def start_druggability_assessment(
+        self,
+        target_id: str,
+        *,
+        trial_term: str = "",
+    ) -> dict[str, Any]:
+        """Queue a druggability assessment of one exact project target.
+
+        Public evidence only - Open Targets tractability, drugs and clinical
+        candidates, safety liabilities, and ClinicalTrials.gov activity - with
+        every call audited. It reports evidence and gaps, never a probability.
+        """
+        self._require_explicit("start_druggability_assessment")
+        from ..intelligence.druggability_service import create_druggability_run
+
+        try:
+            parsed_target_id = uuid.UUID(target_id)
+        except ValueError as exc:
+            raise ValueError("invalid_target_id") from exc
+        term = trial_term.strip()
+        payload = {"target_id": str(parsed_target_id), "trial_term": term}
+
+        def execute() -> dict[str, Any]:
+            row = create_druggability_run(
+                self.session,
+                self.project,
+                parsed_target_id,
+                self.user,
+                trial_term=term,
+                source={"source": "copilot", "source_message_id": str(self.source_message_id)},
+            )
+            return _awaitable(
+                self.session,
+                {
+                    "intelligence_run_id": str(row.id),
+                    "target_id": str(row.target_id),
+                    "kind": "druggability",
+                    "status": "pending",
+                },
+                row.id,
+            )
+
+        return self._once("start_druggability_assessment", payload, execute)
 
     def create_knowledge_draft(
         self,
