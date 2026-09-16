@@ -131,3 +131,22 @@ written by the API are only visible to workers scheduled on the same node.
 Setting `byokStorage.enabled: false` removes the volume entirely; BYOK then returns
 `503 credential_store_unavailable`, which is the honest outcome rather than writing keys to
 a location that silently loses them.
+
+## EPO OPS credentials
+
+Mount an existing Kubernetes Secret containing one UTF-8 file with
+`consumer_key:consumer_secret` on one line (or the key and secret on two lines). Keep the actual values outside Git and Helm
+values files. The chart accepts a reference only:
+
+```yaml
+epoOpsCredentials:
+  secretName: bda-epo-ops
+  keyFile: credentials
+  mountPath: /var/run/secrets/bda/epo-ops
+```
+
+The API and research/copilot workers receive the same read-only file (mode 0440,
+readable by the pod's group 10001); other pods do not mount it. The ConfigMap
+contains only the `file:` reference. An empty `secretName` leaves EPO disabled.
+Claims availability depends on publication coverage and the EPO account quota;
+a queued lookup is not proof that a full text or a legal conclusion is available.

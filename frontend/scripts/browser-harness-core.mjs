@@ -1331,6 +1331,7 @@ function createStrictRoutes({ scenario, routeId }) {
     model: '', checked_at: null, checks: {}, eligible_services: [], reason: 'No model in this browser fixture.',
   }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/events`, {}, () => ok({}))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/room`, { limit: '100' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/decision-requests`, { status: 'open' }, () => ok({ items: [] }))
   // Hotspot sets are read on the Research structures view and by the workflow

@@ -186,9 +186,9 @@ class _FakeTools:
 
     def list_clinical_trial_sponsors(self, term, *, page_token=None):
         self.sponsor_pages = getattr(self, "sponsor_pages", 0) + 1
-        # Always offers another page, so the cap is what stops the loop.
+        # Two registrations per page, 50 pages: the announced 100 registrations.
         return _Result(
-            {"studies": [_study("INDUSTRY", "Merck"), _study("OTHER", "Fudan")], "nextPageToken": "next"},
+            {"studies": [_study("INDUSTRY", "Merck"), _study("OTHER", "Fudan")], "nextPageToken": str(self.sponsor_pages) if self.sponsor_pages < 50 else None},
             "clinical_trials.sponsors",
         )
 
@@ -216,9 +216,10 @@ def test_a_full_retrieval_records_every_call_and_reports_no_gaps() -> None:
     assert report["trial_activity"]["total_matching"] == 100
 
 
-def test_the_sponsor_scan_stops_at_its_cap_and_reports_itself_as_partial() -> None:
+def test_the_sponsor_scan_stops_at_its_cap_and_reports_itself_as_partial(monkeypatch) -> None:
     from backend_v2.app.intelligence import druggability as kernel
 
+    monkeypatch.setattr(kernel, "MAX_SPONSOR_PAGES", 2)
     tools = _FakeTools()
 
     report = _gather(tools)
@@ -362,3 +363,33 @@ def test_saved_documents_are_counted_without_claiming_they_were_read() -> None:
     assert (signal["saved_papers"], signal["saved_patents"]) == (12, 30)
     assert signal["recent"][0]["document_id"] == "doc-1"
     assert "Saved is not read" in signal["interpretation"]
+
+
+def test_sponsors_cover_more_than_5000_registrations_without_counting_page_overlap():
+    class Pages(_FakeTools):
+        def count_clinical_trials(self, term, *, phase=None, start_year=None):
+            return _Result({"totalCount": 6001 if phase is None and start_year is None else 5}, "count")
+
+        def list_clinical_trial_sponsors(self, term, *, page_token=None):
+            start = int(page_token or 0)
+            rows = []
+            for n in range(max(0, start - 1), min(start + 1000, 6001)):
+                row = _study("INDUSTRY", "Example")
+                row["protocolSection"]["identificationModule"] = {"nctId": f"NCT{n:08d}"}
+                rows.append(row)
+            return _Result({"studies": rows, "nextPageToken": str(start + 1000) if start + 1000 < 6001 else None}, "sponsors")
+    result = _gather(Pages())["market_landscape"]["sponsor_mix"]
+    assert result["studies_aggregated"] == 6001
+    assert result["duplicate_registrations_skipped"] == 6
+    assert result["pages_read"] == 7
+    assert result["complete"] is True
+
+
+def test_repeated_sponsor_cursor_stops_and_never_reports_complete():
+    class Repeated(_FakeTools):
+        def list_clinical_trial_sponsors(self, term, *, page_token=None):
+            return _Result({"studies": [_study("OTHER", "Example")], "nextPageToken": "same"}, "sponsors")
+    report = _gather(Repeated())
+    assert report["market_landscape"]["sponsor_mix"]["pages_read"] == 2
+    assert report["market_landscape"]["sponsor_mix"]["complete"] is False
+    assert any("repeated a page token" in gap for gap in report["gaps"])

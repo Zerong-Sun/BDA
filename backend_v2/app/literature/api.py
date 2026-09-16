@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
@@ -12,7 +13,8 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
+from . import patent_service
 from .models import (
     LiteratureDocument,
     LiteratureSearchRun,
@@ -35,6 +37,9 @@ from .schemas import (
     LiteratureSearchDetail,
     LiteratureSearchPage,
     LiteratureSearchResponse,
+    PatentJurisdiction,
+    PatentLookupCreate,
+    PatentLookupResponse,
     RelationPage,
     RelationResponse,
     RetrievalTracePage,
@@ -48,6 +53,76 @@ from .schemas import (
 from .service import create_search, ingest, review_resource, subscribe, update_subscription
 
 router = APIRouter(tags=["literature"])
+
+
+@router.get("/projects/{project_id}/patents/landscape", response_model=dict[str, Any])
+def get_patent_landscape(
+    project_id: uuid.UUID,
+    search_run_id: uuid.UUID | None = Query(default=None),
+    jurisdictions: list[PatentJurisdiction] = Query(default=[]),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> dict[str, Any]:
+    require_project_permission(session, project_id, user, "read")
+    return patent_service.project_landscape(
+        session, project_id, search_run_id=search_run_id, jurisdictions=tuple(jurisdictions)
+    )
+
+
+@router.post(
+    "/projects/{project_id}/patents/legal-status-lookups",
+    response_model=PatentLookupResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={"x-permission": "literature.search"},
+)
+def post_patent_legal_status_lookup(
+    project_id: uuid.UUID,
+    payload: PatentLookupCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> PatentLookupResponse:
+    project = require_project_permission(session, project_id, user, "write")
+    return PatentLookupResponse.model_validate(
+        patent_service.create_legal_status_lookup(session, project, payload.document_ids, user)
+    )
+
+
+@router.post(
+    "/projects/{project_id}/patents/claims-lookups",
+    response_model=PatentLookupResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={"x-permission": "literature.search"},
+)
+def post_patent_claims_lookup(
+    project_id: uuid.UUID,
+    payload: PatentLookupCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> PatentLookupResponse:
+    project = require_project_permission(session, project_id, user, "write")
+    return PatentLookupResponse.model_validate(
+        patent_service.create_claims_lookup(session, project, payload.document_ids, user)
+    )
+
+
+@router.get("/projects/{project_id}/patents/claims", response_model=dict[str, Any])
+def search_patent_claims(
+    project_id: uuid.UUID,
+    query: str = Query(min_length=2, max_length=300),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> dict[str, Any]:
+    from .patent_claims import search_claims
+
+    require_project_permission(session, project_id, user, "read")
+    query = query.strip()
+    if len(query) < 2:
+        raise DomainError("patent_claim_query_short", "Enter at least two non-whitespace characters", status_code=422)
+    result = search_claims(session, project_id, query, after=decode_cursor(cursor), limit=limit)
+    next_id = result.pop("next_id")
+    return {**result, "next_cursor": encode_cursor(uuid.UUID(next_id)) if next_id else None}
 
 
 @router.get("/projects/{project_id}/literature/documents", response_model=DocumentPage)

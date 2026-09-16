@@ -74,7 +74,7 @@ def _retrieval_trace_values(
         "source": str(audit.get("tool") or "").split(".", 1)[0] or "unknown",
         "request_json": audit.get("query") or {},
         "response_metadata": response_metadata or {},
-        "status": audit.get("status") or ("failed" if error else "completed"),
+        "status": "failed" if error else (audit.get("status") or "completed"),
         "http_status": audit.get("http_status"),
         "response_checksum_sha256": audit.get("response_checksum_sha256"),
         "content_checksum_sha256": content_checksum_sha256,
@@ -729,7 +729,7 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
 
             summary = family_legal_summary(result.data, reference)
             raw = json.dumps(result.data, ensure_ascii=False, sort_keys=True).encode()
-            object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal.json"
+            object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal/{hashlib.sha256(raw).hexdigest()}.json"
             ObjectStorage().put_bytes(object_key, raw, "application/json")
             with session_scope() as session:
                 artifact = Artifact(
@@ -798,3 +798,10 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
         "skipped": len(requested) - len(targets),
         "refused": refused,
     }
+
+
+@celery_app.task(name="bda_v2.patent_claims")
+def patent_claims(lookup_id: str, payload: dict) -> dict:
+    from .patent_claims import collect_claims
+
+    return collect_claims(lookup_id, payload)

@@ -101,3 +101,10 @@ monitoring:
   serviceMonitorInterval: 30s
   queueLagSeconds: 900
   stuckOperationMinutes: 15
+
+# Optional EPO OPS credentials. Create this Secret separately; never put key/secret
+# values in Helm values. The file contains consumer-key:consumer-secret.
+epoOpsCredentials:
+  secretName: ""
+  keyFile: credentials
+  mountPath: /var/run/secrets/bda/epo-ops

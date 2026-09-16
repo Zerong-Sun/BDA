@@ -539,12 +539,13 @@ _register(
             "safety liabilities, and ClinicalTrials.gov registrations by phase for a search "
             "term (default: the target's name). Every call is audited and saved with the "
             "report. It gives evidence and named gaps, never a druggability probability, and "
-            "no market size. Report it as queued until it finishes."
+            "no market size. Optional candidate_id adds measured sequence liabilities with a digest; no sequence is returned. Report it as queued until it finishes."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "target_id": {"type": "string"},
+                "candidate_id": {"type": "string"},
                 "trial_term": {"type": "string", "maxLength": 200},
             },
             "required": ["target_id"],
@@ -556,7 +557,8 @@ _register(
         awaits="operation",
         audit=True,
         handler=lambda ctx, args: ctx.actions.start_druggability_assessment(
-            _arg_str(args, "target_id"), trial_term=str(args.get("trial_term") or "")
+            _arg_str(args, "target_id"), trial_term=str(args.get("trial_term") or ""),
+            candidate_id=str(args["candidate_id"]) if args.get("candidate_id") else None
         ),
     )
 )
@@ -2259,7 +2261,8 @@ def _analyse_conservation(ctx: ToolContext, args: dict[str, Any]) -> Any:
     return sequences_service.conservation_from_artifact(
         ctx.session,
         _project_of(ctx),
-        artifact_id=uuid.UUID(_arg_str(args, "artifact_id")),
+        artifact_id=uuid.UUID(value) if (value := _arg_str(args, "artifact_id")) else None,
+        target_id=uuid.UUID(value) if (value := _arg_str(args, "target_id")) else None,
         weighting=_arg_str(args, "weighting") or "henikoff",
         limit=_arg_int(args, "limit", 25),
     )
@@ -2271,7 +2274,7 @@ _register(
         coerce_numeric_strings=True,
         description=(
             "Which positions of a protein its homologues have not changed, read "
-            "from an alignment already uploaded to the project (FASTA, a3m or "
+            "from an uploaded or collected alignment (FASTA, a3m or "
             "Stockholm; the first sequence is taken as the query). Returns the "
             "most conserved and most variable positions with per-column entropy, "
             "gap fraction and effective depth. Redundancy is corrected with "
@@ -2284,10 +2287,10 @@ _register(
             "type": "object",
             "properties": {
                 "artifact_id": {"type": "string"},
+                "target_id": {"type": "string", "description": "Alternatively resolve a unique collected AF3 unpaired alignment by the target sequence digest."},
                 "weighting": {"type": "string", "enum": ["henikoff", "none"], "default": "henikoff"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 25},
             },
-            "required": ["artifact_id"],
             "additionalProperties": False,
         },
         capability="sequence-analysis",

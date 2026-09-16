@@ -19,7 +19,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project
-from . import agent_runs, decisions, handoffs, mcp, room
+from . import agent_runs, decisions, handoffs, mcp, project_events, room
 from . import bots as bot_roster
 from .capabilities import (
     COPILOT_CAPABILITIES,
@@ -92,6 +92,14 @@ from .service import (
 )
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
+
+
+@router.get("/projects/{project_id}/events")
+def project_event_stream(project_id: uuid.UUID, user: User = Depends(streaming_user)) -> EventSourceResponse:
+    project_events.authorized_revision(project_id, user.id)
+    return EventSourceResponse(observed_sse("project", project_events.stream(project_id, user.id)))
+
+
 SKILLS = [SkillResponse(**item) for item in COPILOT_CAPABILITIES]
 #: Derived from the roster declaration, not restated. A second list here would
 #: be a second source of truth for which capabilities a bot holds.

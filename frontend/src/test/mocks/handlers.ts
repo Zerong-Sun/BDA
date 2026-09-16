@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
 export const handlers = [
+  http.get('/api/v2/copilot/projects/:projectId/events', () => new HttpResponse('', { headers: { 'Content-Type': 'text/event-stream' } })),
   http.get('/api/v2/health/live', () =>
     HttpResponse.json({ status: 'ok' }),
   ),

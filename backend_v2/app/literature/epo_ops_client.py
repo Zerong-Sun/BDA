@@ -129,6 +129,15 @@ class EpoOpsClient:
             params={},
         )
 
+    def claims(self, publication: PublicationRef) -> EvidenceToolResult:
+        """Retrieve the publication's literal claims, never a legal interpretation."""
+        return self._get(
+            "epo_ops.claims",
+            f"{BASE_URL}/rest-services/published-data/publication/docdb/{quote(publication.docdb, safe='.')}/claims",
+            params={},
+            xml=True,
+        )
+
     def _access_token(self) -> str:
         now = self._clock()
         if self._token and now < self._token_expires_at:
@@ -163,6 +172,7 @@ class EpoOpsClient:
         *,
         params: dict[str, Any],
         not_found_is_empty: bool = False,
+        xml: bool = False,
     ) -> EvidenceToolResult:
         if self.calls >= self.max_calls:
             raise RuntimeError("evidence_tool_call_limit_reached")
@@ -182,7 +192,7 @@ class EpoOpsClient:
                 response = self.client.get(
                     url,
                     params=params,
-                    headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                    headers={"Authorization": f"Bearer {token}", "Accept": "application/xml" if xml else "application/json"},
                 )
                 throttling = response.headers.get("x-throttling-control") or throttling
                 last_status = response.status_code
@@ -199,7 +209,7 @@ class EpoOpsClient:
                 response.raise_for_status()
                 if len(response.content) > self.max_bytes:
                     raise ValueError("evidence_tool_response_too_large")
-                payload = response.json()
+                payload = {"xml": response.text} if xml else response.json()
                 if not isinstance(payload, dict):
                     raise ValueError("evidence_tool_response_not_object")
                 return EvidenceToolResult(
