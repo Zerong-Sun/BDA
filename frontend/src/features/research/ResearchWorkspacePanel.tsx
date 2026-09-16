@@ -35,6 +35,7 @@ import { structureSourceFromTarget } from '../pdb-viewer/types'
 import { GenerateSimilarResearchPanel } from './GenerateSimilarResearchPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { LiteraturePanel } from './LiteraturePanel'
+import { PatentPanel } from './PatentPanel'
 import { ProjectReviewPanel } from './ProjectReviewPanel'
 import { ResearchGapResolutionButton } from './ResearchGapResolutionButton'
 import { ReviewMarkdown } from './ReviewMarkdown'
@@ -296,6 +297,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
             </FramePanel>
           </Frame>
           <OperationBlock title={w.referenceOperations}><LiteraturePanel /></OperationBlock>
+          <OperationBlock title={language === 'zh' ? '专利同族与权利要求' : 'Patent families and claims'}><PatentPanel key={projectId} projectId={projectId} /></OperationBlock>
         </>
       ) : null}
 

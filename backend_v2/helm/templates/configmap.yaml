@@ -1,4 +1,5 @@
 {{- include "bda.validateLsf" . -}}
+{{- include "bda.validateEpoOps" . -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,8 +17,11 @@ data:
   BDA_V2_EXPOSE_DOCS: {{ .Values.config.exposeDocs | quote }}
   BDA_V2_WRITES_ENABLED: {{ .Values.config.writesEnabled | quote }}
   BDA_V2_BUILD_REVISION: {{ required "config.buildRevision is required" .Values.config.buildRevision | quote }}
-  BDA_V2_SCHEMA_REVISION: "0069_patent_search_jurisdictions"
+  BDA_V2_SCHEMA_REVISION: "0070_af3_msa_port"
   BDA_V2_REQUIRED_WORKER_QUEUES: "dispatch,poll,collect,maintenance,research,copilot,scheduler"
+  {{- if .Values.epoOpsCredentials.secretName }}
+  BDA_V2_EPO_OPS_CREDENTIAL_REF: {{ printf "file:%s/%s" .Values.epoOpsCredentials.mountPath .Values.epoOpsCredentials.keyFile | quote }}
+  {{- end }}
   BDA_V2_LLM_LOCAL_SECRET_DIR: {{ .Values.config.llmSecretDir | quote }}
   BDA_V2_LSF_SSH_HOST: {{ .Values.config.lsf.sshHost | quote }}
   BDA_V2_LSF_SSH_PORT: {{ .Values.config.lsf.sshPort | quote }}

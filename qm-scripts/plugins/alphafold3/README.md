@@ -35,6 +35,7 @@ Plugin-specific checks:
 - Run the data pipeline and inference as separate reviewed stages when MSA generation is required.
 - Do not keep a GPU reservation during a CPU-only data pipeline stage.
 - Record per-seed output completeness; an aggregate confidence file is not a substitute for every requested seed.
+- Platform collection extracts embedded protein paired/unpaired MSAs from checksummed *_data.json; migration 0070 exposes protein_msa. Missing or invalid alignments remain unavailable.
 
 The authorized submission order is `validate → render/preview → review → stage → review → bsub`. Queue selection is made from a current `bqueues` check; do not copy another job's queue or CPU count.
 

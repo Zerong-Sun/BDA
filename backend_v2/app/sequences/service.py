@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..artifacts.fetch import artifact_row, artifact_text
+from ..artifacts.models import Artifact
 from ..candidates.models import Candidate
 from ..core.problem import DomainError
 from ..targets.models import Target
@@ -145,7 +146,8 @@ def conservation_from_artifact(
     session: Session,
     project_id: uuid.UUID,
     *,
-    artifact_id: uuid.UUID,
+    artifact_id: uuid.UUID | None = None,
+    target_id: uuid.UUID | None = None,
     weighting: str = "henikoff",
     limit: int = 25,
 ) -> dict[str, Any]:
@@ -157,6 +159,25 @@ def conservation_from_artifact(
     The result names the artifact it read, so a number can be traced back to
     the file it came from.
     """
+    if (artifact_id is None) == (target_id is None):
+        raise DomainError("alignment_source_ambiguous", "Name exactly one artifact_id or target_id", status_code=422)
+    if target_id is not None:
+        _, source = resolve(session, project_id, target_id=target_id)
+        matches = list(session.scalars(select(Artifact).where(
+            Artifact.project_id == project_id, Artifact.deleted_at.is_(None),
+            Artifact.artifact_type == "sequence_alignment",
+            Artifact.lineage["query_sha256"].as_string() == source["sequence_sha256"],
+            Artifact.lineage["method"].as_string() == "alphafold3_embedded_msa",
+            Artifact.lineage["msa_kind"].as_string() == "unpairedMsa",
+        ).order_by(Artifact.created_at.desc(), Artifact.id.desc()).limit(2)))
+        if not matches:
+            raise DomainError("target_alignment_missing", "No collected AF3 unpaired alignment matches this target sequence", status_code=404)
+        # Multiple runs/chain sources are a choice, not permission to silently
+        # substitute a newer alignment for the one the researcher intended.
+        if len(matches) > 1:
+            raise DomainError("target_alignment_ambiguous", "Multiple alignments match; choose an artifact_id", status_code=409)
+        artifact_id = matches[0].id
+    assert artifact_id is not None
     artifact = artifact_row(session, project_id, artifact_id)
     text = artifact_text(
         artifact, max_bytes=MAX_ALIGNMENT_BYTES, too_large_code="alignment_file_too_large"
@@ -169,6 +190,10 @@ def conservation_from_artifact(
         "artifact_id": str(artifact.id),
         "filename": artifact.filename,
         "checksum_sha256": artifact.checksum_sha256,
+        "provenance": {key: artifact.lineage[key] for key in (
+            "job_id", "attempt", "source_artifact_id", "source_checksum_sha256",
+            "method", "chain_id", "msa_kind", "query_sha256",
+        ) if key in (artifact.lineage or {})},
         **result,
     }
 

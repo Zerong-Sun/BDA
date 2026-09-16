@@ -292,7 +292,7 @@ def assessment(
 
 #: Sponsor pages fetched at most. At 1000 registrations a page this covers
 #: most targets; beyond it the mix is reported as partial, never extrapolated.
-MAX_SPONSOR_PAGES = 5
+MAX_SPONSOR_PAGES = 100
 
 #: How many start years the registration trend covers, ending with this year.
 TREND_YEARS = 8
@@ -311,32 +311,54 @@ MARKET_LIMITS: tuple[str, ...] = (
 )
 
 
+class SponsorAccumulator:
+    """Count pages without retaining source records; NCT ids prevent overlap inflation."""
+
+    def __init__(self) -> None:
+        self.by_class: Counter[str] = Counter()
+        self.industry: Counter[str] = Counter()
+        self.seen: set[str] = set()
+        self.aggregated = 0
+        self.duplicates = 0
+
+    def add(self, studies: Iterable[Mapping[str, Any]]) -> None:
+        for study in studies:
+            if not isinstance(study, Mapping):
+                continue
+            protocol = study.get("protocolSection") or {}
+            identifier = (protocol.get("identificationModule") or {}).get("nctId")
+            if identifier:
+                if str(identifier) in self.seen:
+                    self.duplicates += 1
+                    continue
+                self.seen.add(str(identifier))
+            lead = (protocol.get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}
+            sponsor_class = str(lead.get("class") or "UNKNOWN")
+            self.aggregated += 1
+            self.by_class[sponsor_class] += 1
+            if sponsor_class == "INDUSTRY" and lead.get("name"):
+                self.industry[str(lead["name"])] += 1
+
+    def result(self, total_matching: int | None, *, top: int = 10) -> dict[str, Any]:
+        return {
+            "studies_aggregated": self.aggregated,
+            "total_matching": total_matching,
+            "complete": bool(total_matching is not None and self.aggregated >= total_matching),
+            "duplicate_registrations_skipped": self.duplicates,
+            "by_class": dict(self.by_class.most_common()),
+            "industry_share": round(self.by_class["INDUSTRY"] / self.aggregated, 3) if self.aggregated else None,
+            "top_industry_sponsors": [
+                {"sponsor": name, "registrations": count} for name, count in self.industry.most_common(top)
+            ],
+        }
+
+
 def sponsor_mix(
     studies: Iterable[Mapping[str, Any]], *, total_matching: int | None, top: int = 10
 ) -> dict[str, Any]:
-    """Who leads the registrations retrieved, by class and by industry sponsor."""
-    by_class: Counter[str] = Counter()
-    industry: Counter[str] = Counter()
-    aggregated = 0
-    for study in studies:
-        if not isinstance(study, Mapping):
-            continue
-        lead = ((study.get("protocolSection") or {}).get("sponsorCollaboratorsModule") or {}).get("leadSponsor") or {}
-        sponsor_class = str(lead.get("class") or "UNKNOWN")
-        aggregated += 1
-        by_class[sponsor_class] += 1
-        if sponsor_class == "INDUSTRY" and lead.get("name"):
-            industry[str(lead["name"])] += 1
-    return {
-        "studies_aggregated": aggregated,
-        "total_matching": total_matching,
-        # A mix from a partial sample is labelled partial; ordering of the
-        # source's pages is unspecified, so a first page is not a random sample.
-        "complete": bool(total_matching is not None and aggregated >= total_matching),
-        "by_class": dict(by_class.most_common()),
-        "industry_share": round(by_class["INDUSTRY"] / aggregated, 3) if aggregated else None,
-        "top_industry_sponsors": [{"sponsor": name, "registrations": count} for name, count in industry.most_common(top)],
-    }
+    accumulator = SponsorAccumulator()
+    accumulator.add(studies)
+    return accumulator.result(total_matching, top=top)
 
 
 def registration_trend(counts_by_year: Mapping[int, int | None], *, current_year: int) -> dict[str, Any]:

@@ -11,6 +11,7 @@ import { ActivityDrawer } from './features/operations/ActivityDrawer'
 import { ProjectRequired } from './features/projects/ProjectRequired'
 import { ApiError, setUnauthorizedHandler } from './lib/api/client'
 import { useProjectContext } from './lib/hooks/useProjectContext'
+import { useProjectEvents } from './lib/hooks/useProjectEvents'
 import { useAppStore } from './lib/store/appStore'
 import { applyTheme, resolveTheme, watchSystemTheme } from './lib/theme/initTheme'
 import { isDemoProject, TourOverlay } from './features/tour'
@@ -108,6 +109,7 @@ export function AppShell() {
   const setAppMode = useAppStore((s) => s.setAppMode)
   const location = useLocation()
   const { projectId, activeProject } = useProjectContext()
+  useProjectEvents(activeProject ? projectId : null)
   const showRail = Boolean(activeProject) && railRoutes.some((route) => location.pathname.startsWith(route))
   // `<main>` is the scroll container and outlives every route, so without this a
   // new page opens at whatever depth the previous one was scrolled to.

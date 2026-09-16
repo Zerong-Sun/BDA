@@ -86,3 +86,34 @@ is actually mounted.
 {{- end }}
 {{- end }}
 {{- end -}}
+
+{{- define "bda.epoOpsVolume" -}}
+{{- if .Values.epoOpsCredentials.secretName -}}
+- name: epo-ops-credentials
+  secret:
+    secretName: {{ .Values.epoOpsCredentials.secretName | quote }}
+    defaultMode: 0440
+    items:
+      - key: {{ .Values.epoOpsCredentials.keyFile | quote }}
+        path: {{ .Values.epoOpsCredentials.keyFile | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "bda.epoOpsVolumeMount" -}}
+{{- if .Values.epoOpsCredentials.secretName -}}
+- name: epo-ops-credentials
+  mountPath: {{ .Values.epoOpsCredentials.mountPath | quote }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "bda.validateEpoOps" -}}
+{{- if .Values.epoOpsCredentials.secretName }}
+{{- if or (not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.-]*$" .Values.epoOpsCredentials.keyFile)) (contains ".." .Values.epoOpsCredentials.keyFile) }}
+{{- fail "epoOpsCredentials.keyFile must be a simple Secret key filename" }}
+{{- end }}
+{{- if or (not (hasPrefix "/" .Values.epoOpsCredentials.mountPath)) (contains ".." .Values.epoOpsCredentials.mountPath) (eq "/" .Values.epoOpsCredentials.mountPath) }}
+{{- fail "epoOpsCredentials.mountPath must be an absolute directory without parent traversal" }}
+{{- end }}
+{{- end }}
+{{- end -}}

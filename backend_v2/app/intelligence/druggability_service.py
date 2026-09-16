@@ -39,6 +39,7 @@ def create_druggability_run(
     user: User,
     *,
     trial_term: str = "",
+    candidate_id: uuid.UUID | None = None,
     source: dict[str, Any] | None = None,
 ) -> IntelligenceRun:
     target = session.get(Target, target_id)
@@ -71,11 +72,26 @@ def create_druggability_run(
             "Supply a shorter trial_term.",
             status_code=422,
         )
+    candidate_sequence = None
+    if candidate_id is not None:
+        from ..candidates.models import Candidate
+        from ..sequences.service import analyse
+
+        candidate = session.get(Candidate, candidate_id)
+        if candidate is None or candidate.project_id != project.id:
+            raise DomainError("candidate_not_found", "Candidate does not belong to this project", status_code=404)
+        # Freeze measurements of the exact requested sequence before queueing.
+        # A later candidate edit must not silently change what this run assessed.
+        candidate_sequence = analyse(session, project.id, candidate_id=candidate_id)
     row = IntelligenceRun(
         project_id=project.id,
         target_id=target.id,
         created_by=user.id,
-        query={"kind": DRUGGABILITY_KIND, "trial_term": term, **(source or {})},
+        query={
+            **(source or {}), "kind": DRUGGABILITY_KIND, "trial_term": term,
+            "candidate_id": str(candidate_id) if candidate_id else None,
+            "candidate_sequence": candidate_sequence,
+        },
     )
     session.add(row)
     session.flush()

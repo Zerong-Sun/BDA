@@ -132,7 +132,15 @@ def test_a_topic_becomes_cql_with_offices_applied_after_it(
 
 @pytest.mark.parametrize(
     ("topic", "jurisdictions"),
-    [("   ", ()), ("AND OR", ()), ("PD-1", ("DE",)), ("x" * 600, ())],
+    [
+        ("   ", ()),
+        ("AND OR", ()),
+        ("PD-1", ("DE",)),
+        ("x" * 600, ()),
+        # OPS answers 400 to these; refusing here costs no request from the quota.
+        ('ta all "programmed death 1" and ta all antibody', ()),
+        ("ta any pd1", ()),
+    ],
 )
 def test_a_query_that_cannot_be_a_search_is_refused(topic: str, jurisdictions: tuple[str, ...]) -> None:
     with pytest.raises(PatentQueryError):
@@ -282,3 +290,18 @@ def test_a_patent_search_names_one_source_and_offices_only_restrict_patents() ->
         LiteratureSearchCreate(query="PD-1 antibody", sources=["europe_pmc", "epo_ops_patents"])
     with pytest.raises(ValidationError, match="restrict a patent search only"):
         LiteratureSearchCreate(query="PD-1 antibody", sources=["europe_pmc"], jurisdictions=["CN"])
+
+
+def test_an_unquoted_cql_operand_is_refused_with_the_correction() -> None:
+    """The message has to say what to write: the model that wrote it reads it."""
+    with pytest.raises(PatentQueryError, match=r'write all "antibody"'):
+        epo_ops.cql_query('ta all "programmed death 1" and ta all antibody')
+
+    # The quoted form is CQL OPS accepts, and is passed through as written.
+    quoted = 'ta all "programmed death 1" and ta all "antibody"'
+    assert epo_ops.cql_query(quoted) == quoted
+
+
+def test_cql_operator_words_inside_a_quoted_operand_are_not_reparsed():
+    query = 'ta all "bind all receptors" and pa any "Example Company"'
+    assert epo_ops.cql_query(query) == query

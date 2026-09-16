@@ -248,6 +248,7 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
             "literature.ingest": "bda_v2.literature_ingest",
             "literature.search": "bda_v2.literature_search",
             "literature.patent_legal_status": "bda_v2.patent_legal_status",
+            "literature.patent_claims": "bda_v2.patent_claims",
             "literature.subscription.run": "bda_v2.subscription_run",
             "intelligence.run": "bda_v2.intelligence_run",
             "intelligence.export": "bda_v2.intelligence_export",
@@ -298,7 +299,7 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                 continue
             try:
                 args: list[object] = [str(event.aggregate_id)]
-                if event.topic in {"target.structure.import", "research.gaps.resolve", "literature.patent_legal_status"}:
+                if event.topic in {"target.structure.import", "research.gaps.resolve", "literature.patent_legal_status", "literature.patent_claims"}:
                     args.append(event.payload)
                 elif event.topic == "experiment_results.import":
                     args.append(bool(event.payload.get("dry_run")))
@@ -614,6 +615,11 @@ def _persist_outputs(session: Session, job: Job, submission: JobSubmission, veri
             ]
         )
         artifacts.append(artifact)
+    snapshot = job.runtime_spec.get("plugin_snapshot") or {}
+    if snapshot.get("output_parser") == "alphafold3":
+        from ..artifacts.af3_alignments import PORT, collect
+        declared = any(port.get("name") == PORT["name"] for port in snapshot.get("output_ports", []))
+        artifacts.extend(collect(session, artifacts, declared=declared))
     return artifacts
 
 

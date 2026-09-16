@@ -355,3 +355,33 @@ def test_a_target_with_no_name_and_no_term_says_what_is_missing(factory) -> None
             druggability_service.create_druggability_run(session, project, target.id, user)
 
     assert error.value.error_code == "trial_term_missing"
+
+
+def test_candidate_sequence_measurements_are_frozen_without_copying_residues(factory):
+    import json
+
+    from backend_v2.app.candidates.models import Candidate
+
+    sequence = "ACDEFGHIKLMNPQRSTVWY" * 3
+    with factory() as session:
+        project, user = _project(session)
+        target = Target(project_id=project.id, name="Example", uniprot_accession="Q15116")
+        session.add(target)
+        session.flush()
+        candidate = Candidate(project_id=project.id, candidate_key="example", name="Example candidate", properties={"sequence": sequence})
+        session.add(candidate)
+        session.flush()
+        run = druggability_service.create_druggability_run(session, project, target.id, user, candidate_id=candidate.id)
+        frozen = run.query["candidate_sequence"]
+        assert sequence not in json.dumps(run.query)
+        assert frozen["source"]["sequence_sha256"]
+        candidate.properties = {"sequence": "A" * 80}
+        run_id = run.id
+        session.commit()
+    intelligence_tasks.druggability_assessment(str(run_id))
+    with factory() as session:
+        report = session.scalar(select(IntelligenceReport).where(IntelligenceReport.run_id == run_id))
+        assert report.content["candidate_sequence"] == frozen
+        assert sequence not in json.dumps(report.content)
+        evidence = session.scalar(select(IntelligenceEvidence).where(IntelligenceEvidence.run_id == run_id, IntelligenceEvidence.evidence_type == "druggability_candidate_sequence"))
+        assert evidence.citation["retrieval"]["sequence_sha256"] == frozen["source"]["sequence_sha256"]

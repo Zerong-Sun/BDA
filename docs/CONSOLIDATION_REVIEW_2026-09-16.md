@@ -39,12 +39,28 @@
 
 验证日志与最终数字保存在私有整合回执。数据库转储、集群输入/输出、个人配置与恢复快照不进入公共提交。
 
-## 明确未完成的工程项
+## 后续工程收尾（2026-09-16）
 
-- TypeScript 7 升级 PR #5：现有 typescript-eslint 的 peer 范围小于 6.1，不能强行安装。保留 6.0 工具链及该 PR，待兼容版本后复测。
-- 专利全文权利要求索引、按族格局视图、同族/法律事件 REST 接口及 Helm 凭据挂载模板。
-- 研究室 feed、Inbox、agent run 的推送更新；当前保留轮询。
-- AlphaFold 3 MSA 制品输出与采集；候选序列指标接入成药性报告。
-- 双模式操作的未实现部分见 [规划](plans/DUAL_MODE_OPERATION_PLAN.md)。其他产品决策和来源见 [规划索引](plans/README.md)。
+- TypeScript 7 使用官方并行工具链：构建由 `@typescript/native`（typescript 7.0.2）执行，
+  ESLint 与 AST 测试继续通过 `typescript` 别名使用 `@typescript/typescript6` 6.0.3。
+  不放宽 typescript-eslint 的 peer 范围。依据 [微软升级说明](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0)。
+- 专利 REST 入口与页面支持已保存公开文本的同族分组、法律事件异步检索、权利要求提取和字面搜索。
+  原 XML 按内容哈希不可变保存，每条原文关联检索追踪与来源制品。重复交付不重复建行，后续检索保留旧引用，搜索仅使用最近索引。
+  同族预览最多扫描 2,000 份记录、展示 50 个族/每族 10 份文本，截断明确标记。
+  [EPO OPS](https://www.epo.org/en/searching-for-patents/data/web-services/ops) 实际覆盖和配额决定能否获得原文；缺凭据时拒绝排队。
+- 补入保留 Claude 工作区的后续 EPO 修复：fault 原因、带引号 CQL 校验、各国最近中性事件；只有明确的无命中 fault 才计为空结果。健康提示已有更新的同类实现，保留现有调度暂停与重试体验。
+- Helm 可引用只读 EPO Secret，API 与研究/Copilot worker 一致挂载；配置文件不存密钥。
+- 成药性报告可绑定候选：排队时固定序列摘要与测量，后续候选改动不改变该次报告。
+  ClinicalTrials.gov 申请人统计逐页计数、NCT ID 去重，最多 100 页（每页 1,000）；失败、循环游标、达到上限均明确标记不完整。
+- Room、Inbox 和 agent run 列表由项目事件流失效刷新，权限每次重查；有可独立工作的轮询兜底。
+- AF3 输出中的真实比对提取为逐链 A3M，具有来源哈希和 lineage；迁移 0070 注册 MSA 端口。
+  target 自动选择只接受项目中唯一的序列摘要匹配，歧义需指定 artifact。
 
+新增能力通过离线与隔离数据库检查，并不表示 EPO 真实账号或启明站点完成验收。
+部署与最终检查结果以私有回执为准。启明需用户手动登录；未取得已确认会话时不探测、不重连、不提交作业。
+
+## 保留的规划与科学问题
+
+双模式操作的未实现部分见 [规划](plans/DUAL_MODE_OPERATION_PLAN.md)。
+其他产品决策和来源见 [规划索引](plans/README.md)。
 法律事件不会被自动解释为有效/失效或 FTO 结论；没有可靠数据时不生成市场规模或成药概率。

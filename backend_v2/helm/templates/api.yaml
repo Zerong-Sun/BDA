@@ -37,9 +37,11 @@ spec:
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
             {{- include "bda.byokVolumeMount" . | nindent 12 }}
+            {{- include "bda.epoOpsVolumeMount" . | nindent 12 }}
       volumes:
         - {name: tmp, emptyDir: {}}
         {{- include "bda.byokVolume" . | nindent 8 }}
+        {{- include "bda.epoOpsVolume" . | nindent 8 }}
 ---
 apiVersion: v1
 kind: Service

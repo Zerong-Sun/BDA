@@ -525,6 +525,7 @@ class CopilotActionService:
         target_id: str,
         *,
         trial_term: str = "",
+        candidate_id: str | None = None,
     ) -> dict[str, Any]:
         """Queue a druggability assessment of one exact project target.
 
@@ -539,8 +540,9 @@ class CopilotActionService:
             parsed_target_id = uuid.UUID(target_id)
         except ValueError as exc:
             raise ValueError("invalid_target_id") from exc
+        parsed_candidate_id = uuid.UUID(candidate_id) if candidate_id else None
         term = trial_term.strip()
-        payload = {"target_id": str(parsed_target_id), "trial_term": term}
+        payload = {"target_id": str(parsed_target_id), "trial_term": term, "candidate_id": str(parsed_candidate_id) if parsed_candidate_id else None}
 
         def execute() -> dict[str, Any]:
             row = create_druggability_run(
@@ -549,6 +551,7 @@ class CopilotActionService:
                 parsed_target_id,
                 self.user,
                 trial_term=term,
+                candidate_id=parsed_candidate_id,
                 source={"source": "copilot", "source_message_id": str(self.source_message_id)},
             )
             return _awaitable(

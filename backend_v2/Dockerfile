@@ -1,7 +1,7 @@
 FROM python:3.14-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0069_patent_search_jurisdictions
+ARG BDA_SCHEMA_REVISION=0070_af3_msa_port
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)

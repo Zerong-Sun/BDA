@@ -74,7 +74,7 @@ def _retrieval_trace_values(
         "source": str(audit.get("tool") or "").split(".", 1)[0] or "unknown",
         "request_json": audit.get("query") or {},
         "response_metadata": response_metadata or {},
-        "status": audit.get("status") or ("failed" if error else "completed"),
+        "status": "failed" if error else (audit.get("status") or "completed"),
         "http_status": audit.get("http_status"),
         "response_checksum_sha256": audit.get("response_checksum_sha256"),
         "content_checksum_sha256": content_checksum_sha256,
@@ -242,6 +242,9 @@ def literature_search(search_run_id: str) -> dict:
                         "result_count": len(results),
                         "raw_response_artifact_id": str(raw_search_artifact.id),
                         "result_type": "biblio" if ops_run else "core",
+                        # OPS states "no results found" in its own answer; recorded
+                        # so an empty search reads as what the source said.
+                        **({"no_results": True} if search_result.audit.get("no_results") else {}),
                         # OPS says how many records matched in all, not only how
                         # many were returned - the difference a reader must see.
                         **({"total_result_count": ops_search_total(search_result.data)} if ops_run else {}),
@@ -688,7 +691,8 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
                 try:
                     result = client.family_legal(reference)
                 except RuntimeError as exc:
-                    if reference.kind is None or not str(exc).endswith("_not_found"):
+                    # The message may carry the fault OPS gave after the code.
+                    if reference.kind is None or not str(exc).split(":")[0].endswith("_not_found"):
                         raise
                     # Europe PMC's kind code for a publication is not always
                     # DOCDB's (B for B2); the number alone still names it.
@@ -729,7 +733,7 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
 
             summary = family_legal_summary(result.data, reference)
             raw = json.dumps(result.data, ensure_ascii=False, sort_keys=True).encode()
-            object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal.json"
+            object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal/{hashlib.sha256(raw).hexdigest()}.json"
             ObjectStorage().put_bytes(object_key, raw, "application/json")
             with session_scope() as session:
                 artifact = Artifact(
@@ -798,3 +802,10 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
         "skipped": len(requested) - len(targets),
         "refused": refused,
     }
+
+
+@celery_app.task(name="bda_v2.patent_claims")
+def patent_claims(lookup_id: str, payload: dict) -> dict:
+    from .patent_claims import collect_claims
+
+    return collect_claims(lookup_id, payload)

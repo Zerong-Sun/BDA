@@ -248,7 +248,9 @@ def gather_druggability(
         retrieval["clinical_trials_trend"] = trend_audits
         trend = druggability.registration_trend(by_year, current_year=current_year)
 
-        studies: list[dict[str, Any]] = []
+        sponsor_counts = druggability.SponsorAccumulator()
+        seen_tokens: set[str] = set()
+        pagination_exhausted = False
         sponsor_audits: list[dict[str, Any]] = []
         page_token: str | None = None
         for _page in range(druggability.MAX_SPONSOR_PAGES):
@@ -258,13 +260,24 @@ def gather_druggability(
                 failures.append(f"ClinicalTrials.gov sponsor page could not be retrieved ({exc}); the mix is partial.")
                 break
             sponsor_audits.append(result.audit)
-            studies.extend(result.data.get("studies") or [])
+            sponsor_counts.add(result.data.get("studies") or [])
             page_token = result.data.get("nextPageToken")
             if not page_token:
+                pagination_exhausted = True
                 break
+            if page_token in seen_tokens:
+                failures.append("ClinicalTrials.gov repeated a page token; sponsor pagination stopped as partial.")
+                break
+            seen_tokens.add(page_token)
         retrieval["clinical_trials_sponsors"] = sponsor_audits
         total_matching = (trials or {}).get("total_matching")
-        sponsors = druggability.sponsor_mix(studies, total_matching=total_matching)
+        sponsors = sponsor_counts.result(total_matching)
+        sponsors["complete"] = bool(sponsors["complete"] and pagination_exhausted)
+        sponsors["pagination_exhausted"] = pagination_exhausted
+        sponsors["pages_read"] = len(sponsor_audits)
+        sponsors["page_limit"] = druggability.MAX_SPONSOR_PAGES
+        if not pagination_exhausted and len(sponsor_audits) == druggability.MAX_SPONSOR_PAGES:
+            failures.append("ClinicalTrials.gov sponsor page limit reached; the mix is partial, not extrapolated.")
 
     report = druggability.assessment(
         target=target,
@@ -344,6 +357,7 @@ def druggability_assessment(run_id: str) -> dict:
             if target
             else {"id": str(run.target_id)}
         )
+        candidate_sequence = (run.query or {}).get("candidate_sequence")
         trial_term = str((run.query or {}).get("trial_term") or target_view.get("name") or "").strip()
         # Filing years from patents this project already saved through a
         # recorded search - read here, not searched for: an assessment must not
@@ -386,9 +400,8 @@ def druggability_assessment(run_id: str) -> dict:
 
     from datetime import UTC, datetime
 
-    # UniProt, Open Targets, 6 phase counts, 8 start-year counts and up to 5
-    # sponsor pages: 21 calls, with headroom for retries recorded as calls.
-    tools = EvidenceToolService(max_calls=30, timeout_seconds=30.0)
+    # Bound source requests while allowing targets with more than 5,000 registrations.
+    tools = EvidenceToolService(max_calls=druggability.MAX_SPONSOR_PAGES + 20, timeout_seconds=30.0)
     try:
         report = gather_druggability(
             tools,
@@ -421,8 +434,15 @@ def druggability_assessment(run_id: str) -> dict:
     finally:
         tools.close()
 
+    if candidate_sequence is not None:
+        report["candidate_sequence"] = candidate_sequence
+        report.setdefault("retrieval", {})["candidate_sequence"] = {
+            "source": "BDA sequence measurements at queue time",
+            **candidate_sequence.get("source", {}),
+        }
     retrieval = report.get("retrieval") or {}
     sections = {
+        "candidate_sequence": retrieval.get("candidate_sequence"),
         "tractability": retrieval.get("open_targets"),
         "clinical_candidates": retrieval.get("open_targets"),
         "safety_liabilities": retrieval.get("open_targets"),

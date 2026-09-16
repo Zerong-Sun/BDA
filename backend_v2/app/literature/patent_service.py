@@ -55,6 +55,7 @@ MAX_COUNTRIES_LISTED = 12
 #: One OPS family request per document, and INPADOC allows about 45 a minute.
 MAX_LEGAL_STATUS_DOCUMENTS = 25
 LEGAL_STATUS_TOPIC = "literature.patent_legal_status"
+CLAIMS_TOPIC = "literature.patent_claims"
 
 
 def publication_key(patent: dict[str, Any]) -> str:
@@ -102,6 +103,10 @@ def _legal_view(metadata: dict[str, Any]) -> dict[str, Any] | None:
             {
                 "country": row.get("country"),
                 "events": row.get("events"),
+                # Both: a country whose every event is neutral - a publication,
+                # a request for examination - has no flagged event, and showing
+                # only that would report a count with nothing in it.
+                "latest_event": row.get("latest_event"),
                 "latest_flagged_event": row.get("latest_flagged_event"),
             }
             for row in (looked_up.get("by_country") or [])[:MAX_COUNTRIES_LISTED]
@@ -127,19 +132,20 @@ def project_landscape(
             status_code=422,
         )
 
-    documents = session.scalars(
+    documents = list(session.scalars(
         select(LiteratureDocument)
         .where(
             LiteratureDocument.project_id == project_id,
             LiteratureDocument.source.in_(PATENT_SOURCES),
         )
         .order_by(LiteratureDocument.created_at.desc())
-        .limit(MAX_DOCUMENTS_READ)
-    )
+        .limit(MAX_DOCUMENTS_READ + 1)
+    ))
+    truncated = len(documents) > MAX_DOCUMENTS_READ
 
     by_key: dict[str, tuple[LiteratureDocument, dict[str, Any], dict[str, Any]]] = {}
     merged = 0
-    for document in documents:
+    for document in documents[:MAX_DOCUMENTS_READ]:
         metadata = document.metadata_json or {}
         patent = metadata.get("patent") or {}
         if not patent:
@@ -156,6 +162,28 @@ def project_landscape(
                 continue
         by_key[key] = (document, patent, metadata)
     selected = list(by_key.values())
+    grouped: dict[str, list[tuple[LiteratureDocument, dict[str, Any], dict[str, Any]]]] = {}
+    for item in selected:
+        if family := family_id(item[2]):
+            grouped.setdefault(family, []).append(item)
+    groups = [
+        {
+            "family_id": family,
+            "publications": len(members),
+            "jurisdictions": sorted({str(p.get("country_code")) for _, p, _ in members if p.get("country_code")}),
+            "applicants": sorted({str(p.get("applicant")) for _, p, _ in members if p.get("applicant")}),
+            "members": [
+                {
+                    "document_id": str(d.id), "publication_number": p.get("publication_number"),
+                    "kind_code": p.get("kind_code"), "title": d.title,
+                    "retrieval_trace_id": (m.get("content_provenance") or {}).get("retrieval_trace_id"),
+                }
+                for d, p, m in members[:10]
+            ],
+            "members_truncated": len(members) > 10,
+        }
+        for family, members in sorted(grouped.items(), key=lambda item: (-len(item[1]), item[0]))[:MAX_RECORDS_LISTED]
+    ]
 
     today = datetime.now(UTC).date()
     summary = landscape([patent for _, patent, _ in selected], today=today)
@@ -194,6 +222,8 @@ def project_landscape(
         "landscape": summary,
         "families": {
             "distinct": len(families),
+            "groups": groups,
+            "groups_truncated": len(families) > len(groups),
             "publications_without_family_id": sum(1 for _, _, metadata in selected if not family_id(metadata)),
             "basis": (
                 "DOCDB simple family ids, carried by EPO OPS records and by Europe PMC records "
@@ -211,6 +241,9 @@ def project_landscape(
         "records": records,
         "records_listed": len(records),
         "records_matched": len(selected),
+        "documents_read": min(len(documents), MAX_DOCUMENTS_READ),
+        "documents_truncated": truncated,
+        "complete": not truncated,
         "duplicate_copies_merged": merged,
         "searches": searches,
         "filters": {
@@ -222,13 +255,15 @@ def project_landscape(
     }
 
 
-def create_legal_status_lookup(
+def _create_lookup(
     session: Session,
     project: Project,
     document_ids: list[uuid.UUID],
     user: User,
+    *,
+    topic: str,
 ) -> dict[str, Any]:
-    """Queue a family and legal-event lookup for saved patents of this project.
+    """Queue an EPO lookup for saved patents of this project.
 
     Every refusal happens here, before anything is queued: a document of another
     project, a paper passed as a patent, too many at once, or no credential. A
@@ -247,7 +282,7 @@ def create_legal_status_lookup(
     if not credential_available(get_settings().epo_ops_credential_ref):
         raise DomainError(
             "epo_ops_not_configured",
-            "Patent families and legal events come from EPO Open Patent Services, which is not "
+            "Patent evidence comes from EPO Open Patent Services, which is not "
             "configured on this server. Set BDA_V2_EPO_OPS_CREDENTIAL_REF.",
             status_code=503,
         )
@@ -277,8 +312,8 @@ def create_legal_status_lookup(
     lookup_id = uuid.uuid4()
     operation = enqueue_operation(
         session,
-        topic=LEGAL_STATUS_TOPIC,
-        resource_type="patent_legal_status_lookup",
+        topic=topic,
+        resource_type="patent_claims_lookup" if topic == CLAIMS_TOPIC else "patent_legal_status_lookup",
         resource_id=lookup_id,
         user=user,
         project_id=project.id,
@@ -290,5 +325,13 @@ def create_legal_status_lookup(
         "operation_id": str(operation.id),
         "status": "pending",
         "documents": len(requested),
-        "database": "epo_ops_inpadoc",
+        "database": "epo_ops_claims" if topic == CLAIMS_TOPIC else "epo_ops_inpadoc",
     }
+
+
+def create_legal_status_lookup(session: Session, project: Project, document_ids: list[uuid.UUID], user: User) -> dict[str, Any]:
+    return _create_lookup(session, project, document_ids, user, topic=LEGAL_STATUS_TOPIC)
+
+
+def create_claims_lookup(session: Session, project: Project, document_ids: list[uuid.UUID], user: User) -> dict[str, Any]:
+    return _create_lookup(session, project, document_ids, user, topic=CLAIMS_TOPIC)

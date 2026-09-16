@@ -164,6 +164,18 @@ PATENT_SEARCH_SOURCES: frozenset[str] = frozenset({"europe_pmc_patents", "epo_op
 PatentJurisdiction = Literal["CN", "US", "EP", "WO", "JP", "KR"]
 
 
+class PatentLookupCreate(BaseModel):
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=25)
+
+
+class PatentLookupResponse(BaseModel):
+    lookup_id: uuid.UUID
+    operation_id: uuid.UUID
+    status: str
+    documents: int
+    database: str
+
+
 def _default_literature_sources() -> list[LiteratureSource]:
     return ["europe_pmc"]
 

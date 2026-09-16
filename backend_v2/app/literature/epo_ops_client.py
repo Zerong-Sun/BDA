@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -36,6 +37,30 @@ from .epo_ops import BASE_URL, MAX_SEARCH_RANGE, PublicationRef
 #: A 65-member family with legal events is about 0.9 MB. Anything past this is
 #: not a response a lookup should hold in memory and archive.
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+
+
+#: OPS answers a refusal with a fault document naming the cause. Without it a
+#: failed run says only that a request failed, and the query that caused it -
+#: unquoted CQL, an exhausted quota - cannot be corrected by whoever reads it.
+_FAULT = re.compile(r"<code>([^<]{1,80})</code>\s*<message>([^<]{1,400})</message>", re.IGNORECASE | re.DOTALL)
+
+
+#: The fault OPS returns when a search matched nothing. Every other fault on a
+#: 404 is a refusal of the request, and reporting it as "no hits" would turn a
+#: broken query into evidence of absence.
+NO_RESULTS_FAULT = "SERVER.EntityNotFound"
+
+
+def fault_reason(response: httpx.Response) -> str | None:
+    """What OPS said was wrong, as one line, or None if it did not say."""
+    try:
+        text = response.text[:4000]
+    except (UnicodeDecodeError, httpx.ResponseNotRead, RuntimeError):
+        return None
+    match = _FAULT.search(text)
+    if match is None:
+        return None
+    return f"{match.group(1).strip()}: {' '.join(match.group(2).split())}"
 
 
 class EpoOpsUnavailable(RuntimeError):
@@ -129,6 +154,15 @@ class EpoOpsClient:
             params={},
         )
 
+    def claims(self, publication: PublicationRef) -> EvidenceToolResult:
+        """Retrieve the publication's literal claims, never a legal interpretation."""
+        return self._get(
+            "epo_ops.claims",
+            f"{BASE_URL}/rest-services/published-data/publication/docdb/{quote(publication.docdb, safe='.')}/claims",
+            params={},
+            xml=True,
+        )
+
     def _access_token(self) -> str:
         now = self._clock()
         if self._token and now < self._token_expires_at:
@@ -163,6 +197,7 @@ class EpoOpsClient:
         *,
         params: dict[str, Any],
         not_found_is_empty: bool = False,
+        xml: bool = False,
     ) -> EvidenceToolResult:
         if self.calls >= self.max_calls:
             raise RuntimeError("evidence_tool_call_limit_reached")
@@ -173,6 +208,7 @@ class EpoOpsClient:
         last_status: int | None = None
         throttling: str | None = None
         rejection: str | None = None
+        fault: str | None = None
         reauthenticated = False
         attempts = 0
         while attempts <= self.max_retries:
@@ -182,7 +218,7 @@ class EpoOpsClient:
                 response = self.client.get(
                     url,
                     params=params,
-                    headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                    headers={"Authorization": f"Bearer {token}", "Accept": "application/fulltext+xml" if xml else "application/json"},
                 )
                 throttling = response.headers.get("x-throttling-control") or throttling
                 last_status = response.status_code
@@ -193,13 +229,18 @@ class EpoOpsClient:
                     attempts -= 1
                     continue
                 if response.status_code == 404 and not_found_is_empty:
-                    audit = self._audit(tool, query, started_at, attempts, response, throttling)
-                    audit["no_results"] = True
-                    return EvidenceToolResult(data={}, audit=audit)
+                    reason = fault_reason(response)
+                    if reason is not None and reason.split(":", 1)[0] == NO_RESULTS_FAULT:
+                        audit = self._audit(tool, query, started_at, attempts, response, throttling)
+                        audit["no_results"] = True
+                        # What OPS said, so the trace records the statement
+                        # rather than this client's reading of a status code.
+                        audit["fault"] = reason
+                        return EvidenceToolResult(data={}, audit=audit)
                 response.raise_for_status()
                 if len(response.content) > self.max_bytes:
                     raise ValueError("evidence_tool_response_too_large")
-                payload = response.json()
+                payload = {"xml": response.text} if xml else response.json()
                 if not isinstance(payload, dict):
                     raise ValueError("evidence_tool_response_not_object")
                 return EvidenceToolResult(
@@ -214,8 +255,10 @@ class EpoOpsClient:
                 last_error = exc
                 status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
                 if isinstance(exc, httpx.HTTPStatusError):
-                    # OPS names why it refused (quota, blocked) in this header.
+                    # OPS names why it refused (quota, blocked) in this header,
+                    # and what was wrong with the request in the body.
                     rejection = exc.response.headers.get("x-rejection-reason") or rejection
+                    fault = fault_reason(exc.response) or fault
                 if status is not None and status not in {429, 503} and status < 500:
                     break
                 if isinstance(exc, ValueError):
@@ -224,12 +267,19 @@ class EpoOpsClient:
                     # OPS throttles per minute; retrying at once only spends the quota.
                     self._sleep(min(2.0 * 2 ** (attempts - 1), 20.0))
         error = str(last_error)[:500] if last_error else "epo_ops_unauthorized"
-        self.audits.append(self._failure(tool, query, started_at, attempts, error, last_status, throttling, rejection))
+        audit = self._failure(tool, query, started_at, attempts, error, last_status, throttling, rejection)
+        audit["fault"] = fault
+        self.audits.append(audit)
         if last_status == 404:
-            raise RuntimeError(f"{tool}_not_found") from last_error
+            # The fault travels here too: a 404 that is not "no results" is a
+            # refusal, and the caller has to be able to say which one it was.
+            raise RuntimeError(f"{tool}_not_found{': ' + fault if fault else ''}") from last_error
+        reason = rejection or fault
         if last_status in {401, 403}:
-            raise RuntimeError(f"{tool}_refused{': ' + rejection if rejection else ''}") from last_error
-        raise RuntimeError(f"{tool}_failed") from last_error
+            raise RuntimeError(f"{tool}_refused{': ' + reason if reason else ''}") from last_error
+        # The fault travels in the message because that is what reaches the run
+        # and the trace a person reads: "search_failed" alone cannot be acted on.
+        raise RuntimeError(f"{tool}_failed{': ' + fault if fault else ''}") from last_error
 
     def _audit(
         self,
