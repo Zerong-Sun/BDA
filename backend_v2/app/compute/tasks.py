@@ -845,6 +845,34 @@ def _gc_protected(object_name: str, live_job_prefixes: tuple[str, ...]) -> bool:
     return any(segment in object_name for segment in GC_PROTECTED_SEGMENTS)
 
 
+def _foreign_to_this_database(
+    object_name: str,
+    known_project_prefixes: frozenset[str],
+    known_job_prefixes: frozenset[str],
+) -> bool:
+    """True when the key is scoped to a project or job owned by a DIFFERENT database.
+
+    One bucket is routinely shared by several databases -- a demo or rehearsal database
+    configured with the same BDA_V2_MINIO_BUCKET as the primary one. ``known_artifacts`` in
+    reconcile_artifacts is read from THIS database only, so every object belonging to another
+    database looks orphaned here, and deleting on that basis destroys the other deployment's
+    evidence. That is not hypothetical: six databases sharing one bucket turned a routine
+    sweep into 3158 delete markers over another database's artifacts in a single minute.
+
+    Only project- and job-scoped keys can be attributed, so only those are skipped. Ordinary
+    garbage (``staging/``, ``objects/``, anything unprefixed) stays collectable -- the sweep
+    is still the only thing that reclaims it, and refusing to touch it would trade a deletion
+    bug for a storage leak.
+    """
+    for prefix, known in (("projects/", known_project_prefixes), ("jobs/", known_job_prefixes)):
+        if object_name.startswith(prefix):
+            parts = object_name.split("/", 2)
+            if len(parts) >= 3:
+                return f"{prefix}{parts[1]}/" not in known
+            return False
+    return False
+
+
 @celery_app.task(name="bda_v2.reconcile_artifacts")
 def reconcile_artifacts() -> dict:
     now = datetime.now(UTC)
@@ -876,13 +904,21 @@ def reconcile_artifacts() -> dict:
             f"jobs/{job_id}/"
             for job_id in session.scalars(select(Job.id).where(Job.status.not_in(TERMINAL_STATES)))
         )
+        # Every project and job this database owns, live or terminal. A key scoped to an id
+        # absent from these sets belongs to a database sharing the bucket, not to garbage.
+        known_project_prefixes = frozenset(
+            f"projects/{project_id}/" for project_id in session.scalars(select(Project.id))
+        )
+        known_job_prefixes = frozenset(
+            f"jobs/{job_id}/" for job_id in session.scalars(select(Job.id))
+        )
 
     storage = ObjectStorage()
     for _, key in expired_data:
         if storage.exists(key):
             storage.remove(key)
     missing = [artifact_id for artifact_id, key in available_data if not storage.exists(key)]
-    orphaned = [
+    unclaimed = [
         item.object_name
         for item in storage.list_objects()
         if item.object_name not in known_staging | known_artifacts
@@ -890,6 +926,12 @@ def reconcile_artifacts() -> dict:
         and item.last_modified
         and item.last_modified < now - timedelta(hours=1)
     ]
+    orphaned = [
+        name
+        for name in unclaimed
+        if not _foreign_to_this_database(name, known_project_prefixes, known_job_prefixes)
+    ]
+    foreign_objects = len(unclaimed) - len(orphaned)
     for key in orphaned:
         storage.remove(key)
 
@@ -903,7 +945,12 @@ def reconcile_artifacts() -> dict:
             artifact = session.get(Artifact, artifact_id)
             if artifact and artifact.status == "available":
                 artifact.status = "failed"
-    return {"expired_uploads": len(expired_data), "missing_objects": len(missing), "orphaned_objects": len(orphaned)}
+    return {
+        "expired_uploads": len(expired_data),
+        "missing_objects": len(missing),
+        "orphaned_objects": len(orphaned),
+        "foreign_objects": foreign_objects,
+    }
 
 
 @celery_app.task(name="bda_v2.purge_deleted_projects")
