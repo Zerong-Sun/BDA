@@ -1076,7 +1076,12 @@ def test_reconciliation_and_purge(task_database) -> None:
         )
         session.commit()
     result = tasks.reconcile_artifacts.run()
-    assert result == {"expired_uploads": 1, "missing_objects": 1, "orphaned_objects": 2}
+    assert result == {
+        "expired_uploads": 1,
+        "missing_objects": 1,
+        "orphaned_objects": 2,
+        "foreign_objects": 0,
+    }
     assert active_key in FakeStorage.objects
     assert failed_key not in FakeStorage.objects
 
@@ -1696,3 +1701,32 @@ def test_a_refused_credential_stops_a_lookup_instead_of_spending_every_request(t
         assert failed["status"] == "failed"
         assert session.get(LiteratureRetrievalTrace, uuid.UUID(failed["retrieval_trace_id"])).status == "failed"
         assert session.get(LiteratureDocument, second).metadata_json["patent_legal_status"]["status"] == "not_attempted"
+
+
+def test_gc_leaves_another_databases_objects_alone(task_database) -> None:
+    """One bucket, several databases: the sweep must not delete what it cannot claim.
+
+    bda_v2, bda_v2_demo and four rehearsal databases were all configured with the same
+    BDA_V2_MINIO_BUCKET. known_artifacts is read from a single database, so every object
+    under another database's project prefix looked orphaned -- one sweep laid 3158 delete
+    markers over another deployment's evidence, and the task's missing-objects branch then
+    flipped 3204 artifact rows to status='failed'.
+
+    Ordinary garbage must still be collected: a fix that spared everything unattributable
+    would trade the deletion bug for a storage leak, and test_reconciliation_and_purge
+    already pins that contract.
+    """
+    factory, ids = task_database
+    mine = f"projects/{ids['project']}/sha256/" + "a" * 64
+    theirs = "projects/00000000-0000-4000-8000-000000000000/sha256/" + "b" * 64
+    plain_garbage = "objects/unreferenced-blob"
+    FakeStorage.objects[mine] = b"mine"
+    FakeStorage.objects[theirs] = b"theirs"
+    FakeStorage.objects[plain_garbage] = b"garbage"
+
+    result = tasks.reconcile_artifacts.run()
+
+    assert mine not in FakeStorage.objects, "an unreferenced key in this database's own project is garbage"
+    assert plain_garbage not in FakeStorage.objects, "unprefixed garbage must still be reclaimed"
+    assert theirs in FakeStorage.objects, "a key under another database's project must survive"
+    assert result["foreign_objects"] >= 1
