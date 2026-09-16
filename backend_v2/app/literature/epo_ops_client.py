@@ -192,7 +192,7 @@ class EpoOpsClient:
                 response = self.client.get(
                     url,
                     params=params,
-                    headers={"Authorization": f"Bearer {token}", "Accept": "application/xml" if xml else "application/json"},
+                    headers={"Authorization": f"Bearer {token}", "Accept": "application/fulltext+xml" if xml else "application/json"},
                 )
                 throttling = response.headers.get("x-throttling-control") or throttling
                 last_status = response.status_code

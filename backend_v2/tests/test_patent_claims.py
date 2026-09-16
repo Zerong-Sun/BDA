@@ -48,7 +48,7 @@ def test_claims_client_requests_xml_and_keeps_credentials_out_of_audit():
     def handler(request):
         if request.url.path.endswith('/auth/accesstoken'):
             return _token(request)
-        assert request.headers['Accept'] == 'application/xml'
+        assert request.headers['Accept'] == 'application/fulltext+xml'
         assert request.url.path.endswith('/publication/docdb/EP.100.A1/claims')
         return httpx.Response(200, content=XML.encode(), headers={'Content-Type': 'application/xml'})
     client, _ = _client(handler)
