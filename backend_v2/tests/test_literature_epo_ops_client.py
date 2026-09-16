@@ -86,7 +86,7 @@ def test_no_hits_is_an_empty_answer_not_a_failure() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/auth/accesstoken"):
             return _token(request)
-        return httpx.Response(404, text="<fault>No results found</fault>")
+        return httpx.Response(404, text="<fault><code>SERVER.EntityNotFound</code><message>No results found</message></fault>")
 
     client, _ = _client(handler)
     result = client.search('ta all "nothing"', limit=5)
@@ -95,6 +95,48 @@ def test_no_hits_is_an_empty_answer_not_a_failure() -> None:
     assert result.audit["status"] == "completed"
     assert result.audit["no_results"] is True
     assert result.audit["http_status"] == 404
+
+
+def test_a_404_that_is_not_no_results_is_a_refusal_not_an_empty_search() -> None:
+    """A broken query answered 404 must never be recorded as evidence of absence."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/auth/accesstoken"):
+            return _token(request)
+        return httpx.Response(
+            404,
+            text=(
+                '<fault xmlns="http://ops.epo.org"><code>CLIENT.InvalidIndex</code>'
+                "<message>The query provided is invalid. Invalid index name zzz</message></fault>"
+            ),
+        )
+
+    client, _ = _client(handler)
+    with pytest.raises(RuntimeError) as raised:
+        client.search('zzz all "pd1"', limit=5)
+
+    assert "CLIENT.InvalidIndex" in str(raised.value)
+    assert client.audits[-1]["status"] == "failed"
+
+
+def test_no_results_is_recorded_as_what_ops_said() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/auth/accesstoken"):
+            return _token(request)
+        return httpx.Response(
+            404,
+            text=(
+                '<fault xmlns="http://ops.epo.org"><code>SERVER.EntityNotFound</code>'
+                "<message>No results found</message></fault>"
+            ),
+        )
+
+    client, _ = _client(handler)
+    result = client.search('ta all "nothing at all"', limit=5)
+
+    assert result.data == {}
+    assert result.audit["no_results"] is True
+    assert result.audit["fault"].startswith("SERVER.EntityNotFound")
 
 
 def test_a_publication_ops_does_not_know_is_a_named_gap() -> None:
@@ -308,3 +350,54 @@ def test_a_malformed_credential_file_is_refused_without_quoting_it(tmp_path) -> 
 
     with pytest.raises(EpoOpsUnavailable, match="^epo_ops_credential_malformed$"):
         load_credential(f"file:{path}")
+
+
+# The body OPS actually returns for invalid CQL (fetched 2026-09-16).
+CQL_FAULT = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<fault xmlns="http://ops.epo.org">    <code>CLIENT.CQLSyntax</code>'
+    "    <message>The query provided is invalid. CQL expression has invalid syntax. "
+    "any/all/within values should be quoted. Position 0-0</message> </fault>"
+)
+
+
+def test_a_refusal_carries_the_reason_ops_gave_for_it() -> None:
+    """Without the fault body a failed run says only that a request failed."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/auth/accesstoken"):
+            return _token(request)
+        return httpx.Response(400, text=CQL_FAULT, headers={"content-type": "application/xml"})
+
+    client, sleeps = _client(handler)
+    with pytest.raises(RuntimeError) as raised:
+        client.search("ta all antibody", limit=5)
+
+    assert "CLIENT.CQLSyntax" in str(raised.value)
+    assert "should be quoted" in str(raised.value)
+    assert sleeps == [], "a rejected query is rejected again; retrying only spends the quota"
+    assert client.audits[-1]["fault"].startswith("CLIENT.CQLSyntax:")
+
+
+def test_a_body_without_a_fault_leaves_the_error_unadorned() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/auth/accesstoken"):
+            return _token(request)
+        return httpx.Response(400, text="<html>gateway</html>")
+
+    client, _ = _client(handler)
+    with pytest.raises(RuntimeError, match="^epo_ops.search_failed$"):
+        client.search("ta=x", limit=1)
+
+    assert client.audits[-1]["fault"] is None
+
+
+def test_unexplained_search_404_is_not_evidence_of_no_results():
+    def handler(request):
+        if request.url.path.endswith('/auth/accesstoken'):
+            return _token(request)
+        return httpx.Response(404, text='<fault>Unknown</fault>')
+    client, _ = _client(handler)
+    with pytest.raises(RuntimeError, match='not_found'):
+        client.search('ta all "example"', limit=5)
+    assert client.audits[-1].get('no_results') is not True

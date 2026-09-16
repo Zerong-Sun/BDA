@@ -185,7 +185,14 @@ LOOKED_UP = {
     "retrieved_at": "2026-09-15T12:00:00+00:00",
     "retrieval_trace_id": "trace-legal",
     "by_country": [
-        {"country": "DE", "events": 2, "positive": 1, "negative": 0, "latest_flagged_event": {"code": "PGFP"}},
+        {
+            "country": "DE",
+            "events": 2,
+            "positive": 1,
+            "negative": 0,
+            "latest_event": {"code": "PB01"},
+            "latest_flagged_event": {"code": "PGFP"},
+        },
         {"country": "EP", "events": 3, "positive": 2, "negative": 1, "latest_flagged_event": {"code": "27O"}},
     ],
 }
@@ -249,7 +256,8 @@ def test_legal_events_are_shown_per_country_and_only_for_a_completed_lookup(sess
     view = records[str(looked_up.id)]["legal_events"]
     assert [row["country"] for row in view["countries"]] == ["DE", "EP"]
     assert view["retrieval_trace_id"] == "trace-legal"
-    assert "positive" not in view["countries"][0], "only the latest flagged event per country is shown"
+    assert view["countries"][0]["latest_event"] == {"code": "PB01"}
+    assert "positive" not in view["countries"][0], "the per-country counts stay in the lookup"
     assert records[str(failed.id)]["legal_events"] == {
         "status": "failed",
         "error": "epo_ops.family_legal_failed",

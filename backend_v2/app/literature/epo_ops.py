@@ -65,6 +65,10 @@ _CQL_RELATION = re.compile(
     re.IGNORECASE,
 )
 _BOOLEAN_WORDS = {"AND", "OR", "NOT"}
+# OPS requires the value after all/any/within to be quoted, and answers 400
+# otherwise. Caught here, the person is told what to write; sent, a run fails
+# and spends a request from a per-minute quota to learn the same thing.
+_UNQUOTED_OPERAND = re.compile(r"\b(all|any|within)\s+(?!\")([^\s()]+)", re.IGNORECASE)
 _PUBLICATION = re.compile(r"^([A-Z]{2})([A-Z0-9]*?[0-9])([A-Z][0-9]?)?$")
 _KIND = re.compile(r"^[A-Z][0-9]?$")
 _IPC = re.compile(r"^([A-H][0-9]{2}[A-Z])\s*([0-9]{1,4})\s*/\s*([0-9]{1,6})")
@@ -123,6 +127,15 @@ def cql_query(topic: str, jurisdictions: Sequence[str] = ()) -> str:
         raise PatentQueryError("A patent search needs a topic.")
     codes = jurisdiction_codes(jurisdictions)
     if _CQL_RELATION.search(text):
+        # Ignore operator-looking words inside already quoted operands.
+        masked = re.sub(r'"(?:\\.|[^"\\])*"', '"quoted"', text)
+        unquoted = _UNQUOTED_OPERAND.search(masked)
+        if unquoted is not None:
+            operator = unquoted.group(1).lower()
+            raise PatentQueryError(
+                f'OPS requires the value after {operator} to be quoted: write '
+                f'{operator} "{unquoted.group(2)}" rather than {operator} {unquoted.group(2)}.'
+            )
         query = text
     else:
         terms = [term for term in text.replace('"', " ").replace("(", " ").replace(")", " ").split()]

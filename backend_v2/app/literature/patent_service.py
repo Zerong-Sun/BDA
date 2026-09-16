@@ -103,6 +103,10 @@ def _legal_view(metadata: dict[str, Any]) -> dict[str, Any] | None:
             {
                 "country": row.get("country"),
                 "events": row.get("events"),
+                # Both: a country whose every event is neutral - a publication,
+                # a request for examination - has no flagged event, and showing
+                # only that would report a count with nothing in it.
+                "latest_event": row.get("latest_event"),
                 "latest_flagged_event": row.get("latest_flagged_event"),
             }
             for row in (looked_up.get("by_country") or [])[:MAX_COUNTRIES_LISTED]

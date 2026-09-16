@@ -242,6 +242,9 @@ def literature_search(search_run_id: str) -> dict:
                         "result_count": len(results),
                         "raw_response_artifact_id": str(raw_search_artifact.id),
                         "result_type": "biblio" if ops_run else "core",
+                        # OPS states "no results found" in its own answer; recorded
+                        # so an empty search reads as what the source said.
+                        **({"no_results": True} if search_result.audit.get("no_results") else {}),
                         # OPS says how many records matched in all, not only how
                         # many were returned - the difference a reader must see.
                         **({"total_result_count": ops_search_total(search_result.data)} if ops_run else {}),
@@ -688,7 +691,8 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
                 try:
                     result = client.family_legal(reference)
                 except RuntimeError as exc:
-                    if reference.kind is None or not str(exc).endswith("_not_found"):
+                    # The message may carry the fault OPS gave after the code.
+                    if reference.kind is None or not str(exc).split(":")[0].endswith("_not_found"):
                         raise
                     # Europe PMC's kind code for a publication is not always
                     # DOCDB's (B for B2); the number alone still names it.
