@@ -124,7 +124,7 @@ function MetricBar({
       <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-text-secondary">
         <span>{label}</span>
         <span className="text-text-primary">
-          {hasValue ? value.toFixed(label === 'pLDDT' ? 0 : 1) : notScored}
+          {hasValue ? value.toFixed(label === 'ipTM' ? 2 : 1) : notScored}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-border-soft">
@@ -145,7 +145,7 @@ export function CandidateTable({
   onDownloadPage,
   isDownloading = false,
 }: CandidateTableProps) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const tableDescriptionId = useId()
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'interface_score', desc: true },
@@ -165,6 +165,7 @@ export function CandidateTable({
       const baseColumns = [
       columnHelper.display({
         id: 'select',
+        size: 42,
         header: () => (
           <PageSelectionCheckbox
             selectedIds={selectedIds}
@@ -177,7 +178,7 @@ export function CandidateTable({
           <Checkbox
             checked={selectedIds?.has(info.row.original.id) ?? false}
             aria-label={format(t.candidatesExt.table.selectCandidateAria, {
-              candidateId: info.row.original.id,
+              candidateId: info.row.original.candidate_key || info.row.original.id,
             })}
             onCheckedChange={() => onToggleCandidate?.(info.row.original.id)}
             onClick={(event) => event.stopPropagation()}
@@ -185,7 +186,7 @@ export function CandidateTable({
         ),
         enableSorting: false,
       }),
-      columnHelper.accessor('id', {
+      columnHelper.accessor((c) => candidateText(c, 'native_id') || c.candidate_key || c.name, {
         id: 'id',
         header: ({ column }) => <DataGridColumnHeader column={column} title={t.candidatesExt.table.candidate} />,
         cell: (info) => (
@@ -195,9 +196,9 @@ export function CandidateTable({
             size="sm"
             aria-current={selectedId === info.row.original.id ? 'true' : undefined}
             aria-label={format(t.candidatesExt.table.viewDetailsAria, {
-              candidateId: info.row.original.id,
+              candidateId: info.row.original.candidate_key || info.row.original.id,
             })}
-            className="justify-start gap-2 px-1 aria-[current=true]:text-primary"
+            className="h-auto min-h-8 justify-start gap-2 whitespace-normal break-all px-1 text-left aria-[current=true]:text-primary"
             onClick={(event) => {
               event.stopPropagation()
               onSelect(info.row.original)
@@ -212,20 +213,22 @@ export function CandidateTable({
           </Button>
         ),
       }),
-      columnHelper.accessor('name', {
+      columnHelper.accessor((c) => candidateText(c, 'family') ?? c.name, {
         id: 'family',
         header: ({ column }) => <DataGridColumnHeader column={column} title={t.candidatesExt.table.family} />,
       }),
       columnHelper.display({
         id: 'score_summary',
+        size: 230,
         header: () => (
           <HeaderLabel label={t.candidatesExt.table.scoreSummary} help={t.candidatesExt.table.scoreSummaryHelp} />
         ),
         cell: (info) => (
           <div className="grid gap-2">
             <MetricBar
-              label={t.candidatesExt.table.interface}
-              value={candidateScore(info.row.original, 'interface_score') ?? info.row.original.score}
+              label={candidateScore(info.row.original, 'interface_score') === null && candidateScore(info.row.original, 'iptm') !== null ? 'ipTM' : t.candidatesExt.table.interface}
+              max={candidateScore(info.row.original, 'interface_score') === null && candidateScore(info.row.original, 'iptm') !== null ? 1 : 100}
+              value={candidateScore(info.row.original, 'interface_score') ?? candidateScore(info.row.original, 'iptm') ?? info.row.original.score}
               notScored={t.candidatesExt.table.notScored}
             />
             <MetricBar
@@ -235,7 +238,7 @@ export function CandidateTable({
             />
             <MetricBar
               label="PAE"
-              value={candidateScore(info.row.original, 'interface_pae')}
+              value={candidateScore(info.row.original, 'interface_pae') ?? candidateScore(info.row.original, 'pae_interaction')}
               notScored={t.candidatesExt.table.notScored}
               max={30}
               invert
@@ -280,7 +283,7 @@ export function CandidateTable({
         ),
         cell: (info) => formatScore(info.getValue(), t.candidatesExt.table.notScored, 0),
       }),
-      columnHelper.accessor((candidate) => candidateScore(candidate, 'interface_pae'), {
+      columnHelper.accessor((candidate) => candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction'), {
         id: 'interface_pae',
         header: ({ column }) => (
           <GridHelpHeader
@@ -291,7 +294,7 @@ export function CandidateTable({
         ),
         cell: (info) => (info.getValue() != null ? `${info.getValue()} Å` : t.candidatesExt.table.notScored),
       }),
-      columnHelper.accessor((candidate) => candidateScore(candidate, 'rosetta_score'), {
+      columnHelper.accessor((candidate) => candidateScore(candidate, 'rosetta_interface_dg') ?? candidateScore(candidate, 'rosetta_score'), {
         id: 'rosetta_score',
         header: ({ column }) => (
           <GridHelpHeader
@@ -326,7 +329,7 @@ export function CandidateTable({
       }),
       columnHelper.accessor('status', {
         header: ({ column }) => <DataGridColumnHeader column={column} title={t.candidatesExt.table.status} />,
-        cell: (info) => <StatusPill label={info.getValue()} tone={statusTone(info.getValue())} />,
+        cell: (info) => <StatusPill label={language === 'zh' && candidateText(info.row.original, 'source_dataset') && info.row.original.complex_artifact_id ? '预测已导入' : info.getValue()} tone={statusTone(info.getValue())} />,
       }),
       columnHelper.accessor((candidate) => candidateText(candidate, 'decision'), {
         id: 'decision',
@@ -338,11 +341,14 @@ export function CandidateTable({
       ]
       return baseColumns
     },
-    [format, onSelect, onToggleCandidate, onTogglePage, selectedId, selectedIds, t],
+    [format, onSelect, onToggleCandidate, onTogglePage, selectedId, selectedIds, t, language],
   )
   const columnVisibility = useMemo<VisibilityState>(
     () => ({
-      interface_score: expertColumns,
+      family: !data.every((c) => Boolean(candidateText(c, 'native_id'))) || data.some((c) => Boolean(candidateText(c, 'family'))),
+      pred_kd: data.some((c) => Boolean(candidateText(c, 'pred_kd'))),
+      decision: data.some((c) => Boolean(candidateText(c, 'decision'))),
+      interface_score: expertColumns && data.some((c) => candidateScore(c, 'interface_score') !== null),
       plddt: expertColumns,
       solubility_score: expertColumns,
       interface_pae: expertColumns,
@@ -351,7 +357,7 @@ export function CandidateTable({
       buried_sasa: expertColumns,
       expression_risk: expertColumns,
     }),
-    [expertColumns],
+    [expertColumns, data],
   )
 
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {

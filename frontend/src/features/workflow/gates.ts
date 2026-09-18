@@ -77,7 +77,7 @@ export function gateLabel(
       return `${zh ? '已放行' : 'Released'} ${run.selected} / ${run.total}`
     return states[run.status]?.[zh ? 0 : 1] ?? run.status
   }
-  if (policy?.mode === 'dependency') return zh ? '等待完成' : 'Wait for completion'
+  if (policy?.mode === 'dependency') return zh ? '已配置 · 完成依赖' : 'Configured · dependency'
   if (!policy?.configured) return zh ? '待配置门控' : 'Configure gate'
   return zh ? '等待上游' : 'Waiting for upstream'
 }

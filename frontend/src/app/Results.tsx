@@ -43,7 +43,8 @@ function ResultsMetricsSkeleton() {
 }
 
 export function ResultsPage() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const zh = language === 'zh'
   const { projectId, activeProject } = useProjectContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
@@ -100,6 +101,15 @@ export function ResultsPage() {
     enabled: Boolean(projectId),
   })
   const candidates = candidatePage?.items ?? []
+  const sourceGroups = new Map<string, typeof candidates>()
+  for (const candidate of candidates) {
+    const source = typeof candidate.properties.source_dataset === 'string' ? candidate.properties.source_dataset : ''
+    sourceGroups.set(source, [...(sourceGroups.get(source) ?? []), candidate])
+  }
+  const nativeCandidates = candidates.filter((c) => Boolean(c.properties.source_dataset))
+  const nativeIds = new Set(nativeCandidates.flatMap((c) => [c.id, c.candidate_key]))
+  const nativeReadouts = results.filter((r) => nativeIds.has(r.candidate_id ?? '') || nativeIds.has(r.candidate_ref ?? ''))
+  const hasImported = nativeCandidates.length > 0
 
   const {
     data: artifacts = [],
@@ -224,11 +234,21 @@ export function ResultsPage() {
           void refetchArtifacts()
         }}
       >
-        <AlphaFoldResults
-          candidates={candidates}
-          artifacts={artifacts}
-          onDownload={(artifact) => void handleArtifactDownload(artifact.id)}
-        />
+        {[...sourceGroups].sort(([a], [b]) => Number(!a) - Number(!b) || a.localeCompare(b)).map(([source, group]) => {
+          const keys = new Set(group.map((c) => c.candidate_key))
+          const groupArtifacts = artifacts.filter((a) => source
+            ? a.lineage.package_id === source || keys.has(String(a.lineage.candidate_key ?? ''))
+            : !a.lineage.package_id || keys.has(String(a.lineage.candidate_key ?? '')))
+          const panel = <AlphaFoldResults candidates={group} artifacts={groupArtifacts} onDownload={(a) => void handleArtifactDownload(a.id)} />
+          return source ? <div key={source}>
+            <h2 className="mb-2 text-sm font-semibold">{zh ? '导入数据集' : 'Imported dataset'} · {source}</h2>
+            <p className="mb-3 text-sm text-text-secondary">{zh ? '上游已筛选子集；以下统计仅包含该数据集，不能推断总体通过率。' : 'An upstream-selected subset; statistics cover this dataset only, not population success rates.'}</p>
+            {panel}
+          </div> : hasImported ? <details key="legacy" className="mb-5 rounded-lg border border-border-soft p-4">
+            <summary className="cursor-pointer text-sm">{zh ? '其他项目记录（不计入上方导入数据统计）' : 'Other project records (excluded from imported statistics)'}</summary>
+            <div className="mt-3">{panel}</div>
+          </details> : <div key="legacy">{panel}</div>
+        })}
         <RosettaResults
           candidates={candidates}
           artifacts={artifacts}
@@ -236,6 +256,11 @@ export function ResultsPage() {
         />
       </ApiState>
 
+      {hasImported ? <p className="mb-4 rounded-lg border border-border-soft bg-surface-2 p-4 text-sm">
+        {zh ? `导入的 ${nativeCandidates.length} 条候选关联实验读数：${nativeReadouts.length} 条。项目历史实验与交付记录在下方单独查看。` : `${nativeCandidates.length} imported candidates have ${nativeReadouts.length} linked experimental readouts. Project history is shown separately below.`}
+      </p> : null}
+      <details open={!hasImported} className="mb-5">
+      <summary className="mb-3 cursor-pointer text-sm font-semibold">{zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}</summary>
       <div data-tour-id="results-metrics">
       <ApiState
         isLoading={summaryLoading}
@@ -293,6 +318,7 @@ export function ResultsPage() {
         </div>
       </div>
 
+      </details>
       <NextStep stage="results" />
     </section>
   )

@@ -1,3 +1,4 @@
+import { WorkflowEvidence } from './WorkflowEvidence'
 import { ModelResultGuide } from '../results/ModelResultGuide'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Copy, Download, FileCode, FloppyDisk, Gear, Network, PlugsConnected } from '@phosphor-icons/react'
@@ -267,6 +268,7 @@ function WorkflowInspectorContent({
               <StatusPill label={selectedNode.status} tone={statusTone(selectedNode.status)} />
             </div>
 
+            <WorkflowEvidence nodes={[selectedNode]} artifacts={projectArtifacts} projectId={projectId ?? ''} expanded />
             <ModelResultGuide pluginKey={activePlugin?.plugin_key ?? selectedNode.model_plugin ?? selectedNode.node_type} />
 
             <RouteDisplayCatalog

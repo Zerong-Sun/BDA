@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { candidateScore, candidateStrings, type Candidate } from '../../lib/schemas/candidate'
+import { candidateScore, candidateStrings, candidateText, type Candidate } from '../../lib/schemas/candidate'
 import type { StructureMetadataResponse } from '../pdb-viewer/types'
 import { useI18n } from '../../lib/i18n'
 
@@ -43,12 +43,12 @@ function metricRows(candidate: Candidate, labels: {
     },
     {
       label: labels.metricInterfacePae,
-      value: candidateScore(candidate, 'interface_pae'),
+      value: candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction'),
       source: labels.metricSourceInterfaceConfidence,
     },
     {
       label: labels.metricRosetta,
-      value: candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'interface_energy'),
+      value: candidateScore(candidate, 'rosetta_interface_dg') ?? candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'interface_energy'),
       source: labels.metricSourceRosetta,
     },
   ].filter((row) => row.value !== null && row.value !== undefined)
@@ -60,9 +60,11 @@ export function CandidateStructureOverlay({
   structureMode,
   projectId,
 }: CandidateStructureOverlayProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const detail = t.candidatesExt.detail
-  const chains = metadata?.chains?.length ? metadata.chains : candidateStrings(candidate, 'chains')
+  const declaredChains = candidateStrings(candidate, 'chains')
+  const mappedChains = [candidateText(candidate, 'fixed_partner_chain'), candidateText(candidate, 'design_chain')].filter((c): c is string => Boolean(c))
+  const chains = metadata?.chains?.length ? metadata.chains : declaredChains.length ? declaredChains : mappedChains
   const rows = metricRows(candidate, detail)
 
   return (
@@ -84,7 +86,7 @@ export function CandidateStructureOverlay({
                   <dt className="rounded bg-surface-2 px-2 py-0.5 font-mono text-text-primary">
                     {chainId}
                   </dt>
-                  <dd className="text-right">{chainRole(index, structureMode, detail)}</dd>
+                  <dd className="text-right">{chainId === candidateText(candidate, 'design_chain') ? (language === 'zh' ? '设计链（来源已核验）' : 'Design chain (source verified)') : chainId === candidateText(candidate, 'fixed_partner_chain') ? (language === 'zh' ? '固定伙伴链（来源已核验）' : 'Fixed partner (source verified)') : chainRole(index, structureMode, detail)}</dd>
                 </div>
               ))}
             </dl>
@@ -118,7 +120,7 @@ export function CandidateStructureOverlay({
                 <div key={row.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <dt className="truncate text-text-primary">{row.label}</dt>
                   <dd className="text-right">
-                    <span>{row.value}</span>
+                    <span>{typeof row.value === 'number' ? row.value.toFixed(3) : row.value}</span>
                     <span className="block text-[10px] text-text-muted">{row.source}</span>
                   </dd>
                 </div>

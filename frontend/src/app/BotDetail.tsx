@@ -1,3 +1,4 @@
+import { botDisplayText } from '../features/copilot/bots/displayText'
 import { useEffect } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -84,7 +85,7 @@ function BotResponsibility({ botId }: { botId: string }) {
               {bot ? <Tabs value={view} onValueChange={(value) => setParam('view', value === 'chat' ? 'chat' : null)}>
                 <div className="bot-selected-header"><BotAvatar id={bot.id} stance={bot.stance} /><div className="min-w-0">
                   <p className="bot-selected-stance">{stanceLabel[bot.stance] ?? bot.stance}</p>
-                  <h2>{name(bot)}</h2><p>{bot.summary}</p>
+                  <h2>{name(bot)}</h2><p>{botDisplayText(bot, language).summary}</p>
                 </div></div>
                 <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? 'Bot 职责页视图' : 'Bot page views'}>
                   <TabsTrigger value="work">{zh ? '职责与工作' : 'Responsibilities & work'}</TabsTrigger>
@@ -140,7 +141,7 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   return <div className="bot-work">
     <section aria-label={zh ? '职责与边界' : 'Mandate and refusals'}>
       <h3>{zh ? '职责与边界' : 'Mandate and refusals'}</h3>
-      <p className="text-sm text-text-secondary">{bot.charter}</p>
+      <div className="space-y-3 text-sm leading-7 text-text-secondary">{botDisplayText(bot, language).charter.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
     </section>
     <section aria-label={zh ? '托管任务' : 'Guided tasks'}>
       <h3>{zh ? '托管任务' : 'Guided tasks'}</h3>
