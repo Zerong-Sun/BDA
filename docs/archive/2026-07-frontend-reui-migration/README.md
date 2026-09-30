@@ -3,13 +3,14 @@
 状态：历史归档
 
 这三份文件原先位于 `docs/superpowers/`，是 2026-07-26 那次前端 shadcn/ReUI 迁移的设计、实施计划与
-中途评审输出。迁移已经完成，文件按原字节迁入本目录，仅改名，不改内容：
+中途评审输出。迁移已经完成。2026-10-01 核验本目录与 9 月 7 日归档的三份副本逐字节相同后，
+统一保留 [9 月 7 日归档](../2026-09-07/manifest.json)，移除本目录的重复副本。下表 SHA-256 校验归档提示之后的原始正文：
 
 | 归档文件 | 原路径 | SHA-256 |
 |---|---|---|
-| `design.md` | `docs/superpowers/specs/2026-07-26-frontend-reui-migration-design.md` | `1e525302e9fcb840577fdfe68e52b8b1d5691bdaca3663f60228a58d5f196b47` |
-| `implementation-plan.md` | `docs/superpowers/plans/2026-07-26-frontend-reui-migration.md` | `076e31ec4bc5b1aec8a514dc32b8dca03ae99839fe39d99b1a796bea714641d3` |
-| `task-4-review.md` | `docs/superpowers/plans/Task-4-review.md` | `75bbcae2d4be333168b5810a0895bae449bf07da48ef2a9477400bbca1b4954e` |
+| [design.md](../2026-09-07/frontend/2026-07-26-frontend-reui-migration-design.md) | `docs/superpowers/specs/2026-07-26-frontend-reui-migration-design.md` | `1e525302e9fcb840577fdfe68e52b8b1d5691bdaca3663f60228a58d5f196b47` |
+| [implementation-plan.md](../2026-09-07/frontend/2026-07-26-frontend-reui-migration.md) | `docs/superpowers/plans/2026-07-26-frontend-reui-migration.md` | `076e31ec4bc5b1aec8a514dc32b8dca03ae99839fe39d99b1a796bea714641d3` |
+| [task-4-review.md](../2026-09-07/frontend/Task-4-review.md) | `docs/superpowers/plans/Task-4-review.md` | `75bbcae2d4be333168b5810a0895bae449bf07da48ef2a9477400bbca1b4954e` |
 
 ## 为什么归档而不是继续当作活跃文档
 
