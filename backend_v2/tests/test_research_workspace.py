@@ -7,12 +7,14 @@ from types import SimpleNamespace
 import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.artifacts.models import Artifact
+from backend_v2.app.candidates.models import Candidate
 from backend_v2.app.copilot.research_context import ResearchContextService
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.models import Organization, User
 from backend_v2.app.projects.models import Project
 from backend_v2.app.research import workspace
 from backend_v2.app.research.models import ResearchBrief
+from backend_v2.app.targets.models import Target
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -185,6 +187,44 @@ def test_bilingual_artifact_lineage_reaches_copilot_as_a_readable_structure_cita
             assert citation["workspace_type"] == "structure"
             assert citation["url"] == "https://www.rcsb.org/structure/1ABC"
             assert artifact.lineage == lineage
+    finally:
+        drop_all(engine, Base.metadata)
+
+
+@pytest.mark.parametrize(("has_primary", "candidate_count"), [(True, 0), (False, 1), (False, 0)])
+def test_overview_distinguishes_primary_target_from_candidate_count(has_primary, candidate_count) -> None:
+    engine = enforce_foreign_keys(create_engine(
+        "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    ))
+    Base.metadata.create_all(engine)
+    try:
+        with sessionmaker(engine, expire_on_commit=False)() as session:
+            user = User(username="scope-owner", display_name="Owner", role="admin", enabled=True)
+            organization = Organization(name="Scope Org")
+            session.add_all([user, organization])
+            session.flush()
+            project = Project(organization_id=organization.id, owner_id=user.id,
+                              name="Scope project", project_type="protein_design")
+            session.add(project)
+            session.flush()
+            if has_primary:
+                target = Target(project_id=project.id, name="Confirmed target", identity_status="confirmed")
+                session.add(target)
+                session.flush()
+                project.primary_target_id = target.id
+            for index in range(candidate_count):
+                session.add(Candidate(project_id=project.id, candidate_key=f"target-{index}", name="Research target",
+                                      candidate_kind="research_target"))
+            session.add(Candidate(project_id=project.id, candidate_key="design", name="Binder design"))
+            session.flush()
+
+            result = ResearchContextService(session, project).research_overview()
+
+            assert result["primary_target_present"] is has_primary
+            assert (result["project"]["primary_target"] is not None) is has_primary
+            assert result["counts"]["research_targets"] == candidate_count
+            assert "Candidate records" in result["counts_scope"]["research_targets"]
+            assert "primary_target" in result["counts_scope"]["research_targets"]
     finally:
         drop_all(engine, Base.metadata)
 

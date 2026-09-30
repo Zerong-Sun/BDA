@@ -174,10 +174,23 @@ function useTourAnchor(
             // someone uses a tab, or chooses the explicit Next button.
             if (candidate.getAttribute('role') === 'tablist'
               && !(event.target instanceof Element && event.target.closest('[role="tab"]'))) return
+            if (step.anchor!.id === 'workflow-canvas'
+              && !(event.target instanceof Element && event.target.closest('.react-flow__node'))) return
             advance()
           }
           candidate.addEventListener('click', onClick)
-          removeTargetListener = () => candidate.removeEventListener('click', onClick)
+          // React Flow's keyboard selection changes the selected class without
+          // dispatching a click. Observe that selection for the same tour step.
+          const selectionObserver = step.anchor!.id === 'workflow-canvas'
+            ? new MutationObserver(() => {
+              if (candidate.querySelector('.react-flow__node.selected')) advance()
+            })
+            : null
+          selectionObserver?.observe(candidate, { subtree: true, attributes: true, attributeFilter: ['class'] })
+          removeTargetListener = () => {
+            candidate.removeEventListener('click', onClick)
+            selectionObserver?.disconnect()
+          }
         }
       }
     }
@@ -641,7 +654,7 @@ export function TourMenu({
 }) {
   const { t, language } = useI18n()
   const { projects, setProjectId } = useProjectContext()
-  const { tourState, startTour, restartTour, setTourMenuOpen, setAppMode } = useAppStore()
+  const { tourState, startTour, resumeTour, restartTour, setTourMenuOpen, setAppMode } = useAppStore()
   const [demoUnavailable, setDemoUnavailable] = useState(false)
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusTarget?.isConnected
@@ -651,6 +664,10 @@ export function TourMenu({
         : null,
   )
   const labels = t.tour
+  const pausedSection = getTourSection(tourState.sectionId)
+  const canResume = tourState.status === 'paused'
+    && (!tourState.completedSections.includes(tourState.sectionId)
+      || pausedSection?.steps.at(-1)?.id !== tourState.stepId)
 
   const closeMenu = useCallback(() => {
     const returnTarget = returnFocusRef.current
@@ -755,7 +772,12 @@ export function TourMenu({
           </Alert>
         ) : null}
 
-        <div>
+        <div className="flex flex-wrap gap-2">
+          {canResume ? (
+            <Button type="button" size="sm" onClick={() => { if (prepareDemo()) resumeTour() }}>
+              {language === 'zh' ? '继续导览' : 'Continue tour'}
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={restart}>
             <ArrowCounterClockwiseIcon aria-hidden="true" />
             {labels.menu.restart}

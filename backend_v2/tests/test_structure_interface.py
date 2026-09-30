@@ -65,6 +65,32 @@ def test_two_chains_in_contact_bury_surface_on_both_sides() -> None:
     assert result["interface_residue_count"] == {"A": 1, "B": 1}
 
 
+def test_interface_counts_keep_the_selected_chains_and_whole_model_denominators() -> None:
+    extra_residues = [
+        _atom(13, "CA", "GLY", "A", 2, 80.0, 0.0, 0.0),
+        _atom(14, "CA", "ALA", "C", 1, 90.0, 0.0, 0.0),
+    ]
+    text = TOUCHING.replace("END\n", "\n".join(extra_residues) + "\nEND\n")
+
+    result = kernels.interface(text, chain_a="A", chain_b="B")
+
+    assert result["interface_residue_count"] == {"A": 1, "B": 1}
+    assert result["residue_scope"]["selected_chain_counts"] == {"A": 2, "B": 1}
+    assert result["residue_scope"]["model_total"] == 4
+    assert "non-solvent" in result["residue_scope"]["definition"]
+    assert "0.1" in result["interface_residue_definition"]
+
+
+def test_capped_interface_details_do_not_change_counts_or_claim_completeness(monkeypatch) -> None:
+    monkeypatch.setattr(kernels, "MAX_CONTACT_PAIRS", 1)
+
+    result = kernels.interface(TOUCHING, chain_a="A", chain_b="B")
+
+    assert result["interface_residue_count"] == {"A": 1, "B": 1}
+    assert len(result["interface_residues"]) == result["returned_interface_residue_count"] == 1
+    assert result["interface_residues_truncated"] is True
+
+
 def test_the_interface_area_is_half_the_total_buried_and_not_the_sum() -> None:
     """Both sides bury each other; reporting the sum double-counts one interface."""
     result = kernels.interface(TOUCHING, chain_a="A", chain_b="B")

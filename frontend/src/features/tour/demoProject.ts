@@ -11,5 +11,5 @@ export function isDemoProject(project: Project): boolean {
 }
 
 export function findDemoProject(projects: Project[]): Project | undefined {
-  return projects.find(isDemoProject)
+  return projects.find((project) => project.status !== 'trashed' && isDemoProject(project))
 }

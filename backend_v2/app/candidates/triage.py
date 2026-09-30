@@ -80,6 +80,8 @@ class Criterion:
 @dataclass(frozen=True)
 class Verdict:
     tier: str | None
+    criteria_tier: str | None = None
+    tier_criteria: dict[str, list[Criterion]] = field(default_factory=dict)
     criteria: list[Criterion] = field(default_factory=list)
     passed: int = 0
     failed: int = 0
@@ -189,6 +191,8 @@ def triage(
     the reason in the module docstring. The returned criteria are those of the
     tier that was reached, or of the last (least demanding) tier when none was,
     because that is the list a person needs in order to know what to run next.
+    ``criteria_tier`` names that list; ``tier_criteria`` retains every tier's
+    comparisons so not reaching a tier cannot be mistaken for not assessing it.
     """
     if not tiers:
         return Verdict(tier=None)
@@ -200,6 +204,8 @@ def triage(
         if criteria and all(item.outcome == "pass" for item in criteria):
             return Verdict(
                 tier=name,
+                criteria_tier=name,
+                tier_criteria=evaluated,
                 criteria=criteria,
                 passed=len(criteria),
                 failed=0,
@@ -209,6 +215,8 @@ def triage(
     criteria = evaluated[fallback_name]
     return Verdict(
         tier=None,
+        criteria_tier=fallback_name,
+        tier_criteria=evaluated,
         criteria=criteria,
         passed=sum(1 for item in criteria if item.outcome == "pass"),
         failed=sum(1 for item in criteria if item.outcome == "fail"),

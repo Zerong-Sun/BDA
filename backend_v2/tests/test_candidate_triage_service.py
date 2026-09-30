@@ -169,6 +169,39 @@ def test_a_partially_measured_design_separates_the_two_reasons(session: Session)
     assert verdict["failed"] == 1 and verdict["missing"] == 1
 
 
+def test_tool_result_names_the_fallback_tier_and_preserves_all_comparisons(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(
+        session, project,
+        [("pae_interaction", 18.0, "synthetic_fixture", "synthetic_fixture"),
+         ("plddt", 62.0, "synthetic_fixture", "synthetic_fixture")],
+    )
+
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+
+    assert verdict["criteria_tier"] == "tier_a"
+    assert verdict["tier"] is None
+    for tier, assessment in verdict["tier_assessments"].items():
+        assert assessment["outcome"] == "fail"
+        assert (assessment["passed"], assessment["failed"], assessment["missing"]) == (0, 2, 0)
+        assert [item["threshold"] for item in assessment["criteria"]] == list(TIERS[tier].values())
+        assert {item["method"] for item in assessment["criteria"]} == {"synthetic_fixture"}
+
+
+def test_tool_result_does_not_extend_recorded_provenance_to_missing_criteria(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(session, project, [("plddt", 92.0, "synthetic_fixture", "synthetic_fixture")])
+
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+
+    for assessment in verdict["tier_assessments"].values():
+        assert assessment["outcome"] == "missing"
+        assert (assessment["passed"], assessment["failed"], assessment["missing"]) == (1, 0, 1)
+        absent, present = assessment["criteria"]
+        assert absent["method"] is absent["assessor"] is absent["value"] is None
+        assert present["method"] == present["assessor"] == "synthetic_fixture"
+
+
 def test_another_projects_candidate_is_not_judged(session: Session) -> None:
     project, _user = _project(session)
     other, _other_user = _project(session)

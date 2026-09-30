@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 
 from sqlalchemy.orm import Session
 
@@ -107,21 +108,26 @@ def triage_candidate(
         "candidate_key": candidate.candidate_key,
         "name": candidate.name,
         "tier": verdict.tier,
+        "criteria_tier": verdict.criteria_tier,
         "passed": verdict.passed,
         "failed": verdict.failed,
         "missing": verdict.missing,
         "metric_count": len(rows),
-        "criteria": [
-            {
-                "name": item.name,
-                "threshold": item.threshold,
-                "outcome": item.outcome,
-                "value": item.value,
-                "metric_key": item.metric_key,
-                "method": item.method,
-                "assessor": item.assessor,
-                "note": item.note,
+        "criteria": [asdict(item) for item in verdict.criteria],
+        # A fallback explains what to fix, but losing the other comparisons
+        # makes a failed stricter tier indistinguishable from an unassessed one.
+        "tier_assessments": {
+            name: {
+                "outcome": (
+                    "fail" if any(item.outcome == "fail" for item in criteria)
+                    else "missing" if any(item.outcome == "missing" for item in criteria)
+                    else "pass" if criteria else "not_assessed"
+                ),
+                "passed": sum(item.outcome == "pass" for item in criteria),
+                "failed": sum(item.outcome == "fail" for item in criteria),
+                "missing": sum(item.outcome == "missing" for item in criteria),
+                "criteria": [asdict(item) for item in criteria],
             }
-            for item in verdict.criteria
-        ],
+            for name, criteria in verdict.tier_criteria.items()
+        },
     }

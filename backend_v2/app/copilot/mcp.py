@@ -341,15 +341,24 @@ def read_resource(session: Session, grant: CopilotMcpSession, uri: str) -> dict[
 
 
 def _resolve(context: ToolContext, source: str, kind: str, identifier: str) -> Any:
+    # The source namespace is the capability fence checked by read_resource.
+    # Never reinterpret a project URI as research data based on its kind.
+    if source == "project":
+        return _project_pointer(kind, identifier)
     research = context.research
-    if source == "literature" or (source == "research" and kind == "reference"):
+    if kind == "reference":
         return research.get_reference(identifier)
+    if source == "literature":
+        if kind == "literature_excerpt":
+            return research.get_reference_excerpt(identifier)
+        if kind == "literature_evidence":
+            items = research.get_research_items(kind, ids=[identifier])
+            return items[0] if items else None
+        return None
     if kind == "dataset":
         return research.get_dataset_slice(identifier)
-    if source == "research":
-        items = research.get_research_items(kind, ids=[identifier])
-        return items[0] if items else None
-    return _project_pointer(kind, identifier)
+    items = research.get_research_items(kind, ids=[identifier])
+    return items[0] if items else None
 
 
 #: Every citation kind `ProjectContextService` can emit. A URI this server handed out has

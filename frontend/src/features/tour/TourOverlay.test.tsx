@@ -518,6 +518,65 @@ describe('TourOverlay', () => {
     expect(useAppStore.getState().tourState.stepId).toBe('research-workspace')
   })
 
+  it('waits for a workflow node selection instead of advancing on canvas controls or whitespace', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'workflow', stepId: 'workflow-canvas' } })
+    renderWithProviders(<>
+      <div data-tour-id="workflow-canvas">
+        <div>Canvas whitespace</div>
+        <button type="button">Zoom in</button>
+        <div className="react-flow__node" role="button" tabIndex={0}>Fold step</div>
+      </div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Connected steps')
+    fireEvent.click(screen.getByText('Canvas whitespace'))
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-canvas')
+    fireEvent.click(screen.getByRole('button', { name: 'Fold step' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-inspector')
+  })
+
+  it('continues a paused chapter from its saved step through the chapter menu', async () => {
+    projectContext.projects = [{ id: 'pd1-demo', name: 'PD-1', source_project_key: 'PD1' }]
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'project-library' }, tourMenuOpen: true })
+    renderWithProviders(<><div data-tour-id="project-library">Library</div><TourOverlay /></>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue tour' }))
+    expect(useAppStore.getState()).toMatchObject({ appMode: 'demo', tourMenuOpen: false,
+      tourState: { status: 'active', sectionId: 'projects', stepId: 'project-library' } })
+    expect(projectContext.setProjectId).toHaveBeenCalledWith('pd1-demo')
+    expect(await screen.findByText('Project library')).toBeInTheDocument()
+  })
+
+  it('recognizes a workflow node selected with the keyboard without a synthetic click', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'workflow', stepId: 'workflow-canvas' } })
+    renderWithProviders(<>
+      <div data-tour-id="workflow-canvas"><div className="react-flow__node" role="button" tabIndex={0}>Fold step</div></div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Connected steps')
+    await act(async () => { screen.getByRole('button', { name: 'Fold step' }).classList.add('selected') })
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-inspector')
+  })
+
+  it('shows localized feedback when continuing has no usable demo project', async () => {
+    projectContext.projects = [{ id: 'old-demo', name: 'PD-1', source_project_key: 'PD1', status: 'trashed' }]
+    useAppStore.setState({ language: 'zh', tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'project-library' }, tourMenuOpen: true })
+    renderWithProviders(<TourOverlay />)
+    fireEvent.click(await screen.findByRole('button', { name: '继续导览' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('PD‑1 演示项目不可用')
+    expect(useAppStore.getState().tourState.status).toBe('paused')
+    expect(projectContext.setProjectId).not.toHaveBeenCalled()
+  })
+
+  it('does not offer to continue a chapter whose final step is already completed', async () => {
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'main-navigation', completedSections: ['projects'] }, tourMenuOpen: true })
+    renderWithProviders(<TourOverlay />)
+    expect(await screen.findByRole('dialog', { name: 'Interface tour' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue tour' })).not.toBeInTheDocument()
+  })
+
   it('opens the result history only when its panels are needed', async () => {
     setReducedMotion(true)
     const expand = vi.fn(() => {

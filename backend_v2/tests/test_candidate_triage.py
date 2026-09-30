@@ -187,6 +187,28 @@ def test_a_design_that_reaches_nothing_is_explained_against_the_easiest_tier() -
     assert {item.threshold for item in verdict.criteria} == set(TIER_A.values())
 
 
+def test_failed_and_missing_tiers_remain_distinguishable_after_fallback() -> None:
+    metrics = [_metric("pae_interaction", 22.0), _metric("plddt", 62.0)]
+
+    verdict = triage.triage(metrics, TIERS)
+
+    assert verdict.criteria_tier == "tier_a"
+    assert list(verdict.tier_criteria) == ["tier_b", "tier_a"]
+    for criteria in verdict.tier_criteria.values():
+        assert [item.outcome for item in criteria] == ["fail", "fail", "missing"]
+        assert criteria[-1].method is criteria[-1].assessor is None
+
+
+def test_reaching_lower_tier_keeps_the_stricter_tiers_failed_comparisons() -> None:
+    metrics = [_metric("pae_interaction", 12.0), _metric("plddt", 75.0), _metric("rosetta_ddg_reu", -25.0)]
+
+    verdict = triage.triage(metrics, TIERS)
+
+    assert verdict.tier == verdict.criteria_tier == "tier_a"
+    assert {item.outcome for item in verdict.tier_criteria["tier_b"]} == {"fail"}
+    assert {item.outcome for item in verdict.tier_criteria["tier_a"]} == {"pass"}
+
+
 def test_no_tiers_declared_is_not_a_verdict() -> None:
     assert triage.triage([_metric("iptm", 0.9)], {}).tier is None
 

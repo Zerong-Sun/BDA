@@ -2387,7 +2387,11 @@ def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
             "metrics contain no value - not that the design failed. Whether "
             "it was measured elsewhere is unknown. Preserve each criterion's "
             "method and assessor, including nulls; missing criteria do not "
-            "reject a design by this route."
+            "reject a design by this route. criteria_tier names the tier behind "
+            "the top-level criteria and counts; tier_assessments contains every "
+            "tier's comparisons. A recorded value that misses a threshold is "
+            "fail, not unassessable. Tier outcomes describe these supplied metrics, "
+            "not experimental validation."
         ),
     }
 

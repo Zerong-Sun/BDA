@@ -106,6 +106,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     nodesRef.current = nodes
     edgesRef.current = edges
 
+    useEffect(() => () => {
+      if (saveTimer.current !== null) {
+        window.clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+    }, [readOnly, workflowRunId])
+
     useEffect(() => {
       if (!initialNodes) return
 
@@ -185,9 +192,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
 
     const persistLayout = useCallback(
       (currentNodes: Node[], currentEdges: BdaWorkflowEdge[]) => {
-        if (!workflowRunId) return
+        if (!workflowRunId || readOnly) return
         if (saveTimer.current) window.clearTimeout(saveTimer.current)
         saveTimer.current = window.setTimeout(() => {
+          saveTimer.current = null
           void saveWorkflowLayout(workflowRunId, {
             nodes: currentNodes.map((node) => ({
               id: node.id,
@@ -202,7 +210,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             .catch(error => showToast(error instanceof Error ? error.message : 'Layout save failed', 'error'))
         }, 500)
       },
-      [workflowRunId, onLayoutSaved, showToast],
+      [workflowRunId, readOnly, onLayoutSaved, showToast],
     )
 
     const onEdgesChange = useCallback(
@@ -403,6 +411,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     ])
 
     const proOptions = useMemo(() => ({ hideAttribution: true }), [])
+    // Node deletion has no canvas persistence handler. React Flow's default
+    // Backspace removal would only hide server nodes locally (even read-only
+    // ones) and can also remove their connections. Keep those nodes inspectable.
+    const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, deletable: false })), [nodes])
     const flowKey = useMemo(
       () => `${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
       [nodes, edges],
@@ -460,7 +472,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
         <ReactFlow
           className="min-h-0 flex-1"
           key={flowKey}
-          nodes={nodes}
+          nodes={renderedNodes}
           edges={edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
@@ -486,6 +498,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           nodesConnectable={!readOnly}
           edgesFocusable={false}
           edgesReconnectable={false}
+          deleteKeyCode={readOnly ? null : 'Backspace'}
           panOnScroll
           selectionOnDrag={false}
         >

@@ -83,6 +83,14 @@ class ResearchContextService:
             if review
             else None,
             "counts": self.workspace.get("counts", {}),
+            "counts_scope": {
+                "research_targets": (
+                    "Candidate records whose candidate_kind is research_target, not biological Target records. "
+                    "A zero count does not mean the project has no target; inspect project.primary_target "
+                    "and use list_project_targets for the full biological target inventory."
+                ),
+            },
+            "primary_target_present": project.get("primary_target") is not None,
             "available_kinds": sorted({item["kind"] for item in self._items}),
         }
 
@@ -135,6 +143,43 @@ class ResearchContextService:
                 return reference
         return None
 
+    @staticmethod
+    def _reference_excerpt(reference: dict[str, Any], chunk: LiteratureChunk) -> dict[str, Any]:
+        return {
+            "kind": "literature_excerpt",
+            "id": str(chunk.id),
+            "label": _text(reference.get("title")) or f"Literature chunk {chunk.position}",
+            "data": {
+                "document_id": str(chunk.document_id),
+                "ref_id": reference.get("ref_id"),
+                "title": reference.get("title"),
+                "url": reference.get("url"),
+                "chunk_id": str(chunk.id),
+                "position": chunk.position,
+                "content": chunk.content,
+                "chunk_version": chunk.version,
+                "review_status": (reference.get("metadata") or {}).get("review_status", "pending_review"),
+                "content_provenance": (reference.get("metadata") or {}).get("content_provenance") or {},
+            },
+        }
+
+    def get_reference_excerpt(self, chunk_id: str) -> dict[str, Any] | None:
+        """Resolve one saved excerpt by identity, without treating position as an offset."""
+        try:
+            identifier = uuid.UUID(chunk_id)
+        except (ValueError, TypeError, AttributeError):
+            return None
+        chunk = self.session.scalar(
+            select(LiteratureChunk)
+            .join(LiteratureDocument, LiteratureChunk.document_id == LiteratureDocument.id)
+            .where(LiteratureChunk.id == identifier, LiteratureDocument.project_id == self.project_id)
+        )
+        if chunk is None:
+            return None
+        reference = next((item for item in self.workspace.get("references", [])
+                          if str(item.get("document_id")) == str(chunk.document_id)), None)
+        return self._reference_excerpt(reference, chunk) if reference is not None else None
+
     def get_reference_content(
         self,
         reference_id: str,
@@ -165,25 +210,8 @@ class ResearchContextService:
                 .limit(max(1, min(limit, 50)))
             )
         )
-        provenance = ((reference or {}).get("metadata") or {}).get("content_provenance") or {}
         rows: list[dict[str, Any]] = [
-            {
-                "kind": "literature_excerpt",
-                "id": str(chunk.id),
-                "label": _text((reference or {}).get("title")) or f"Literature chunk {chunk.position}",
-                "data": {
-                    "document_id": document_id,
-                    "ref_id": (reference or {}).get("ref_id"),
-                    "title": (reference or {}).get("title"),
-                    "url": (reference or {}).get("url"),
-                    "chunk_id": str(chunk.id),
-                    "position": chunk.position,
-                    "content": chunk.content,
-                    "chunk_version": chunk.version,
-                    "review_status": ((reference or {}).get("metadata") or {}).get("review_status", "pending_review"),
-                    "content_provenance": provenance,
-                },
-            }
+            self._reference_excerpt(reference or {}, chunk)
             for chunk in chunks
         ]
         if rows:

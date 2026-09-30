@@ -674,6 +674,7 @@ def interface(
 
     interface_residues = [item for item in per_residue]
     hydrophobic = sum(1 for item in interface_residues if item["name"].upper() in _HYDROPHOBIC)
+    residue_counts = {chain.get_id(): len(_polymer_residues(chain)) for chain in model}
     return {
         "chain_a": chain_a,
         "chain_b": chain_b,
@@ -687,6 +688,17 @@ def interface(
         # The conventional "interface area": half the total buried, because the
         # two sides bury each other and reporting the sum double-counts it.
         "interface_area_a2": round((buried[chain_a] + buried[chain_b]) / 2, 1),
+        "residue_scope": {
+            "analysed_model": model.get_id(),
+            "model_count": len(list(structure)),
+            "definition": "All non-solvent residues, including ligands, in the first model only.",
+            "selected_chain_counts": {chain_a: residue_counts[chain_a], chain_b: residue_counts[chain_b]},
+            "model_total": sum(residue_counts.values()),
+        },
+        "interface_residue_definition": (
+            "Non-solvent residues losing more than 0.1 A^2 of accessible surface on complex formation. "
+            "This is distinct from a heavy-atom distance contact and does not count every residue in the file."
+        ),
         "interface_residue_count": {
             chain_a: sum(1 for item in interface_residues if item["chain"] == chain_a),
             chain_b: sum(1 for item in interface_residues if item["chain"] == chain_b),
@@ -703,6 +715,8 @@ def interface(
         "hydrogen_bonds": bonds[:MAX_CONTACT_PAIRS],
         "salt_bridges": bridges[:MAX_CONTACT_PAIRS],
         "interface_residues": interface_residues[:MAX_CONTACT_PAIRS],
+        "returned_interface_residue_count": min(len(interface_residues), MAX_CONTACT_PAIRS),
+        "interface_residues_truncated": len(interface_residues) > MAX_CONTACT_PAIRS,
     }
 
 

@@ -35,6 +35,7 @@ from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from . import agent_runs, bots
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
+from .agent_review import EVIDENCE_CALIBRATION, needs_review, review_messages, reviewable_delivery
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import SCIENTIFIC_POLICY
 from .provider import completion_message
@@ -72,7 +73,7 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     This is the whole of "restoring" a run. There is no in-memory object graph to
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
-    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + FINAL_INSTRUCTION}]
+    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + EVIDENCE_CALIBRATION + "\n" + FINAL_INSTRUCTION}]
     # The run's bot, read from the roster rather than from the row. The row
     # holds the id; the charter is source, so a run resumed after a deploy
     # operates under the current wording instead of a snapshot of what the
@@ -369,24 +370,24 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                 run.outcome = {**repaired_outcome, "format_repair": "attempted_once"}
             except Exception:
                 run.outcome = {**run.outcome, "format_repair": "unavailable"}
-        if (run.task_contract or {}).get("service_kind") in {"literature", "interpretation"} and run.outcome["status"] in {"completed", "partial"}:
+        if needs_review(run, turns):
             try:
-                review_messages = [
-                    {"role": "system", "content": SCIENTIFIC_POLICY + "\nReview the entire draft against the tool records. Correct unsupported claims in every section. Preserve the contract's required sections and do not invent citations.\n" + FINAL_INSTRUCTION},
-                    {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
-                        "draft": run.outcome, "tool_records": tool_records(turns)}, ensure_ascii=False)},
-                ]
-                reserve_model_call(session, run, provider, review_messages)
-                review_message = completion_message(provider, review_messages)
+                review_conversation = review_messages(run, turns)
+                reserve_model_call(session, run, provider, review_conversation)
+                review_message = completion_message(provider, review_conversation)
                 reviewed = str(review_message.get("content") or "")
                 reviewed_outcome = evaluate_delivery(run, reviewed, turns)
-                if reviewed_outcome["status"] == "review_required":
+                if not reviewable_delivery(run, reviewed_outcome):
                     raise ValueError("invalid_review_delivery")
                 agent_runs.append_turn(session, run, role="assistant", content=reviewed,
                                        reasoning_content=review_message.get("reasoning_content") if isinstance(review_message.get("reasoning_content"), str) else None)
                 run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed"}
             except Exception:
-                run.outcome = {**run.outcome, "status": "review_required", "scientific_review": "unavailable",
+                # Preserve an honest stop and its saved draft when the review
+                # cannot fit the remaining budget or fails. No extra call can
+                # bypass reserve_model_call's turn/cost ceiling.
+                status = run.outcome["status"] if run.outcome["status"] in {"blocked", "needs_input"} else "review_required"
+                run.outcome = {**run.outcome, "status": status, "scientific_review": "unavailable",
                                "missing": [*run.outcome.get("missing", []), "scientific_review_unavailable"]}
         agent_runs.finish(session, run, status="succeeded")
         settle_parent(session, run)
