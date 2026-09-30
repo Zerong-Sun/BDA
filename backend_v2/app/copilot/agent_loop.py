@@ -413,12 +413,23 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
     )
     context = _tool_context(session, run)
     waits: list[tuple[str, uuid.UUID, str]] = []
+    requested_names = {str((item.get("function") or {}).get("name") or "") for item in requested}
     for request in requested:
         call_id = str(request.get("id") or "")
         function = request.get("function") or {}
         name = str(function.get("name") or "")
         spec = REGISTRY.get(name)
-        result, wait = _run_tool(context, run, name, function.get("arguments"), call_id)
+        pending_sources = (sorted(set(spec.defer_with) & requested_names)
+                           if spec and name in (run.allowed_tools or []) else [])
+        result: dict[str, Any] | list[Any]
+        if pending_sources:
+            result, wait = {
+                "error": "tool_results_not_yet_observed", "tool": name,
+                "wait_for": pending_sources,
+                "next_step": "Read the measurement receipts, then call this tool in a later turn with evidence-backed arguments.",
+            }, None
+        else:
+            result, wait = _run_tool(context, run, name, function.get("arguments"), call_id)
         if wait is not None:
             waits.append(wait)
             # The tool result for a wait is written when the task settles, so the
@@ -458,6 +469,10 @@ def _run_tool(
             raise ValueError("tool_arguments_not_object")
         result = REGISTRY.execute(name, context, arguments)
     except DomainError as error:
+        # Registry schema feedback contains bounded declared paths/constraints,
+        # never the input values. Other domain errors keep their existing shape.
+        if error.error_code == "copilot_tool_arguments_invalid" and error.errors:
+            return {"error": error.error_code, "validation_errors": error.errors}, None
         return {"error": error.error_code}, None
     except (TypeError, ValueError, RuntimeError, KeyError) as exc:
         return {"error": str(exc)[:300]}, None

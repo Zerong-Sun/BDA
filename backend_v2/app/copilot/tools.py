@@ -20,6 +20,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -1476,9 +1477,10 @@ def _read_handoffs(ctx: ToolContext, args: dict[str, Any]) -> Any:
 _CLAIM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "statement": {"type": "string"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
         "evidence_ref": {
             "type": "string",
+            "maxLength": MAX_TEXT,
             "description": (
                 "The artifact, job, result, reference or goal id this rests on. "
                 "A claim with none is recorded as unsupported."
@@ -1496,20 +1498,23 @@ _register(
         description=(
             "Leave a structured handover for the next operator: what you did, the "
             "claims you are making with the evidence behind each one, what you "
-            "could not settle, and the ids the next operator needs. Append-only."
+            "could not settle, and the ids the next operator needs. Append-only. "
+            "Each summary, claim statement, evidence reference, open question and ref "
+            f"is limited to {MAX_TEXT} characters. Oversized input is rejected before saving; "
+            "shorten it and retry. Text is never truncated."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "to_bot": {"type": "string"},
-                "summary": {"type": "string"},
-                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": 20},
+                "summary": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
+                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": MAX_CLAIMS},
                 "open_questions": {
                     "type": "array",
-                    "items": {"type": "string"},
-                    "maxItems": 20,
+                    "items": {"type": "string", "maxLength": MAX_TEXT},
+                    "maxItems": MAX_OPEN_QUESTIONS,
                 },
-                "refs": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+                "refs": {"type": "array", "items": {"type": "string", "maxLength": MAX_TEXT}, "maxItems": MAX_REFS},
             },
             "required": ["to_bot", "summary"],
             "additionalProperties": False,
@@ -2131,6 +2136,8 @@ _register(
             "scene the viewer renders. Use it to make 'the interface I mean' "
             "unambiguous before arguing about it. It shows; it concludes "
             "nothing - the residues you pass are the ones you already measured."
+            " Read measurement results before choosing residues; call this in a subsequent turn, "
+            "not in the same batch as those measurements. A label applies to every highlighted residue."
         ),
         parameters={
             "type": "object",
@@ -2151,6 +2158,7 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_render_structure_view,
+        defer_with=("analyse_structure", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
     )
 )
 
