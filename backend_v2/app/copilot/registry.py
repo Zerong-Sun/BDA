@@ -306,7 +306,7 @@ class ToolRegistry:
         issues = _argument_issues(spec.parameters, arguments)
         if issues:
             raise DomainError("copilot_tool_arguments_invalid",
-                              "Tool arguments violate the declared field constraints; correct them and retry. Nothing was executed.",
+                              "Tool arguments do not match the declared schema.",
                               status_code=422, errors=issues)
         return spec.handler(context, arguments)
 

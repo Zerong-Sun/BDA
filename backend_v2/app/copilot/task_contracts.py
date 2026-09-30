@@ -145,6 +145,80 @@ def _has_excerpt(value: Any) -> bool:
     return any(_has_excerpt(item) for item in value.values() if isinstance(item, (list, dict)))
 
 
+def source_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Observed saved-source windows, separate from task/evidence completion.
+
+    A traced excerpt can answer a narrow question without reading its whole
+    source. Conversely, one successful page must not imply all pages were read.
+    Only actual, consistently identified rows count; empty/failed reads cannot
+    erase an earlier gap. Offsets are indexed-chunk offsets, not publications.
+    """
+    sources: dict[tuple[str, str], dict] = {}
+    for record in tool_records(turns):
+        rows = record["result"]
+        if record["tool"] != "get_reference_content" or not record["successful"] or not isinstance(rows, list) or not rows:
+            continue
+        first = rows[0].get("data") if isinstance(rows[0], dict) else None
+        if not isinstance(first, dict):
+            continue
+        window = first.get("read_window")
+        provenance = first.get("content_provenance")
+        if not isinstance(window, dict) or not isinstance(provenance, dict):
+            continue
+        document, checksum = first.get("document_id"), provenance.get("content_checksum_sha256")
+        offset, total, count = (window.get(key) for key in ("offset", "total_count", "returned_count"))
+        if (not isinstance(document, str) or not document or not isinstance(checksum, str) or not checksum
+                or type(offset) is not int or type(total) is not int or type(count) is not int
+                or offset < 0 or total < 0 or count != len(rows) or offset + count > total):
+            continue
+        # Do not trust a window counter in place of its actual traced contents.
+        if not all(isinstance(row, dict) and isinstance(row.get("data"), dict)
+                   and row["data"].get("document_id") == document
+                   and isinstance(row["data"].get("content_provenance"), dict)
+                   and row["data"]["content_provenance"].get("content_checksum_sha256") == checksum
+                   and _has_excerpt(row["data"]) for row in rows):
+            continue
+        source = sources.setdefault((document, checksum), {
+            "document_id": document, "ref_id": first.get("ref_id"),
+            "content_checksum_sha256": checksum, "read_windows": [],
+            "total_counts": [], "observed_has_more": False, "evidence_call_ids": [],
+        })
+        source["read_windows"].append([offset, offset + count])
+        source["total_counts"].append(total)
+        source["observed_has_more"] |= window.get("has_more") is True
+        source["evidence_call_ids"].append(record["call_id"])
+    result = []
+    for source in sources.values():
+        merged: list[list[int]] = []
+        for start, end in sorted(source["read_windows"]):
+            if merged and start <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], end)
+            else:
+                merged.append([start, end])
+        totals = sorted(set(source.pop("total_counts")))
+        total = totals[0] if len(totals) == 1 else None
+        # With conflicting totals, preserve observations without claiming a
+        # complete source or prescribing a potentially stale next offset.
+        next_offset = 0
+        for start, end in merged:
+            if start > next_offset:
+                break
+            next_offset = end
+        complete = total is not None and next_offset == total
+        result.append({**source, "read_windows": merged, "observed_total_counts": totals,
+                       "total_count": total, "read_count": sum(end - start for start, end in merged),
+                       "coverage_complete": complete,
+                       "known_next_offset": next_offset if total is not None and next_offset < total else None,
+                       "evidence_call_ids": list(dict.fromkeys(source["evidence_call_ids"]))})
+    return result
+
+
+def pending_source_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Only sources actually observed to have more saved pages merit feedback."""
+    return [source for source in source_coverage(turns)
+            if source["observed_has_more"] and not source["coverage_complete"]]
+
+
 def progress(contract: dict, turns: list[CopilotAgentTurn]) -> list[dict]:
     records = tool_records(turns)
     rows = []
@@ -225,6 +299,8 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
 def task_view(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> dict:
     result = dict(run.outcome or {})
     result["steps"] = progress(run.task_contract or {}, turns)
+    if (run.task_contract or {}).get("service_kind") == "literature":
+        result["source_coverage"] = source_coverage(turns)
     records = tool_records(turns)
     result["evidence"] = [{"call_id": r["call_id"], "tool": r["tool"], "successful": r["successful"]} for r in records]
     result["deliverables"] = [
