@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkflowPage } from '../../app/Workflow'
 import { renderWithProviders } from '../../test/renderWithProviders'
-import { useAppStore } from '../../lib/store/appStore'
+import { initialTourState, useAppStore } from '../../lib/store/appStore'
 
 const state = vi.hoisted(() => ({ projectId: 'project-a' }))
 const api = vi.hoisted(() => ({
@@ -63,6 +63,25 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('workflow journey', () => {
+  it.each(['en', 'zh'] as const)('restores the selected example after reloading an active workflow tour (%s)', async (language) => {
+    window.location.hash = '/workflow?project=project-a&node=target'
+    useAppStore.setState({ appMode: 'application', tourState: initialTourState })
+    localStorage.setItem('bda-app-store', JSON.stringify({ state: { language,
+      tourState: { ...initialTourState, status: 'active', sectionId: 'workflow', stepId: 'workflow-inspector' },
+    }, version: 0 }))
+    await useAppStore.persist.rehydrate()
+    api.graph.mockResolvedValue({ workflow: run, nodes: [], edges: [], layout: {} })
+    renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByTestId('demo-workflow-inspector')).toHaveTextContent(language === 'zh' ? '靶标蛋白' : 'Target protein')
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-inspector')
+    expect(window.location.hash).toContain('node=target')
+    expect(api.preview).not.toHaveBeenCalled()
+    expect(api.submit).not.toHaveBeenCalled()
+    expect(api.create).not.toHaveBeenCalled()
+    act(() => useAppStore.getState().advanceTour())
+    expect(useAppStore.getState().tourState.completedSections).toContain('workflow')
+    expect(useAppStore.getState().tourMenuOpen).toBe(true)
+  })
   it.each(['en', 'zh'] as const)('inspects the selected demo node even when the API workflow has zero nodes (%s)', async (language) => {
     useAppStore.setState({ appMode: 'demo', language })
     api.graph.mockResolvedValue({ workflow: run, nodes: [], edges: [], layout: {} })
