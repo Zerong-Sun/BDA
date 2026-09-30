@@ -59,10 +59,12 @@ jobs:
       - name: Enforce coverage gates
         run: python backend_v2/scripts/check_coverage.py backend_v2/coverage.json
       - name: Enforce research package branch coverage
-        run: >-
-          pytest backend_v2/tests/test_research_package_validation.py
-          --cov=backend_v2.app.research.package_validation --cov-branch
-          --cov-report=term-missing --cov-fail-under=95
+        run: |
+          pytest backend_v2/tests/test_research_package_validation.py \
+            --cov=backend_v2.app.research.package_validation --cov-branch \
+            --cov-report=term-missing --cov-report=json:backend_v2/research-branch-coverage.json --cov-fail-under=95
+          # pytest-cov's percent is statements + branches; enforce branch outcomes separately.
+          python backend_v2/scripts/check_coverage.py backend_v2/research-branch-coverage.json --research-branch
       - name: Reject OpenAPI contract drift
         run: |
           PYTHONPATH=. python backend_v2/scripts/export_openapi.py backend_v2/openapi.json
