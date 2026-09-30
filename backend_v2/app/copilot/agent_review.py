@@ -19,6 +19,13 @@ Preserve recorded units and provenance; do not invent additional defects in a cl
 otherwise correctly reject. A single observed or injected failure does not establish the
 outcome of a future retry. Mark predictions and causal explanations as unverified unless
 the returned evidence supports them. State only limitations needed for the user's goal.
+Match answer length to the requested task; a single-object check usually needs only brief
+sections. Include the requested results and their units, relevant source IDs, provenance
+and per-item exceptions. State a shared limitation once. Do not list unrelated jobs or
+other records returned by a broad query unless they affect this task's conclusion; their
+appearance in the same query does not establish a relationship. Remove repeated caveats,
+evidence recaps and handoff-chain descriptions while preserving information needed to
+review the answer and any action actually recorded.
 """
 
 REVIEW_INSTRUCTION = """BDA_AGENT_FACTUAL_REVIEW_V1. Review every section of the draft against the supplied
@@ -36,6 +43,20 @@ goal as review_required because it has no machine-checkable steps. Return the de
 status that describes the task; the server will retain that human-review requirement.
 Scientific content remains pending human review.
 """
+
+ROUTING_INSTRUCTION = """Use the registered operator routing when describing handoffs. Each operator's
+expected_handoff belongs to that operator; a recipient has its own outgoing targets.
+The graph is advisory, grants no action permissions and prescribes no mandatory sequence.
+The user's goal determines whether any further step is needed. Stop when that requested
+scope is met or blocked; do not append another operator merely to continue a chain.
+A recorded handoff alone does not start the recipient's run.
+"""
+
+
+def operator_routing() -> dict[str, Any]:
+    return {"mandatory_sequence": False, "authorizes_actions": False,
+            "operators": [{"id": bot.id, "summary": bot.summary, "expected_handoff": list(bot.handoff)}
+                          for bot in bots.all_bots()]}
 
 
 def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[dict[str, Any]]:
@@ -62,11 +83,11 @@ def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list
     charter = bots.get(run.bot) if run.bot else None
     return [
         {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + REVIEW_INSTRUCTION
-         + EVIDENCE_CALIBRATION + "\n" + FINAL_INSTRUCTION},
+         + EVIDENCE_CALIBRATION + "\n" + ROUTING_INSTRUCTION + "\n" + FINAL_INSTRUCTION},
         {"role": "user", "content": json.dumps({
             "goal": run.goal, "contract": run.task_contract,
             "bot": {"id": charter.id, "charter": charter.charter} if charter else None,
-            "draft": run.outcome, "tool_records": receipts,
+            "operator_routing": operator_routing(), "draft": run.outcome, "tool_records": receipts,
         }, ensure_ascii=False)},
     ]
 

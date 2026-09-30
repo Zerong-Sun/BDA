@@ -35,7 +35,14 @@ from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from . import agent_runs, bots
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
-from .agent_review import EVIDENCE_CALIBRATION, needs_review, review_messages, reviewable_delivery
+from .agent_review import (
+    EVIDENCE_CALIBRATION,
+    ROUTING_INSTRUCTION,
+    needs_review,
+    operator_routing,
+    review_messages,
+    reviewable_delivery,
+)
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import SCIENTIFIC_POLICY
 from .provider import completion_message
@@ -92,6 +99,9 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                 ),
             }
         )
+        conversation.append({"role": "system", "content": ROUTING_INSTRUCTION})
+        conversation.append({"role": "system", "content": "Registered operator routing: "
+                             + json.dumps(operator_routing(), ensure_ascii=False)})
     conversation.append({"role": "user", "content": run.goal})
     if run.task_contract:
         conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**run.task_contract, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})

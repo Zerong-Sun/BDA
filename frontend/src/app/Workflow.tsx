@@ -13,11 +13,11 @@ import { mapApiGraphToGraph } from '../features/workflow/workflowMapper'
 import { WorkflowResourceSidebar } from '../features/workflow/WorkflowResourceSidebar'
 import { RunLineage } from '../features/workflow/RunLineage'
 import { WorkflowInspector } from '../features/workflow/WorkflowInspector'
+import { DemoWorkflowInspector } from '../features/workflow/DemoWorkflowInspector'
+import { getDemoWorkflow } from '../features/workflow/demoWorkflow'
 import { WorkflowContextBar } from '../features/workflow/WorkflowContextBar'
 import { WorkflowToolbar } from '../features/workflow/WorkflowToolbar'
 import {
-  defaultWorkflowEdges,
-  defaultWorkflowNodes,
   isOrderingHandle,
   type NodeTemplate,
 } from '../features/workflow/workflowTypes'
@@ -309,6 +309,7 @@ function WorkflowWorkspace() {
   const uiDensity = useAppStore((s) => s.uiDensity)
   const queryClient = useQueryClient()
   const isDemoMode = appMode === 'demo'
+  const demoWorkflow = useMemo(() => getDemoWorkflow(language), [language])
   const projectAccess = useProjectAccess(projectId)
   const canEdit = !isDemoMode && projectAccess.isSuccess && projectAccess.data?.permissions.write === true
   const canCompute = canEdit && projectAccess.data?.permissions.compute === true
@@ -1116,10 +1117,14 @@ function WorkflowWorkspace() {
               </Frame>
             ) : isDemoMode ? (
               <WorkflowCanvas
-                initialNodes={defaultWorkflowNodes}
-                initialEdges={defaultWorkflowEdges}
+                initialNodes={demoWorkflow.nodes}
+                initialEdges={demoWorkflow.edges}
                 readOnly
-                onNodeSelected={setSelectedNodeId}
+                onNodeSelected={(nodeId) => {
+                  if (!setSelectedNodeId(nodeId)) return
+                  setSelectedEdgeId(null)
+                  setSelectedArtifactId(undefined)
+                }}
                 selectedNodeId={selectedNodeId}
               />
             ) : workflowRunId ? (
@@ -1187,7 +1192,11 @@ function WorkflowWorkspace() {
           </main>
 
           <div className="order-2 min-h-0 xl:order-3" data-tour-id="workflow-inspector">
-            {selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} canOperate={canEdit} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
+            {isDemoMode && !selectedArtifact ? <DemoWorkflowInspector
+              selectedStep={demoWorkflow.steps.find(step => step.node.id === selectedNodeId)}
+              stepCount={demoWorkflow.steps.length}
+            /> : (
+            selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} canOperate={canEdit} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
               workflowRunId={workflowRunId}
               workflowVersion={workflowGraph?.workflow.version}
               readOnly={readOnly}
@@ -1197,7 +1206,7 @@ function WorkflowWorkspace() {
               artifactCount={visibleArtifacts.length}
               nodes={workflowNodes}
               onDirtyChange={setUnsavedNodeChanges}
-            />}
+            />)}
           </div>
         </div>
       </ApiState>

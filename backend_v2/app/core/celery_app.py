@@ -22,6 +22,7 @@ import uuid
 from collections.abc import Mapping
 from contextvars import ContextVar, Token
 from datetime import UTC, datetime
+from os import getpid
 from socket import gethostname
 
 from celery import Celery  # type: ignore[import-untyped]
@@ -143,7 +144,13 @@ def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
     """Publish worker identity without making task execution depend on telemetry."""
     from ..platform.models import WorkerHeartbeat
 
-    instance_id = str(getattr(sender, "hostname", "") or gethostname())
+    # Celery emits this signal from Heart, not from the Worker. Its dispatcher
+    # carries --hostname; using the machine hostname collapses separately named
+    # queue workers on one host into one row that they continually overwrite.
+    eventer = getattr(sender, "eventer", None)
+    instance_id = str(
+        getattr(eventer, "hostname", "") or getattr(sender, "hostname", "") or f"{gethostname()}:{getpid()}"
+    )
     try:
         with session_scope() as session:
             row = session.get(WorkerHeartbeat, instance_id)

@@ -27,7 +27,7 @@ vi.mock('../../lib/api/artifacts', () => ({ listProjectArtifacts: api.artifacts 
 vi.mock('../../lib/api/registry', () => ({ listModelPlugins: async () => [], validateModelPlugin: vi.fn() }))
 vi.mock('./WorkflowContextBar', () => ({ WorkflowContextBar: () => null }))
 vi.mock('./WorkflowResourceSidebar', () => ({ WorkflowResourceSidebar: ({ artifacts }: { artifacts: Array<{ id: string }> }) => <div>{artifacts.map((artifact) => <span key={artifact.id}>{artifact.id}</span>)}</div> }))
-vi.mock('./WorkflowCanvas', () => ({ WorkflowCanvas: ({ onNodeSelected }: { onNodeSelected: (id: string) => void }) => <><button onClick={() => onNodeSelected('node-1')}>Select node</button><button onClick={() => onNodeSelected('node-2')}>Select another node</button></> }))
+vi.mock('./WorkflowCanvas', () => ({ WorkflowCanvas: ({ onNodeSelected }: { onNodeSelected: (id: string) => void }) => <><button onClick={() => onNodeSelected('node-1')}>Select node</button><button onClick={() => onNodeSelected('node-2')}>Select another node</button><button onClick={() => onNodeSelected('target')}>Select demo target</button></> }))
 vi.mock('./WorkflowInspector', () => ({ WorkflowInspector: ({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) => <div><button onClick={() => onDirtyChange(true)}>Edit parameter</button><button onClick={() => onDirtyChange(false)}>Save parameter</button></div> }))
 vi.mock('./NodeBuilder', () => ({ NodeBuilder: ({ open }: { open: boolean }) => open ? <div>Manual node builder</div> : null }))
 vi.mock('../../components/ui/NextStep', () => ({ NextStep: () => <div>Next step: candidates</div> }))
@@ -63,6 +63,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('workflow journey', () => {
+  it.each(['en', 'zh'] as const)('inspects the selected demo node even when the API workflow has zero nodes (%s)', async (language) => {
+    useAppStore.setState({ appMode: 'demo', language })
+    api.graph.mockResolvedValue({ workflow: run, nodes: [], edges: [], layout: {} })
+    renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByTestId('demo-workflow-inspector')).toHaveTextContent(language === 'zh' ? '8 个演示步骤' : '8 example steps')
+    fireEvent.click(await screen.findByRole('button', { name: 'Select demo target' }))
+    expect(window.location.hash).toContain('node=target')
+    expect(screen.getByTestId('demo-workflow-inspector')).toHaveTextContent(language === 'zh' ? '靶标蛋白' : 'Target protein')
+    expect(screen.getByTestId('demo-workflow-inspector')).toHaveTextContent(language === 'zh' ? '靶标身份、序列和来源结构。' : 'Target identity, sequence and source structure.')
+    expect(api.preview).not.toHaveBeenCalled()
+    expect(api.submit).not.toHaveBeenCalled()
+    expect(api.create).not.toHaveBeenCalled()
+  })
   it('waits for permissions and keeps viewer controls read-only', async () => {
     let resolve!: (value: object) => void
     api.access.mockImplementationOnce(() => new Promise((done) => { resolve = done }))

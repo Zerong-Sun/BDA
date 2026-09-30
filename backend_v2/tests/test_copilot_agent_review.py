@@ -142,3 +142,28 @@ def test_custom_review_rejects_bad_evidence_or_structure_and_keeps_the_original(
     assert run.outcome["scientific_review"] == "unavailable"
     assert run.outcome["summary"] == json.loads(draft)["summary"]
     assert agent_runs.transcript(session, run)[-1].content == draft
+
+
+def test_actor_and_reviewer_receive_the_recipients_own_roster_routes(session: Session):
+    from backend_v2.app.copilot import bots
+
+    project, user = _project(session)
+    run = _run(session, project, user, bot="planner", goal="Inspect the input and leave an analyst handoff.",
+               task_contract=build_contract("custom", []))
+    run.outcome = json.loads(_delivery())
+    packet = json.loads(review_messages(run, [])[1]["content"])
+    routing = packet["operator_routing"]
+    by_id = {entry["id"]: entry for entry in routing["operators"]}
+    assert set(by_id) == bots.bot_ids()
+    for bot in bots.all_bots():
+        assert by_id[bot.id]["expected_handoff"] == list(bot.handoff)
+        assert by_id[bot.id]["summary"] == bot.summary
+    assert by_id["analyst"]["expected_handoff"] != by_id["planner"]["expected_handoff"]
+    assert routing["mandatory_sequence"] is False
+    assert routing["authorizes_actions"] is False
+    assert packet["goal"] == run.goal
+    conversation = agent_loop.messages_for(run, [])
+    prefix = "Registered operator routing: "
+    supplied = [json.loads(item["content"][len(prefix):]) for item in conversation
+                if item["role"] == "system" and item["content"].startswith(prefix)]
+    assert supplied == [routing]
