@@ -504,7 +504,7 @@ export function createProcessCloseMonitor(child) {
   }
 }
 
-export function createStorageSeed({ authenticated, language, themePreference, scenario = 'populated' }) {
+export function createStorageSeed({ authenticated, language, themePreference }) {
   const session = {
     'bda-research-package-sync-attempted': 'true',
   }
@@ -520,7 +520,6 @@ export function createStorageSeed({ authenticated, language, themePreference, sc
 
   const state = {
     activeProjectId: authenticated ? PROJECT_ID : '',
-    appMode: scenario === 'read-only' ? 'demo' : 'application',
     language,
     uiDensity: 'guided',
     themePreference,

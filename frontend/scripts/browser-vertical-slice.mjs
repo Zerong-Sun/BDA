@@ -1541,6 +1541,27 @@ async function navigateCase(page, testCase, caseDirectory) {
   }
 }
 
+async function enterReadOnlyDemo(page, testCase, diagnostics) {
+  if (testCase.scenario !== 'read-only') return
+
+  // Operating mode is session-only. Enter demo through the same settings action
+  // as a user instead of relying on an unsupported persisted appMode field.
+  const settingsName = testCase.language === 'zh' ? '应用设置' : 'Application settings'
+  const settingsTrigger = await firstVisible(page.getByRole('button', { name: settingsName, exact: true }))
+  if (settingsTrigger) {
+    await settingsTrigger.click()
+  } else {
+    await page.getByRole('button', { name: /^(More workspace actions|更多工作区操作)$/ }).click()
+    await page.getByRole('menuitem', { name: settingsName, exact: true }).click()
+  }
+  const drawer = page.getByRole('dialog').filter({ has: page.locator('[data-tour-id="settings-drawer"]') })
+  await expectVisible(drawer, 'Settings for read-only demo setup')
+  await drawer.getByRole('button', { name: /^(Demo mode|演示模式)/ }).click()
+  await page.keyboard.press('Escape')
+  await expectHidden(drawer, 'Settings for read-only demo setup')
+  diagnostics.interactions.demoMode = 'Entered read-only demo through application settings'
+}
+
 async function runCase(browser, testCase) {
   const startedAt = new Date().toISOString()
   const caseDirectory = path.join(RUN_DIRECTORY, 'cases', safeFilePart(testCase.id))
@@ -1595,6 +1616,7 @@ async function runCase(browser, testCase) {
     page.setDefaultTimeout(10_000)
     diagnosticController = await installDiagnostics(page, testCase, router, diagnostics)
     await navigateCase(page, testCase, caseDirectory)
+    await enterReadOnlyDemo(page, testCase, diagnostics)
     await assertDocumentContract(page, testCase)
     await assertScenarioState(page, testCase, diagnostics)
 
