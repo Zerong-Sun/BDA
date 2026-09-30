@@ -87,6 +87,7 @@ def _candidate(session: Session, project: Project, metrics: list[tuple[str, floa
             CandidateMetric(
                 candidate_id=candidate.id, metric_key=key, value=value,
                 method=method, assessor=assessor, evidence_kind="predicted",
+                unit="pLDDT_0_100" if key == "plddt" else "",
                 model_variant=f"seed-{index}_sample-0",
             )
         )
@@ -220,3 +221,28 @@ def test_an_unknown_candidate_is_a_404(session: Session) -> None:
         triage_candidate(session, project, uuid.uuid4(), TIERS)
 
     assert failure.value.status_code == 404
+
+
+def test_scale_metadata_and_counts_survive_service_serialization(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(session, project, [("plddt", 0.94, "boltz2", "design_model")])
+    from sqlalchemy import select
+    row = session.scalar(select(CandidateMetric).where(CandidateMetric.candidate_id == candidate.id))
+    assert row is not None
+    row.unit = ""
+    row.context = {"stored_scale": "fraction_0_1"}
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+    assert verdict["conflicted"] == 1 and verdict["failed"] == 0
+    assert all(item["conflicted"] == 1 and item["outcome"] == "scale_conflict" for item in verdict["tier_assessments"].values())
+    row.context = {"stored_scale": "percent_0_100", "reported_value": 0.94}
+    row.value = 94
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, {"a": {"binder_plddt": "> 70"}})
+    assert verdict["passed"] == 1 and verdict["conflicted"] == 0
+    row.method = "unverified"
+    row.context = {}
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+    assert verdict["scale_unknown"] == 1 and verdict["failed"] == 0
+    assert all(item["outcome"] == "scale_unknown" for item in verdict["tier_assessments"].values())

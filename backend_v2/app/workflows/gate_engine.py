@@ -11,6 +11,7 @@ import re
 import zipfile
 from pathlib import PurePosixPath
 
+from ..core import confidence_scale
 from .gate_schemas import GatePolicy
 
 OPS = {
@@ -23,17 +24,47 @@ OPS = {
 }
 
 
+def _scale_issue(row: dict, key: str) -> str | None:
+    if not confidence_scale.is_confidence(key):
+        return None
+    sources = row.get("metric_sources", [])
+    scales = row.get("metric_scales", {})
+    if not isinstance(sources, list) or any(not isinstance(source, dict) for source in sources) or not isinstance(scales, dict):
+        return "scale_conflict"
+    matched = [source for source in sources if (
+        source.get("key") == key or f"{source.get('key')}:{source.get('method')}:{source.get('model_variant', '')}:{source.get('condition', '')}" == key
+    )]
+    if len(matched) > 1:
+        return "scale_unknown"
+    source = matched[0] if matched else {}
+    context = source.get("context")
+    if context is not None and not isinstance(context, dict):
+        return "scale_conflict"
+    context = dict(context or {})
+    if key in scales:
+        if "stored_scale" in context and context["stored_scale"] != scales[key]:
+            return "scale_conflict"
+        context["stored_scale"] = scales[key]
+    return confidence_scale.comparison_issue(key, row.get("metrics", {}).get(key), context=context,
+                                              unit=source.get("unit", ""), method=source.get("method", ""))
+
+
 def evaluate(records: list[dict], policy: GatePolicy) -> list[dict]:
     decisions = []
     for row in sorted(records, key=lambda r: r["id"]):
         metrics = row.get("metrics", {})
         reasons, outcomes = [], []
         missing = False
+        scale_attention = False
         for rule in policy.rules.conditions:
             value = metrics.get(rule.metric)
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
                 reasons.append(f"missing_metric:{rule.metric}")
                 missing = True
+                outcomes.append(False)
+            elif issue := _scale_issue(row, rule.metric):
+                reasons.append(f"{issue}:{rule.metric}; thresholds use 0-100")
+                missing = scale_attention = True
                 outcomes.append(False)
             else:
                 passed = OPS[rule.op](value, rule.value)
@@ -62,6 +93,9 @@ def evaluate(records: list[dict], policy: GatePolicy) -> list[dict]:
         ):
             missing = True
             reasons.append(f"missing_metric:{sort_key}")
+        if sort_key and (issue := _scale_issue(row, sort_key)):
+            missing = scale_attention = True
+            reasons.append(f"{issue}:{sort_key}; cannot rank unresolved confidence scales")
         if row.get("error"):
             missing = True
             reasons.append(row["error"])
@@ -71,7 +105,7 @@ def evaluate(records: list[dict], policy: GatePolicy) -> list[dict]:
                 "passed": passed and not missing,
                 "reasons": reasons if not passed or missing else [],
                 "metrics": metrics,
-                "needs_attention": bool(row.get("needs_attention")),
+                "needs_attention": bool(row.get("needs_attention")) or scale_attention,
             }
         )
     eligible = [r for r in decisions if r["passed"]]

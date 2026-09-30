@@ -98,6 +98,8 @@ def triage_candidate(
                 "value": row.value,
                 "method": row.method,
                 "assessor": row.assessor,
+                "unit": row.unit,
+                "context": row.context,
             }
             for row in rows
         ],
@@ -112,6 +114,8 @@ def triage_candidate(
         "passed": verdict.passed,
         "failed": verdict.failed,
         "missing": verdict.missing,
+        "conflicted": verdict.conflicted,
+        "scale_unknown": verdict.scale_unknown,
         "metric_count": len(rows),
         "criteria": [asdict(item) for item in verdict.criteria],
         # A fallback explains what to fix, but losing the other comparisons
@@ -119,13 +123,17 @@ def triage_candidate(
         "tier_assessments": {
             name: {
                 "outcome": (
-                    "fail" if any(item.outcome == "fail" for item in criteria)
+                    "scale_conflict" if any(item.outcome == "scale_conflict" for item in criteria)
+                    else "scale_unknown" if any(item.outcome == "scale_unknown" for item in criteria)
+                    else "fail" if any(item.outcome == "fail" for item in criteria)
                     else "missing" if any(item.outcome == "missing" for item in criteria)
                     else "pass" if criteria else "not_assessed"
                 ),
                 "passed": sum(item.outcome == "pass" for item in criteria),
                 "failed": sum(item.outcome == "fail" for item in criteria),
                 "missing": sum(item.outcome == "missing" for item in criteria),
+                "conflicted": sum(item.outcome == "scale_conflict" for item in criteria),
+                "scale_unknown": sum(item.outcome == "scale_unknown" for item in criteria),
                 "criteria": [asdict(item) for item in criteria],
             }
             for name, criteria in verdict.tier_criteria.items()

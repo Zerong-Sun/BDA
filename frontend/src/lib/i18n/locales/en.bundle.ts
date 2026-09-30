@@ -1261,6 +1261,13 @@ export const bundleEn = {
       reserve: 'Reserve',
       priorityOnly: 'Priority only',
     },
+    foldScreen: {
+      withheld: 'Hidden {count} candidates below pLDDT {floor} on a confirmed 0–100 scale. Data is retained; direct links stay visible.',
+      included: 'Showing all results, including {count} candidates below pLDDT {floor} on a confirmed 0–100 scale.',
+      uncertain: '{count} candidates have an unknown or conflicting pLDDT scale. Their raw values stay visible and are excluded from this filter and the mean.',
+      show: 'Show low-confidence candidates',
+      hide: 'Hide low-confidence candidates',
+    },
     table: {
       rankedScreen: 'Ranked screen',
       rankedScreenHint: 'Visual bars summarize model signals; open expert columns for raw values.',

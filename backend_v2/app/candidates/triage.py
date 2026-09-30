@@ -31,6 +31,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..core import confidence_scale
+
 #: Comparators a threshold may use, longest first so ">=" is not read as ">".
 _OPERATORS: tuple[tuple[str, Callable[[float, float], bool]], ...] = (
     ("<=", operator.le),
@@ -86,6 +88,8 @@ class Verdict:
     passed: int = 0
     failed: int = 0
     missing: int = 0
+    conflicted: int = 0
+    scale_unknown: int = 0
 
 
 def parse_threshold(text: str) -> tuple[Callable[[float, float], bool], float, str]:
@@ -159,6 +163,22 @@ def evaluate(
                 )
             )
             continue
+        issues = [(item, confidence_scale.comparison_issue(
+            str(item.get("key")), item.get("value"), context=item.get("context"),
+            unit=str(item.get("unit") or ""), method=str(item.get("method") or ""),
+        )) for item in recorded]
+        # Do not choose a favourable seed before resolving its units. A mixed-scale
+        # set cannot be ranked safely, even if another row would happen to pass.
+        unresolved = next(((item, issue) for item, issue in issues if issue), None)
+        if unresolved:
+            item, issue = unresolved
+            criteria.append(Criterion(
+                name=name, threshold=threshold, outcome=str(issue), value=item.get("value"),
+                metric_key=str(item.get("key")), method=str(item.get("method") or "") or None,
+                assessor=str(item.get("assessor") or "") or None,
+                note="pLDDT thresholds use 0-100. Confirm the recorded scale before comparison; this is not a design failure.",
+            ))
+            continue
         chosen = _best(recorded, compare, limit)
         assert chosen is not None  # `recorded` is non-empty
         value = float(chosen["value"])
@@ -221,4 +241,6 @@ def triage(
         passed=sum(1 for item in criteria if item.outcome == "pass"),
         failed=sum(1 for item in criteria if item.outcome == "fail"),
         missing=sum(1 for item in criteria if item.outcome == "missing"),
+        conflicted=sum(1 for item in criteria if item.outcome == "scale_conflict"),
+        scale_unknown=sum(1 for item in criteria if item.outcome == "scale_unknown"),
     )

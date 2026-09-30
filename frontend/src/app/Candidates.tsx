@@ -1,4 +1,5 @@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
+import { FOLD_CONFIDENCE_FLOOR, canonicalFoldConfidence, screenByFoldConfidence } from '../features/candidates/foldConfidence'
 import { candidatesCsv } from '../features/candidates/candidatesCsv'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -43,6 +44,7 @@ export function CandidatesPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('All')
   const [priorityOnly, setPriorityOnly] = useState(false)
+  const [confidenceFilter, setConfidenceFilter] = useState({ scope: '', enabled: false })
   const [searchParams, setSearchParams] = useSearchParams()
   const linkedCandidateId = searchParams.get('candidate')?.trim() || null
   const [selected, setSelected] = useState<Candidate | null>(null)
@@ -74,7 +76,7 @@ export function CandidatesPage() {
   const activeSource = sources.includes(requestedSource) ? requestedSource : 'all'
   const normalizedSearch = search.trim().toLocaleLowerCase()
   const normalizedStatus = status.toLocaleLowerCase()
-  const candidates = allCandidates.filter((candidate) => {
+  const matching = allCandidates.filter((candidate) => {
       const matchesSearch =
         !normalizedSearch ||
         [
@@ -91,6 +93,14 @@ export function CandidatesPage() {
       const matchesSource = activeSource === 'all' || candidate.properties.source_dataset === activeSource
       return matchesSearch && matchesStatus && matchesPriority && matchesSource
   })
+
+  const confidenceScope = `${projectId}:${activeSource}`
+  const foldScreen = confidenceFilter.scope === confidenceScope && confidenceFilter.enabled
+  const confidenceScreen = screenByFoldConfidence(matching)
+  const candidates = foldScreen
+    ? matching.filter(candidate => !confidenceScreen.screenedOut.includes(candidate) || candidate.id === linkedCandidateId)
+    : matching
+  const hiddenCount = matching.length - candidates.length
 
   useEffect(() => {
     const resetSelection = window.setTimeout(() => {
@@ -221,7 +231,7 @@ export function CandidatesPage() {
         {[
           [zh ? '计算候选' : 'Candidates', candidates.length],
           [zh ? '可用三维结构' : 'Structures', candidates.filter(c => c.complex_artifact_id || c.structure_artifact_id).length],
-          [zh ? '平均 pLDDT' : 'Mean pLDDT', (() => { const values = candidates.map(c => candidateScore(c, 'plddt')).filter((v): v is number => v !== null); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : '—' })()],
+          [zh ? '平均 pLDDT（已确认 0–100）' : 'Mean pLDDT (confirmed 0–100)', (() => { const values = candidates.map(canonicalFoldConfidence).filter((v): v is number => v !== null); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : '—' })()],
           [zh ? '界面预测覆盖' : 'Interface metrics', candidates.filter(c => candidateScore(c, 'iptm') !== null).length],
         ].map(([label, value]) => <AppFrame key={label} panelClassName="p-4"><span className="text-xs text-text-secondary">{label}</span><strong className="mt-2 block text-2xl">{value}</strong></AppFrame>)}
       </div> : (
@@ -268,6 +278,23 @@ export function CandidatesPage() {
       />
       </div>
 
+      {(confidenceScreen.screenedOut.length > 0 || confidenceScreen.uncertain.length > 0) ? (
+        <AppFrame className="mb-4" panelClassName="flex flex-wrap items-center justify-between gap-3 p-3">
+          <div className="text-sm text-text-secondary" role="status">
+            {confidenceScreen.screenedOut.length > 0 ? <p>{format(
+              foldScreen ? t.candidatesExt.foldScreen.withheld : t.candidatesExt.foldScreen.included,
+              { count: foldScreen ? hiddenCount : confidenceScreen.screenedOut.length, floor: FOLD_CONFIDENCE_FLOOR },
+            )}</p> : null}
+            {confidenceScreen.uncertain.length > 0 ? <p>{format(t.candidatesExt.foldScreen.uncertain, { count: confidenceScreen.uncertain.length })}</p> : null}
+          </div>
+          {confidenceScreen.screenedOut.length > 0 ? <Button type="button" variant="outline" onClick={() => {
+            setConfidenceFilter({ scope: confidenceScope, enabled: !foldScreen })
+            setSelected(null)
+            setSelectedIds(new Set())
+          }}>{foldScreen ? t.candidatesExt.foldScreen.show : t.candidatesExt.foldScreen.hide}</Button> : null}
+        </AppFrame>
+      ) : null}
+
       <ApiState
         isLoading={isLoading}
         isError={isError}
@@ -279,7 +306,7 @@ export function CandidatesPage() {
           <div className="flex min-h-[34rem] flex-col overflow-hidden xl:min-h-0">
             <AppFrame className="min-h-0 flex-1" panelClassName="min-h-0 overflow-hidden">
               <CandidateTable
-                key={`${projectId}:${search}:${status}:${priorityOnly}`}
+                key={`${projectId}:${activeSource}:${search}:${status}:${priorityOnly}:${foldScreen}`}
                 data={candidates}
                 selectedId={activeCandidate?.id}
                 selectedIds={selectedIds}

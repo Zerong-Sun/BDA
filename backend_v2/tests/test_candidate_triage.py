@@ -29,7 +29,7 @@ TIERS = {"tier_b": TIER_B, "tier_a": TIER_A}
 
 
 def _metric(key: str, value: float, method: str = "alphafold3", assessor: str = "independent_model") -> dict:
-    return {"key": key, "value": value, "method": method, "assessor": assessor}
+    return {"key": key, "value": value, "method": method, "assessor": assessor, "unit": "pLDDT_0_100" if key == "plddt" else ""}
 
 
 # --- reading a threshold --------------------------------------------------------

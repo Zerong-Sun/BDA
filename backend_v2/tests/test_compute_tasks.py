@@ -1123,7 +1123,8 @@ def test_copilot_task_failure_marks_pending_source_message_failed(
 def test_reconciliation_and_purge(task_database) -> None:
     factory, ids = task_database
     expired_key, failed_key = "staging/expired", "staging/failed"
-    active_key, missing_key, orphan_key = "staging/active", "objects/missing", "objects/orphan"
+    active_key, missing_key = "staging/active", "objects/missing"
+    orphan_key = f"projects/{ids['project']}/sha256/orphan"
     FakeStorage.objects[expired_key] = b"expired"
     FakeStorage.objects[failed_key] = b"failed"
     FakeStorage.objects[active_key] = b"active"
@@ -1175,7 +1176,10 @@ def test_reconciliation_and_purge(task_database) -> None:
         )
         session.commit()
     result = tasks.reconcile_artifacts.run()
-    assert result == {"expired_uploads": 1, "missing_objects": 1, "orphaned_objects": 2}
+    assert result == {
+        "expired_uploads": 1, "missing_objects": 1, "orphaned_objects": 2,
+        "foreign_objects": 0, "unattributed_objects": 0,
+    }
     assert active_key in FakeStorage.objects
     assert failed_key not in FakeStorage.objects
 
@@ -1795,3 +1799,53 @@ def test_a_refused_credential_stops_a_lookup_instead_of_spending_every_request(t
         assert failed["status"] == "failed"
         assert session.get(LiteratureRetrievalTrace, uuid.UUID(failed["retrieval_trace_id"])).status == "failed"
         assert session.get(LiteratureDocument, second).metadata_json["patent_legal_status"]["status"] == "not_attempted"
+
+
+def test_gc_preserves_foreign_and_unattributed_shared_bucket_objects(task_database) -> None:
+    factory, ids = task_database
+    foreign_project = f"projects/{uuid.uuid4()}/sha256/evidence"
+    foreign_job = f"jobs/{uuid.uuid4()}/attempt-1/output.json"
+    own_orphan = f"projects/{ids['project']}/sha256/unreferenced"
+    live_input = f"jobs/{ids['job']}/attempt-1/input.json"
+    unowned = {"staging/other-upload", "objects/other-evidence", "unprefixed", "projects/incomplete"}
+    protected = {foreign_project, foreign_job, live_input, *unowned}
+    FakeStorage.objects.update({key: b"preserve" for key in protected})
+    FakeStorage.objects[own_orphan] = b"orphan"
+
+    result = tasks.reconcile_artifacts.run()
+
+    assert set(FakeStorage.removed) == {own_orphan}
+    assert protected <= FakeStorage.objects.keys()
+    assert result["foreign_objects"] == 2
+    assert result["unattributed_objects"] == len(unowned)
+    assert result["orphaned_objects"] == 1
+
+
+def test_gc_reclaims_local_terminal_job_and_known_failed_upload(task_database) -> None:
+    factory, ids = task_database
+    terminal_key = f"jobs/{ids['job']}/attempt-1/output.json"
+    failed_upload = "staging/local-failed"
+    referenced = f"projects/{ids['project']}/sha256/referenced"
+    foreign_key = f"jobs/{uuid.uuid4()}/attempt-1/output.json"
+    with factory() as session:
+        session.get(Job, ids["job"]).status = "failed"
+        session.add(ArtifactUpload(
+            project_id=ids["project"], created_by=ids["user"], filename="failed",
+            artifact_type="data", content_type="text/plain", object_key=failed_upload,
+            status="failed", expires_at=datetime.now(UTC) - timedelta(hours=2),
+        ))
+        session.add(Artifact(
+            project_id=ids["project"], artifact_type="data", filename="reference.txt",
+            object_key=referenced, content_type="text/plain", size_bytes=4,
+            checksum_sha256="a" * 64, status="available", created_by=ids["user"],
+        ))
+        session.commit()
+    FakeStorage.objects.update({key: b"data" for key in (terminal_key, failed_upload, referenced, foreign_key)})
+
+    result = tasks.reconcile_artifacts.run()
+
+    assert set(FakeStorage.removed) == {terminal_key, failed_upload}
+    assert set(FakeStorage.objects) == {referenced, foreign_key}
+    assert result["orphaned_objects"] == 2
+    assert result["foreign_objects"] == 1
+    assert result["missing_objects"] == 0

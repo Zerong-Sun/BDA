@@ -851,6 +851,27 @@ def _gc_protected(object_name: str, live_job_prefixes: tuple[str, ...]) -> bool:
     return any(segment in object_name for segment in GC_PROTECTED_SEGMENTS)
 
 
+def _gc_scope(
+    object_name: str,
+    known_projects: frozenset[str],
+    known_jobs: frozenset[str],
+    recorded_keys: set[str],
+) -> str:
+    """Attribute a key before collection; absence from one DB is not ownership.
+
+    Distinct databases can share a bucket. Unknown project/job prefixes belong
+    outside this database's collection scope. Unscoped keys (including staging)
+    require an actual local record; their owner cannot be inferred from age.
+    """
+    if object_name in recorded_keys:
+        return "local"
+    for prefix, known in (("projects", known_projects), ("jobs", known_jobs)):
+        parts = object_name.split("/", 2)
+        if len(parts) == 3 and parts[0] == prefix and parts[1] and parts[2]:
+            return "local" if parts[1] in known else "foreign"
+    return "unattributed"
+
+
 @celery_app.task(name="bda_v2.reconcile_artifacts")
 def reconcile_artifacts() -> dict:
     now = datetime.now(UTC)
@@ -882,13 +903,17 @@ def reconcile_artifacts() -> dict:
             f"jobs/{job_id}/"
             for job_id in session.scalars(select(Job.id).where(Job.status.not_in(TERMINAL_STATES)))
         )
+        known_projects = frozenset(str(item) for item in session.scalars(select(Project.id)))
+        known_jobs = frozenset(str(item) for item in session.scalars(select(Job.id)))
+        recorded_keys = set(session.scalars(select(Artifact.object_key)))
+        recorded_keys.update(session.scalars(select(ArtifactUpload.object_key)))
 
     storage = ObjectStorage()
     for _, key in expired_data:
         if storage.exists(key):
             storage.remove(key)
     missing = [artifact_id for artifact_id, key in available_data if not storage.exists(key)]
-    orphaned = [
+    unclaimed = [
         item.object_name
         for item in storage.list_objects()
         if item.object_name not in known_staging | known_artifacts
@@ -896,6 +921,11 @@ def reconcile_artifacts() -> dict:
         and item.last_modified
         and item.last_modified < now - timedelta(hours=1)
     ]
+    scoped = {
+        name: _gc_scope(name, known_projects, known_jobs, recorded_keys)
+        for name in unclaimed
+    }
+    orphaned = [name for name, scope in scoped.items() if scope == "local"]
     for key in orphaned:
         storage.remove(key)
 
@@ -909,7 +939,13 @@ def reconcile_artifacts() -> dict:
             artifact = session.get(Artifact, artifact_id)
             if artifact and artifact.status == "available":
                 artifact.status = "failed"
-    return {"expired_uploads": len(expired_data), "missing_objects": len(missing), "orphaned_objects": len(orphaned)}
+    return {
+        "expired_uploads": len(expired_data),
+        "missing_objects": len(missing),
+        "orphaned_objects": len(orphaned),
+        "foreign_objects": sum(scope == "foreign" for scope in scoped.values()),
+        "unattributed_objects": sum(scope == "unattributed" for scope in scoped.values()),
+    }
 
 
 @celery_app.task(name="bda_v2.purge_deleted_projects")

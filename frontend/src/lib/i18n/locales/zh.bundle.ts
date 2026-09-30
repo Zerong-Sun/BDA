@@ -1233,6 +1233,13 @@ export const bundleZh = {
       reserve: '储备',
       priorityOnly: '仅优先级',
     },
+    foldScreen: {
+      withheld: '已隐藏 {count} 条已确认 0–100 量纲且 pLDDT 低于 {floor} 的候选。数据保留，直接链接仍可查看。',
+      included: '当前显示全部结果，包含 {count} 条已确认 0–100 量纲且 pLDDT 低于 {floor} 的候选。',
+      uncertain: '{count} 条候选的 pLDDT 量纲不明或冲突。保留原值，不参与此筛选和均值计算。',
+      show: '显示低置信度候选',
+      hide: '隐藏低置信度候选',
+    },
     table: {
       rankedScreen: '排序筛选',
       rankedScreenHint: '可视化条汇总模型信号；打开专家列查看原始值。',
