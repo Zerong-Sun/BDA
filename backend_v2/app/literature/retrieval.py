@@ -18,6 +18,11 @@ def europe_pmc_results(payload: dict[str, Any], *, limit: int) -> list[dict[str,
             continue
         pmcid = str(row.get("pmcid") or "").strip().upper().replace("PMC_", "PMC")
         abstract = str(row.get("abstractText") or "").strip()
+        journal_info = row.get("journalInfo")
+        journal = journal_info.get("journal") if isinstance(journal_info, dict) else None
+        journal_title = str(row.get("journalTitle") or "").strip()
+        if not journal_title and isinstance(journal, dict):
+            journal_title = str(journal.get("title") or journal.get("medlineAbbreviation") or "").strip()
         results.append(
             {
                 "rank": rank,
@@ -29,7 +34,7 @@ def europe_pmc_results(payload: dict[str, Any], *, limit: int) -> list[dict[str,
                 "pmid": str(row.get("pmid") or "").strip(),
                 "pmcid": pmcid,
                 "authors": str(row.get("authorString") or "").strip(),
-                "journal": str(row.get("journalTitle") or "").strip(),
+                "journal": journal_title,
                 "year": str(row.get("pubYear") or "").strip(),
                 "is_open_access": str(row.get("isOpenAccess") or "").upper() == "Y",
                 "in_epmc": str(row.get("inEPMC") or "").upper() == "Y",

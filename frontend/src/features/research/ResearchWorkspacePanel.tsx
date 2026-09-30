@@ -39,6 +39,9 @@ import { PatentPanel } from './PatentPanel'
 import { ProjectReviewPanel } from './ProjectReviewPanel'
 import { ResearchGapResolutionButton } from './ResearchGapResolutionButton'
 import { ReviewMarkdown } from './ReviewMarkdown'
+import { LiteratureSourceDetails } from './LiteratureSourceDetails'
+import { workspaceCitationRecords } from './findingCitations'
+import { citationValueLabel, safeCitationUrl } from './citationMarkers'
 import { DryLabDecisionTree } from './DryLabDecisionTree'
 import {
   DatasetDataGrid,
@@ -101,7 +104,8 @@ function AskCopilotButton({ entityId, entityType, label }: { entityId: string; e
 const NONE_OPEN: string[] = []
 
 function ReferenceUrl({ url, label }: { url: string; label: string }) {
-  return <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline"><FileMagnifyingGlassIcon aria-hidden="true" />{label}</a>
+  const safeUrl = safeCitationUrl(url)
+  return safeUrl ? <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline"><FileMagnifyingGlassIcon aria-hidden="true" />{label}</a> : <span>{label}</span>
 }
 
 export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
@@ -215,7 +219,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
             <Disclosure className="science-document" title={w.reviewTitle}>
               <div>
               <div className="flex items-start justify-between gap-3"><SectionHeading title={w.reviewTitle} /><AskCopilotButton entityId={workspace.review_document.id} entityType="review" label={workspaceText(workspace.review_document.title, language)} /></div>
-              <div className="mt-4"><ReviewMarkdown>{workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
+              <div className="mt-4"><ReviewMarkdown citations={workspaceCitationRecords(workspace.references, language)}>{workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
               </div>
             </Disclosure>
           ) : <Alert><AlertDescription>{w.reviewEmpty}</AlertDescription></Alert>}
@@ -289,9 +293,10 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
               ].filter((link): link is { url: string; label: string } => Boolean(link))
                 .filter((link, index, values) => values.findIndex((candidate) => candidate.url === link.url) === index)
               return <article key={reference.document_id} className="border bg-muted/30 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs text-accent">{reference.ref_id} · {reference.verification_status || reference.status}</span><div className="flex items-center gap-2"><span className="text-xs text-text-muted">{[reference.year, reference.journal].filter(Boolean).join(' · ')}</span><AskCopilotButton entityId={reference.document_id} entityType="reference" label={workspaceText(reference.title, language)} /></div></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs text-accent">{reference.ref_id} · {citationValueLabel(reference.verification_status || reference.status, language)}</span><div className="flex items-center gap-2"><span className="text-xs text-text-muted">{[reference.year, reference.journal?.trim() || (language === 'zh' ? '期刊未记录' : 'Journal not recorded')].filter(Boolean).join(' · ')}</span><AskCopilotButton entityId={reference.document_id} entityType="reference" label={workspaceText(reference.title, language)} /></div></div>
                 <h3 className="mt-2 font-semibold">{workspaceText(reference.title, language)}</h3>{reference.authors ? <p className="mt-1 text-xs text-text-secondary">{reference.authors}</p> : null}
                 {links.length ? <div className="mt-3 flex flex-wrap gap-3">{links.map((link) => <ReferenceUrl key={link.url} url={link.url} label={link.label} />)}</div> : null}
+                <LiteratureSourceDetails projectId={projectId} documentId={reference.document_id} metadata={reference.metadata ?? {}} abstract={reference.abstract} />
               </article>
             }) : <Alert><AlertDescription>{w.referencesEmpty}</AlertDescription></Alert>}
             </FramePanel>

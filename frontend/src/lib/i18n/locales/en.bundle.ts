@@ -3,7 +3,7 @@ export const bundleEn = {
     apiState: {
       loadingDefault: 'Loading...',
     retry: 'Retry',
-      backendUnavailable: 'Backend unavailable. Start the API on port 8100 and retry.',
+      backendUnavailable: "Cannot connect to the service. Check the connection and retry.",
     },
     errorBoundaryTitle: 'Something went wrong',
     errorBoundaryBody:
@@ -25,7 +25,7 @@ export const bundleEn = {
       themeSystem: 'System',
     },
     backendHealth: {
-      workersUnavailable: 'Compute services are unavailable. Existing results can still be browsed and downloaded.',
+      workersUnavailable: "Background workers are unavailable. Existing records remain readable; bot, search and compute tasks must wait for recovery.",
       unavailable: 'Cannot connect to the service. Try again in a moment.',
       paused: 'Automatic scheduling is paused. You can continue browsing existing projects and results.',
       degraded: 'Some services are not ready. Some operations may be unavailable.',
@@ -94,12 +94,11 @@ export const bundleEn = {
   },
   login: {
     brandEyebrow: 'BDA Workbench',
-    heroTitle: 'An AI workbench for protein design — no deep modeling background required.',
-    heroBody:
-      'Describe your design goal and let the assistant help gather target evidence, propose a visual workflow, explain candidate scores in plain language, and close the loop with wet-lab results.',
-    heroBullet1: 'Agents collect target intelligence and draft design routes for you.',
-    heroBullet2: 'A visual, step-by-step workflow shows exactly what runs and why.',
-    heroBullet3: 'Every score, structure, and result is explained and traceable.',
+    heroTitle: "A workspace for protein design research",
+    heroBody: "Organise evidence, build workflows and follow computational and experimental results.",
+    heroBullet1: "Research team: define questions, check evidence and compare plans.",
+    heroBullet2: "Workflows: check inputs and parameters, then preview and confirm.",
+    heroBullet3: "Results: inspect measurements, original files and provenance.",
     formTitle: 'Sign in to BDA Workbench',
     formSubtitle: 'Your traceable protein-design workspace.',
     usernameLabel: 'Username',
@@ -131,7 +130,7 @@ export const bundleEn = {
       goal: 'Goal',
       goalPlaceholder: 'Fold the top three candidates and compare the results.',
       maxTurns: 'Turn limit',
-      maxCost: 'Cost ceiling (cents)',
+      maxCost: 'Cost ceiling (US cents)',
       costHint: 'Applies to the run and every subagent it spawns.',
       start: 'Start run',
       starting: 'Starting…',
@@ -147,8 +146,10 @@ export const bundleEn = {
       statusFailed: 'failed',
       statusCancelled: 'cancelled',
       turns: '{count} turns',
-      cost: '{cents}¢',
-      costWithSubtree: '{cents}¢ ({total}¢ with subagents)',
+      cost: '{cents} US cents',
+      costWithSubtree: '{cents} US cents ({total} with subagents)',
+      costUnmeasured: 'Cost not measured',
+      costEstimatedReserve: 'Estimated reserve: {cents} US cents',
       transcript: 'Transcript',
       transcriptEmpty: 'Nothing recorded yet.',
       roleUser: 'Goal',
@@ -310,7 +311,7 @@ export const bundleEn = {
     },
     cluster: {
       title: 'Cluster job drafts',
-      body: 'Copilot can create drafts, but only this confirmation button can submit a real LSF job.',
+      body: 'Review the draft script and resources, then confirm to submit an LSF job.',
       empty: 'No drafts yet. Ask Copilot to prepare an LSF job for review.',
       reviewScript: 'Review LSF script',
       confirmSubmit: 'Confirm and submit',
@@ -1110,7 +1111,7 @@ export const bundleEn = {
       evidenceCount: '{count} linked',
       supersedesCount: 'replaces {count}',
       unbound: 'No evidence linked',
-      unboundHelp: 'This decision points at nothing the platform can resolve. Add job, candidate, artifact, finding, experiment-result or protein ids to its provenance.',
+      unboundHelp: 'Link a job, candidate, file, finding, experiment result or construct in the evidence section.',
       laneDry: 'Dry',
       laneWet: 'Wet',
       laneEvidenceMismatch: 'no bench evidence linked',
@@ -1118,7 +1119,7 @@ export const bundleEn = {
       allLanes: 'All lanes',
       bootstrapTitle: 'Start the decision tree from the brief',
       bootstrapSubtitle: 'Drafts goals and open questions from this project\u2019s design prompt. Nothing is written until you have been through it.',
-      bootstrapNeedsPrompt: 'This project has no design prompt yet. Write one first \u2014 a tree drafted from a project name is a guess wearing the shape of a plan.',
+      bootstrapNeedsPrompt: 'Add a project brief before drafting goals and decisions.',
       bootstrapDraft: 'Draft from the prompt',
       bootstrapDrafting: 'Drafting\u2026',
       bootstrapFailed: 'Could not draft a tree from this prompt.',
@@ -1138,7 +1139,7 @@ export const bundleEn = {
       editorEdit: 'Edit',
       editorHeadingNew: 'Record an entry',
       editorHeadingEdit: 'Edit entry',
-      editorIntro: 'What was decided, and what it rested on. A judgement with no evidence and no closed branch is a diary line, not a decision record.',
+      editorIntro: 'Record the decision, supporting evidence and alternatives you considered.',
       editorSave: 'Save',
       editorSaving: 'Saving\u2026',
       editorCancel: 'Cancel',
@@ -1166,9 +1167,9 @@ export const bundleEn = {
       fieldCausedByHelp: 'The problem or decision that prompted this one.',
       errSelfLink: 'An entry cannot point at itself.',
       sectionProvenance: 'Evidence',
-      sectionProvenanceHelp: 'Identifiers, one per line \u2014 not names mentioned in prose. Only these keys exist, so a reader always knows where to look.',
+      sectionProvenanceHelp: 'Select supporting records or enter their IDs, one per line.',
       sectionAlternatives: 'Branches closed off',
-      sectionAlternativesHelp: 'The option and why it was rejected, both required. An alternative listed without a reason is decoration, and re-reading it later tells you nothing about whether the reason still holds.',
+      sectionAlternativesHelp: 'For each alternative, include the reason it was rejected.',
       sectionCodeRefs: 'Scripts and modules',
       altOption: 'Option',
       altRejectedBecause: 'Rejected because',
@@ -1547,9 +1548,9 @@ export const bundleEn = {
       aiInterpretation: 'AI interpretation',
       dismiss: 'Dismiss',
       experimentSummaryEmpty:
-        'No experiment summary has been written for this project yet. Upload validation readouts to start closing the loop.',
+        'No experiment summary is available. Upload measurements and link them to candidates.',
       noReadoutsYet:
-        'No wet-lab readouts are recorded for this project yet. Upload experiment results or run a validation workflow to populate this view.',
+        'No wet-lab readouts are recorded. Upload measurements and link them to the tested candidates.',
     },
     experimentUpload: {
       uploading: 'Uploading experiment data...',
@@ -1906,24 +1907,20 @@ export const bundleEn = {
         title: 'Platform overview and first steps',
         items: {
           whatIsPlatform: {
-            question: 'What is this platform for?',
-            answer:
-              'BDA Workbench is a full-stack protein binder design automation platform. It connects literature review, target intelligence, workflow DAG orchestration (RFdiffusion, ProteinMPNN, AlphaFold2, Rosetta), candidate ranking, and closed-loop campaign evaluation in one traceable workspace.',
+            question: "What can I do here?",
+            answer: "Keep research evidence, workflows, computational results and experiments in one project. Bots help draft and analyse; you confirm compute submissions and key decisions.",
           },
           whoIsItFor: {
-            question: 'Who is it designed for?',
-            answer:
-              'Computational biologists, protein engineers, and research teams designing binders, antibodies, enzymes, or peptide scaffolds. Viewers can inspect results; researchers can run workflows and submit cluster jobs; admins manage users and audit logs.',
+            question: "Who can use it?",
+            answer: "Research teams can organise evidence, design workflows and review results. Viewers have read access; researchers and administrators act within their project permissions.",
           },
           prerequisites: {
-            question: 'What do I need before starting a project?',
-            answer:
-              'A running BDA backend (port 8100), valid login credentials, and optionally an OpenAI-compatible API key for Copilot. For compute runs you need access to a configured adapter (demo, local, Docker, or remote LSF). Have your target name, UniProt ID, or PDB ID ready.',
+            question: "What do I need to get started?",
+            answer: "A login, a research goal and any available sequence or structure. Browsing does not require a model. AI tasks need a configured model; real compute also needs a validated execution environment.",
           },
           firstWorkflow: {
-            question: 'What is the recommended first workflow?',
-            answer:
-              'Create a project, run Target intelligence on the Research page, confirm a structure, then open Workflow and follow the guided route: target intake → RFdiffusion backbone generation → ProteinMPNN sequence design → AlphaFold2 prediction → Rosetta scoring → candidate review. Use the PD-1 demo project to explore a complete loop first.',
+            question: "What should I do first?",
+            answer: "Explore the PD-1 demo to learn the interface. For your work, create a project, confirm its goal and inputs, then choose a suitable route or build a workflow. Check parameters and preview before submitting. Demo data are not research results.",
           },
         },
       },
@@ -1932,29 +1929,24 @@ export const bundleEn = {
         title: 'Literature review and evidence',
         items: {
           whyResearchRequired: {
-            question: 'Why is the research step required before design?',
-            answer:
-              'Design without context risks wrong epitopes, incompatible scaffolds, and unverifiable claims. The Project review and Target intelligence steps establish mechanism, prior art, hotspot evidence, and testable success criteria that downstream workflow nodes and Copilot route planning depend on.',
+            question: "Why gather evidence first?",
+            answer: "Evidence helps define the question, inputs, evaluation criteria and risks. Link key claims to their sources so plans and results can be reviewed.",
           },
           missingCitations: {
-            question: 'Why are citations or papers sometimes missing?',
-            answer:
-              'Europe PMC and RCSB PDB searches may return no open-access full text, paywalled articles, or targets with sparse literature. The system stores metadata and abstracts when full text is unavailable. Claims without traceable excerpts are marked pending_review and are not written as confirmed knowledge.',
+            question: "Why are some claims missing citations?",
+            answer: "A supporting source or excerpt may not have been saved. A search hit or abstract does not mean the full paper was read. Open the source to check; leave unsupported claims unresolved.",
           },
           paperTypes: {
-            question: 'How should the system handle papers, preprints, and reviews?',
-            answer:
-              'Peer-reviewed papers with PMCID get full-text ingestion and chunk-level evidence. Preprints are ingested with lower evidence weight and flagged as unreviewed. Review articles inform landscape synthesis but should not be the sole source for residue-level hotspot claims without primary data.',
+            question: "How should I treat papers, preprints and reviews?",
+            answer: "Check the publication type, date and peer-review status. Reviews provide context; trace specific experimental claims to the original research where possible. Scientific review remains a human task.",
           },
           completeSummary: {
-            question: 'What should a complete research summary include?',
-            answer:
-              'A complete Project review covers all eleven tracks: meaning, target mechanism, prior art, binding strategy, design strategy, purification plan, functional validation, developability risks, success criteria, open questions, and per-source deep reads with evidence grading (established fact vs interpretation vs hypothesis).',
+            question: "What belongs in a research brief?",
+            answer: "State the goal, constraints, evidence, success criteria, rationale and open questions. Place citations after the claims they support and retain uncertainty.",
           },
           incompleteResearch: {
-            question: 'What happens if the research result is incomplete?',
-            answer:
-              'Incomplete reviews show empty or partial sections in the Project review panel. Copilot will note gaps when planning routes. You can continue to workflow with warnings, but hotspot confirmation and route comparison may lack evidence. Re-run Target intelligence or ingest additional literature before committing compute.',
+            question: "Can I continue with incomplete evidence?",
+            answer: "You can keep drafting, but mark what is missing. Required inputs and validation must pass before workflow submission. Resolve blockers before committing compute.",
           },
         },
       },
@@ -1963,29 +1955,24 @@ export const bundleEn = {
         title: 'Target selection and structures',
         items: {
           whyChooseTarget: {
-            question: 'Why must I choose a target protein before design?',
-            answer:
-              'Workflow nodes require a target_structure artifact with defined chains, binding site context, and contig maps. Without a confirmed target, RFdiffusion cannot sample backbones against the correct interface, and AlphaFold2 cannot score complex confidence against the intended partner.',
+            question: "Why confirm the target and inputs?",
+            answer: "Plugins need specific sequences, structures or other inputs. Check species, chains and residue numbering so the computation uses the intended material.",
           },
           fiveOptions: {
-            question: 'Why does the system provide 5 target options?',
-            answer:
-              'The Target intelligence agent ranks up to five structure candidates from RCSB PDB and AlphaFold DB based on resolution, construct coverage, epitope relevance, and evidence level. Presenting a short list lets you compare trade-offs (experimental vs predicted, full-length vs domain) without manual database searching.',
+            question: "How do I choose a structure?",
+            answer: "Compare provenance, experimental or predicted status, chains, residue coverage and fit to the project. The number of options depends on the available evidence.",
           },
           pdbVsAlphafold: {
-            question: 'How do I choose between PDB and AlphaFold structures?',
-            answer:
-              'Prefer experimental PDB structures when resolution is good (< 3 Å), the construct matches your design goal, and the binding interface is present. Use AlphaFold models when no suitable PDB exists, but treat them as predictions—Copilot and scoring outputs must not be presented as validated binding.',
+            question: "How do experimental and predicted structures differ?",
+            answer: "Check the experimental method, coverage and confidence information. Keep predicted structures labelled as predictions; structural confidence is not proof of binding or function.",
           },
           noPdbStructure: {
-            question: 'What happens if no good PDB structure exists?',
-            answer:
-              'The Structure Analyst falls back to AlphaFold predictions from UniProt mapping. You can also upload a custom PDB or mmCIF via the target intake dropzone. Document the source in Project review so downstream interpretation distinguishes predicted from experimental coordinates.',
+            question: "What if no suitable PDB structure is available?",
+            answer: "Import an existing PDB/mmCIF file or check available predicted structures. Record their provenance and limitations, then verify that the inputs meet the selected plugin requirements.",
           },
           structureStorage: {
-            question: 'Where is the selected structure file stored?',
-            answer:
-              'Confirmed structures are registered as project artifacts in MinIO and referenced by artifact UUID. The 3D viewer uses a short-lived presigned artifact URL.',
+            question: "Where are structures stored?",
+            answer: "Files are stored in project object storage. The database records artifact IDs, sizes, checksums and provenance. The viewer reads them through authorised download URLs.",
           },
         },
       },
@@ -1994,25 +1981,20 @@ export const bundleEn = {
         title: 'PDB download and structure cleanup',
         items: {
           pdbDownloadFailures: {
-            question: 'What can go wrong during PDB download?',
-            answer:
-              'Common failures: invalid PDB ID, RCSB API timeout, network proxy blocking outbound HTTPS, or file format mismatch (CIF vs PDB). The UI shows an error toast and the BackendHealthBanner if the API is unreachable. Retry after confirming the ID at rcsb.org and that port 8100 is live.',
+            question: "What if a structure download fails?",
+            answer: "Check the structure ID and the task error. Retry when the source is available, or upload a valid file you already have. Avoid repeatedly submitting the same task.",
           },
           missingResidues: {
-            question:
-              'What if the PDB has missing residues, multiple chains, ligands, or cofactors?',
-            answer:
-              'The structure preparation step should identify missing loops, unresolved regions, and non-protein heteroatoms. Multi-chain complexes require explicit chain selection for the target and binder partner. Ligands and cofactors may be stripped for design or retained for context—verify the cleaned structure in the 3D viewer before submitting the workflow.',
+            question: "How do I handle missing residues, chains and ligands?",
+            answer: "Inspect chains, numbering gaps and ligands in the structure view. Choose what to retain for your question, record the preparation, and check the prepared structure before submission.",
           },
           wrongChain: {
-            question: 'What if the wrong chain is selected?',
-            answer:
-              'Design nodes will optimize against the incorrect binding surface, producing irrelevant backbones. Check chain IDs in the structure metadata panel, compare sequence length to UniProt, and re-select or re-upload before running RFdiffusion. Completed runs with wrong chains must be discarded and re-run.',
+            question: "What if I selected the wrong chain?",
+            answer: "Correct the input and revalidate before submission. Submitted runs retain their snapshots. Create a new plan with the corrected input and record why the earlier result is unsuitable.",
           },
           metadataDisplay: {
-            question: 'How should structure metadata be displayed?',
-            answer:
-              'Show PDB ID, method (X-ray, cryo-EM, predicted), resolution, chain IDs, residue range, organism, and construct notes. Flag predicted models distinctly from experimental structures. Hotspot residues confirmed in Target intelligence should cross-link to the 3D viewer selection.',
+            question: "What should I check on the structure page?",
+            answer: "Check the source ID, experimental or predicted status, chains, residue ranges, and available species or resolution data. Cited sites should match the viewer numbering.",
           },
         },
       },
@@ -2021,24 +2003,20 @@ export const bundleEn = {
         title: 'Workflow modes and agent behavior',
         items: {
           designModes: {
-            question: 'What design modes are supported?',
-            answer:
-              'The workflow DAG supports binder design (RFdiffusion + ProteinMPNN), enzyme redesign and stabilization (Rosetta relax/scoring), specificity redesign via constrained sampling, decoy/exploratory analysis with Mask RGN, and antibody CDR-focused routes via Target intelligence. Mode selection depends on registered model plugins and campaign round goals.',
+            question: "Which design routes can I run?",
+            answer: "Use the current route catalogue, enabled plugins and site validation as the source of truth. Choose a template or build a graph. Missing plugins, inputs or runtime validation block execution.",
           },
           clarifyingQuestions: {
-            question: 'Why does the agent ask clarifying questions?',
-            answer:
-              'Copilot and Target intelligence need binding site definition, scaffold preference, developability constraints, and validation assay context to propose routes that match your project. Ambiguous goals (e.g. "improve binding" without a target site) lead to shallow or unsafe recommendations.',
+            question: "Why does a bot ask for more information?",
+            answer: "A useful plan needs a clear goal, inputs, constraints and success criteria. Unresolved details should remain explicit questions.",
           },
           changeGoal: {
-            question: 'Can users change the design goal after starting?',
-            answer:
-              'You can edit workflow parameters and add nodes before submission. After a run starts, the DAG is read-only for that run. To change goals, create a new workflow run or advance a campaign round with an approved parameter patch. Project review and target confirmation should be updated to reflect the new goal.',
+            question: "Can I change the goal?",
+            answer: "Update the project goal and plan again. Draft parameters remain editable; submitted run snapshots do not. Create a new workflow for a changed plan and recheck earlier recommendations.",
           },
           intermediateSteps: {
-            question: 'How should intermediate steps be shown?',
-            answer:
-              'The Workflow canvas displays node status (queued, running, completed, failed) with port-level artifact links. Guided mode simplifies the view; Advanced mode shows the full DAG, edge types, and legend. Job logs and stdout tails are available for cluster-backed nodes via the Jobs panel.',
+            question: "How do I follow execution?",
+            answer: "The workflow shows nodes and dependencies; the task panel shows status, logs and artifacts. Review results before releasing a manual gate. Queued work is not completed work.",
           },
         },
       },
@@ -2047,24 +2025,20 @@ export const bundleEn = {
         title: 'Scores, structures, and visualization',
         items: {
           interpretResults: {
-            question: 'How should users interpret sequences, scores, structures, and rankings?',
-            answer:
-              'Candidate tables rank designs by composite scores (predicted Kd proxies, interface ddG, AF2 pLDDT/ipTM, Rosetta energy, developability flags). Higher rank does not guarantee wet-lab success. Use Glossary tooltips for metric definitions. Structures in the viewer reflect predicted complexes—treat confidence values as computational, not experimental validation.',
+            question: "How do I interpret candidate scores?",
+            answer: "Check metric definitions, units, methods and conditions before comparing candidates. Missing values are not zero. Distinguish structural predictions, computed scores and experimental measurements.",
           },
           modelDifferences: {
-            question: 'Why might different models produce different results?',
-            answer:
-              'RFdiffusion, ProteinMPNN, AlphaFold2, and Rosetta use different training data, energy functions, and sampling strategies. Stochastic sampling (temperature, seed) also varies outputs. Compare across models in the candidate funnel and prefer designs that score consistently, not just on a single metric.',
+            question: "What if models disagree?",
+            answer: "Check inputs, versions, parameters and random seeds. Keep each result with its provenance. Review supporting and conflicting evidence before deciding on further computation or experiments.",
           },
           visualizationFails: {
-            question: 'What should users do if visualization fails?',
-            answer:
-              'Check that the artifact file exists and the backend preview endpoint returns 200. Mol* requires valid PDB/mmCIF format—corrupt or empty files fail silently in some browsers. Open browser devtools for errors, retry download, or upload a corrected structure. Demo mode may serve local fallbacks without backend preview.',
+            question: "What if a structure will not display?",
+            answer: "Retry on the page, then check whether the file can be downloaded and is valid PDB/mmCIF. If it still fails, report the error and artifact ID to an administrator.",
           },
           partialResults: {
-            question: 'How should failed or partial results be displayed?',
-            answer:
-              'Failed nodes show a red failed status with error summary in the job panel. Partial outputs (e.g. some backbones completed, AF2 timed out) list available artifacts with a warning badge. The candidate table includes only designs that passed BDA filters; inspect raw score tables for rejected sequences.',
+            question: "How should I handle partial results or failures?",
+            answer: "Check task status, errors and registered artifacts. Partial output is not a successful workflow. Keep the failure record and continue through a retry or a new plan.",
           },
         },
       },
@@ -2073,30 +2047,24 @@ export const bundleEn = {
         title: 'Project lifecycle and integration issues',
         items: {
           projectCrud: {
-            question: 'How do users create, start, save, and delete projects?',
-            answer:
-              'Create projects from the Projects page (New project). Selecting a project saves context to the URL (?project=id) and local store. Workflow runs start via Submit workflow. Delete moves the workspace to project_trash/ (recoverable via scanner)—not immediate erasure. All actions require researcher role or higher.',
+            question: "How do I create, run or delete a project?",
+            answer: "Create or open a project on the Projects page. Start a run through workflow preview and confirmation. Check the confirmation and retention rules before deletion; archiving, trash and permanent cleanup are different actions.",
           },
           buttonFailures: {
-            question:
-              'What happens if Start, Getting Started, Delete Project, or other buttons fail?',
-            answer:
-              'Buttons disable during pending mutations. Failures show toast notifications with API error detail. Common causes: no project selected, missing auth token (redirect to login), backend offline, or insufficient permissions. Check the BackendHealthBanner and retry after the API is reachable.',
+            question: "Why is a button unavailable?",
+            answer: "Check the nearby reason: a project, permission, required input or current version may be missing. Wait for active work to settle, then correct the issue or retry.",
           },
           apiTimeout: {
-            question: 'What if an API request times out?',
-            answer:
-              'TanStack Query retries transient failures up to three times with exponential backoff. Long-running operations (literature ingest, target dossier) may exceed default timeouts—refresh the page and check job status rather than resubmitting. Cluster jobs persist server-side; Copilot chat timeouts may truncate responses.',
+            question: "What should I do after a timeout?",
+            answer: "Check the task list to see whether the request was accepted. Refreshing does not cancel background work. Avoid duplicate submissions; report the task ID and error if progress stalls.",
           },
           schemaMismatch: {
-            question: 'What if frontend and backend response schemas do not match?',
-            answer:
-              'Zod validation errors appear in the console and may cause empty UI sections. This usually indicates a version skew between frontend and API. Align deployments from the same commit, check /api/docs for the current schema, and report mismatches to the team with the failing endpoint and response payload.',
+            question: "What if the page reports incompatible data?",
+            answer: "If a refresh does not help, record the page, action and error ID so an administrator can check frontend and API versions. A blank area is not proof that no data exist.",
           },
           incompleteState: {
-            question: 'What if a project has incomplete workflow state?',
-            answer:
-              'Projects with missing workflow runs, orphaned artifacts, or interrupted jobs show partial data in Candidates and Results. Open Workflow to inspect node statuses, sync jobs via Refresh, or start a new run. Campaign rounds cannot evaluate while jobs are still running.',
+            question: "What if project status and results disagree?",
+            answer: "Check the latest workflow and task state and the artifact provenance. Confirm that background services are available before retrying or creating a run. Do not overwrite earlier results.",
           },
         },
       },
@@ -2105,49 +2073,40 @@ export const bundleEn = {
         title: 'Common execution problems',
         items: {
           loadingNeverEnds: {
-            question: 'Loading state never ends',
-            answer:
-              'Usually caused by a hung API request or backend process. Open Network tab—if requests stay pending, restart uvicorn on port 8100. If queries return 401, sign in again. Clear stale React Query cache by refreshing. Copilot streams may hang without an API key configured.',
+            question: "What if loading never finishes?",
+            answer: "Retry or refresh, and sign in again if the session expired. When background services are unavailable, existing records may remain readable while asynchronous work waits for recovery.",
           },
           emptyResearch: {
-            question: 'Empty result after research',
-            answer:
-              'Target intelligence may return no PDB hits or literature for obscure targets. Verify spelling, try UniProt accession instead of gene name, and manually ingest papers via Copilot literature tools. Empty Project review sections mean the agent did not complete—re-run with a more specific prompt.',
+            question: "What if research is empty?",
+            answer: "Check the selected project, research task state and search terms. No matches, a failed task and missing imports are different situations; address the reported cause.",
           },
           citationLinksMissing: {
-            question: 'Citation links missing',
-            answer:
-              'Metadata-only papers lack DOI/PMID links when Europe PMC returns incomplete records. Open-access status affects link generation. Pending_review claims intentionally omit unverified citations. Manually add references in the Project review references track.',
+            question: "What if a citation will not open?",
+            answer: "Check for a DOI, PMID or source URL and whether the cited excerpt was saved. Unverified or metadata-only sources should state their limits. Do not fill a citation number with an unrelated paper.",
           },
           pdbDownloadFailed: {
-            question: 'PDB download failed',
-            answer:
-              'Confirm the PDB ID exists, check outbound network from the backend container, and retry. Large mmCIF files may timeout—increase timeout or download manually and upload via the structure dropzone. RCSB maintenance windows occasionally cause 503 errors.',
+            question: "What if the structure source is unavailable?",
+            answer: "Keep the failed task and retry when the source recovers. Alternatively, upload a valid structure you already have and record its source and version.",
           },
           shallowAgent: {
-            question: 'Agent response is too shallow',
-            answer:
-              'Copilot degrades to rule-based mode without an LLM API key. Configure OpenAI-compatible credentials in Settings. Provide project context (select a project), ask specific questions with target names, and use Target intelligence for deep dossiers instead of short chat prompts.',
+            question: "What if a bot has not completed the task?",
+            answer: "Check project context, model availability, authorised capabilities and the delivery status. Provide a specific question and success criteria. A reply alone does not mean the task is complete.",
           },
           lockedStep: {
-            question: 'Workflow step is locked',
-            answer:
-              'DAG nodes lock until upstream ports have completed artifacts. Completed workflow runs are read-only. Campaign gates block evaluation until all jobs finish. Check edge dependencies on the canvas and resolve failed upstream nodes before retrying.',
+            question: "Why is a workflow locked?",
+            answer: "Check whether inputs are missing, upstream work is unfinished, a manual gate is waiting, or the run was submitted. Submitted snapshots cannot be edited; use a new workflow for a new plan.",
           },
           deleteConfirmation: {
-            question: 'Delete action needs confirmation',
-            answer:
-              'Project deletion requires explicit confirmation to prevent accidental data loss. Workspaces move to trash rather than immediate delete. Cluster job drafts require Confirm and submit—Copilot cannot auto-submit jobs. If the confirm dialog does not appear, check for popup blockers.',
+            question: "Why is confirmation required?",
+            answer: "Deletion, compute submission and key research decisions change data or use resources. Check the object, inputs, parameters and budget first. A bot proposal does not approve itself.",
           },
           backendNotRunning: {
-            question: 'Backend not running',
-            answer:
-              'The BackendHealthBanner appears when port 8100 is unreachable. Start the API with docker compose up, uvicorn, or your deployment script. Frontend demo mode allows read-only exploration but cannot create projects or submit workflows without the backend.',
+            question: "What can I do while a service is unavailable?",
+            answer: "The page identifies affected services. Existing projects and results may remain readable; model tasks, searches and compute need their background services restored. An administrator should check the deployment.",
           },
           missingEnvVars: {
-            question: 'Environment variables missing',
-            answer:
-              'Backend requires DATABASE_URL, REDIS_URL, JWT_SECRET, and storage paths. Copilot needs LLM_API_KEY and LLM_BASE_URL. Cluster adapter needs SSH/LSF credentials. Check .env against docs/deployment guides. Settings → Connections shows validation status for key services.',
+            question: "What if models or compute are not configured?",
+            answer: "Ask an administrator to check model, source, object-storage and compute-site settings. A working frontend does not prove external readiness. You can browse local records and edit drafts without a cluster session.",
           },
         },
       },
@@ -2162,38 +2121,38 @@ export const bundleEn = {
     },
     hero: {
       pill: 'AI Protein Design Workflow',
-      title: 'From research to design-ready results',
+      title: 'Learn the research workflow',
       subtitle:
-        'Follow the connected workflow path through our protein design campus. Agents guide you from literature review to experimental handoff — step by step, with full traceability.',
+        'See what each step needs, what it produces, and where to do it.',
       disclaimer:
-        'This is an educational guide. It is separate from live project state and does not reflect your current workflow progress.',
+        'This guide explains the process; it does not show your project progress.',
       scrollPrompt: 'Scroll to follow the workflow',
     },
     map: {
       title: 'Workflow map',
       subtitle:
-        'Each station represents a stage in the AI protein design pipeline. Scroll to move along the path.',
+        'Choose a step to see its inputs, actions, and outputs.',
     },
     models: {
       eyebrow: 'Model principles',
-      title: 'How the three core models work together',
+      title: 'Three model methods',
       subtitle:
-        'From 3D backbone generation and amino-acid sequence design to structural verification, these diagrams show the problem each model solves in the design loop.',
+        'These methods address different questions. Choose a route for your goal and check that its models are available.',
       inputLabel: 'Input',
       mechanismLabel: 'Core mechanism',
       outputLabel: 'Output',
       enlarge: 'View full size',
       chainLabel: 'Core model workflow',
-      chainCaption: 'generate a backbone → design a sequence → predict and verify structure',
+      chainCaption: 'example route: backbone → sequence → predicted structure; experiments test function',
       rfdiffusion: {
         role: 'Backbone generation',
         summary:
           'Starts from random atomic noise and progressively generates a designable 3D protein backbone under structural and functional constraints.',
         input: 'Random noise plus optional target, motif, symmetry, or length constraints.',
         mechanism:
-          'A diffusion model repeatedly denoises the coordinates, forms a backbone trace, and refines the all-atom geometry.',
-        output: 'Candidate protein backbones that satisfy the requested geometric conditions.',
-        alt: 'RFdiffusion principle diagram showing atomic noise denoised into a backbone trace, refined at all-atom level, and returned as a protein design candidate.',
+          'The original RFdiffusion denoises residue positions and orientations to generate a protein backbone. Sequence design is a separate step.',
+        output: 'Candidate protein backbones for sequence design and further evaluation.',
+        alt: 'RFdiffusion: noisy residue frames are denoised into a candidate protein backbone.',
       },
       proteinmpnn: {
         role: 'Sequence design',
@@ -2206,14 +2165,14 @@ export const bundleEn = {
         alt: 'ProteinMPNN principle diagram showing a target backbone encoded as a protein graph, geometric message passing, per-position amino-acid probabilities, and sequence decoding.',
       },
       alphafold3: {
-        role: 'Structure prediction and verification',
+        role: 'Structure prediction',
         summary:
           'Integrates sequence, template, and chemical context to predict 3D structures of proteins and their interaction partners with confidence estimates.',
         input: 'Protein, DNA, or RNA sequences, small molecules, and available MSA, template, and chemical features.',
         mechanism:
-          'The Evoformer performs global relational reasoning, while the structure module iteratively generates and refines 3D geometry.',
+          'Pairformer updates pair and single representations; a diffusion module predicts atomic coordinates.',
         output: 'A predicted 3D complex plus confidence metrics such as pLDDT and PAE.',
-        alt: 'AlphaFold 3 principle diagram showing heterogeneous biological inputs encoded into unified representations, processed by the Evoformer and structure module, and returned as a 3D structure with confidence.',
+        alt: 'AlphaFold 3: molecular inputs are processed by Pairformer and a diffusion module to predict coordinates and confidence.',
       },
     },
     faq: {
@@ -2223,8 +2182,8 @@ export const bundleEn = {
       empty: 'FAQ content is not available.',
     },
     cta: {
-      title: 'Ready to start designing?',
-      body: 'Create a project, confirm your target, and let agents build a traceable workflow from research to candidates.',
+      title: 'Open your project',
+      body: 'Open a project, define the goal, and review the available evidence before planning a run.',
       startProject: 'Start a project',
       signIn: 'Sign in to begin',
       backToLogin: 'Back to login',

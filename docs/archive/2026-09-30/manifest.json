@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "archived_on": "2026-09-30",
+  "preservation": "Original bytes are preserved after an archive notice, separated by \\n---\\n\\n. Historical relative links resolve from old_path.",
+  "documents": [
+    {
+      "old_path": "docs/plans/BOT_ROOM_PLAN.md",
+      "archive_path": "docs/archive/2026-09-30/BOT_ROOM_PLAN.md",
+      "reason": "研究室 P0–P4 已交付；原设计留作追溯。",
+      "replacement": "docs/BOT_FIRST_WORKSPACE.md",
+      "original_bytes": 17874,
+      "original_sha256": "321983028cb08434c4edbdb8f03a73bb12e861c4cf90174b8c4a9cb1ba14de20",
+      "archive_bytes": 18184,
+      "archive_sha256": "86940dc2fd1bb258e1c4c36e38c04d0c9742f0a251a0c6e820860825f0d3345e",
+      "active_path_action": "removed"
+    },
+    {
+      "old_path": "docs/plans/PROTEIN_DESIGN_FEATURES.md",
+      "archive_path": "docs/archive/2026-09-30/PROTEIN_DESIGN_FEATURES.md",
+      "reason": "第 1–7 项已实现，第 8 项明确不做，第 9 项复用现有入口。",
+      "replacement": "docs/RESEARCH_TOOL_CAPABILITIES.md",
+      "original_bytes": 6162,
+      "original_sha256": "877ff4d1d1f8391ddcd792b5bd4d3c1e5fe2febd3519c75c7f565c30e877b83f",
+      "archive_bytes": 6514,
+      "archive_sha256": "7c5ceb4c2b1d6ae61489fe210503f71a710dca1d186fc33520eac826207e8a9a",
+      "active_path_action": "removed"
+    },
+    {
+      "old_path": "docs/plans/DRUG_LANDSCAPE_AUDIT.md",
+      "archive_path": "docs/archive/2026-09-30/DRUG_LANDSCAPE_AUDIT.md",
+      "reason": "2026-09-15 专利与成药性验收记录，保留当时结果和修复证据。",
+      "replacement": "docs/RESEARCH_TOOL_CAPABILITIES.md",
+      "original_bytes": 5943,
+      "original_sha256": "82c64950a4cd787358a7664b11fbc779e12aa092c22fcf70a3e59e2a7351260e",
+      "archive_bytes": 6293,
+      "archive_sha256": "4599ad0a82abe1d7de09a97e658dcfd762f3e04444bb6cc8b8aa578bc2a47853",
+      "active_path_action": "removed"
+    },
+    {
+      "old_path": "docs/plans/DRUG_LANDSCAPE_PLAN.md",
+      "archive_path": "docs/archive/2026-09-30/DRUG_LANDSCAPE_PLAN.md",
+      "reason": "P1–P4 和 9/16 工程补齐已交付；当前路径仅保留待办与边界。",
+      "replacement": "docs/plans/DRUG_LANDSCAPE_PLAN.md",
+      "original_bytes": 10985,
+      "original_sha256": "45821a3ceb609a32719a27cf6c331e6d3cdaa1c15ab84fd518f952868985135b",
+      "archive_bytes": 11333,
+      "archive_sha256": "fd2a5df262f4f3321e58d306090c94536fc70a2216c55035fd4ad580d5b8b361",
+      "active_path_action": "replaced_by_pending_scope"
+    },
+    {
+      "old_path": "docs/plans/FRONTEND_USAGE_PLAN.md",
+      "archive_path": "docs/archive/2026-09-30/FRONTEND_USAGE_PLAN.md",
+      "reason": "已交付 U1/U2/U3/U6 与设计论证归档；当前路径仅保留 U4/U5 边界和待办。",
+      "replacement": "docs/plans/FRONTEND_USAGE_PLAN.md",
+      "original_bytes": 6597,
+      "original_sha256": "4a24d5c11c2dfbc866e32347b5e6fab09df122989a5074b3d623a946485f0f2e",
+      "archive_bytes": 6957,
+      "archive_sha256": "471bb42a10ea460d5814e02cc48449dcb6a5d3c04811e8d4a332e7431f7d6fe0",
+      "active_path_action": "replaced_by_pending_scope"
+    }
+  ]
+}

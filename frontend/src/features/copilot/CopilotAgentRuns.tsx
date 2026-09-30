@@ -208,8 +208,8 @@ function costLabel(
   copy: Record<string, string>,
   format: (template: string, values: Record<string, string | number>) => string,
 ): string {
-  if (run.task_contract?.cost_mode === 'unavailable') return 'Cost not measured / 费用未计量'
-  if (run.task_contract?.cost_mode === 'conservative_estimate') return `Estimated reserve / 保守预留 ${run.subtree_cost_usd_cents ?? run.cost_usd_cents}¢`
+  if (run.task_contract?.cost_mode === 'unavailable') return copy.costUnmeasured
+  if (run.task_contract?.cost_mode === 'conservative_estimate') return format(copy.costEstimatedReserve, { cents: run.subtree_cost_usd_cents ?? run.cost_usd_cents })
   // The server always sends the subtree total; falling back to the run's own
   // cost keeps an older response readable rather than showing a confident zero.
   const subtree = run.subtree_cost_usd_cents ?? run.cost_usd_cents

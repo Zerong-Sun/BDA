@@ -12,7 +12,7 @@ import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { BotAvatar } from './BotAvatar'
-import { CopilotCitations } from './CopilotCitations'
+import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { HandoffCard } from './CopilotChain'
 import { ownedService, parseMention } from './mentions'
@@ -374,11 +374,7 @@ function RoomEntry({
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : ''}
         </p>
-        <div className="room-text">{message.content}</div>
-        <CopilotCitations
-          citations={(message.citations ?? []) as Array<Record<string, unknown>>}
-          projectId={projectId}
-        />
+        <div className="room-text">{mine ? message.content : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
       </div>
     </article>
   )

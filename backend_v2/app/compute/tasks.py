@@ -287,7 +287,13 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                 # every tick and eventually filled the batch, starving every real event.
                 _defer_event(event, f"unknown_topic:{event.topic}")
                 continue
-            operation = session.get(Operation, event.id)
+            # A fast consumer can start before this publishing transaction commits.
+            # Hold the operation lock until queued and published_at commit together;
+            # otherwise its running update invalidates our version and rolls back
+            # an already sent batch, causing immediate redelivery of every event.
+            operation = session.scalar(
+                select(Operation).where(Operation.id == event.id).with_for_update().execution_options(populate_existing=True)
+            )
             project_id = event.payload.get("project_id")
             if not project_id and operation is not None and operation.project_id is not None:
                 project_id = str(operation.project_id)
@@ -308,8 +314,8 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                 for index, task_name in enumerate(names):
                     # The first subscriber keeps the event id, because an Operation
                     # row is keyed on it. Any further subscriber gets a task id
-                    # derived from that same id, so redelivery of the event still
-                    # deduplicates per subscriber instead of colliding between them.
+                    # derived from that same id. This gives idempotent consumers a
+                    # stable identity; Celery task IDs alone do not deduplicate delivery.
                     task_id = str(event.id) if index == 0 else str(uuid.uuid5(event.id, task_name))
                     celery_app.send_task(task_name, args=args, task_id=task_id, headers=message_headers)
                 event.published_at = datetime.now(UTC)

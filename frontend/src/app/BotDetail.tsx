@@ -95,7 +95,10 @@ function BotResponsibility({ botId }: { botId: string }) {
                   {runId ? <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setParam('run', null)} />
                     : <BotWork bot={bot} bots={bots.data ?? []} projectId={projectId} onOpenRun={(id) => setParam('run', id)} onChat={() => setParam('view', 'chat')} />}
                 </TabsContent>
-                <TabsContent value="chat"><div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div></TabsContent>
+                <TabsContent value="chat">
+                  <p className="mb-3 text-sm text-text-secondary"><Link to={`${team}&view=room`} className="text-accent underline">{zh ? '查看已保存的团队对话记录' : 'View saved team conversation history'}</Link></p>
+                  <div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div>
+                </TabsContent>
               </Tabs> : <div className="science-empty">
                 <h2>{zh ? '名录中没有这个 Bot' : 'This Bot is not in the roster'}</h2>
                 <p>{zh ? '它可能已被移出名录；以它身份运行过的任务记录仍会保留。' : 'It may have been retired; tasks that ran as it are still recorded.'}</p>

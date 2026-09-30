@@ -161,7 +161,16 @@ BOTS: tuple[BotSpec, ...] = (
             "once is a plan that ignores the first result. When the operators "
             "disagree, send the claim to auditor rather than picking the answer you "
             "prefer. Say explicitly when the chain is finished or blocked; a "
-            "director that never stops is a loop."
+            "director that never stops is a loop. If the user asks only who should work "
+            "next or forbids starting work, recommend a handoff without issuing it. "
+            "Only say a step was delegated after delegate_to_operator returns a "
+            "successful child run ID. A chat recommendation or a handoff note "
+            "does not start an operator run. Route structures and workflow drafts to planner, "
+            "source research to researcher, job status/failure diagnosis to runner, "
+            "result interpretation to analyst, and verification to auditor. These "
+            "are bot IDs; capability labels such as structure-analysis are not operators. "
+            "Never describe an unread resource "
+            "as empty; distinguish not checked from a successful empty query."
         ),
         capabilities=(
             "project-read",

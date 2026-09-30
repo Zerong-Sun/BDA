@@ -16,7 +16,7 @@ export const en: TranslationDict = {
   },
   lab: {
     title: 'Lab',
-    subtitle: 'Constructs on the bench, and the calculations that start every run.',
+    subtitle: 'Manage protein constructs, calculate concentrations, and analyse instrument exports.',
     library: {
       title: 'Protein library',
       empty: 'No constructs yet. Add one, or paste a FASTA to register a batch.',
@@ -72,7 +72,7 @@ export const en: TranslationDict = {
     instruments: {
       title: 'Instrument analysis',
       intro:
-        'Upload an export, analyse it, and the fitted numbers are recorded against the file they came from. The file itself is never rewritten: re-analysing adds a result beside the old one.',
+        'Upload an instrument export to analyse it. Each analysis retains its source file and version.',
       instrument: 'Instrument',
       bli: 'BLI (ForteBio CSV)',
       akta: 'AKTA (Unicorn ZIP)',
@@ -154,14 +154,14 @@ export const en: TranslationDict = {
     newExperiment: 'New project',
     project: 'Project',
     selectProject: 'Select project',
-    noWorkflowData: 'No workflow data are available for this project yet. Open the PD-1 reference project to inspect a complete design loop.',
+    noWorkflowData: 'No workflow data yet. Open Workflow to create a plan, or browse the PD-1 reference project for research examples.',
   },
   experiments: {
-    eyebrow: 'Research project portfolio',
+    eyebrow: 'Projects',
     title: 'BDA Research Projects',
-    copilotTitle: 'From design goal to a traceable, step-by-step loop',
+    copilotTitle: 'Choose a research task',
     copilotBody:
-      'Ask the assistant to plan a design route, adjust workflow settings, explain candidate scores, read validation results, and turn them into the next design round.',
+      'Ask a bot to plan a route, review candidates, or interpret results. Review its proposal before applying changes.',
     planRoute: 'Plan a design route',
     reviewCandidates: 'Review top candidates',
     interpretResults: 'Read validation results',
@@ -243,7 +243,7 @@ export const en: TranslationDict = {
     },
   },
   candidates: {
-    eyebrow: 'Candidate prioritization layer',
+    eyebrow: 'Candidates',
     title: 'Candidate table',
     exportCsv: 'Export CSV',
     viewLabResults: 'View lab results',
@@ -251,7 +251,7 @@ export const en: TranslationDict = {
     predKd: 'Predicted Kd',
   },
   results: {
-    eyebrow: 'Closed-loop evidence',
+    eyebrow: 'Results',
     title: 'Results and deliverables',
     preparePackage: 'Prepare delivery package',
     disclaimer:
@@ -264,7 +264,7 @@ export const en: TranslationDict = {
     description: 'Connection validation and runtime mode',
     operatingMode: 'Operating mode',
     applicationMode: 'Application mode',
-    applicationModeBody: 'Live projects, workflow runs, and cluster jobs.',
+    applicationModeBody: 'Edit projects and submit workflows to the configured compute service.',
     demoMode: 'Demo mode',
     demoModeBody: 'Read-only reference projects and seeded data.',
     connections: 'Service connections',

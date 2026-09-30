@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { PipelineRail } from './PipelineRail'
+import { getProjectOverview } from '../../lib/api/projects'
 
 vi.mock('../../lib/hooks/useProjectContext', () => ({
   useProjectContext: () => ({
@@ -26,6 +27,21 @@ describe('PipelineRail route selection', () => {
   })
 
   afterEach(cleanup)
+
+  it('opens imported results and lab records when the target is not ready, without marking research done', async () => {
+    vi.mocked(getProjectOverview).mockResolvedValueOnce({ target_readiness: { ready_for_workflow: false },
+      funnel: { generated: 0, ordered: 0 }, candidate_count: 0, experiment_result_count: 2, latest_workflow_id: null,
+    } as never)
+    window.location.hash = '/projects?project=proj_ready'
+    renderWithProviders(<PipelineRail />)
+    const results = screen.getByRole('tab', { name: /Results/i })
+    await waitFor(() => expect(results).toBeEnabled())
+    expect(screen.getByRole('tab', { name: /Lab/i })).toBeEnabled()
+    expect(screen.getByRole('tab', { name: /Research/i })).not.toHaveTextContent(/done/i)
+    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeDisabled()
+    fireEvent.click(results)
+    await waitFor(() => expect(window.location.hash).toContain('/results?project=proj_ready'))
+  })
 
   it('selects Research from the route even when project progress is at Results', async () => {
     window.location.hash = '/research?project=proj_ready'

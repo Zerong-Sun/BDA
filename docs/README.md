@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-13（Asia/Shanghai；统一任务、bots、工作流与两批归档入口）
+最后核验：2026-09-30（归档已交付方案，更新能力与剩余工作入口）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -13,7 +13,6 @@
 ## 开始使用
 
 - [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
-- [Bot 工作区视觉层级复审](FRONTEND_VISUAL_REVIEW.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)
@@ -32,6 +31,7 @@
 
 ## 研究记录与审核
 
+- [研究工具能力、输入与来源限制](RESEARCH_TOOL_CAPABILITIES.md)
 - [研究记录结构](RESEARCH_RECORD_STRUCTURE.md)
 - [文献综述写作与审核标准](RESEARCH_REVIEW_WRITING_STANDARD.md)
 - [数据目录与公开/私有数据边界](DATA_CATALOG.md)
@@ -49,7 +49,7 @@
 - [RFdiffusion 工作流提交](RFDIFFUSION_WORKFLOW_SUBMISSION.md)
 - [Staging 发布与恢复](STAGING_RELEASE_AND_RECOVERY.md)
 
-插件生成的运行手册位于 `qm-scripts/plugins/`。当前能力与部署要求以活跃文档和对应代码为准；真实模型、检索源和客户集群仍需按使用指南分别验收。
+插件运行手册位于 `qm-scripts/plugins/`。后端相邻文档见[架构](../backend_v2/docs/architecture.md)、[运维](../backend_v2/docs/operations.md)、[测试](../backend_v2/docs/testing.md)和[运维脚本](../backend_v2/scripts/README.md)。真实模型、检索源和客户集群仍需分别验收。
 
 ## 规划与历史
 
@@ -60,22 +60,10 @@
 
 ## 验证记录
 
+以下记录只证明对应批次的验证范围。
+
 - [2026-09-16 分支整合与复核](CONSOLIDATION_REVIEW_2026-09-16.md)
-
 - [分支整合六维复核与修复](INTEGRATION_SIX_DIMENSION_REVIEW.md)
-
+- [Bot 工作区视觉层级复审](FRONTEND_VISUAL_REVIEW.md)
 - [六维复核与修复清单](GUIDED_PLATFORM_REVIEW.md)
 - [前端插件检查与修复](FRONTEND_PLUGIN_CHECK_2026-09-07.md)
-
-Generated plugin runbooks live under `qm-scripts/plugins/`. Backend-adjacent notes
-that sit next to the code they describe — [architecture](../backend_v2/docs/architecture.md),
-[operations](../backend_v2/docs/operations.md), [testing](../backend_v2/docs/testing.md) and
-[the operational scripts](../backend_v2/scripts/README.md) — are reached through
-`backend_v2/README.md`. Historical v1 documents that contain private paths or research
-runs are retained only in the private recovery archive, not in this public repository.
-
-## Archive
-
-Retired plans, designs, and reviews live in [docs/archive/](archive/README.md), which also
-registers removed source files and the command that recovers them. Archived material
-records past intent; it never describes current behavior.

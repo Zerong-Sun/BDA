@@ -127,10 +127,10 @@ describe('agent run panel', () => {
 
     renderWithProviders(<CopilotAgentRuns />)
 
-    await waitFor(() => expect(screen.getByText(/19¢ with subagents/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/19 with subagents/)).toBeInTheDocument())
     // The childless run says only its own cost: the longer label on equal
     // numbers would imply subagents that do not exist.
-    expect(screen.getByText(/2 turns · 4¢$/)).toBeInTheDocument()
+    expect(screen.getByText(/2 turns · 4 US cents$/)).toBeInTheDocument()
   })
 
   it('renders a tool-only turn by naming what it called', async () => {

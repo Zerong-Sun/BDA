@@ -28,6 +28,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
+          // Notifications stay below menus and dialogs so a saved message cannot block the next action.
+          zIndex: 40,
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",

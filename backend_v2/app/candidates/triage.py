@@ -10,13 +10,12 @@ two.**
 
     pass    - the metric was recorded and satisfies the threshold
     fail    - the metric was recorded and does not
-    missing - the metric was never recorded
+    missing - the metric is absent from the supplied records
 
 Folding `missing` into `fail` is the mistake this module exists to avoid. A
-design with no Rosetta score has not failed a Rosetta gate; nobody has run
-Rosetta on it. A triage that reports those alike tells a person to discard
-work that has not been assessed, and it does so most often exactly when a
-pipeline stage was skipped - which is when someone most needs to notice.
+design with no recorded Rosetta score cannot be judged against that gate.
+The supplied records do not establish whether it was measured elsewhere.
+Reporting missing as failed could discard work whose assessment is unknown.
 
 Thresholds are passed in rather than imported. The catalogue lives in
 `copilot/route_catalog.py`, and this is the candidates domain: a domain module
@@ -152,8 +151,8 @@ def evaluate(
                     threshold=threshold,
                     outcome="missing",
                     note=(
-                        f"No {' or '.join(candidates_keys)} recorded for this candidate. "
-                        "Not a failure: nothing has measured it."
+                        f"No {' or '.join(candidates_keys)} recorded for this candidate in the supplied metrics. "
+                        "Not a failure: whether it was measured elsewhere is unknown."
                     ),
                 )
             )

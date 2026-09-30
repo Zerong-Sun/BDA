@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
 import type { NormalizedResearchWorkspace } from '../../lib/api/researchWorkspace'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { server } from '../../test/mocks/handlers'
 import { ResearchWorkspacePanel } from './ResearchWorkspacePanel'
 import type { ResearchTab } from './researchUi'
 
@@ -81,6 +83,9 @@ describe('ResearchWorkspacePanel', () => {
     useAppStore.setState({ language: 'en' })
     getWorkspace.mockReset()
     getWorkspace.mockImplementation(async (projectId: string) => fixture(projectId))
+    server.use(http.get('/api/v2/projects/:projectId/primary-target', () =>
+      HttpResponse.json({ detail: 'Primary target is not configured for this workspace fixture' }, { status: 404 }),
+    ))
   })
 
   afterEach(cleanup)
@@ -124,6 +129,23 @@ describe('ResearchWorkspacePanel', () => {
       'href',
       'https://doi.org/10.1000/example',
     )
+    expect(screen.getByText('Journal not recorded')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['en', 'Metadata checked in Europe PMC'],
+    ['zh', 'Europe PMC 元数据已核对'],
+  ] as const)('labels metadata checks and renders the recorded journal in %s', async (language, status) => {
+    useAppStore.setState({ language })
+    const workspace = fixture()
+    workspace.references[0].verification_status = 'verified_europe_pmc'
+    workspace.references[0].journal = 'Journal of Evidence'
+    workspace.references[0].year = '2026'
+    getWorkspace.mockResolvedValue(workspace)
+    renderWithProviders(<ResearchWorkspacePanel view="references" />)
+    expect(await screen.findByText(`REF-1 · ${status}`)).toBeInTheDocument()
+    expect(screen.getByText('2026 · Journal of Evidence')).toBeInTheDocument()
+    expect(screen.queryByText(/verified_europe_pmc/)).not.toBeInTheDocument()
   })
 
   it('switches research body language without fetching again', async () => {

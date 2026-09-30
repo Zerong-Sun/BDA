@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { ArrowRight } from '@phosphor-icons/react'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { Button } from '@/components/ui/Button'
@@ -7,6 +7,9 @@ import { useI18n } from '../../lib/i18n'
 export function GuideCTA() {
   const { t } = useI18n()
   const isAuthenticated = Boolean(sessionStorage.getItem('bda_token'))
+  const [searchParams] = useSearchParams()
+  const project = searchParams.get('project')
+  const projectPath = `/projects${project ? `?project=${encodeURIComponent(project)}` : ''}`
 
   return (
     <AppFrame
@@ -24,7 +27,7 @@ export function GuideCTA() {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {isAuthenticated ? (
-            <Button nativeButton={false} render={<Link to="/projects" />} className="gap-2">
+            <Button nativeButton={false} render={<Link to={projectPath} />} className="gap-2">
               {t.guide.cta.startProject}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
@@ -34,7 +37,6 @@ export function GuideCTA() {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
-          <Button nativeButton={false} render={<Link to="/login" />} variant="outline">{t.guide.cta.backToLogin}</Button>
         </div>
       </div>
     </AppFrame>

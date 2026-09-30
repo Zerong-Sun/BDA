@@ -140,7 +140,7 @@ def test_the_verdict_says_who_produced_the_deciding_number(session: Session) -> 
     assert {item["method"] for item in verdict["criteria"]} == {"alphafold2_superfold"}
 
 
-def test_a_design_nobody_has_measured_is_missing_rather_than_failed(session: Session) -> None:
+def test_a_design_without_recorded_metrics_is_missing_rather_than_failed(session: Session) -> None:
     project, _user = _project(session)
     candidate = _candidate(session, project, [])
 
@@ -149,6 +149,11 @@ def test_a_design_nobody_has_measured_is_missing_rather_than_failed(session: Ses
     assert verdict["tier"] is None
     assert verdict["missing"] == 2
     assert verdict["failed"] == 0
+    for criterion in verdict["criteria"]:
+        assert criterion["value"] is criterion["method"] is criterion["assessor"] is None
+        assert "supplied metrics" in criterion["note"]
+        assert "unknown" in criterion["note"]
+        assert "nothing has measured" not in criterion["note"]
 
 
 def test_a_partially_measured_design_separates_the_two_reasons(session: Session) -> None:

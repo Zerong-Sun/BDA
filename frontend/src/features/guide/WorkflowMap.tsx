@@ -22,9 +22,8 @@ export function WorkflowMap({ activeStep, onActiveStepChange }: WorkflowMapProps
   }, [onActiveStepChange])
 
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReducedMotion) return
-
+    // Reduced motion changes animation, not which section is being read.
+    if (typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -57,7 +56,8 @@ export function WorkflowMap({ activeStep, onActiveStepChange }: WorkflowMapProps
   const scrollToStep = useCallback((stepNumber: number) => {
     const el = stationRefs.current.get(stepNumber)
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
       onActiveStepChange(stepNumber)
     }
   }, [onActiveStepChange])

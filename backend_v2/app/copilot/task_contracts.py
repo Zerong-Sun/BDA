@@ -81,6 +81,11 @@ that support it. This confirms delivery of a draft/diagnosis, never scientific v
 If you cannot proceed, report blocked or needs_input with an actionable reason. Do not
 invent artifact links or evidence IDs. A brief must include objectives, constraints,
 success criteria and missing inputs. For literature distinguish excerpts from search hits.
+Keep the summary to one or two sentences. Make each section concise and focused on
+its own purpose, preserving the source IDs, units, analysis versions and limitations
+needed to review its claims. Do not repeat complete tool payloads or the same content
+across the summary and sections. State a shared limitation once unless its effect
+differs for a particular result.
 """
 
 
@@ -108,9 +113,21 @@ def tool_records(turns: list[CopilotAgentTurn]) -> list[dict]:
         except (ValueError, TypeError):
             continue
         meta = (turn.tool_calls or [{}])[0]
-        bad = isinstance(result, dict) and (result.get("error") or result.get("status") in {"failed", "cancelled", "pending", "running"})
+        # A settled compute wait reports the job's failure, not a failed read.
+        # Keep failed actions/delegations and unresolved waits unsuccessful.
+        observed_job = (meta.get("name") == "await_compute_job" and isinstance(result, dict)
+                        and ((result.get("kind") == "gpu_job" and result.get("resource_id")
+                              and result.get("job_status") in {"succeeded", "failed", "cancelled"})
+                             or (result.get("job_id") and result.get("waiting") is False
+                                 and result.get("status") in {"succeeded", "failed", "cancelled"})))
+        observed_run = (meta.get("name") == "read_operator_work" and isinstance(result, dict)
+                        and result.get("run_id") and isinstance(result.get("tool_results"), list)
+                        and not result.get("error"))
+        bad = not (observed_job or observed_run) and isinstance(result, dict) and (result.get("error") or result.get("status") in {"failed", "cancelled", "pending", "running"})
         records.append({"call_id": meta.get("tool_call_id", ""), "tool": meta.get("name", ""),
-                        "successful": bool(result) and not bool(bad), "result": result})
+                        # An empty list is a successful query with no matches.
+                        # Steps that require actual rows enforce that below.
+                        "successful": result is not None and not bool(bad), "result": result})
     return records
 
 
@@ -120,7 +137,10 @@ def _has_excerpt(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     provenance = value.get("content_provenance") or value
-    if isinstance(provenance, dict) and value.get("chunk_id") and provenance.get("content_checksum_sha256") and provenance.get("retrieval_trace_id"):
+    content = value.get("content")
+    if (isinstance(content, str) and content.strip() and isinstance(provenance, dict)
+            and value.get("chunk_id") and provenance.get("content_checksum_sha256")
+            and provenance.get("retrieval_trace_id")):
         return True
     return any(_has_excerpt(item) for item in value.values() if isinstance(item, (list, dict)))
 
@@ -138,10 +158,30 @@ def progress(contract: dict, turns: list[CopilotAgentTurn]) -> list[dict]:
     return rows
 
 
+def _delivery_json(answer: str) -> Any:
+    """Read JSON or one terminal JSON fence, optionally introduced by prose.
+
+    Real providers sometimes add a sentence before the otherwise valid final
+    object. Accept that presentation variation without guessing among multiple
+    blocks or stripping trailing text that might qualify the delivery.
+    """
+    text = answer.strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        if text.count("```") != 2:
+            raise
+        _, block, suffix = text.split("```")
+        language, separator, payload = block.partition("\n")
+        if suffix.strip() or not separator or language.strip().lower() not in {"", "json"}:
+            raise ValueError("ambiguous delivery fence") from None
+        return json.loads(payload)
+
+
 def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgentTurn]) -> dict:
     steps = progress(run.task_contract or {}, turns)
     try:
-        data = json.loads(answer.removeprefix("```json").removeprefix("```").removesuffix("```").strip())
+        data = _delivery_json(answer)
         if not isinstance(data, dict) or data.get("status") not in {"completed", "partial", "blocked", "needs_input"}:
             raise ValueError("invalid delivery status")
         if not isinstance(data.get("summary"), str) or not data["summary"].strip():
@@ -163,17 +203,20 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     sections = data.get("sections", {})
     if not isinstance(sections, dict):
         sections = {}
+    invalid_sections = any(not isinstance(v, str) or not v.strip() for v in sections.values())
     sections = {k: v for k, v in sections.items() if isinstance(v, str) and v.strip()}
     gaps += [key for key in (run.task_contract or {}).get("required_sections", []) if key not in sections]
     status = data["status"]
     checks = []
+    if invalid_sections:
+        checks.append("invalid_section_values")
     if invalid:
         checks.append("unverified_evidence_call_ids")
     if status == "completed" and (gaps or missing or not refs or any(not set(s["evidence_call_ids"]) & set(refs) for s in steps)):
         status = "partial"
     if status == "completed" and not steps:
         status = "review_required"  # Open-ended goals have no machine-verifiable delivery contract.
-    if invalid:
+    if invalid or invalid_sections:
         status = "review_required"
     return {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks)),
             "next_action": data["next_action"], "evidence_call_ids": [ref for ref in refs if ref in successful], "steps": steps}
@@ -206,8 +249,8 @@ def available_step_tools(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) ->
     bookkeeping = allowed & (REGISTRY.write_ids() - REGISTRY.user_intent_write_ids())
     if pending is None:
         return reads
-    # Keep discovery/context available, but expose the work of just this step.
-    helpers = {'research_overview', 'list_project_targets', 'search_research', 'get_research_items', 'get_reference'}
-    if pending['id'] == 'note':
-        helpers |= {'get_reference_content', 'search_project_knowledge'}
-    return bookkeeping | (allowed & (helpers | set(pending['tools'])))
+    # Evidence reads must not disappear behind a recipe step. A user may name
+    # a known source directly, and diagnosis may need several kinds of reads.
+    # Only user-intent writes are gated by the current step; delivery still
+    # requires every declared step and its verified evidence.
+    return reads | bookkeeping | (allowed & set(pending['tools']))

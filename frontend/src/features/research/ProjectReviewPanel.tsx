@@ -56,7 +56,7 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
 import { useAppStore } from '../../lib/store/appStore'
-import { findingCitationSources } from './findingCitations'
+import { findingCitationRecords, findingCitationSources, workspaceCitationRecords } from './findingCitations'
 import { formatCitation } from './formatCitation'
 import { text } from './jsonHelpers'
 import { firstSentenceForTitle } from './parseReviewFinding'
@@ -266,7 +266,7 @@ export function ProjectReviewPanel({
         <div className="mb-5 border-b border-border-soft pb-5">
           <p className="text-xs uppercase tracking-wide text-accent">{r.eyebrow}</p>
           <h3 className="mt-1 text-lg font-semibold">{briefTitle || r.fallbackTitle}</h3>
-          <div className="mt-3"><ReviewMarkdown>{briefContent}</ReviewMarkdown></div>
+          <div className="mt-3"><ReviewMarkdown citations={workspaceCitationRecords(workspace.references, language)}>{briefContent}</ReviewMarkdown></div>
         </div>
       ) : null}
 
@@ -347,10 +347,10 @@ export function ProjectReviewPanel({
                           worse than a long one. */}
                       {shouldTruncateReviewStatement(statement) ? (
                         <Disclosure className="mt-2" title={format(r.longStatement, { count: statement.length })}>
-                          <ReviewMarkdown>{statement}</ReviewMarkdown>
+                          <ReviewMarkdown citations={findingCitationRecords(item.evidence)}>{statement}</ReviewMarkdown>
                         </Disclosure>
                       ) : (
-                        <div className="mt-2"><ReviewMarkdown>{statement}</ReviewMarkdown></div>
+                        <div className="mt-2"><ReviewMarkdown citations={findingCitationRecords(item.evidence)}>{statement}</ReviewMarkdown></div>
                       )}
                       {text(item.evidence.uncertainty) ? (
                         <Alert className="mt-2" variant="warning">

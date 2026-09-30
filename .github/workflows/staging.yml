@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0070_af3_msa_port
+            BDA_SCHEMA_REVISION=0071_copilot_reasoning_content
           provenance: mode=max
           sbom: true
       - id: frontend
@@ -184,7 +184,7 @@ jobs:
       - name: Read-only smoke
         run: |
           curl --fail --show-error --silent --retry 12 --retry-all-errors \
-            "https://${STAGING_HOST}/api/v2/health/ready" | jq -e '.status == "ready"'
+            "https://${STAGING_HOST}/api/v2/health/ready" | jq -e '.status == "ok"'
       - name: Roll back failed release
         if: ${{ failure() && steps.prior.outputs.revision != '' }}
         run: helm rollback bda "${{ steps.prior.outputs.revision }}" -n bda-staging --wait --timeout 10m

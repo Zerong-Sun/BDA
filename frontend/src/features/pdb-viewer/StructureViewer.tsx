@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { useToastStore } from '../../components/ui/toastStore'
 import {
   type ColorPreset,
@@ -559,8 +560,8 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
         ) : null}
         {isFullscreen && structureLoaded ? <div className="mb-2 flex items-center gap-3 rounded-lg border border-border-soft bg-surface-1 px-4 py-2 text-sm">
           <label htmlFor="structure-residue-query">{language === 'zh' ? '残基与侧链' : 'Residue & side chain'}</label>
-          <input id="structure-residue-query" aria-label={language === 'zh' ? '残基编号' : 'Residue identifier'} placeholder="A:54" value={residueQuery} onChange={event => setResidueQuery(event.target.value)} className="w-24 rounded border border-border-soft bg-bg-app px-2 py-1 font-mono" />
-          <Button size="sm" variant="outline" onClick={() => {
+          <Input id="structure-residue-query" aria-label={language === 'zh' ? '残基编号' : 'Residue identifier'} placeholder="A:54" value={residueQuery} onChange={event => setResidueQuery(event.target.value)} className="w-24 font-mono" />
+          <Button type="button" size="sm" variant="outline" onClick={() => {
             const match = residueQuery.trim().match(/^([^:]+):(-?\d+)$/)
             const viewer = viewerRef.current
             const selected = Boolean(match && viewer && focusResidueById(viewer.plugin, match[1], Number(match[2])))

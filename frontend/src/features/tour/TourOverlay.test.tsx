@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialTourState, useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { TourOverlay } from './TourOverlay'
+import { TOUR_SECTIONS } from './tourData'
 
 const projectContext = vi.hoisted(() => ({
   projectId: 'pd1-demo',
@@ -186,6 +187,25 @@ describe('TourOverlay', () => {
     expect(useAppStore.getState().tourState.stepId).toBe('project-library')
   })
 
+  it('lets a filter menu own Escape while the tour callout is being hidden', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'candidates', stepId: 'candidate-filters' } })
+    renderWithProviders(<>
+      <div data-tour-id="candidate-filters"><button type="button" aria-haspopup="menu" aria-expanded="false">Add filter</button></div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Filter candidates')
+    const target = screen.getByRole('button', { name: 'Add filter' })
+    await act(async () => {
+      target.setAttribute('aria-expanded', 'true')
+      fireEvent.keyDown(target, { key: 'Escape' })
+    })
+    expect(useAppStore.getState().tourState.status).toBe('active')
+    expect(screen.queryByTestId('tour-card')).not.toBeInTheDocument()
+    await act(async () => target.setAttribute('aria-expanded', 'false'))
+    expect(useAppStore.getState().tourState.stepId).toBe('candidate-table')
+  })
+
   it('falls back to a modal Dialog and localized Alert when an anchor cannot be found', async () => {
     vi.useFakeTimers()
     startAtProjectSelector()
@@ -231,7 +251,7 @@ describe('TourOverlay', () => {
         status: 'active',
         sectionId: 'faq',
         stepId: 'faq-content',
-        completedSections: ['projects', 'research', 'workflow', 'candidates', 'results', 'copilot-settings'],
+        completedSections: TOUR_SECTIONS.filter((section) => section.id !== 'faq').map((section) => section.id),
         updatedAt: null,
       },
     })
@@ -247,7 +267,7 @@ describe('TourOverlay', () => {
       tourMenuOpen: false,
       tourState: {
         status: 'completed',
-        completedSections: ['projects', 'research', 'workflow', 'candidates', 'results', 'copilot-settings', 'faq'],
+        completedSections: TOUR_SECTIONS.map((section) => section.id),
       },
     })
   })
@@ -398,7 +418,7 @@ describe('TourOverlay', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finish chapter' }))
 
     expect(screen.getByRole('dialog', { name: 'Interface tour' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
@@ -475,7 +495,47 @@ describe('TourOverlay', () => {
     await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: true, settingsOpen: false }))
     act(() => useAppStore.getState().advanceTour())
     await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: false, settingsOpen: true }))
+    act(() => useAppStore.getState().advanceTour())
+    await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: false, settingsOpen: false }))
     view.unmount()
+  })
+
+  it('advances research navigation only from a tab, not surrounding text', async () => {
+    setReducedMotion(true)
+    useAppStore.getState().startTour('research')
+    renderWithProviders(<>
+      <div data-tour-id="research-tabs">
+        <h1>Project heading</h1>
+        <div role="tablist"><span>Tab spacing</span><button role="tab" type="button">Evidence</button></div>
+      </div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Research views')
+    fireEvent.click(screen.getByText('Project heading'))
+    fireEvent.click(screen.getByText('Tab spacing'))
+    expect(useAppStore.getState().tourState.stepId).toBe('research-tabs')
+    fireEvent.click(screen.getByRole('tab', { name: 'Evidence' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('research-workspace')
+  })
+
+  it('opens the result history only when its panels are needed', async () => {
+    setReducedMotion(true)
+    const expand = vi.fn(() => {
+      const result = document.createElement('div')
+      result.dataset.tourId = 'results-metrics'
+      result.textContent = 'Stored metrics'
+      document.querySelector('[data-tour-id="results-history"]')!.append(result)
+    })
+    useAppStore.getState().startTour('results')
+    renderWithProviders(<>
+      <div data-tour-id="results-history">
+        <button type="button" data-slot="accordion-trigger" aria-expanded="false" onClick={expand}>Result history</button>
+      </div>
+      <TourOverlay />
+    </>)
+    await waitFor(() => expect(document.querySelector('[data-tour-anchor="results-metrics"]')).toBeInTheDocument())
+    expect(expand).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('updates copy in place when the language changes', async () => {
@@ -514,7 +574,7 @@ describe('TourOverlay', () => {
     const menu = await screen.findByRole('dialog', { name: 'Interface tour' })
     expect(menu).toHaveAttribute('data-slot', 'dialog-content')
     const chapterButtons = screen.getAllByTestId('tour-chapter')
-    expect(chapterButtons).toHaveLength(7)
+    expect(chapterButtons).toHaveLength(TOUR_SECTIONS.length)
     expect(chapterButtons.every((button) => button.getAttribute('data-slot') === 'button')).toBe(true)
 
     const completedChapter = screen.getByRole('button', { name: 'Research workspace, Completed' })

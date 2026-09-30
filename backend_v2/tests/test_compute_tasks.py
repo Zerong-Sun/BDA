@@ -610,7 +610,8 @@ def test_domain_background_tasks(task_database, monkeypatch) -> None:
 
     assert delivery_tasks.build_delivery_package.run(str(domain_ids[0]))["status"] == "available"
     assert delivery_tasks.build_delivery_package.run(str(domain_ids[0]))["status"] == "ignored"
-    assert literature_tasks.literature_ingest.run(str(domain_ids[1]))["status"] == "available"
+    # The fixture has a title only, which cannot stand in for paper content.
+    assert literature_tasks.literature_ingest.run(str(domain_ids[1]))["status"] == "metadata_only"
     monkeypatch.setattr(literature_tasks.literature_search, "run", lambda run_id: {"status": "completed", "result_count": 0})
     assert literature_tasks.subscription_run.run(str(domain_ids[6]))["status"] == "completed"
     assert intelligence_tasks.intelligence_run.run(str(domain_ids[2]))["status"] == "succeeded"
@@ -768,6 +769,104 @@ def test_literature_search_preserves_search_full_text_and_evidence_trace(task_da
             )
         )
         assert {"search", "search_hit", "metadata_verification", "full_text"} <= stages
+        old_provenance = dict(provenance)
+        old_artifact_id = document.artifact_id
+        old_artifact = session.get(Artifact, old_artifact_id)
+        old_key = old_artifact.object_key
+        old_bytes = FakeStorage.objects[old_key]
+        old_chunk = session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document.id))
+        old_chunk_id, old_text = old_chunk.id, old_chunk.content
+        second = LiteratureSearchRun(
+            project_id=ids["project"], query="Updated paper", sources=["europe_pmc"],
+            requested_limit=3, fetch_full_text=True, extract_claims=True, created_by=ids["user"],
+        )
+        session.add(second)
+        session.commit()
+        second_id = second.id
+
+    xml = xml.replace(b"reduced the measured", b"did not reduce the measured")
+    assert literature_tasks.literature_search.run(str(second_id))["status"] == "completed"
+    with factory() as session:
+        document = session.get(LiteratureDocument, packaged_document_id)
+        assert document.metadata_json["content_provenance"] == old_provenance
+        latest = document.metadata_json["latest_retrieval_provenance"]
+        assert latest["content_checksum_sha256"] != old_provenance["content_checksum_sha256"]
+        assert document.artifact_id == old_artifact_id
+        assert session.get(LiteratureChunk, old_chunk_id).content == old_text
+        assert FakeStorage.objects[old_key] == old_bytes
+        latest_artifact = session.get(Artifact, uuid.UUID(latest["raw_content_artifact_id"]))
+        assert latest_artifact.object_key != old_key
+        assert FakeStorage.objects[latest_artifact.object_key] == xml
+
+
+def test_empty_full_text_xml_falls_back_to_abstract_without_mixing_artifact(task_database, monkeypatch) -> None:
+    from backend_v2.app.literature.retrieval import text_checksum
+
+    factory, ids = task_database
+    with factory() as session:
+        run = LiteratureSearchRun(
+            project_id=ids["project"], query="abstract fallback", sources=["europe_pmc"],
+            requested_limit=1, fetch_full_text=True, extract_claims=True, created_by=ids["user"],
+        )
+        session.add(run)
+        session.commit()
+        run_id = run.id
+    abstract = "The original database abstract describes the observation."
+    xml = b'<article><front><article-meta><permissions><license><license-p>XML license</license-p></license></permissions></article-meta></front></article>'
+    audit = {"tool": "europe_pmc.search", "query": {}, "status": "completed", "http_status": 200}
+
+    class FakeEvidenceTools:
+        def __init__(self, **_kwargs):
+            self.audits = []
+
+        def search_europe_pmc(self, query, page_size):
+            self.audits.append(audit)
+            return SimpleNamespace(audit=audit, data={"resultList": {"result": [{
+                "id": "empty-xml", "title": "Abstract fallback", "abstractText": abstract,
+                "pmcid": "PMC123", "isOpenAccess": "Y",
+            }]}})
+
+        def get_europe_pmc_full_text(self, pmcid):
+            xml_audit = {**audit, "tool": "europe_pmc.full_text_xml"}
+            self.audits.append(xml_audit)
+            return SimpleNamespace(audit=xml_audit, content=xml)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("backend_v2.app.research.evidence_tools.EvidenceToolService", FakeEvidenceTools)
+    assert literature_tasks.literature_search.run(str(run_id))["status"] == "completed"
+    with factory() as session:
+        document = session.scalar(select(LiteratureDocument).where(LiteratureDocument.project_id == ids["project"]))
+        provenance = document.metadata_json["content_provenance"]
+        assert provenance["content_kind"] == "database_abstract"
+        assert provenance["content_checksum_sha256"] == text_checksum([abstract])
+        assert provenance["raw_content_artifact_id"] is None
+        assert provenance["license_text"] == ""
+        assert document.artifact_id is None
+        chunk = session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document.id))
+        assert chunk.content == abstract
+        abstract_trace = session.get(LiteratureRetrievalTrace, uuid.UUID(provenance["retrieval_trace_id"]))
+        assert abstract_trace.stage == "abstract"
+        full_text_trace = session.scalar(select(LiteratureRetrievalTrace).where(
+            LiteratureRetrievalTrace.search_run_id == run_id, LiteratureRetrievalTrace.stage == "full_text",
+        ))
+        artifact = session.get(Artifact, uuid.UUID(full_text_trace.response_metadata["raw_content_artifact_id"]))
+        assert FakeStorage.objects[artifact.object_key] == xml
+
+
+def test_ingest_does_not_turn_a_title_into_evidence(task_database) -> None:
+    factory, ids = task_database
+    with factory() as session:
+        row = LiteratureDocument(project_id=ids["project"], title="Unverified title", source="manual")
+        session.add(row)
+        session.commit()
+        document_id = row.id
+    assert literature_tasks.literature_ingest.run(str(document_id))["status"] == "metadata_only"
+    with factory() as session:
+        row = session.get(LiteratureDocument, document_id)
+        assert row.metadata_json["content_provenance"]["content_kind"] == "metadata_only"
+        assert session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document_id)) is None
 
 
 def test_research_target_accession_resolves_exact_supported_alias(

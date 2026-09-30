@@ -39,7 +39,7 @@ from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import SCIENTIFIC_POLICY
 from .provider import completion_message
 from .registry import REGISTRY, ToolContext
-from .task_contracts import FINAL_INSTRUCTION, available_step_tools, evaluate_delivery, progress
+from .task_contracts import FINAL_INSTRUCTION, available_step_tools, evaluate_delivery, progress, tool_records
 
 #: Kept deliberately short. The turn policy that governs what may be claimed
 #: lives in the chat prompt and is unchanged by running longer; what an agent
@@ -51,9 +51,14 @@ AGENT_SYSTEM_PROMPT = (
     "it is waiting, the platform suspends you and calls you again with the "
     "result, so do not poll and do not assume an outcome. A failed job is a "
     "result: report it rather than silently retrying it. When the goal is met, "
-    "or cannot be met with the tools you have, answer in prose with no further "
+    "or cannot be met with the tools you have, return the final JSON delivery with no further "
     "tool call - that answer ends the run. Never claim that queued or "
-    "human-confirmed work has completed."
+    "human-confirmed work has completed. Gather only evidence needed for this goal; "
+    "do not enumerate every dataset, graph or reference in the project. Once the "
+    "contract steps have evidence, deliver the requested draft with explicit gaps. "
+    "A missing input is something to report, not a reason to keep searching unrelated records. "
+    "Preserve synthetic fixture labels: an expected injected failure is not repaired "
+    "by changing its recorded error or relabelling it as success."
 )
 
 
@@ -106,10 +111,27 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                     "role": "assistant",
                     "content": turn.content or None,
                     "tool_calls": list(turn.tool_calls),
+                    **({"reasoning_content": turn.reasoning_content} if isinstance(getattr(turn, "reasoning_content", None), str) else {}),
                 }
             )
         else:
-            conversation.append({"role": turn.role, "content": turn.content})
+            conversation.append({"role": turn.role, "content": turn.content,
+                **({"reasoning_content": turn.reasoning_content} if turn.role == "assistant" and isinstance(getattr(turn, "reasoning_content", None), str) else {})})
+    conversation.append({"role": "system", "content":
+        "Verified tool-call index for this run; copy exact call_id values into evidence_call_ids. "
+        "Tool names, artifact IDs and invented aliases are not call IDs. "
+        + json.dumps([{k: record[k] for k in ("call_id", "tool", "successful")}
+                      for record in tool_records(turns)], ensure_ascii=False)
+        + f"\nTranscript budget remaining: {max(0, run.max_turns - run.turn_count)} messages. "
+        "Return a concise final JSON as soon as the goal has sufficient evidence. "
+        "Authorized evidence reads are available throughout the recipe. Only write tools follow the contract one step at a time. "
+        "A saved source read needs no extra human permission when its tool is provided. "
+        "Pending required reads must be performed before final delivery when their tools are available. "
+        "Only the declared tools are available; an unavailable tool in this recipe does not change a bot's general role. "
+        "Planner owns structural analysis and proposed routes/drafts. Runner owns job status, waits and failure diagnosis; "
+        "runner never submits. Analyst interprets measured/predicted results. Researcher reviews sources and research questions. "
+        "Conductor coordinates only authorized steps. Auditor reviews and never repairs or approves. "
+        "Only the user confirms/submits through the application."})
     return conversation
 
 
@@ -305,10 +327,49 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         answer = content.strip() if isinstance(content, str) else ""
         if not answer:
             raise AgentRunError("agent_run_empty_answer")
-        agent_runs.append_turn(session, run, role="assistant", content=answer)
+        agent_runs.append_turn(session, run, role="assistant", content=answer,
+                               reasoning_content=message.get("reasoning_content") if isinstance(message.get("reasoning_content"), str) else None)
+        delivery_retries = (run.outcome or {}).get("delivery_retry_count", 0)
         run.outcome = evaluate_delivery(run, answer, turns)
+        attempted = {record["tool"] for record in tool_records(turns)}
+        unfinished = [item for item in progress(run.task_contract or {}, turns)
+                      if item["status"] != "completed" and set(item["tools"]) & set(run.allowed_tools or [])
+                      and not set(item["tools"]) & attempted]
+        if unfinished and delivery_retries < 2:
+            # Retry omitted required reads, not a read which returned no usable
+            # evidence or failed. Those gaps belong in a partial/blocked delivery;
+            # repeating them must not be a prerequisite to reporting the result.
+            run.outcome = {**run.outcome, "delivery_retry_count": delivery_retries + 1}
+            return run.status
+        repair_reasons = set(run.outcome.get("missing", [])) & {
+            "structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values",
+            *(run.task_contract or {}).get("required_sections", []),
+        }
+        if repair_reasons:
+            # One bounded repair, with real evidence IDs; never silently bless
+            # a malformed delivery or fabricate a mapping for invented citations.
+            try:
+                repair_messages = [
+                    {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
+                     + "\nRepair the delivery format and unsupported claims once. Return one JSON object only. "
+                       "Each sections value MUST be a string, not a nested object. Use exact successful call_id values "
+                       "from the supplied records. Keep the entire delivery under 1200 words; summarize evidence, "
+                       "do not copy excerpts. Do not claim to have read beyond the returned source window. "
+                       "If a source/action is unverified, say so rather than inventing it."},
+                    {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
+                     "repair_reasons": sorted(repair_reasons), "draft": answer,
+                     "tool_records": tool_records(turns)}, ensure_ascii=False)},
+                ]
+                reserve_model_call(session, run, provider, repair_messages)
+                repaired_message = completion_message(provider, repair_messages)
+                repaired = str(repaired_message.get("content") or "")
+                repaired_outcome = evaluate_delivery(run, repaired, turns)
+                agent_runs.append_turn(session, run, role="assistant", content=repaired,
+                                       reasoning_content=repaired_message.get("reasoning_content") if isinstance(repaired_message.get("reasoning_content"), str) else None)
+                run.outcome = {**repaired_outcome, "format_repair": "attempted_once"}
+            except Exception:
+                run.outcome = {**run.outcome, "format_repair": "unavailable"}
         if (run.task_contract or {}).get("service_kind") in {"literature", "interpretation"} and run.outcome["status"] in {"completed", "partial"}:
-            from .task_contracts import tool_records
             try:
                 review_messages = [
                     {"role": "system", "content": SCIENTIFIC_POLICY + "\nReview the entire draft against the tool records. Correct unsupported claims in every section. Preserve the contract's required sections and do not invent citations.\n" + FINAL_INSTRUCTION},
@@ -321,7 +382,8 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                 reviewed_outcome = evaluate_delivery(run, reviewed, turns)
                 if reviewed_outcome["status"] == "review_required":
                     raise ValueError("invalid_review_delivery")
-                agent_runs.append_turn(session, run, role="assistant", content=reviewed)
+                agent_runs.append_turn(session, run, role="assistant", content=reviewed,
+                                       reasoning_content=review_message.get("reasoning_content") if isinstance(review_message.get("reasoning_content"), str) else None)
                 run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed"}
             except Exception:
                 run.outcome = {**run.outcome, "status": "review_required", "scientific_review": "unavailable",
@@ -336,6 +398,7 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         role="assistant",
         content=content if isinstance(content, str) else "",
         tool_calls=list(requested),
+        reasoning_content=message.get("reasoning_content") if isinstance(message.get("reasoning_content"), str) else None,
     )
     context = _tool_context(session, run)
     waits: list[tuple[str, uuid.UUID, str]] = []

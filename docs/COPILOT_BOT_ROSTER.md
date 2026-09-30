@@ -63,10 +63,10 @@ stated in a charter; the argument and its rules are in
 | # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to | Absorbed |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
-| 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
-| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
+| 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `patent-search`, `druggability-assessment`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
+| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `sequence-analysis`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
 | 3 | `runner` | 执行与排障 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
-| 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
+| 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `sequence-analysis`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
 | — | `auditor` | 复核 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
 
 Retired ids are listed in `bots.RETIRED`. Runs and handoffs recorded under them
@@ -277,32 +277,12 @@ vocabulary is what turns it on in chat, deliberately and one at a time.
 
 ## Skill and MCP inventory
 
-“Skill” in this repository means one capability id, and the capability is what
-grants tools. After this change the full list is:
+“Skill” means one capability id. The complete 2026-09-30 inventory is
+[the service guide's capability table](COPILOT_SERVICE_GUIDE.md#7-开发者能力与模型工具清单):
+22 capabilities and 54 tools, taken from `capabilities.py` and the registry.
+The six operators' ownership is listed above; a task or project grant may narrow it.
 
-| Capability (skill) | Mode | Tools | Bots that hold it |
-| --- | --- | --- | --- |
-| `agent-orchestration` | read (async) | `await_compute_job`, `spawn_subagent` | runner |
-| `chain-orchestration` | read (async) | `list_operators`, `delegate_to_operator` | conductor |
-| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | runner |
-| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, researcher, planner, runner, analyst, auditor |
-| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, researcher, planner, analyst, auditor |
-| `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
-| `review-audit` | read | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | auditor |
-| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | planner |
-| `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
-| `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, researcher, planner, runner, analyst, auditor |
-| `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
-| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | researcher, analyst |
-| `research-trace-authoring` | draft | `attach_to_research_goal` | analyst |
-| `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
-| `workflow-planning` | draft | `get_workflow_status` | planner, runner |
-| `literature-search` | queue | `start_literature_search` | researcher |
-| `research-gap-repair` | queue | `resolve_research_gaps` | researcher |
-| `target-intelligence` | queue | `start_target_intelligence` | researcher |
-
-Everything in that table is reachable over MCP except the two async ones.
-`agent-orchestration` and `chain-orchestration` are excluded by construction:
+MCP filters individual tools by their required execution context:
 `await_compute_job`, `spawn_subagent` and `delegate_to_operator` declare
 `requires="agent_run"`, an MCP client has no run to suspend, and `mcp.py`
 refuses to list them. `runner` and `conductor` are therefore the two operators
@@ -310,8 +290,7 @@ whose full capability set exists only inside a durable agent run — `conductor`
 can read the roster and the handover record from chat, and can only recommend an
 operator there rather than delegate to one.
 
-`chain-messaging` is a `draft` capability that an unbound MCP grant still does
-not get: `mcp.available_tools` degrades such a grant with `REGISTRY.write_ids()`,
+The write tools in `chain-messaging` are unavailable to an unbound MCP grant: `mcp.available_tools` degrades such a grant with `REGISTRY.write_ids()`,
 which is the conservative set and includes `post_handoff`. The narrower
 `user_intent_write_ids()` — the set the chat intent gate filters — is the one
 that excludes it, and it has to be asked for by name.

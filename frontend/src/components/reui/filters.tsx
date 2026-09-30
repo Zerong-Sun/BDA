@@ -1871,9 +1871,6 @@ export function Filters<T = unknown>({
                       value={menuSearchInput}
                       onFocus={() => setActiveMenu("root")}
                       onMouseEnter={() => setActiveMenu("root")}
-                      onBlur={() =>
-                        activeMenu === "root" && rootInputRef.current?.focus()
-                      }
                       onChange={(e) => setMenuSearchInput(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {

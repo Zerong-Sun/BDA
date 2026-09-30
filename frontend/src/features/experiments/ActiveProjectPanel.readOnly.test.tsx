@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type {
   ButtonHTMLAttributes,
   ReactElement,
@@ -9,6 +9,7 @@ import type { Project } from '../../lib/api/projects'
 import type { ProjectTargetStructure, TargetReadiness } from '../../lib/schemas/target'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { ActiveProjectPanel } from './ActiveProjectPanel'
+import { useAppStore } from '../../lib/store/appStore'
 
 const hookState = vi.hoisted(() => ({
   target: null as ProjectTargetStructure | null,
@@ -145,12 +146,27 @@ const target = {
 
 describe('ActiveProjectPanel read-only mutation gates', () => {
   beforeEach(() => {
+    useAppStore.setState({ language: 'en' })
+    hookState.readiness = { ...hookState.readiness, next_action: 'Approve structure', blockers: ['approval_required'] }
     hookState.target = target
     hookState.prepare.mockReset()
     hookState.approve.mockReset()
   })
 
   afterEach(cleanup)
+
+  it.each([
+    ['zh', '确认此靶标身份', '准备结构'],
+    ['en', 'Confirm this target identity', 'Prepare structure'],
+  ] as const)('renders real action and blocker codes in %s', (language, action, blocker) => {
+    useAppStore.setState({ language })
+    hookState.readiness = { ...hookState.readiness, next_action: 'target_identity_unconfirmed', blockers: ['target_structure_unavailable'] }
+    renderWithProviders(<ActiveProjectPanel project={project} projectQuery="?project=proj_test" onManage={vi.fn()} onCreate={vi.fn()} />)
+    const readinessAlert = within(screen.getByRole('alert'))
+    expect(readinessAlert.getByText(action)).toBeInTheDocument()
+    expect(readinessAlert.getByText(blocker)).toBeInTheDocument()
+    expect(screen.queryByText(/target_identity_unconfirmed|target_structure_unavailable/)).not.toBeInTheDocument()
+  })
 
   it('disables prepare and approve and guards both mutation endpoints', async () => {
     renderWithProviders(

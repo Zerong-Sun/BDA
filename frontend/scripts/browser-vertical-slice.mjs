@@ -1103,7 +1103,15 @@ async function exerciseCandidateGrid(page, diagnostics) {
   const filterInput = filters.getByPlaceholder(CANDIDATE_SEARCH_FILTER_PATTERN).first()
   await filterInput.fill('later-page-family')
   await page.keyboard.press('Enter')
+  if (await filterInput.inputValue() !== 'later-page-family') {
+    throw new Error('Candidate search lost its input while closing the add-filter menu.')
+  }
   await expectVisible(page.getByText('Browser candidate 12').first(), 'filtered later-page candidate')
+  const filteredRows = await table.locator('tbody tr').evaluateAll((rows) =>
+    rows.map((row) => row.getAttribute('data-row-id')))
+  if (JSON.stringify(filteredRows) !== JSON.stringify(['candidate_browser_12'])) {
+    throw new Error(`Candidate search did not isolate the later-page match: ${JSON.stringify(filteredRows)}`)
+  }
   if (await page.getByText('Browser candidate 1', { exact: true }).count()) {
     throw new Error('Candidate filter left a non-matching row visible.')
   }
@@ -1117,6 +1125,7 @@ async function exerciseCandidateGrid(page, diagnostics) {
   diagnostics.interactions.candidatePagination = { pageOneRows, pageTwoRows, restoredRows }
   diagnostics.interactions.candidateRequestContract = {
     cursorRequests: candidateRequests,
+    filteredRows,
     filtering: 'complete cursor collection first; filter/sort/paginate locally without fabricated API parameters',
   }
 }

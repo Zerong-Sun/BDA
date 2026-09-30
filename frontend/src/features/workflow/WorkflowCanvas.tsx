@@ -27,7 +27,8 @@ import {
   type WorkflowNodeData,
 } from './workflowTypes'
 import { useToastStore } from '../../components/ui/toastStore'
-import { saveWorkflowLayout, addWorkflowNode } from '../../lib/api/workflow'
+import { saveWorkflowLayout, addWorkflowNode, getWorkflowGraph } from '../../lib/api/workflow'
+import { saveConnections } from '../../lib/api/workflowGates'
 import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
 import { useI18n } from '../../lib/i18n'
@@ -94,7 +95,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     const showToast = useToastStore(s => s.show)
     const [addingNode, setAddingNode] = useState(false)
     useAppStore((s) => s.themePreference)
-    const { t } = useI18n()
+    const { t, language } = useI18n()
     const gridColor = themeColor('--border-soft', '#202020')
     const accentColor = themeColor('--accent', '#D08A2A')
     const maskColor = themeColor('--border-soft', 'rgba(0,0,0,0.45)')
@@ -383,8 +384,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           setNodes(nextNodes)
           setEdges(nextEdges)
           if (workflowRunId && !readOnly) {
-            const { getWorkflowGraph } = await import('../../lib/api/workflow')
-            const { saveConnections } = await import('../../lib/api/workflowGates')
             const latest = await getWorkflowGraph(workflowRunId)
             await saveConnections(workflowRunId, [...latest.edges, ...newEdges.map(e => ({ id: e.id, source: e.source, target: e.target }))], latest.workflow.version)
           }
@@ -421,7 +420,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             present the legend was drawn straight over the read-only sentence. */}
         {readOnly ? (
           <p className="shrink-0 border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
-            {t.workflowExt.canvas.readOnlyBanner}
+            {language === 'zh' ? '当前工作流只读。可选择节点和连线查看详情。' : 'This workflow is read-only. Select nodes and connections to inspect details.'}
           </p>
         ) : null}
         {addingNode ? (

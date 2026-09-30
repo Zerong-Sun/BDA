@@ -25,6 +25,7 @@ import { ApiState } from '../components/ui/ApiState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../components/ui/AppFrame'
+import { Disclosure } from '../components/ui/Disclosure'
 import { Alert, AlertDescription } from '@/components/reui/alert'
 import { isDemoProject } from '../features/tour'
 
@@ -244,10 +245,9 @@ export function ResultsPage() {
             <h2 className="mb-2 text-sm font-semibold">{zh ? '导入数据集' : 'Imported dataset'} · {source}</h2>
             <p className="mb-3 text-sm text-text-secondary">{zh ? '上游已筛选子集；以下统计仅包含该数据集，不能推断总体通过率。' : 'An upstream-selected subset; statistics cover this dataset only, not population success rates.'}</p>
             {panel}
-          </div> : hasImported ? <details key="legacy" className="mb-5 rounded-lg border border-border-soft p-4">
-            <summary className="cursor-pointer text-sm">{zh ? '其他项目记录（不计入上方导入数据统计）' : 'Other project records (excluded from imported statistics)'}</summary>
+          </div> : hasImported ? <Disclosure key="legacy" className="mb-5 rounded-lg border border-border-soft p-4" title={zh ? '其他项目记录（不计入导入数据统计）' : 'Other project records (excluded from imported statistics)'}>
             <div className="mt-3">{panel}</div>
-          </details> : <div key="legacy">{panel}</div>
+          </Disclosure> : <div key="legacy">{panel}</div>
         })}
         <RosettaResults
           candidates={candidates}
@@ -259,8 +259,8 @@ export function ResultsPage() {
       {hasImported ? <p className="mb-4 rounded-lg border border-border-soft bg-surface-2 p-4 text-sm">
         {zh ? `导入的 ${nativeCandidates.length} 条候选关联实验读数：${nativeReadouts.length} 条。项目历史实验与交付记录在下方单独查看。` : `${nativeCandidates.length} imported candidates have ${nativeReadouts.length} linked experimental readouts. Project history is shown separately below.`}
       </p> : null}
-      <details open={!hasImported} className="mb-5">
-      <summary className="mb-3 cursor-pointer text-sm font-semibold">{zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}</summary>
+      <div data-tour-id="results-history">
+      <Disclosure key={`experiment-history-${projectId}-${hasImported}`} defaultOpen={!hasImported} className="mb-5" title={zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}>
       <div data-tour-id="results-metrics">
       <ApiState
         isLoading={summaryLoading}
@@ -275,7 +275,9 @@ export function ResultsPage() {
 
       <AppFrame className="mb-5" panelClassName="p-4 text-sm text-text-secondary break-words">
         {summary
-          ? `${summary.experiment_result_count} results · ${summary.passed_result_count} pass · ${summary.failed_result_count} fail`
+          ? zh
+            ? `${summary.experiment_result_count} 条结果 · ${summary.passed_result_count} 条通过 · ${summary.failed_result_count} 条未通过`
+            : `${summary.experiment_result_count} results · ${summary.passed_result_count} pass · ${summary.failed_result_count} fail`
           : t.resultsExt.page.experimentSummaryEmpty}
       </AppFrame>
 
@@ -318,7 +320,8 @@ export function ResultsPage() {
         </div>
       </div>
 
-      </details>
+      </Disclosure>
+      </div>
       <NextStep stage="results" />
     </section>
   )

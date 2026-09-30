@@ -190,7 +190,7 @@ export function AlphaFoldResults({
             <h2 className="text-base font-semibold text-text-primary">{copy.title}</h2>
             <p className="mt-1 text-sm text-text-secondary">{zh ? '查看结构置信度、界面指标与可追溯的原始结果。' : 'Review structural confidence, interface metrics and traceable source files.'}</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button>
           <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-text-secondary">
             {zh ? `可用预测 · ${rows.length} 条` : `Available predictions · ${rows.length}`}
           </span>

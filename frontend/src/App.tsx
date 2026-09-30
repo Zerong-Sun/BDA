@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
+import { useI18n } from './lib/i18n'
 import { Topbar } from './components/ui/Topbar'
 import { PipelineRail } from './components/ui/PipelineRail'
 import { Toast } from './components/ui/Toast'
@@ -55,7 +56,8 @@ const BotDetailPage = lazy(() => import('./app/BotDetail').then((module) => ({ d
 const InboxPage = lazy(() => import('./app/Inbox').then((module) => ({ default: module.InboxPage })))
 
 function RouteFallback() {
-  return <div className="p-6 text-sm text-muted-foreground" role="status">Loading…</div>
+  const { t } = useI18n()
+  return <div className="p-6 text-sm text-muted-foreground" role="status">{t.common.loading}</div>
 }
 
 function AuthHandler() {

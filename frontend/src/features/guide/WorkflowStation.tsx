@@ -1,9 +1,12 @@
 import clsx from 'clsx'
 import { forwardRef } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { IconTile } from '@/components/reui/icon-tile'
 import { AppFrame } from '@/components/ui/AppFrame'
+import { Button } from '@/components/ui/Button'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { WorkflowStationData } from './guideWorkflowData'
-import { StepAnimationPlaceholder } from './StepAnimationPlaceholder'
+import { StepFlow } from './StepFlow'
 import { StepDetailPanel } from './StepDetailPanel'
 import { useI18n } from '../../lib/i18n'
 
@@ -19,8 +22,26 @@ export const WorkflowStation = forwardRef<HTMLElement, WorkflowStationProps>(fun
   ref,
 ) {
   const { language } = useI18n()
+  const [searchParams] = useSearchParams()
+  const project = searchParams.get('project')
+  const destinations: Record<string, [string, string, string]> = {
+    research: ['/research?tab=evidence', 'Open evidence', '打开文献与证据'],
+    'target-confirmation': ['/workflow', 'Open target preparation', '打开靶标准备'],
+    'pdb-download': ['/research?tab=structures', 'Open structures', '打开结构'],
+    'structure-cleaning': ['/workflow', 'Open target preparation', '打开靶标准备'],
+    'design-goal': ['/research?tab=goals', 'Open project goals', '打开目标与问题'],
+    'agent-planning': ['/bots/planner', 'Open Planner', '打开方案设计 Bot'],
+    'model-execution': ['/workflow', 'Open workflow', '打开工作流'],
+    'candidate-generation': ['/candidates', 'Open candidates', '打开候选物'],
+    'scoring-ranking': ['/candidates', 'Compare candidates', '比较候选物'],
+    visualization: ['/candidates', 'Inspect candidate structures', '查看候选物结构'],
+    export: ['/results', 'Open results and delivery', '打开结果与交付'],
+  }
+  const destination = destinations[station.id]
+  const destinationPath = destination
+    ? `${destination[0]}${project ? `${destination[0].includes('?') ? '&' : '?'}project=${encodeURIComponent(project)}` : ''}`
+    : ''
   const Icon = station.icon
-  const isFuture = !isActive && !isPast
 
   return (
     <article
@@ -30,17 +51,11 @@ export const WorkflowStation = forwardRef<HTMLElement, WorkflowStationProps>(fun
       data-active={isActive}
       className={clsx(
         'guide-station relative scroll-mt-28',
-        'transition-all duration-700 ease-out',
+        'transition-colors duration-200 ease-out',
         'motion-reduce:transition-none motion-reduce:transform-none',
         isActive
-          ? [
-              'guide-station-active z-20 scale-[1.02]',
-              'md:scale-[1.03]',
-            ]
-          : isPast
-            ? 'z-10 opacity-70 blur-[0.3px]'
-            : 'z-0 opacity-55 blur-[0.5px]',
-        isFuture && 'guide-station-future',
+          ? 'guide-station-active z-20'
+          : isPast ? 'z-10' : 'z-0',
       )}
       aria-current={isActive ? 'step' : undefined}
     >
@@ -79,7 +94,6 @@ export const WorkflowStation = forwardRef<HTMLElement, WorkflowStationProps>(fun
               >
                 {language === 'zh' ? `第 ${station.stepNumber} 步` : `Step ${station.stepNumber}`}
               </span>
-              <span className="font-mono text-fine uppercase tracking-wider text-text-muted">{station.stationLabel}</span>
             </div>
             <h3
               className={clsx(
@@ -102,10 +116,17 @@ export const WorkflowStation = forwardRef<HTMLElement, WorkflowStationProps>(fun
         <p className="mb-6 text-sm leading-relaxed text-text-secondary sm:text-base">{station.beginnerExplanation}</p>
 
         <div className="mb-6">
-          <StepAnimationPlaceholder stepId={station.id} />
+          <StepFlow station={station} active={isActive} />
         </div>
 
-        <StepDetailPanel station={station} isActive={isActive} />
+        <Disclosure className="rounded-lg border border-border-soft px-4"
+          title={language === 'zh' ? '输入、输出和检查项' : 'Inputs, outputs and checks'}>
+          <StepDetailPanel station={station} isActive={isActive} />
+        </Disclosure>
+        {destination && sessionStorage.getItem('bda_token') ? <Button nativeButton={false}
+          render={<Link to={destinationPath} />} variant="outline" className="mt-4 h-auto min-h-9 whitespace-normal">
+          {destination[language === 'zh' ? 2 : 1]}
+        </Button> : null}
       </AppFrame>
     </article>
   )

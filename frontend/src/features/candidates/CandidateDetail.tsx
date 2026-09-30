@@ -161,9 +161,12 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
         <h2 className="text-lg font-semibold">{candidate.candidate_key || candidate.id}</h2>
         <StatusPill label={decision ?? '—'} tone={statusTone(decision ?? '')} />
       </div>
+      {candidate.name && candidate.name !== (candidate.candidate_key || candidate.id) ? (
+        <p className="mb-2 font-medium">{candidate.name}</p>
+      ) : null}
       <p className="mb-4 text-sm text-text-secondary">
         {format(t.candidatesExt.detail.familyLine, {
-          family: candidate.name,
+          family: candidateText(candidate, 'family') ?? '—',
           nextAction: nextAction ?? (language === 'zh' ? '尚未指定下一步。' : 'No next action specified.'),
         })}
       </p>

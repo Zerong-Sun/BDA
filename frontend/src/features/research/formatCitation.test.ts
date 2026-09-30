@@ -52,3 +52,14 @@ describe('formatCitation', () => {
     })
   })
 })
+
+it('does not disguise a different host as PubMed or PDB', () => {
+  expect(formatCitation('https://evil.example/rcsb.org/structure/3LS4').label).toBe('evil.example')
+  expect(formatCitation('https://evil.example/pubmed.ncbi.nlm.nih.gov/123/').label).toBe('evil.example')
+  expect(formatCitation('https://user:secret@example.org/paper').href).toBeUndefined()
+})
+
+it('removes prose punctuation without damaging balanced DOI parentheses', () => {
+  expect(formatCitation('doi:10.1000/example).').href).toBe('https://doi.org/10.1000/example')
+  expect(formatCitation('10.1000/test(1)').href).toBe('https://doi.org/10.1000/test(1)')
+})

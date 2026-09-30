@@ -1,0 +1,8 @@
+@media (prefers-reduced-motion: no-preference) {
+  .tour-step { animation: tour-step-enter 160ms ease-out; }
+  .tour-spotlight { transition: top 160ms ease-out, left 160ms ease-out, width 160ms ease-out, height 160ms ease-out; }
+  @keyframes tour-step-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

@@ -10,7 +10,7 @@ it('opens evidence nodes while preserving provenance and record counts', () => {
  const select = vi.fn()
  renderWithProviders(<WorkflowEvidence nodes={[node]} artifacts={[]} projectId="p1" onSelect={select} />)
  expect(screen.getByText('来源待核验')).toBeInTheDocument()
- expect(screen.getByText('1 条记录 · 0 个文件')).toBeInTheDocument()
+ expect(screen.getByText('1 record · 0 files')).toBeInTheDocument()
  fireEvent.click(screen.getByRole('button', { name: 'BLI 历史实验记录' }))
  expect(select).toHaveBeenCalledWith('n1')
 })

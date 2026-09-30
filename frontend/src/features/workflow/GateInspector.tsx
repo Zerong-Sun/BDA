@@ -25,6 +25,7 @@ export function GateInspector({
   edge,
   runs,
   readOnly,
+  canOperate,
   onSave,
   onClose,
   onSource,
@@ -36,6 +37,8 @@ export function GateInspector({
   edge: WorkflowEdge
   runs: GateSummary[]
   readOnly: boolean
+  /** Submitted graphs are immutable, but authorized reviewers can still release gates. */
+  canOperate: boolean
   onSave: (edge: WorkflowEdge) => Promise<void>
   onClose: () => void
   onSource: () => void
@@ -89,6 +92,7 @@ export function GateInspector({
   })
   const action = useMutation({
     mutationFn: async (kind: 'save' | 'preview' | 'release' | 'retry') => {
+      if (!canOperate || (kind === 'save' && readOnly)) throw new Error(zh ? '当前项目无此操作权限。' : 'This action is unavailable in this project.')
       if (kind === 'save')
         await onSave({
           ...edge,
@@ -130,7 +134,7 @@ export function GateInspector({
     onError: (e) => toast(e.message, 'error'),
   })
   const reviewable = gate?.status === 'awaiting_review' && !gate.preview
-  const canSelect = reviewable && !action.isPending && !results.isFetching && !results.isError
+  const canSelect = canOperate && reviewable && !action.isPending && !results.isFetching && !results.isError
     && results.data?.gate.version === gate.version && releasedVersion !== selectionKey
   return (
     <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
@@ -143,7 +147,7 @@ export function GateInspector({
       <p className="my-2 break-words text-xs">
         {edge.source}.{edge.source_port} → {edge.target}.{edge.target_port}
       </p>
-      {!readOnly && (
+      {canOperate && !readOnly && (
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onEditMapping}>
             {zh ? '修改连接端口' : 'Edit connection ports'}
@@ -167,7 +171,7 @@ export function GateInspector({
         title={<> {zh ? '本分支筛选规则' : 'Branch screening policy'} </>}
       >
         <div className="mt-2">
-          <GatePolicyEditor value={policy} onChange={setPolicy} disabled={readOnly} />
+          <GatePolicyEditor value={policy} onChange={setPolicy} disabled={!canOperate || readOnly || action.isPending} />
         </div>
       </WorkflowSection>
       <label className="mb-2 block text-xs">
@@ -191,7 +195,7 @@ export function GateInspector({
         <Button
           type="button"
           size="sm"
-          disabled={readOnly || action.isPending}
+          disabled={!canOperate || readOnly || action.isPending}
           onClick={() => action.mutate('save')}
         >
           {zh ? '保存规则' : 'Save rules'}
@@ -200,7 +204,7 @@ export function GateInspector({
           type="button"
           size="sm"
           variant="outline"
-          disabled={action.isPending || (!runs.length && !sourceJob)}
+          disabled={!canOperate || action.isPending || (!runs.length && !sourceJob)}
           onClick={() => action.mutate('preview')}
         >
           {zh ? '试运行' : 'Preview'}
@@ -216,7 +220,7 @@ export function GateInspector({
           type="button"
           size="sm"
           onClick={() => action.mutate('retry')}
-          disabled={action.isPending}
+          disabled={!canOperate || action.isPending}
         >
           {zh ? '重试筛选' : 'Retry screening'}
         </Button>
