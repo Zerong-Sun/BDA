@@ -24,6 +24,14 @@ function apiNode(overrides: Record<string, unknown>) {
 }
 
 describe('workflowMapper', () => {
+  it('aligns an unpositioned route by dependencies despite an unordered API response', () => {
+    const nodes = [apiNode({ id: 'score', node_key: 'score' }), apiNode({ id: 'input', node_key: 'input' }), apiNode({ id: 'design', node_key: 'design' })]
+    const graph = mapApiGraphToGraph(nodes, [{ source: 'input', target: 'design' }, { source: 'design', target: 'score' }])
+    expect(graph.nodes.map((node) => node.position)).toEqual([{ x: 560, y: 80 }, { x: 40, y: 80 }, { x: 300, y: 80 }])
+    const saved = { x: 17, y: 42 }
+    expect(mapApiGraphToGraph([apiNode({ position: saved })], []).nodes[0].position).toEqual(saved)
+  })
+
   it('maps every API node status onto a canvas status', () => {
     // The API vocabulary, not the retired 'completed'/'staging' one the seeding script
     // used to emit. A value the pipeline can return must never fall through.

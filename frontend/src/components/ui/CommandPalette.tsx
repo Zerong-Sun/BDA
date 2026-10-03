@@ -12,6 +12,7 @@ import {
 } from './command'
 import { Button } from './Button'
 import { useI18n } from '../../lib/i18n'
+import { projectText } from '../../lib/i18n/projectText'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useCopilotBots } from '../../features/copilot/bots/registry'
 import { APP_ROUTES, routeLabel } from '../../lib/nav/routes'
@@ -125,7 +126,7 @@ export function CommandPalette() {
                     go(`/projects?project=${encodeURIComponent(project.id)}`)
                   }}
                 >
-                  {project.name}
+                  {projectText(project, 'name', language)}
                 </CommandItem>
               ))}
             </CommandGroup>

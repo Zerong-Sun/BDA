@@ -263,6 +263,7 @@ function WorkflowWorkspace() {
   const workflowSeed = useAppStore((s) => s.workflowSeed)
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
+  const [focusCanvas, setFocusCanvas] = useState(false)
   const [preflightExpanded, setPreflightExpanded] = useState(false)
   const [goal, setGoal] = useState(() =>
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
@@ -802,6 +803,7 @@ function WorkflowWorkspace() {
         onAddNode={() => setBuilderOpen((v) => !v)}
         onStart={() => { if (!unsavedNodeChanges) setConfirmRun(true) }}
       /> : null}
+      {workflowRunId ? <div className="mb-3"><Button type="button" variant="outline" size="sm" aria-pressed={focusCanvas} onClick={() => setFocusCanvas((focused) => !focused)}>{language === 'zh' ? (focusCanvas ? '打开流程工作台' : '流程总览') : (focusCanvas ? 'Open workflow workbench' : 'Workflow overview')}</Button></div> : null}
 
       <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
@@ -1078,8 +1080,8 @@ function WorkflowWorkspace() {
 
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
-        <div className="grid min-h-0 gap-4 xl:h-[calc(100vh-12rem)] xl:min-h-[38rem] xl:grid-cols-[300px_minmax(0,1fr)_340px]">
-          <div className="order-3 min-h-0 xl:order-1">
+        <div className={`grid min-h-0 gap-4 xl:h-[calc(100vh-24rem)] xl:min-h-[34rem] ${focusCanvas ? 'grid-cols-1' : 'xl:grid-cols-[260px_minmax(0,1fr)_300px]'}`}>
+          <div className={`order-3 min-h-0 xl:order-1${focusCanvas ? ' hidden' : ''}`}>
             <WorkflowResourceSidebar
               projectId={projectId}
               artifacts={visibleArtifacts}
@@ -1120,8 +1122,10 @@ function WorkflowWorkspace() {
                 initialNodes={demoWorkflow.nodes}
                 initialEdges={demoWorkflow.edges}
                 readOnly
+                overview={focusCanvas}
                 onNodeSelected={(nodeId) => {
                   if (!setSelectedNodeId(nodeId)) return
+                  if (nodeId) setFocusCanvas(false)
                   setSelectedEdgeId(null)
                   setSelectedArtifactId(undefined)
                 }}
@@ -1163,12 +1167,14 @@ function WorkflowWorkspace() {
                   initialEdges={graph?.edges ?? []}
                   workflowRunId={workflowRunId}
                   readOnly={readOnly || unsavedNodeChanges}
+                  overview={focusCanvas}
                   onConnectionRequested={requestConnection}
                   onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
-                  onEdgeSelected={(edgeId) => { if (setSelectedNodeId(null)) setSelectedEdgeId(edgeId) }}
+                  onEdgeSelected={(edgeId) => { if (setSelectedNodeId(null)) { setFocusCanvas(false); setSelectedEdgeId(edgeId) } }}
                   selectedNodeId={selectedNodeId}
                   onNodeSelected={(nodeId) => {
                     if (!setSelectedNodeId(nodeId)) return
+                    if (nodeId) setFocusCanvas(false)
                     setSelectedEdgeId(null)
                     setSelectedArtifactId(undefined)
                   }}
@@ -1191,7 +1197,7 @@ function WorkflowWorkspace() {
             )}
           </main>
 
-          <div className="order-2 min-h-0 xl:order-3" data-tour-id="workflow-inspector">
+          <div className={`order-2 min-h-0 xl:order-3${focusCanvas ? ' hidden' : ''}`} data-tour-id="workflow-inspector">
             {isDemoMode && !selectedArtifact ? <DemoWorkflowInspector
               selectedStep={demoWorkflow.steps.find(step => step.node.id === selectedNodeId)}
               stepCount={demoWorkflow.steps.length}

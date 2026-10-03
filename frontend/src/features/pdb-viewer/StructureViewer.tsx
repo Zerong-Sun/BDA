@@ -16,6 +16,7 @@ import {
   type ViewPreset,
 } from './ColorPresets'
 import { StructureControls } from './StructureControls'
+import { ResidueSelection } from './ResidueSelection'
 import { StructureEmptyState } from './StructureEmptyState'
 import { StructureErrorState } from './StructureErrorState'
 import { StructureLoadingState } from './StructureLoadingState'
@@ -131,6 +132,8 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
     const [reloadToken, setReloadToken] = useState(0)
     const [residueQuery, setResidueQuery] = useState('')
     const [residueNotice, setResidueNotice] = useState('')
+    const residueSelectionRef = useRef<{ residues: HighlightedResidue[]; sideChainsOnly: boolean } | null>(null)
+    useEffect(() => { residueSelectionRef.current = null }, [sourceKey])
 
     const onReadyRef = useRef(onReady)
     const onErrorRef = useRef(onError)
@@ -401,8 +404,9 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
 
       setError(null)
       applyVisualPreset(viewer.plugin, representation, color, selectedChainRef.current)
-        .then(() => {
+        .then(async () => {
           if (viewerRef.current === viewer) {
+            if (residueSelectionRef.current) await applyResidueHighlights(viewer.plugin, residueSelectionRef.current.residues, { sideChainsOnly: residueSelectionRef.current.sideChainsOnly, labels: true })
             viewer.plugin.managers.camera.focusObject({ durationMs: 200 })
           }
         })
@@ -530,7 +534,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
 
     const body = (
       <>
-        {!isFullscreen && showMetadata && source ? (
+        {showMetadata && source ? (
           <StructureMetadataPanel source={source} />
         ) : null}
         {hasSource ? (
@@ -581,6 +585,18 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
             {v.exitFullscreen}
           </Button>
         ) : null}
+        {hasSource && isFullscreen ? <ResidueSelection key={sourceKey} disabled={!structureLoaded || loading} onApply={async (residues, sideChainsOnly) => {
+          const viewer = viewerRef.current
+          if (!viewer) return
+          if (residues.length && selectedChain && residues.some(residue => residue.chainId !== selectedChain)) {
+            setSelectedChain(null); selectedChainRef.current = null
+            await applyVisualPreset(viewer.plugin, representation, color, null)
+          }
+          residueSelectionRef.current = residues.length ? { residues, sideChainsOnly } : null
+          const result = await applyResidueHighlights(viewer.plugin, residues, { sideChainsOnly, focus: true, labels: true })
+          if (!residues.length) await resetCamera(viewer.plugin)
+          return result
+        }} /> : null}
         <div className={isFullscreen ? 'min-h-0 flex-1' : undefined}>
           <div
             className="molstar-viewer-host relative overflow-hidden border border-border"

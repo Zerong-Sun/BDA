@@ -61,13 +61,13 @@ export function ResearchPage() {
     timeline: { label: t.research.workspace.tabTimeline },
   }
   return (
-    <div className="research-page mx-auto max-w-[1360px]">
+    <div className={`research-page mx-auto max-w-[1360px]${tab === 'structures' ? ' research-page--structures' : ''}`}>
       <Tabs
         value={group}
         onValueChange={(value) => selectTab(value as ResearchTab)}
         data-tour-id="research-tabs"
       >
-        <header className="mb-5 border-b border-border-soft pb-4">
+        <header className="research-page-heading mb-5 border-b border-border-soft pb-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p>
             <h1 className="mt-2 text-3xl font-medium text-text-primary">{activeProject ? projectText(activeProject, 'name', language) : t.research.page.title}</h1>
@@ -116,7 +116,7 @@ export function ResearchPage() {
             <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
           ))}
         </nav> : null}
-        {projectId && (group === 'methods' || group === 'evidence') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {projectId && (group === 'methods' || tab === 'evidence' || tab === 'references') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {group === 'methods' ? <Button type="button" render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
           {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
         </div> : null}

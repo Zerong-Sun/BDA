@@ -38,6 +38,29 @@ export function WorkflowNodeCard({ data, selected }: NodeProps) {
   const required = new Set(nodeData.requiredPorts ?? [])
   const bound = new Set(nodeData.boundPorts ?? [])
 
+  if (nodeData.overview) {
+    const metrics = nodeData.footer.split(' · ').filter(part => !['succeeded', 'running', 'requires_review', 'draft', 'pending', 'failed', 'cancelled'].includes(part))
+    return (
+      <article className={clsx('relative flex h-[232px] w-[300px] flex-col rounded-2xl border border-border-soft border-t-[3px] bg-surface-1 p-5 shadow-sm', topBorderByStatus[statusKey] ?? 'border-t-border-soft', selected && 'ring-2 ring-accent ring-offset-2 ring-offset-bg-canvas')}>
+        <Handle id={ORDER_TARGET_HANDLE} type="target" position={Position.Left} className="!h-1 !w-1 !border-0 !bg-transparent" style={{ top: '50%' }} />
+        <Handle id={ORDER_SOURCE_HANDLE} type="source" position={Position.Right} className="!h-1 !w-1 !border-0 !bg-transparent" style={{ top: '50%' }} />
+        <Handle id="__overview_out_left" type="source" position={Position.Left} className="!h-1 !w-1 !border-0 !bg-transparent" />
+        <Handle id="__overview_in_right" type="target" position={Position.Right} className="!h-1 !w-1 !border-0 !bg-transparent" />
+        <Handle id="__overview_bottom" type="source" position={Position.Bottom} className="!h-1 !w-1 !border-0 !bg-transparent" />
+        <Handle id="__overview_top" type="target" position={Position.Top} className="!h-1 !w-1 !border-0 !bg-transparent" />
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-sm font-semibold tabular-nums text-accent">{String(nodeData.overviewLabel)}</span>
+          <StatusPill label={statusLabel} tone={statusTone(statusKey)} />
+        </div>
+        <h3 className="min-h-10 text-base leading-5 font-semibold text-text-primary">{nodeData.label}</h3>
+        <div className="mt-3 flex-1 space-y-1.5 border-t border-border-soft pt-3 text-xs leading-4 text-text-secondary">
+          {metrics.length ? metrics.slice(0, 3).map(part => <p key={part}>{part}</p>) : <p>{zh ? '已记录步骤状态' : 'Recorded stage status'}</p>}
+        </div>
+        {nodeData.resource ? <p className="mt-2 text-[10px] tracking-widest text-text-muted uppercase">{nodeData.resource}</p> : null}
+      </article>
+    )
+  }
+
   return (
     <article
       className={clsx(

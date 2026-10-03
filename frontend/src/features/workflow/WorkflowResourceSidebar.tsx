@@ -48,7 +48,7 @@ export function WorkflowResourceSidebar({
   const visibleArtifacts = selectedNode ? nodeArtifacts : artifacts
 
   return (
-    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-[300px] shrink-0 2xl:min-h-0">
+    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-full shrink-0 2xl:min-h-0">
       <FramePanel className="min-h-0 overflow-hidden p-0">
       <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="h-full min-h-0">
         <TabsList variant="line" className="mx-3 mt-2">

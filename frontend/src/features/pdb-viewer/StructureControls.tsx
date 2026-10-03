@@ -4,7 +4,7 @@ import { Frame, FramePanel } from '@/components/reui/frame'
 import { Button } from '@/components/ui/Button'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { getViewOptions, type ColorPreset, type RepresentationPreset, type ViewPreset } from './ColorPresets'
+import { getColorOptions, getViewOptions, type ColorPreset, type RepresentationPreset, type ViewPreset } from './ColorPresets'
 import { ColorSchemeSelector } from './ColorSchemeSelector'
 import { ChainSelector } from './ChainSelector'
 import { RepresentationSelector } from './RepresentationSelector'
@@ -51,11 +51,11 @@ export function StructureControls({
 
   return (
     <Frame className="mb-2" spacing="sm">
-      <FramePanel className="flex flex-wrap items-end gap-3">
+      <FramePanel className="structure-toolbar flex flex-wrap items-end gap-3">
         <RepresentationSelector value={representation} onChange={onRepresentationChange} />
         <ColorSchemeSelector value={color} onChange={onColorChange} />
         <ChainSelector chains={chains} value={selectedChain} onChange={onChainChange} />
-        <div className="grid gap-1">
+        <div className="structure-toolbar-camera grid gap-1">
           <Label>{t.viewer.cameraView}</Label>
           <ToggleGroup
             aria-label={t.viewer.cameraView}
@@ -85,7 +85,7 @@ export function StructureControls({
             ))}
           </ToggleGroup>
         </div>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="structure-toolbar-actions ml-auto flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -127,6 +127,9 @@ export function StructureControls({
           ) : null}
         </div>
       </FramePanel>
+      <p className="px-3 pb-2 text-xs text-text-secondary" aria-live="polite">
+        {getColorOptions(t.viewer).find((option) => option.id === color)?.description}
+      </p>
     </Frame>
   )
 }
