@@ -103,6 +103,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
   const decisions = data?.decisions.filter((row) => row.study_id === study?.id) ?? []
   const observations = data?.results.filter((row) => object(row.result_metadata.learning).assay_id === assay?.id) ?? []
   const measuredValue = !['failed', 'missing'].includes(measurementStatus)
+  const evidenceLoaded = Boolean(data) && !query.isError && !access.isError
 
   async function perform(action: () => Promise<unknown>) {
     if (busy) return
@@ -132,10 +133,20 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
 
   return <div className="learning-workbench" data-tour-id="learning-page">
     <header className="learning-header">
-      <span className="learning-eyebrow">ITERAVIA · 2.6 PREVIEW</span>
-      <h1>{copy('项目学习工作台', 'Project learning workbench')}</h1>
-      <p>{copy('把每轮实验变成下一轮决策的依据。', 'Turn each experimental round into evidence for the next decision.')}</p>
-      <p className="learning-limit">{copy('当前提供可复现的单测定基线。模型提升表示通过回顾性检查；实验效果仍需前瞻验证。', 'A reproducible single-assay baseline. Promotion passes retrospective checks; experimental benefit still needs prospective validation.')}</p>
+      <div className="learning-heading">
+        <div className="learning-eyebrow"><span>ITERAVIA</span><span className="learning-version">2.6 PREVIEW</span></div>
+        <h1>{copy('项目学习工作台', 'Project learning workbench')}</h1>
+        <p>{copy('把每轮实验变成下一轮决策的依据。', 'Turn each experimental round into evidence for the next decision.')}</p>
+        <p className="learning-limit">{copy('当前提供可复现的单测定基线。模型提升表示通过回顾性检查；实验效果仍需前瞻验证。', 'A reproducible single-assay baseline. Promotion passes retrospective checks; experimental benefit still needs prospective validation.')}</p>
+      </div>
+      <dl className="learning-overview" aria-label={copy('当前学习目标的数据概况', 'Current study evidence summary')}>
+        {[
+          [copy('实验记录', 'Observations'), observations.length],
+          [copy('冻结数据集', 'Frozen datasets'), datasets.length],
+          [copy('项目模型', 'Project models'), models.length],
+          [copy('批次建议', 'Batch proposals'), decisions.length],
+        ].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{evidenceLoaded ? count : '—'}</dd></div>)}
+      </dl>
     </header>
     <ol className="learning-steps">{[copy('定义目标与测定', 'Define goal & assay'), copy('录入与冻结证据', 'Record & freeze evidence'), copy('评估项目模型', 'Evaluate project model'), copy('审阅下一批实验', 'Review the next batch')].map((label, index) => <li key={label}><span>{index + 1}</span>{label}</li>)}</ol>
     {(query.isPending || access.isPending) && <p role="status">{copy('正在读取项目证据…', 'Loading project evidence…')}</p>}

@@ -49,43 +49,97 @@
   --shadow-medium: 0 8px 24px rgb(23 26 22 / 8%);
 }
 
+/* One dark palette for application, registry controls and charts.
+   Structure/sequence rendering keeps its scientific color conventions. */
 .dark, [data-theme="dark"] {
-  --bg-app: #111612;
-  --bg-canvas: #171c18;
-  --bg-surface-1: #1a211b;
-  --bg-surface-2: #232b24;
-  --bg-surface-3: #2a332b;
-  --border-soft: #374135;
-  --border-default: #46523f;
-  --border-strong: #6f805f;
-  --text-primary: #f3f0e8;
-  --text-secondary: #c7cfbd;
-  --text-muted: #a6b19b;
-  --text-inverse: #171a16;
-  --bda-primary: #d3ed70;
-  --bda-primary-foreground: #171a16;
-  --accent: #d3ed70;
-  --accent-foreground: #171a16;
-  --accent-bg: #303b22;
-  --accent-muted: #bfd854;
-  --accent-border: #7c944c;
-  --accent-2: #e97953;
-  --accent-2-bg: #372b23;
-  --accent-2-border: #855944;
+  color-scheme: dark;
+  --bg-app: #000000;
+  --bg-canvas: #050607;
+  --bg-surface-1: #0d0f12;
+  --bg-surface-2: #171a1f;
+  --bg-surface-3: #22262c;
+  --border-soft: #2b3038;
+  --border-default: #586270;
+  --border-strong: #7c899a;
+  --text-primary: #eef2f7;
+  --text-secondary: #bec7d3;
+  --text-muted: #98a5b6;
+  --text-inverse: #07151d;
+  --bda-primary: #6dd5f2;
+  --bda-primary-foreground: #07151d;
+  --accent: #7bdcf5;
+  --accent-foreground: #07151d;
+  --accent-hover: #a0e8fa;
+  --accent-pressed: #48badb;
+  --accent-muted: #a0d5e4;
+  --accent-bg: #10242b;
+  --accent-border: #387e98;
+  --accent-2: #a2b7ff;
+  --accent-2-hover: #c0ceff;
+  --accent-2-bg: #1b2236;
+  --accent-2-border: #687cab;
+  --bda-success: #68dcb1;
+  --bda-warning: #eac078;
+  --bda-destructive: #f38d94;
+  --bda-info: #a2b7ff;
+  --success: var(--bda-success);
+  --success-bg: rgb(104 220 177 / 10%);
+  --warning: var(--bda-warning);
+  --warning-bg: rgb(234 192 120 / 10%);
+  --destructive: var(--bda-destructive);
+  --danger: var(--bda-destructive);
+  --danger-bg: rgb(243 141 148 / 10%);
+  --info: var(--bda-info);
+  --info-bg: rgb(162 183 255 / 10%);
+  --success-foreground: var(--text-inverse);
+  --info-foreground: var(--text-inverse);
+  --warning-foreground: var(--text-inverse);
+  --destructive-foreground: var(--text-inverse);
   --background: var(--bg-app);
   --foreground: var(--text-primary);
   --card: var(--bg-surface-1);
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface-3);
   --popover-foreground: var(--text-primary);
+  --primary: var(--bda-primary);
+  --primary-foreground: var(--bda-primary-foreground);
   --secondary: var(--bg-surface-2);
   --secondary-foreground: var(--text-primary);
   --muted: var(--bg-surface-2);
   --muted-foreground: var(--text-muted);
   --border: var(--border-soft);
   --input: var(--border-default);
-  --ring: #d3ed70;
+  --ring: var(--bda-primary);
+  --invert: var(--text-primary);
+  --invert-foreground: var(--bg-app);
+  --sidebar: var(--bg-surface-1);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--bda-primary);
+  --sidebar-primary-foreground: var(--bda-primary-foreground);
+  --sidebar-accent: var(--bg-surface-2);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-soft);
+  --sidebar-ring: var(--ring);
+  --chart-1: #6dd5f2;
+  --chart-2: #a2b7ff;
+  --chart-3: #68dcb1;
+  --chart-4: #eac078;
+  --chart-5: #f38d94;
+  --radius: .5rem;
+  --shadow-soft: 0 2px 8px rgb(0 0 0 / 18%);
+  --shadow-medium: 0 12px 32px rgb(0 0 0 / 35%);
 }
+
+[data-theme="light"] { color-scheme: light; }
+.dark ::selection { background: var(--accent); color: var(--accent-foreground); }
+.dark .science-brand-mark { color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); }
+.dark .science-team-preview { background: var(--bg-surface-1); color: var(--text-primary); border-color: var(--border-soft); }
+.dark .science-team-preview .science-eyebrow { color: var(--accent); }
+.dark .science-preview-footer { border-color: var(--border-soft); }
+.dark .science-preview-footer > span:first-child { color: var(--text-muted); }
+.dark .bot-avatar { background: var(--bda-primary); color: var(--bda-primary-foreground); }
+.dark .bot-avatar--produce { background: var(--bda-success); }
+.dark .bot-avatar--review { background: var(--accent-2); }
 
 html { font-family: var(--font-sans); }
 body { line-height: 1.6; }
