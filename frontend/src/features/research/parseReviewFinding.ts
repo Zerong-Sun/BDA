@@ -57,9 +57,11 @@ export function parseReviewFinding(content: string, track: string): ResearchFind
   const title = trimTitleAtWordBoundary(firstMeaningfulLine(content), TITLE_MAX_CHARS)
   const uncertainty = extractUncertainty(content)
   let statement = content.trim()
-  if (statement.startsWith(title)) {
-    statement = statement.slice(title.length).trim()
-    statement = statement.replace(/^\n+/, '')
+  // Only explicit, uncited Markdown headings are presentation duplicates.
+  // A plain opening sentence can contain evidence even without a citation.
+  const heading = statement.match(/^#{1,6}[ \t]+([^\n]+)(?:\n|$)/)
+  if (heading && heading[1].trim() === title && !/\[[^\]]+\]/.test(title)) {
+    statement = statement.slice(heading[0].length).trim()
   }
   if (!statement) statement = content.trim()
 

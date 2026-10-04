@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from pathlib import PurePosixPath
 
+from ...core import confidence_scale
 from .base import ParseContext, ParsedCandidate, ParsedMetric, ParsedOutputs, register_parser
 
 # The high-confidence summary is the one that decides what becomes a candidate; the
@@ -28,7 +30,8 @@ REQUIRED_COLUMNS = frozenset({"run_id", "cycle", "pdb_filename", "iptm"})
 def _number(row: dict, key: str) -> float | None:
     raw = (row.get(key) or "").strip()
     try:
-        return float(raw)
+        value = float(raw)
+        return value if math.isfinite(value) else None
     except (TypeError, ValueError):
         return None
 
@@ -117,7 +120,35 @@ def parse(ctx: ParseContext) -> ParsedOutputs:
                 )
                 if value is not None
             }
-            properties: dict = {"run_id": run_id, "cycle": cycle, "pdb_filename": pdb_name}
+            confidence: dict[str, dict] = {}
+            metadata = summary.get("metadata")
+            invalid_metadata = metadata is not None and not isinstance(metadata, dict)
+            declared = metadata.get("confidence_scales", {}) if isinstance(metadata, dict) else {}
+            invalid_metadata = invalid_metadata or not isinstance(declared, dict)
+            if not isinstance(declared, dict):
+                declared = {}
+            for name in ("plddt", "iplddt"):
+                if name not in scores:
+                    continue
+                # Native Boltz summaries are fractions. A wrapper emitting canonical
+                # values must declare that explicitly; a low value never chooses a scale.
+                row_scale = row.get(f"{name}_scale")
+                metadata_scale = declared.get(name)
+                conflict = invalid_metadata or (name in declared and not isinstance(metadata_scale, str))
+                conflict = conflict or bool(row_scale and name in declared and row_scale != metadata_scale)
+                scale = "conflicting_declarations" if conflict else (
+                    row_scale or metadata_scale if name in declared or row_scale else confidence_scale.FRACTION
+                )
+                source = "conflicting_declarations" if conflict else (
+                    "summary_column" if row_scale else "output_metadata" if name in declared else "provider:proteinhunter_boltz"
+                )
+                scores[name], context = confidence_scale.normalize(scores[name], str(scale), source=source)
+                confidence[name] = {**context, "source_file": str(summary.get("filename")), "source_row": position,
+                                    "row_declared_scale": row_scale, "metadata_declared_scale": metadata_scale}
+                if context["scale_status"] == "scale_conflict":
+                    warnings.append(f"{summary.get('filename')} row {position}: {name} scale_conflict; raw value retained")
+            properties: dict = {"run_id": run_id, "cycle": cycle, "pdb_filename": pdb_name,
+                                "confidence_scale": confidence}
             sequence = (row.get("sequence") or "").strip()
             if sequence:
                 properties["sequence"] = sequence
@@ -145,7 +176,8 @@ def parse(ctx: ParseContext) -> ParsedOutputs:
                     evidence_kind="predicted",
                     assessor="design_model",
                     condition=condition,
-                    context={"run_id": run_id, "cycle": cycle},
+                    unit="pLDDT_0_100" if confidence.get(name, {}).get("scale_status") == "known" else "",
+                    context={"run_id": run_id, "cycle": cycle, **confidence.get(name, {})},
                 )
                 for name, value in scores.items()
             ]

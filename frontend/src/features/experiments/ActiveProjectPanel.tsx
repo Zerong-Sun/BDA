@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { StatusPills } from '../../components/ui/StatusPill'
 import type { Project } from '../../lib/api/projects'
 import { useI18n } from '../../lib/i18n'
-import { projectText } from '../../lib/i18n/projectText'
+import { projectText, projectActionText } from '../../lib/i18n/projectText'
 import {
   useProjectTargetStructure,
   useTargetReadiness,
@@ -132,12 +132,12 @@ export function ActiveProjectPanel({
                   ? t.projects.activeProjectPanel.targetReady
                   : t.projects.activeProjectPanel.targetBlocked}
               </strong>
-              <span>{readinessQuery.data.next_action}</span>
+              <span>{projectActionText(readinessQuery.data.next_action, t)}</span>
             </div>
             {readinessQuery.data.blockers.length > 0 ? (
               <ul className="mt-2 list-disc space-y-1 pl-4">
                 {readinessQuery.data.blockers.map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
+                  <li key={blocker}>{projectActionText(blocker, t)}</li>
                 ))}
               </ul>
             ) : null}

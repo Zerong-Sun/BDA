@@ -9,6 +9,8 @@ import { WorkflowResourceSidebar } from './WorkflowResourceSidebar'
 
 const api = vi.hoisted(() => ({
   getWorkflowPreflight: vi.fn(),
+  getWorkflowGraph: vi.fn(),
+  updateWorkflowNode: vi.fn(),
   previewWorkflowNodeScript: vi.fn(),
   getJobLogs: vi.fn(),
   listModelPlugins: vi.fn(),
@@ -25,7 +27,8 @@ vi.mock('../../lib/api/registry', () => ({
 vi.mock('../../lib/api/workflow', () => ({
   getWorkflowPreflight: api.getWorkflowPreflight,
   previewWorkflowNodeScript: api.previewWorkflowNodeScript,
-  updateWorkflowNode: vi.fn(),
+  updateWorkflowNode: api.updateWorkflowNode,
+  getWorkflowGraph: api.getWorkflowGraph,
 }))
 
 vi.mock('../../lib/api/jobs', () => ({
@@ -55,6 +58,34 @@ beforeEach(() => {
 })
 
 describe('workflow chrome safeguards', () => {
+  it('reports unsaved node changes and clears them only after the saved graph is reloaded', async () => {
+    const onDirtyChange = vi.fn()
+    const node = {
+      id: 'node_test', workflow_run_id: 'run_test', node_key: 'audit', execution_mode: 'dispatch' as const,
+      configuration: {}, node_type: 'compute', model_plugin: 'audit', model_plugin_id: null,
+      container_image: null, command: 'true', queue: null, status: 'draft' as const, parameters: {},
+      input_bindings: [], error_message: null, version: 1, created_at: '', updated_at: '',
+    }
+    let finishSave!: (value: object) => void
+    api.updateWorkflowNode.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve }))
+    api.getWorkflowGraph.mockResolvedValue({ workflow: { version: 2 }, nodes: [{ ...node, queue: 'reviewed-queue' }] })
+    const view = renderWithProviders(<WorkflowInspector workflowRunId="run_test" workflowVersion={1} selectedNode={node} onDirtyChange={onDirtyChange} />)
+    await screen.findByLabelText('LSF queue override')
+    fireEvent.change(screen.getByLabelText('LSF queue override'), { target: { value: 'reviewed-queue' } })
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true))
+    fireEvent.click(screen.getByRole('button', { name: 'Save parameters' }))
+    await waitFor(() => expect(screen.getByLabelText('LSF queue override')).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled()
+    finishSave({ ...node, queue: 'reviewed-queue' })
+    await waitFor(() => expect(api.getWorkflowGraph).toHaveBeenCalledWith('run_test'))
+    view.rerender(<WorkflowInspector workflowRunId="run_test" workflowVersion={2} selectedNode={{ ...node, queue: 'reviewed-queue' }} onDirtyChange={onDirtyChange} />)
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false))
+    fireEvent.change(screen.getByLabelText('LSF queue override'), { target: { value: 'discarded-queue' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(screen.getByLabelText('LSF queue override')).toHaveValue('reviewed-queue')
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false))
+  })
+
   it('propagates read-only state to artifact upload while keeping artifact reads available', async () => {
     renderWithProviders(
       <WorkflowResourceSidebar

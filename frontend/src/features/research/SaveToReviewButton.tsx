@@ -59,11 +59,11 @@ export function SaveToReviewButton({
       payload.evidence = {
         ...existingEvidence,
         citations: citations ?? [],
-        source_refs: citations?.flatMap((citation) => {
+        source_refs: [...new Set([...(Array.isArray(existingEvidence.source_refs) ? existingEvidence.source_refs : []), ...(citations?.flatMap((citation) => {
           const refs = Array.isArray(citation.reference_ids) ? citation.reference_ids.map(String) : []
           const url = typeof citation.url === 'string' && citation.url ? [citation.url] : []
           return [...refs, ...url]
-        }) ?? existingEvidence.source_refs,
+        }) ?? [])])],
         source_language: language,
         localized_content: {
           title: { [language]: payload.title },

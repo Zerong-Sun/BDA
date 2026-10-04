@@ -1,3 +1,11 @@
+> **已归档 · 2026-09-30**
+> 原位置：`docs/plans/BOT_ROOM_PLAN.md`。
+> 原因：研究室 P0–P4 已交付；原设计留作追溯。
+> 当前依据：[现行说明](../../BOT_FIRST_WORKSPACE.md)。
+> 分隔线之后保留归档前原始字节；历史状态与相对链接按原记录解释。
+
+---
+
 > **规划资料，非当前功能清单。** 本文描述尚未实现的形态。当前行为见 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md)、[Copilot bot 名册](../COPILOT_BOT_ROSTER.md)与 [决策透明度](../DECISION_TRANSPARENCY.md)。
 
 # 研究室：一个群聊入口、可见的交接、以及在结构上选位点

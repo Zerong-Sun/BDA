@@ -1,3 +1,4 @@
+import { botDisplayText } from './bots/displayText'
 import { Link } from 'react-router'
 import { ApiState } from '../../components/ui/ApiState'
 import { Button } from '../../components/ui/Button'
@@ -27,13 +28,13 @@ export function BotRoster({ projectId, activeBotId = null, autoActive = false, o
 
   return <aside className="bot-roster" aria-label={zh ? '研究 Bot 名录' : 'Research Bot roster'}>
     <h2>{zh ? '团队成员' : 'Team members'}</h2>
-    <p className="mb-4 text-xs text-text-muted">{zh ? '打开一个职责，查看它负责什么、手上有什么。' : 'Open a responsibility to see what it owns and holds.'}</p>
+    <p className="mb-4 text-xs text-text-muted">{zh ? '选择成员，查看职责与任务。' : 'Select a member to view their role and tasks.'}</p>
     <div className="bot-roster-scroll">
       <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={autoActive} onClick={onAuto}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '自动匹配' : 'Auto-match'}</strong><small>{zh ? '根据问题选择 Bot' : 'Match the question to a Bot'}</small></span></Button>
       <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>
         {byStance(bots.data ?? []).map((group) => <div className="bot-roster-group" key={group.stance}>
           <p className="bot-stance">{stanceLabel[group.stance]}</p>
-          {group.bots.map((bot) => <Button variant="ghost" type="button" className="bot-roster-item" key={bot.id} title={bot.summary} aria-current={activeBotId === bot.id ? 'page' : undefined} render={<Link to={botHref(bot.id, projectId)} />}><BotAvatar id={bot.id} stance={bot.stance} /><span><strong>{zh ? bot.title_zh : bot.title}</strong></span></Button>)}
+          {group.bots.map((bot) => <Button variant="ghost" type="button" className="bot-roster-item" key={bot.id} title={botDisplayText(bot, language).summary} aria-current={activeBotId === bot.id ? 'page' : undefined} render={<Link to={botHref(bot.id, projectId)} />}><BotAvatar id={bot.id} stance={bot.stance} /><span><strong>{zh ? bot.title_zh : bot.title}</strong></span></Button>)}
         </div>)}
         {bots.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '暂无可用 Bot。可在模型设置中检查配置。' : 'No Bots available. Check model settings.'}</p> : null}
       </ApiState>

@@ -212,11 +212,15 @@ def post_chat(
         },
         intent=payload.intent,
     )
-    return ChatAccepted(
+    accepted = ChatAccepted(
         operation_id=operation.id,
         conversation_id=conversation.id,
         message=MessageResponse.model_validate(message),
     )
+    # The request-scoped session dependency exits after the response is sent.
+    # A 202 must already have a durable resource and its outbox operation.
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/conversations", response_model=ConversationPage)
@@ -596,7 +600,9 @@ def start_agent_run(
 ) -> AgentRunAccepted:
     project = require_project(session, payload.project_id, user)
     run, operation = start_agent_run_service(session, project, user, payload)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/agent-runs", response_model=AgentRunPage)
@@ -819,7 +825,9 @@ def continue_agent_run(
     if expected != run.version:
         raise DomainError("version_conflict", "The task changed. Reload it before continuing.", status_code=412)
     operation = continue_service(session, run, user, payload.message, payload.authorized_writes)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/task-readiness", response_model=TaskReadinessResponse)

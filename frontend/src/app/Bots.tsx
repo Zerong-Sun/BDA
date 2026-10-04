@@ -13,6 +13,7 @@ import { Room } from '../features/copilot/Room'
 import { CopilotChain } from '../features/copilot/CopilotChain'
 import { CopilotSettings } from '../features/copilot/CopilotSettings'
 import { useCopilotBots } from '../features/copilot/bots/registry'
+import { botDisplayText } from '../features/copilot/bots/displayText'
 import { botHref } from '../features/copilot/bots/workbenches'
 import { BotRoster } from '../features/copilot/BotRoster'
 import { managesProject, useProjectAccess } from '../lib/hooks/useProjectAccess'
@@ -96,7 +97,7 @@ function BotProjectWorkspace() {
               </TabsList>
               <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} /></TabsContent>
               <TabsContent value="room">
-                {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{selected.summary}</p>
+                {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{botDisplayText(selected, language).summary}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><Button type="button" size="sm" variant="outline" render={<Link to={botHref(selected.id, projectId)} />}>{zh ? '查看职责页' : 'Open responsibility page'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setBot(projectId, null)}>{zh ? '改为自动匹配' : 'Switch to auto-match'}</Button></div>
                 </div></div> : null}
                 <Room

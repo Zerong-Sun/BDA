@@ -2,7 +2,7 @@
 
 状态：活跃 / §6 四步全部已实现
 
-最后核验：2026-09-15（Asia/Shanghai；重新实测 operation 与 `x-permission` 计数；新增的密码子优化端点**故意不做成工具**——它返回 DNA，而工具结果会写进 `copilot_messages.tool_calls`，等于在对话记录里多留一份构建体明文。工具与能力计数不变）
+最后核验：2026-09-30（按当前 OpenAPI 与工具注册表核对数量；外部 MCP 宿主验收单独记录）
 
 权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
@@ -16,11 +16,11 @@
 
 把 `/api/v2` 包成 MCP 工具是第一个会想到的做法，它有三个具体的、可量化的问题：
 
-- **体量**：当前 `openapi.json` 是 185 条 path / **251 个 operation** / 4.3 MB。一个工具清单塞进模型上下文就已经越界，而 MCP 客户端要在每轮对话里带着它。
+- **体量**：2026-09-30 的 `openapi.json` 有 225 条 path、291 个 operation。一个工具清单塞进模型上下文就已经越界，而 MCP 客户端要在每轮对话里带着它。
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
-- **控制面丢失**：286 个 operation 中只有 140 个带 `x-permission`（本轮实测；此处此前写的 251/121 已过期，数字按 `backend_v2/openapi.json` 重新数过）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
+- **控制面丢失**：291 个 operation 中 142 个带 `x-permission`（2026-09-30 按 `backend_v2/openapi.json` 核对）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
-同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **53 个工具 / 22 个 capability**，按执行模式分为 read 37 / draft 11 / queue 5。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
+同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **54 个工具 / 22 个 capability**，按执行模式分为 read 37 / draft 11 / queue 6。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
 ## 2. 结论
 
@@ -28,7 +28,7 @@
 
 `registry.py` 的模块 docstring 自陈了这个模块存在的原因：一个工具曾经散在三处（模型 schema、capability 映射、`if name == ...` 分发链），加一个要改三处，漏掉第三处不会报错——工具要么不可达，要么可达但跳过了 capability 检查。**为 MCP 另写一套工具定义就是加上第四处。**
 
-因此 MCP 层只负责三件事，一件不多：
+MCP 层负责以下四项：
 
 1. 把 `ToolSpec.schema()` 翻译成 MCP 的 `tools/list` 响应；
 2. 把 MCP 的 `tools/call` 翻译成 `REGISTRY.execute(tool_id, context, arguments, granted=…)`；
@@ -41,15 +41,15 @@
 
 写工具的保险丝是 `actions.CopilotActions.request_allows()`：它在**用户自己的原话**里找领域词 + 动词，并排除建议语气与否定从句。当前两个调用点分别传入：
 
-- `copilot/tasks.py:111` — `request_text=source.content`，即用户的聊天消息；
-- `copilot/agent_loop.py:179` — `request_text=run.goal`，即用户创建 agent run 时写下的目标。
+- `copilot/tasks.py` — `request_text=source.content`，即用户的聊天消息；
+- `copilot/agent_loop.py` — `request_text=run.goal`，即用户创建 agent run 时写下的目标。
 
 **MCP 客户端没有"用户原话"。** 它发来的 `arguments` 是对端模型生成的，把它当作 `request_text` 等于让模型给自己开门——这条保险丝会当场失效，而且不会报错。
 
 规则（本方案唯一的新增语义，且是减法）：
 
-- **MCP 会话必须绑定到一个已存在的 `copilot_agent_runs` 行。** `request_text = run.goal`，与 `agent_loop.py:179` 完全一致，不引入第三种意图来源。
-- **未绑定 run 的 MCP 会话只暴露 `execution_mode == "read"` 的 34 个工具**，`tools/list` 里根本不出现另外 14 个。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
+- **MCP 会话必须绑定到一个已存在的 `copilot_agent_runs` 行。** `request_text = run.goal`，与 `agent_loop.py` 完全一致，不引入第三种意图来源。
+- **未绑定 run 的 MCP 会话只暴露获授权且允许 MCP 调用的 `execution_mode == "read"` 工具**；写工具和要求 `agent_run` 上下文的工具不出现在列表中。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
 - `requires="session"` 的 5 个 draft 工具（`wetlab-authoring` 三个、`research-trace-authoring` 一个、`promote_candidate_to_bench`）**不经过 `actions` 服务，因而没有意图门**。在 MCP 上它们必须按 `execution_mode` 归入"需要 run 绑定"一档，否则会成为整条链上唯一没有用户授权的写路径。
 
 ### 3.2 身份与凭证

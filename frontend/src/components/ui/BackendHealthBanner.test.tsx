@@ -37,7 +37,7 @@ describe('BackendHealthBanner', () => {
       checks: { worker_heartbeats: 'missing', schema_revision: 'ok', postgresql: 'ok', redis: 'ok', minio: 'ok' },
     }))
     renderWithProviders(<BackendHealthBanner />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('计算服务暂不可用')
+    expect(await screen.findByRole('alert')).toHaveTextContent('后台任务服务暂不可用')
   })
 
   it('shows plain connection guidance for a network failure', async () => {

@@ -233,3 +233,15 @@ export function subscribeResiduePicks(
   })
   return () => subscription.unsubscribe()
 }
+
+/** Select an existing author-numbered residue using the same Mol* focus as a canvas click. */
+export function focusResidueById(plugin: PluginContext, chainId: string, seq: number): boolean {
+  const structure = plugin.managers.structure.hierarchy.current.structures[0]?.cell?.obj?.data
+  if (!structure) return false
+  const selection = buildResidueSelection(structure, [{ chainId, seq }])
+  if (!selection || StructureSelection.isEmpty(selection)) return false
+  const loci = StructureSelection.toLociWithSourceUnits(selection)
+  plugin.managers.structure.focus.setFromLoci(loci)
+  plugin.managers.camera.focusLoci(loci, { minRadius: 18, extraRadius: 8, durationMs: 250 })
+  return true
+}

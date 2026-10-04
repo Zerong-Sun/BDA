@@ -440,3 +440,91 @@ def test_the_api_returns_claims_in_the_shape_a_reader_can_judge(session: Session
     claims = _list(session, project, user).items[0].claims
 
     assert [claim.confidence for claim in claims] == ["stated", "unsupported"]
+
+
+@pytest.mark.parametrize("field", ["summary", "statement", "evidence_ref", "open_questions", "refs"])
+@pytest.mark.parametrize("character", ["x", "界", "🧪"])
+def test_overlong_handoff_text_is_rejected_before_any_partial_record(session: Session, field: str, character: str) -> None:
+    project, user = _project(session)
+    existing = _post(session, project, user, summary="Previously recorded note")
+    oversized = character * (handoffs.MAX_TEXT + 1)
+    if field in {"statement", "evidence_ref"}:
+        values = {"claims": [{"statement": "Keep the measurement units", "evidence_ref": "result:known", field: oversized}]}
+    elif field in {"open_questions", "refs"}:
+        values = {field: ["first valid entry", oversized]}
+    else:
+        values = {field: oversized}
+
+    with pytest.raises(DomainError, match=f"at most {handoffs.MAX_TEXT}") as raised:
+        _post(session, project, user, **values)
+
+    assert raised.value.status_code == 422
+    assert raised.value.error_code == "copilot_handoff_text_too_long"
+    assert [row.id for row in handoffs.inbox(session, project_id=project.id)] == [existing.id]
+    assert not session.new
+
+
+def test_bounded_unicode_handoff_fields_round_trip_without_losing_the_tail(session: Session) -> None:
+    project, user = _project(session)
+    exact = "🧪" * (handoffs.MAX_TEXT - 1) + "终"
+    row = _post(session, project, user, summary=exact,
+                claims=[{"statement": exact, "evidence_ref": exact, "confidence": "stated"}],
+                open_questions=[exact], refs=[exact])
+    session.expire(row)
+    saved = handoffs.to_json(row)
+    assert saved["summary"] == exact
+    assert saved["claims"] == [{"statement": exact, "evidence_ref": exact, "confidence": "stated"}]
+    assert saved["open_questions"] == [exact] and saved["refs"] == [exact]
+
+
+@pytest.mark.parametrize("field", ["summary", "statement", "evidence_ref", "open_questions", "refs"])
+def test_handoff_tool_declares_and_enforces_every_text_limit(session: Session, field: str) -> None:
+    project, user = _project(session)
+    spec = REGISTRY.get("post_handoff")
+    properties = spec.parameters["properties"]
+    if field in {"statement", "evidence_ref"}:
+        schema = properties["claims"]["items"]["properties"][field]
+        extra = {"claims": [{"statement": "A bounded claim", field: "界" * (handoffs.MAX_TEXT + 1)}]}
+    elif field in {"open_questions", "refs"}:
+        schema = properties[field]["items"]
+        extra = {field: ["界" * (handoffs.MAX_TEXT + 1)]}
+    else:
+        schema = properties[field]
+        extra = {field: "界" * (handoffs.MAX_TEXT + 1)}
+    assert schema["maxLength"] == handoffs.MAX_TEXT
+    with pytest.raises(DomainError) as raised:
+        REGISTRY.execute("post_handoff", _ctx(session, project, user, bot="researcher"),
+                         {"to_bot": "planner", "summary": "A valid summary", **extra})
+    assert raised.value.error_code == "copilot_tool_arguments_invalid"
+    assert handoffs.inbox(session, project_id=project.id) == []
+
+
+def test_agent_can_correct_an_oversized_summary_from_safe_validation_feedback(session: Session, monkeypatch) -> None:
+    import json
+
+    from backend_v2.app.copilot import agent_loop
+    from backend_v2.tests.test_copilot_agent_loop import _call, _provider, _script
+
+    project, user = _project(session)
+    run = agent_runs.create_run(session, project_id=project.id, user_id=user.id, bot="runner",
+                                goal="Hand the recorded failure to planner", allowed_tools=["post_handoff"])
+    oversized = "DO-NOT-ECHO-INPUT-" * 200
+    complete = "Failure recorded; planner should inspect the declared inputs before proposing recovery."
+    seen = _script(monkeypatch, [
+        {"tool_calls": [_call("too-long", "post_handoff", {"to_bot": "planner", "summary": oversized})]},
+        {"tool_calls": [_call("corrected", "post_handoff", {"to_bot": "planner", "summary": complete})]},
+    ])
+    provider = _provider(session)
+    agent_loop.step(session, run, provider)
+    assert handoffs.inbox(session, project_id=project.id) == []
+    failure = json.loads(agent_runs.transcript(session, run)[-1].content)
+    assert failure == {"error": "copilot_tool_arguments_invalid", "validation_errors": [
+        {"path": "/summary", "constraint": "maxLength", "limit": handoffs.MAX_TEXT}]}
+    assert "DO-NOT-ECHO-INPUT" not in json.dumps(failure)
+
+    agent_loop.step(session, run, provider)
+
+    visible_errors = [json.loads(turn["content"]) for turn in seen[1] if turn["role"] == "tool"]
+    assert visible_errors == [failure]
+    records = handoffs.inbox(session, project_id=project.id)
+    assert len(records) == 1 and records[0].summary == complete

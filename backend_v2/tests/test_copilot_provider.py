@@ -53,14 +53,47 @@ def test_openai_compatible_completion(monkeypatch) -> None:
         endpoint="https://llm.example/v1",
         credential_ref="env:BDA_TEST_LLM_TOKEN",
         model="research-model",
-        config={"temperature": 0.1},
+        config={"temperature": 0.1, "thinking": {"type": "disabled"}, "max_tokens": 4096, "platform_default": True},
     )
     assert provider.complete(configured, [{"role": "user", "content": "question"}]) == "completed answer"
     assert captured["url"] == "https://llm.example/v1/chat/completions"
     assert captured["headers"]["Authorization"] == "Bearer secret"
     assert captured["json"]["model"] == "research-model"
+    assert captured["json"]["messages"] == [{"role": "user", "content": "question"}]
+    assert captured["json"]["thinking"] == {"type": "disabled"}
+    assert captured["json"]["max_tokens"] == 4096
+    assert "platform_default" not in captured["json"]
+    assert "stream" not in captured["json"]
     assert captured["timeout"].connect == 10.0
     assert captured["timeout"].read == 180.0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("model", "different-model"),
+        ("messages", [{"role": "user", "content": "overridden input"}]),
+        ("stream", True),
+        ("stream", False),
+    ],
+)
+def test_completion_rejects_reserved_config_before_credentials_or_request(monkeypatch, field, value) -> None:
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid provider config must fail before reading credentials or sending a request")
+
+    monkeypatch.setattr(provider, "credential_value", forbidden)
+    monkeypatch.setattr(provider.httpx, "post", forbidden)
+    configured = SimpleNamespace(
+        endpoint="https://llm.example/v1",
+        credential_ref="env:BDA_TEST_LLM_TOKEN",
+        model="selected-model",
+        config={field: value},
+    )
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "original input"}])
+    assert error.value.error_code == "llm_config_reserved_fields"
+    assert error.value.status_code == 422
+    assert error.value.detail == "LLM provider config cannot set reserved request fields: " + field
 
 
 def test_completion_rejects_missing_endpoint_and_invalid_payload(monkeypatch) -> None:

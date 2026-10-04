@@ -35,11 +35,27 @@ from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from . import agent_runs, bots
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
+from .agent_review import (
+    EVIDENCE_CALIBRATION,
+    ROUTING_INSTRUCTION,
+    needs_review,
+    operator_routing,
+    review_messages,
+    reviewable_delivery,
+)
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import SCIENTIFIC_POLICY
 from .provider import completion_message
 from .registry import REGISTRY, ToolContext
-from .task_contracts import FINAL_INSTRUCTION, available_step_tools, evaluate_delivery, progress
+from .task_contracts import (
+    FINAL_INSTRUCTION,
+    available_step_tools,
+    evaluate_delivery,
+    pending_source_coverage,
+    progress,
+    source_coverage,
+    tool_records,
+)
 
 #: Kept deliberately short. The turn policy that governs what may be claimed
 #: lives in the chat prompt and is unchanged by running longer; what an agent
@@ -51,9 +67,16 @@ AGENT_SYSTEM_PROMPT = (
     "it is waiting, the platform suspends you and calls you again with the "
     "result, so do not poll and do not assume an outcome. A failed job is a "
     "result: report it rather than silently retrying it. When the goal is met, "
-    "or cannot be met with the tools you have, answer in prose with no further "
+    "or cannot be met with the tools you have, return the final JSON delivery with no further "
     "tool call - that answer ends the run. Never claim that queued or "
-    "human-confirmed work has completed."
+    "human-confirmed work has completed. Gather only evidence needed for this goal; "
+    "do not enumerate every dataset, graph or reference in the project. Once the "
+    "contract steps have sufficient evidence for the stated scope, deliver the requested draft with explicit gaps. "
+    "An excerpt step records traced evidence, not complete source coverage: check known unread saved windows "
+    "that matter to the question before finishing; a narrow question need not exhaust every source. "
+    "A missing input is something to report, not a reason to keep searching unrelated records. "
+    "Preserve synthetic fixture labels: an expected injected failure is not repaired "
+    "by changing its recorded error or relabelling it as success."
 )
 
 
@@ -67,7 +90,7 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     This is the whole of "restoring" a run. There is no in-memory object graph to
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
-    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + FINAL_INSTRUCTION}]
+    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + EVIDENCE_CALIBRATION + "\n" + FINAL_INSTRUCTION}]
     # The run's bot, read from the roster rather than from the row. The row
     # holds the id; the charter is source, so a run resumed after a deploy
     # operates under the current wording instead of a snapshot of what the
@@ -86,6 +109,9 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                 ),
             }
         )
+        conversation.append({"role": "system", "content": ROUTING_INSTRUCTION})
+        conversation.append({"role": "system", "content": "Registered operator routing: "
+                             + json.dumps(operator_routing(), ensure_ascii=False)})
     conversation.append({"role": "user", "content": run.goal})
     if run.task_contract:
         conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**run.task_contract, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})
@@ -106,10 +132,43 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                     "role": "assistant",
                     "content": turn.content or None,
                     "tool_calls": list(turn.tool_calls),
+                    **({"reasoning_content": turn.reasoning_content} if isinstance(getattr(turn, "reasoning_content", None), str) else {}),
                 }
             )
         else:
-            conversation.append({"role": turn.role, "content": turn.content})
+            conversation.append({"role": turn.role, "content": turn.content,
+                **({"reasoning_content": turn.reasoning_content} if turn.role == "assistant" and isinstance(getattr(turn, "reasoning_content", None), str) else {})})
+    conversation.append({"role": "system", "content":
+        "Verified tool-call index for this run; copy exact call_id values into evidence_call_ids. "
+        "Tool names, artifact IDs and invented aliases are not call IDs. "
+        + json.dumps([{k: record[k] for k in ("call_id", "tool", "successful")}
+                      for record in tool_records(turns)], ensure_ascii=False)
+        + f"\nTranscript budget remaining: {max(0, run.max_turns - run.turn_count)} messages. "
+        "Return a concise final JSON as soon as the goal has sufficient evidence. "
+        "Authorized evidence reads are available throughout the recipe. Only write tools follow the contract one step at a time. "
+        "A saved source read needs no extra human permission when its tool is provided. "
+        "Pending required reads must be performed before final delivery when their tools are available. "
+        "Only the declared tools are available; an unavailable tool in this recipe does not change a bot's general role. "
+        "Planner owns structural analysis and proposed routes/drafts. Runner owns job status, waits and failure diagnosis; "
+        "runner never submits. Analyst interprets measured/predicted results. Researcher reviews sources and research questions. "
+        "Conductor coordinates only authorized steps. Auditor reviews and never repairs or approves. "
+        "Only the user confirms/submits through the application."})
+    if (run.task_contract or {}).get("service_kind") == "literature":
+        coverage = source_coverage(turns)
+        if coverage:
+            conversation.append({"role": "system", "content":
+                "Observed saved-source coverage (half-open indexed-chunk windows, grouped by document/checksum). "
+                "This is distinct from traced-excerpt step success and from whether the goal needs the whole source. "
+                + json.dumps(coverage, ensure_ascii=False)})
+        if _coverage_check_pending(run) and pending_source_coverage(turns):
+            conversation.append({"role": "system", "content":
+                "One bounded source-coverage check before final delivery: your draft leaves known saved pages unread. "
+                "Use get_reference_content with document_id as reference_id and known_next_offset as offset "
+                "for pages relevant to the user's requested comparison or limitations. These are existing saved reads, "
+                "not new external retrieval. You may instead finish if the current excerpts suffice for the narrow "
+                "question, explaining that scope and unread windows. If a needed read is unavailable, empty, failed "
+                "or cannot fit the remaining budget, report partial with the actual gap; do not repeatedly retry. "
+                "There is no requirement to exhaust unrelated sources, and this check will not be repeated."})
     return conversation
 
 
@@ -272,6 +331,30 @@ def _schemas(run: CopilotAgentRun, turns: list[CopilotAgentTurn] | None = None) 
     ]
 
 
+def _coverage_check_pending(run: CopilotAgentRun) -> bool:
+    return (run.outcome or {}).get("source_coverage_check", {}).get("status") == "pending"
+
+
+def _finish_coverage_limited(session: Session, run: CopilotAgentRun, reason: str) -> str:
+    """Keep the already delivered draft when its optional check cannot proceed."""
+    coverage = source_coverage(agent_runs.transcript(session, run))
+    outcome = run.outcome or {}
+    gaps = [f"Saved source {item['ref_id'] or item['document_id']} "
+            f"({item['content_checksum_sha256']}): read {item['read_count']} of {item['total_count']} "
+            f"indexed chunks; next unread offset {item['known_next_offset']}."
+            for item in coverage if item['observed_has_more'] and not item['coverage_complete']]
+    run.outcome = {**outcome,
+                   "status": outcome["status"] if outcome.get("status") in {"blocked", "needs_input", "review_required"} else "partial",
+                   "source_coverage": coverage,
+                   "source_coverage_check": {"attempts": 1, "status": "unavailable", "reason": reason},
+                   "scientific_review": "unavailable",
+                   "missing": list(dict.fromkeys([*outcome.get("missing", []), *gaps, reason, "scientific_review_unavailable"])),
+                   "next_action": "Review the saved draft within its observed source windows; continue relevant saved reads when the stated limit is resolved."}
+    agent_runs.finish(session, run, status="succeeded")
+    settle_parent(session, run)
+    return run.status
+
+
 def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
     """Advance the run by one provider call. Returns the resulting status."""
     if run.status != "running":
@@ -281,6 +364,8 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
 
     allowed, why = agent_runs.within_budget(session, run)
     if not allowed:
+        if _coverage_check_pending(run):
+            return _finish_coverage_limited(session, run, f"Source coverage check stopped: {why}")
         # Checked before the call, which is the only moment where stopping still
         # saves anything.
         agent_runs.finish(session, run, status="failed", error=f"budget: {why}")
@@ -294,9 +379,18 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
     run.allowed_tools = sorted(set(run.allowed_tools or []) & enabled)
     turns = agent_runs.transcript(session, run)
     schemas = _schemas(run, turns)
+    if _coverage_check_pending(run) and not any(item["function"]["name"] == "get_reference_content" for item in schemas):
+        return _finish_coverage_limited(session, run, "Source coverage check stopped: get_reference_content is unavailable.")
     from .task_budget import reserve_model_call
     messages = messages_for(run, turns)
-    reserve_model_call(session, run, provider, messages, schemas or None)
+    try:
+        reserve_model_call(session, run, provider, messages, schemas or None)
+    except DomainError as exc:
+        if _coverage_check_pending(run) and exc.error_code in {
+            "copilot_turn_limit_reached", "copilot_budget_insufficient", "copilot_budget_pricing_required",
+        }:
+            return _finish_coverage_limited(session, run, f"Source coverage check stopped: {exc.error_code}: {exc.detail}")
+        raise
     message = completion_message(provider, messages, tools=schemas if schemas else None)
     requested = message.get("tool_calls")
     content = message.get("content")
@@ -305,27 +399,88 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         answer = content.strip() if isinstance(content, str) else ""
         if not answer:
             raise AgentRunError("agent_run_empty_answer")
-        agent_runs.append_turn(session, run, role="assistant", content=answer)
+        agent_runs.append_turn(session, run, role="assistant", content=answer,
+                               reasoning_content=message.get("reasoning_content") if isinstance(message.get("reasoning_content"), str) else None)
+        delivery_retries = (run.outcome or {}).get("delivery_retry_count", 0)
+        coverage_check = (run.outcome or {}).get("source_coverage_check")
         run.outcome = evaluate_delivery(run, answer, turns)
-        if (run.task_contract or {}).get("service_kind") in {"literature", "interpretation"} and run.outcome["status"] in {"completed", "partial"}:
-            from .task_contracts import tool_records
+        if coverage_check:
+            coverage_check = {**coverage_check, "status": "responded"}
+            run.outcome = {**run.outcome, "source_coverage_check": coverage_check}
+        attempted = {record["tool"] for record in tool_records(turns)}
+        unfinished = [item for item in progress(run.task_contract or {}, turns)
+                      if item["status"] != "completed" and set(item["tools"]) & set(run.allowed_tools or [])
+                      and not set(item["tools"]) & attempted]
+        if unfinished and delivery_retries < 2:
+            # Retry omitted required reads, not a read which returned no usable
+            # evidence or failed. Those gaps belong in a partial/blocked delivery;
+            # repeating them must not be a prerequisite to reporting the result.
+            run.outcome = {**run.outcome, "delivery_retry_count": delivery_retries + 1}
+            return run.status
+        if ((run.task_contract or {}).get("service_kind") == "literature"
+                and not coverage_check and pending_source_coverage(turns)):
+            # One scope check with tools, before format-only repair. This is
+            # not an automatic full-text requirement or an unbounded retry.
+            run.outcome = {**run.outcome, "source_coverage": source_coverage(turns),
+                           "source_coverage_check": {"attempts": 1, "status": "pending"}}
+            if not any(item["function"]["name"] == "get_reference_content" for item in schemas):
+                return _finish_coverage_limited(session, run, "Source coverage check stopped: get_reference_content is unavailable.")
+            allowed, why = agent_runs.within_budget(session, run)
+            if not allowed:
+                return _finish_coverage_limited(session, run, f"Source coverage check stopped: {why}")
+            # The next step reserves its actual prompt/tool cost once. A
+            # failed reservation preserves this draft without a provider call.
+            return run.status
+        repair_reasons = set(run.outcome.get("missing", [])) & {
+            "structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values",
+            *(run.task_contract or {}).get("required_sections", []),
+        }
+        if repair_reasons:
+            # One bounded repair, with real evidence IDs; never silently bless
+            # a malformed delivery or fabricate a mapping for invented citations.
             try:
-                review_messages = [
-                    {"role": "system", "content": SCIENTIFIC_POLICY + "\nReview the entire draft against the tool records. Correct unsupported claims in every section. Preserve the contract's required sections and do not invent citations.\n" + FINAL_INSTRUCTION},
+                repair_messages = [
+                    {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
+                     + "\nRepair the delivery format and unsupported claims once. Return one JSON object only. "
+                       "Each sections value MUST be a string, not a nested object. Use exact successful call_id values "
+                       "from the supplied records. Keep the entire delivery under 1200 words; summarize evidence, "
+                       "do not copy excerpts. Do not claim to have read beyond the returned source window. "
+                       "If a source/action is unverified, say so rather than inventing it."},
                     {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
-                        "draft": run.outcome, "tool_records": tool_records(turns)}, ensure_ascii=False)},
+                     "repair_reasons": sorted(repair_reasons), "draft": answer,
+                     "tool_records": tool_records(turns)}, ensure_ascii=False)},
                 ]
-                reserve_model_call(session, run, provider, review_messages)
-                review_message = completion_message(provider, review_messages)
+                reserve_model_call(session, run, provider, repair_messages)
+                repaired_message = completion_message(provider, repair_messages)
+                repaired = str(repaired_message.get("content") or "")
+                repaired_outcome = evaluate_delivery(run, repaired, turns)
+                agent_runs.append_turn(session, run, role="assistant", content=repaired,
+                                       reasoning_content=repaired_message.get("reasoning_content") if isinstance(repaired_message.get("reasoning_content"), str) else None)
+                run.outcome = {**repaired_outcome, "format_repair": "attempted_once"}
+            except Exception:
+                run.outcome = {**run.outcome, "format_repair": "unavailable"}
+        if needs_review(run, turns):
+            try:
+                review_conversation = review_messages(run, turns)
+                reserve_model_call(session, run, provider, review_conversation)
+                review_message = completion_message(provider, review_conversation)
                 reviewed = str(review_message.get("content") or "")
                 reviewed_outcome = evaluate_delivery(run, reviewed, turns)
-                if reviewed_outcome["status"] == "review_required":
+                if not reviewable_delivery(run, reviewed_outcome):
                     raise ValueError("invalid_review_delivery")
-                agent_runs.append_turn(session, run, role="assistant", content=reviewed)
+                agent_runs.append_turn(session, run, role="assistant", content=reviewed,
+                                       reasoning_content=review_message.get("reasoning_content") if isinstance(review_message.get("reasoning_content"), str) else None)
                 run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed"}
             except Exception:
-                run.outcome = {**run.outcome, "status": "review_required", "scientific_review": "unavailable",
+                # Preserve an honest stop and its saved draft when the review
+                # cannot fit the remaining budget or fails. No extra call can
+                # bypass reserve_model_call's turn/cost ceiling.
+                status = run.outcome["status"] if run.outcome["status"] in {"blocked", "needs_input"} else "review_required"
+                run.outcome = {**run.outcome, "status": status, "scientific_review": "unavailable",
                                "missing": [*run.outcome.get("missing", []), "scientific_review_unavailable"]}
+        if (run.task_contract or {}).get("service_kind") == "literature":
+            run.outcome = {**run.outcome, "source_coverage": source_coverage(turns),
+                           **({"source_coverage_check": coverage_check} if coverage_check else {})}
         agent_runs.finish(session, run, status="succeeded")
         settle_parent(session, run)
         return run.status
@@ -336,15 +491,27 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
         role="assistant",
         content=content if isinstance(content, str) else "",
         tool_calls=list(requested),
+        reasoning_content=message.get("reasoning_content") if isinstance(message.get("reasoning_content"), str) else None,
     )
     context = _tool_context(session, run)
     waits: list[tuple[str, uuid.UUID, str]] = []
+    requested_names = {str((item.get("function") or {}).get("name") or "") for item in requested}
     for request in requested:
         call_id = str(request.get("id") or "")
         function = request.get("function") or {}
         name = str(function.get("name") or "")
         spec = REGISTRY.get(name)
-        result, wait = _run_tool(context, run, name, function.get("arguments"), call_id)
+        pending_sources = (sorted(set(spec.defer_with) & requested_names)
+                           if spec and name in (run.allowed_tools or []) else [])
+        result: dict[str, Any] | list[Any]
+        if pending_sources:
+            result, wait = {
+                "error": "tool_results_not_yet_observed", "tool": name,
+                "wait_for": pending_sources,
+                "next_step": "Read the measurement receipts, then call this tool in a later turn with evidence-backed arguments.",
+            }, None
+        else:
+            result, wait = _run_tool(context, run, name, function.get("arguments"), call_id)
         if wait is not None:
             waits.append(wait)
             # The tool result for a wait is written when the task settles, so the
@@ -384,6 +551,10 @@ def _run_tool(
             raise ValueError("tool_arguments_not_object")
         result = REGISTRY.execute(name, context, arguments)
     except DomainError as error:
+        # Registry schema feedback contains bounded declared paths/constraints,
+        # never the input values. Other domain errors keep their existing shape.
+        if error.error_code == "copilot_tool_arguments_invalid" and error.errors:
+            return {"error": error.error_code, "validation_errors": error.errors}, None
         return {"error": error.error_code}, None
     except (TypeError, ValueError, RuntimeError, KeyError) as exc:
         return {"error": str(exc)[:300]}, None

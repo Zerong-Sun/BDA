@@ -1,3 +1,4 @@
+import { botDisplayText } from './bots/displayText'
 import { useCallback, useEffect, useRef } from 'react'
 import { useCopilotReadOnly } from './commandAccess'
 import { ApiState } from '../../components/ui/ApiState'
@@ -9,7 +10,7 @@ import {
   SpinnerGapIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
-import { CopilotCitations } from './CopilotCitations'
+import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { useCopilotChat } from './useCopilotChat'
 import { byStance, reviewersOf, successorsOf } from './bots/registry'
@@ -213,8 +214,8 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           show and the row would be permanent chrome. */}
       {activeBotSpec && !externalRoster ? (
         <div className="shrink-0 border-b bg-muted/40 px-4 py-2">
-          <p className="text-xs font-medium text-foreground">{activeBotSpec.summary}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{activeBotSpec.charter}</p>
+          <p className="text-xs font-medium text-foreground">{botDisplayText(activeBotSpec, language).summary}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{botDisplayText(activeBotSpec, language).charter}</p>
           {reviewers.length > 0 ? (
             <p className="mt-1 text-[11px] text-muted-foreground">
               {t.copilot.chat.reviewedBy}{' '}
@@ -340,7 +341,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                 className={message.role === 'user' ? 'ml-8' : 'mr-8'}
               >
                 <FramePanel className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                  {message.content ||
+                  {(message.content ? message.role === 'assistant' ? <ReviewMarkdown citations={message.meta?.citations} projectId={projectId}>{message.content}</ReviewMarkdown> : message.content : null) ||
                     (loading && message.role === 'assistant' ? (
                       <CopilotLoadingBubble
                         stage={activeLoadingStage}
@@ -350,9 +351,6 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                     ) : (
                       ''
                     ))}
-                  {message.role === 'assistant' && message.meta?.citations?.length ? (
-                    <CopilotCitations citations={message.meta.citations} projectId={projectId} />
-                  ) : null}
                   {showSaveButton ? (
                     <SaveToReviewButton
                       projectId={projectId}

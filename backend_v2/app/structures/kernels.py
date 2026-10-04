@@ -89,6 +89,11 @@ _MMCIF_HINT = re.compile(r"^(data_|loop_|_atom_site\.)", re.MULTILINE)
 _PDB_HINT = re.compile(r"^(ATOM  |HETATM|HEADER|MODEL |CRYST1|SEQRES)", re.MULTILINE)
 _RESOLUTION_PDB = re.compile(r"^REMARK\s+2\s+RESOLUTION\.\s+([0-9.]+)\s+ANGSTROMS", re.MULTILINE)
 _RESOLUTION_CIF = re.compile(r"^_refine\.ls_d_res_high\s+([0-9.]+)", re.MULTILINE)
+_PLDDT_B_FACTOR_DECLARATION = re.compile(
+    r"^REMARK\s+\d+\s+B[- ]FACTORS?\s+(?:CONTAIN|STORE|REPRESENT)\s+PLDDT\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+_PLDDT_SOURCES = frozenset({"alphafold_db", "alphafold", "alphafold2", "alphafold3", "colabfold", "boltz", "boltz2"})
 
 
 def detect_format(text: str) -> str:
@@ -176,33 +181,60 @@ def _numbering_gaps(residues: list[Any]) -> list[dict[str, Any]]:
     return gaps
 
 
-def _confidence(atoms: list[Any], *, has_resolution: bool) -> dict[str, Any]:
-    """B-factor statistics, and whether they are plausibly pLDDT.
+def _confidence(
+    atoms: list[Any], *, has_resolution: bool, text: str, provenance: dict[str, Any]
+) -> dict[str, Any]:
+    """Report the B column without inferring its meaning from its numeric range.
 
-    AlphaFold and Boltz write per-atom pLDDT into the B-factor column, so the
-    same numbers mean opposite things: high is good for pLDDT and bad for a
-    crystallographic B-factor. The file does not say which it is, so this
-    returns the statistics under a neutral name and a separate, explicitly
-    stated test - values inside [0, 100] and no refinement resolution - rather
-    than labelling the column and being confidently wrong on one of the two.
+    Missing resolution and values in [0, 100] do not distinguish predicted,
+    experimental and synthetic coordinates. pLDDT needs an explicit source
+    with that convention or a file declaration; synthetic provenance wins.
     """
     values = np.array([float(atom.get_bfactor()) for atom in atoms], dtype=float)
     if values.size == 0:
         return {"available": False}
     inside_plddt_range = bool(values.min() >= 0.0 and values.max() <= 100.0)
+    source = str(provenance.get("source") or "").lower()
+    declared = (
+        source in _PLDDT_SOURCES and provenance.get("predicted") is not False
+        or str(provenance.get("b_factor_metric") or "").lower() == "plddt"
+        or bool(_PLDDT_B_FACTOR_DECLARATION.search(text))
+    )
+    metric, provenance_status = "unknown", "unknown"
+    if provenance.get("synthetic") is True:
+        provenance_status = "synthetic"
+        interpretation = (
+            "Synthetic structure; B-factor-column values are not validated pLDDT. "
+            "Do not use these values to infer prediction confidence, disorder or coordinate reliability."
+        )
+    elif declared and inside_plddt_range and not has_resolution:
+        metric, provenance_status = "plddt", "declared"
+        interpretation = (
+            "The recorded prediction source or file explicitly declares pLDDT in the B-factor column; "
+            "higher values indicate local prediction confidence, not experimental validation or interface accuracy."
+        )
+    elif declared:
+        provenance_status = "conflicting"
+        interpretation = "The pLDDT declaration conflicts with the numeric range or refinement resolution; column semantics are uncertain."
+    elif has_resolution:
+        metric, provenance_status = "b_factor", "declared"
+        interpretation = "The file declares refinement resolution. Treated as B-factors, not prediction confidence."
+    else:
+        interpretation = (
+            "B-factor-column semantics are unknown. The numeric range and missing refinement resolution are only "
+            "a heuristic; do not infer a predicted origin, pLDDT, disorder or coordinate reliability from them."
+        )
     return {
         "available": True,
         "mean": round(float(values.mean()), 2),
         "min": round(float(values.min()), 2),
         "max": round(float(values.max()), 2),
-        "looks_like_plddt": bool(inside_plddt_range and not has_resolution),
-        "interpretation": (
-            "Values are in [0, 100] and the file declares no refinement "
-            "resolution, which is consistent with a predicted model writing "
-            "pLDDT into the B-factor column; higher is more confident."
-            if inside_plddt_range and not has_resolution
-            else "Treated as crystallographic B-factors; higher is less ordered."
-        ),
+        "numeric_range_compatible_with_plddt": inside_plddt_range,
+        "metric": metric,
+        "provenance_status": provenance_status,
+        # Retained for existing consumers, but never true from the range alone.
+        "looks_like_plddt": metric == "plddt",
+        "interpretation": interpretation,
     }
 
 
@@ -216,7 +248,7 @@ def _resolution(text: str, fmt: str) -> float | None:
         return None
 
 
-def analyse(text: str) -> dict[str, Any]:
+def analyse(text: str, *, provenance: dict[str, Any] | None = None) -> dict[str, Any]:
     """Everything about the file that does not need a question first."""
     structure, fmt = _parse(text)
     models = list(structure)
@@ -270,7 +302,7 @@ def analyse(text: str) -> dict[str, Any]:
         "ligands": ligands,
         "solvent_residue_count": solvent_count,
         "disulfides": _disulfides(model),
-        "confidence": _confidence(all_atoms, has_resolution=resolution is not None),
+        "confidence": _confidence(all_atoms, has_resolution=resolution is not None, text=text, provenance=provenance or {}),
         "notes": (
             ["Only the first model was analysed; the file contains more."]
             if len(models) > 1
@@ -642,6 +674,7 @@ def interface(
 
     interface_residues = [item for item in per_residue]
     hydrophobic = sum(1 for item in interface_residues if item["name"].upper() in _HYDROPHOBIC)
+    residue_counts = {chain.get_id(): len(_polymer_residues(chain)) for chain in model}
     return {
         "chain_a": chain_a,
         "chain_b": chain_b,
@@ -655,6 +688,17 @@ def interface(
         # The conventional "interface area": half the total buried, because the
         # two sides bury each other and reporting the sum double-counts it.
         "interface_area_a2": round((buried[chain_a] + buried[chain_b]) / 2, 1),
+        "residue_scope": {
+            "analysed_model": model.get_id(),
+            "model_count": len(list(structure)),
+            "definition": "All non-solvent residues, including ligands, in the first model only.",
+            "selected_chain_counts": {chain_a: residue_counts[chain_a], chain_b: residue_counts[chain_b]},
+            "model_total": sum(residue_counts.values()),
+        },
+        "interface_residue_definition": (
+            "Non-solvent residues losing more than 0.1 A^2 of accessible surface on complex formation. "
+            "This is distinct from a heavy-atom distance contact and does not count every residue in the file."
+        ),
         "interface_residue_count": {
             chain_a: sum(1 for item in interface_residues if item["chain"] == chain_a),
             chain_b: sum(1 for item in interface_residues if item["chain"] == chain_b),
@@ -671,6 +715,8 @@ def interface(
         "hydrogen_bonds": bonds[:MAX_CONTACT_PAIRS],
         "salt_bridges": bridges[:MAX_CONTACT_PAIRS],
         "interface_residues": interface_residues[:MAX_CONTACT_PAIRS],
+        "returned_interface_residue_count": min(len(interface_residues), MAX_CONTACT_PAIRS),
+        "interface_residues_truncated": len(interface_residues) > MAX_CONTACT_PAIRS,
     }
 
 

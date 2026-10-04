@@ -3,7 +3,7 @@ export const bundleZh = {
     apiState: {
       loadingDefault: '加载中...',
     retry: '重试',
-      backendUnavailable: '后端不可用。请在 8100 端口启动 API 后重试。',
+      backendUnavailable: "暂时无法连接服务，请检查连接后重试。",
     },
     errorBoundaryTitle: '出现错误',
     errorBoundaryBody: '渲染此视图时发生意外错误。你可以重试，若问题持续请刷新页面。',
@@ -24,7 +24,7 @@ export const bundleZh = {
       themeSystem: '跟随系统',
     },
     backendHealth: {
-      workersUnavailable: '计算服务暂不可用，已有结果仍可浏览和下载。',
+      workersUnavailable: "后台任务服务暂不可用。已有资料仍可浏览；Bot、检索和计算任务需等待服务恢复。",
       unavailable: '暂时无法连接服务，请稍后重试。',
       paused: '自动调度已暂停，仍可浏览已有项目和结果。',
       degraded: '部分服务暂未就绪，部分操作可能暂时不可用。',
@@ -93,12 +93,11 @@ export const bundleZh = {
   },
   login: {
     brandEyebrow: 'BDA Workbench',
-    heroTitle: '面向蛋白质设计的 AI 工作台——无需深厚的建模背景。',
-    heroBody:
-      '描述你的设计目标，让助手帮你收集靶标证据、提出可视化工作流、用通俗语言解释候选物评分，并用湿实验结果闭合设计循环。',
-    heroBullet1: '智能体为你收集靶标情报并起草设计路线。',
-    heroBullet2: '可视化分步工作流清晰展示每一步运行内容及原因。',
-    heroBullet3: '每项评分、结构与结果均可解释且可追溯。',
+    heroTitle: "蛋白质设计研究工作台",
+    heroBody: "整理证据、设计工作流，追踪计算与实验结果。",
+    heroBullet1: "研究团队：明确问题、查证资料、比较方案。",
+    heroBullet2: "工作流：检查输入和参数，预览后确认运行。",
+    heroBullet3: "结果：查看指标、原始文件和来源。",
     formTitle: '登录 BDA Workbench',
     formSubtitle: '你的可追溯蛋白质设计工作空间。',
     usernameLabel: '用户名',
@@ -129,7 +128,7 @@ export const bundleZh = {
       goal: '目标',
       goalPlaceholder: '折叠排名前三的候选物并比较结果。',
       maxTurns: '轮数上限',
-      maxCost: '成本上限（分）',
+      maxCost: '成本上限（美分）',
       costHint: '该上限覆盖本次运行及其派生的所有子智能体。',
       start: '开始运行',
       starting: '启动中…',
@@ -145,8 +144,10 @@ export const bundleZh = {
       statusFailed: '已失败',
       statusCancelled: '已取消',
       turns: '{count} 轮',
-      cost: '{cents} 分',
-      costWithSubtree: '{cents} 分（含子智能体共 {total} 分）',
+      cost: '{cents} 美分',
+      costWithSubtree: '{cents} 美分（含子智能体共 {total} 美分）',
+      costUnmeasured: '费用未计量',
+      costEstimatedReserve: '预估费用预留：{cents} 美分',
       transcript: '过程记录',
       transcriptEmpty: '暂无记录。',
       roleUser: '目标',
@@ -160,7 +161,7 @@ export const bundleZh = {
     chain: {
       title: '链条',
       toggle: '链条',
-      intro: '每个 operator 交给下一个的内容，以及每条声明背后的证据。最新在前。',
+      intro: '查看 Bot 之间的交接内容及其证据，最新记录在前。',
       selectProject: '请先选择项目。',
       loading: '正在加载链条…',
       failed: '交接记录加载失败。',
@@ -202,9 +203,9 @@ export const bundleZh = {
       dismiss: '完成',
       empty: '还没有 MCP 会话。',
       noProject: '选择一个项目后才能签发会话。',
-      revoke: '吹销',
-      revoking: '吹销中…',
-      revoked: '已吹销',
+      revoke: '撤销',
+      revoking: '撤销中…',
+      revoked: '已撤销',
       expired: '已过期',
       active: '有效',
       readOnly: '只读',
@@ -303,7 +304,7 @@ export const bundleZh = {
     },
     cluster: {
       title: '集群任务草稿',
-      body: 'Copilot 可创建草稿，但只有此确认按钮能提交真实的 LSF 任务。',
+      body: '核对草稿中的脚本与资源，确认后提交 LSF 任务。',
       empty: '尚无草稿。请让 Copilot 准备待审核的 LSF 任务。',
       reviewScript: '查看 LSF 脚本',
       confirmSubmit: '确认并提交',
@@ -1082,7 +1083,7 @@ export const bundleZh = {
       evidenceCount: '{count} 条证据',
       supersedesCount: '取代 {count} 条',
       unbound: '未绑定证据',
-      unboundHelp: '这条决策没有指向任何平台能解析的对象。请在 provenance 中补上作业、候选、产物、发现、实验结果或构建体的 id。',
+      unboundHelp: '请在证据栏关联作业、候选、文件、研究发现、实验结果或构建体。',
       laneDry: '干',
       laneWet: '湿',
       laneEvidenceMismatch: '未绑定湿实验证据',
@@ -1090,7 +1091,7 @@ export const bundleZh = {
       allLanes: '全部干湿',
       bootstrapTitle: '从任务书开始制定决策树',
       bootstrapSubtitle: '根据本项目的设计任务书起草目标与未决问题。你逐条看过之前不写入任何东西。',
-      bootstrapNeedsPrompt: '本项目还没有设计任务书。请先写一份——只凭项目名起草的树，是一个套着计划外形的猜测。',
+      bootstrapNeedsPrompt: '请先补充项目任务书，再起草目标与决策。',
       bootstrapDraft: '从任务书起草',
       bootstrapDrafting: '正在起草…',
       bootstrapFailed: '无法从这份任务书起草决策树。',
@@ -1110,7 +1111,7 @@ export const bundleZh = {
       editorEdit: '编辑',
       editorHeadingNew: '记录一条',
       editorHeadingEdit: '编辑条目',
-      editorIntro: '判断是什么，依据是什么。没有证据、也没有关掉任何分支的判断，是日记不是决策记录。',
+      editorIntro: '记录判断、依据，以及考虑过的备选方案。',
       editorSave: '保存',
       editorSaving: '保存中\u2026',
       editorCancel: '取消',
@@ -1138,9 +1139,9 @@ export const bundleZh = {
       fieldCausedByHelp: '引出这一条的问题或决策。',
       errSelfLink: '一条记录不能指向它自己。',
       sectionProvenance: '证据',
-      sectionProvenanceHelp: '写标识符，每行一个 \u2014 不是正文里提到的名字。只有这几个键，读的人才知道该去哪里找。',
+      sectionProvenanceHelp: '选择支持该判断的记录，或填写记录 ID，每行一个。',
       sectionAlternatives: '关掉的分支',
-      sectionAlternativesHelp: '选项与否决理由，两项都必填。没有理由的备选是装饰，日后重读也判断不了那个理由是否还成立。',
+      sectionAlternativesHelp: '每个备选方案都需填写未采用的原因。',
       sectionCodeRefs: '脚本与模块',
       altOption: '选项',
       altRejectedBecause: '否决理由',
@@ -1231,6 +1232,13 @@ export const bundleZh = {
       retest: '复测',
       reserve: '储备',
       priorityOnly: '仅优先级',
+    },
+    foldScreen: {
+      withheld: '已隐藏 {count} 条已确认 0–100 量纲且 pLDDT 低于 {floor} 的候选。数据保留，直接链接仍可查看。',
+      included: '当前显示全部结果，包含 {count} 条已确认 0–100 量纲且 pLDDT 低于 {floor} 的候选。',
+      uncertain: '{count} 条候选的 pLDDT 量纲不明或冲突。保留原值，不参与此筛选和均值计算。',
+      show: '显示低置信度候选',
+      hide: '隐藏低置信度候选',
     },
     table: {
       rankedScreen: '排序筛选',
@@ -1491,8 +1499,8 @@ export const bundleZh = {
     page: {
       aiInterpretation: 'AI 解读',
       dismiss: '关闭',
-      experimentSummaryEmpty: '此项目尚无实验摘要。上传验证读数以开始闭环。',
-      noReadoutsYet: '此项目尚无湿实验读数。上传实验结果或运行验证工作流以填充此视图。',
+      experimentSummaryEmpty: '此项目尚无实验摘要。请上传测量结果并关联候选物。',
+      noReadoutsYet: '此项目尚无湿实验读数。请上传测量结果并关联受测候选物。',
     },
     experimentUpload: {
       uploading: '正在上传实验数据…',
@@ -1839,24 +1847,20 @@ export const bundleZh = {
         title: '平台概览与第一步',
         items: {
           whatIsPlatform: {
-            question: '这个平台是做什么的？',
-            answer:
-              'BDA 工作台是全栈蛋白质结合蛋白设计自动化平台，将文献综述、靶点智能分析、工作流 DAG 编排（RFdiffusion、ProteinMPNN、AlphaFold2、Rosetta）、候选物排序和闭环 Campaign 评估整合在一个可追溯的工作空间中。',
+            question: "这个平台能帮我做什么？",
+            answer: "在一个项目中整理研究证据、设计工作流、计算结果和实验记录，并追溯它们之间的关系。Bot 可以辅助起草和分析；计算提交与关键决定仍需人工确认。",
           },
           whoIsItFor: {
-            question: '它面向哪些用户？',
-            answer:
-              '面向计算生物学家、蛋白质工程师以及设计结合蛋白、抗体、酶或肽支架的研究团队。查看者可浏览结果；研究员可运行工作流并提交集群任务；管理员管理用户和审计日志。',
+            question: "谁可以使用？",
+            answer: "研究团队可协作整理资料、设计方案和分析结果。查看者只能浏览；研究员和管理员可执行的操作取决于项目权限。",
           },
           prerequisites: {
-            question: '开始项目前需要准备什么？',
-            answer:
-              '运行中的 BDA 后端（8100 端口）、有效登录凭证，以及可选的 Copilot 用 OpenAI 兼容 API 密钥。计算运行需要已配置的适配器（demo、local、Docker 或远程 LSF）。请准备好靶点名称、UniProt ID 或 PDB ID。',
+            question: "开始前需要准备什么？",
+            answer: "准备登录账号、研究目标和已有序列或结构。浏览资料无需模型账号；AI 任务需要可用模型，真实计算还需要管理员配置并验证计算环境。",
           },
           firstWorkflow: {
-            question: '推荐的第一步工作流是什么？',
-            answer:
-              '创建项目，在研究页运行靶点智能分析，确认结构，然后打开工作流按引导路线执行：靶点导入 → RFdiffusion 骨架生成 → ProteinMPNN 序列设计 → AlphaFold2 预测 → Rosetta 评分 → 候选物审查。建议先打开 PD-1 演示项目了解完整闭环。',
+            question: "第一次应该怎么操作？",
+            answer: "先打开 PD-1 演示项目熟悉页面。正式研究时，创建项目、确认目标与输入，再在工作流中选择适用路线或手动建图；检查参数和预览后确认提交。演示数据不是实际研究结果。",
           },
         },
       },
@@ -1865,29 +1869,24 @@ export const bundleZh = {
         title: '文献综述与证据',
         items: {
           whyResearchRequired: {
-            question: '为什么设计前需要研究步骤？',
-            answer:
-              '缺乏背景的设计可能导致错误表位、不兼容支架和不可验证的结论。项目综述和靶点智能分析建立机制、前人工作、热点证据和可检验的成功标准，供下游工作流节点和 Copilot 路线规划使用。',
+            question: "为什么先整理研究证据？",
+            answer: "证据帮助确定研究问题、输入、评价标准和风险。把关键判断与来源关联后，方案和结果才便于复核。",
           },
           missingCitations: {
-            question: '为什么有时缺少引用或论文？',
-            answer:
-              'Europe PMC 和 RCSB PDB 搜索可能无法返回开放获取全文、遇到付费墙，或靶点文献稀少。系统在无法获取全文时保存元数据和摘要。无可追溯摘录的声明标记为 pending_review，不会写入为已确认知识。',
+            question: "为什么有些结论没有引用？",
+            answer: "可能尚未保存支持该结论的来源或片段。检索命中和摘要不等于读过全文；请打开来源核查。没有证据时应保留缺口，不补造引用。",
           },
           paperTypes: {
-            question: '系统如何处理论文、预印本和综述？',
-            answer:
-              '有 PMCID 的同行评议论文进行全文摄取和分块证据提取。预印本以较低证据权重摄取并标记为未审稿。综述用于领域综合，但不应作为残基级热点声明的唯一来源，除非有原始数据支持。',
+            question: "怎样区分论文、预印本和综述？",
+            answer: "查看来源的出版类型和日期，并确认是否经过同行评议。综述可帮助了解背景，具体实验结论应尽量追到原始研究；平台不会替你完成科学审核。",
           },
           completeSummary: {
-            question: '完整的研究摘要应包含什么？',
-            answer:
-              '完整的项目综述涵盖全部十一条研究轨道：意义与应用、靶点机制、前人工作、结合策略、设计策略、纯化方案、功能验证、可开发性风险、成功标准、开放问题和逐篇深度阅读（含证据分级：已确立事实 vs 解释 vs 假设）。',
+            question: "研究简报应包含什么？",
+            answer: "写清目标、约束、已有证据、成功标准、方案依据和待解决问题。引用放在它支持的判断之后，保留不确定性。",
           },
           incompleteResearch: {
-            question: '研究结果不完整会怎样？',
-            answer:
-              '不完整的综述在项目综述面板显示空白或部分章节。Copilot 在规划路线时会标注缺口。可在警告下继续工作流，但热点确认和路线比较可能缺乏证据。在投入计算前重新运行靶点智能分析或摄取更多文献。',
+            question: "资料不足时能继续吗？",
+            answer: "可以继续整理草稿，但应明确缺失信息。工作流缺少必需输入或验证时不能提交；先补齐阻断项，再决定是否投入计算。",
           },
         },
       },
@@ -1896,29 +1895,24 @@ export const bundleZh = {
         title: '靶点选择与结构',
         items: {
           whyChooseTarget: {
-            question: '为什么必须先选择靶点蛋白？',
-            answer:
-              '工作流节点需要具有明确链、结合位点上下文和 contig 图的 target_structure 制品。未确认靶点时，RFdiffusion 无法针对正确界面采样骨架，AlphaFold2 也无法针对预期伙伴评估复合物置信度。',
+            question: "为什么要确认靶标和输入？",
+            answer: "插件需要明确的序列、结构或其他输入。确认物种、结构链和残基编号，避免把计算用在错误的对象上。",
           },
           fiveOptions: {
-            question: '为什么系统提供 5 个靶点选项？',
-            answer:
-              '靶点智能代理根据分辨率、构建覆盖、表位相关性和证据等级，从 RCSB PDB 和 AlphaFold DB 中排序最多五个结构候选。简短列表便于比较权衡（实验 vs 预测、全长 vs 结构域），无需手动检索数据库。',
+            question: "如何选择结构？",
+            answer: "比较结构的来源、实验或预测类型、链、残基覆盖和项目需要。可用选项取决于已有资料与检索结果，不保证固定数量。",
           },
           pdbVsAlphafold: {
-            question: '如何在 PDB 和 AlphaFold 结构之间选择？',
-            answer:
-              '当分辨率良好（< 3 Å）、构建与设计目标匹配且结合界面存在时，优先实验 PDB 结构。无合适 PDB 时使用 AlphaFold 模型，但应视为预测——Copilot 和评分输出不得表述为已验证结合。',
+            question: "PDB 和预测结构有什么区别？",
+            answer: "查看结构的实验方法、覆盖范围和置信信息。预测结构必须保留预测标识；不要把结构置信度当成已验证的结合或功能。",
           },
           noPdbStructure: {
-            question: '如果没有合适的 PDB 结构怎么办？',
-            answer:
-              '结构分析师回退到 UniProt 映射的 AlphaFold 预测。也可通过靶点导入拖放区上传自定义 PDB 或 mmCIF。在项目综述中记录来源，以便下游解读区分预测与实验坐标。',
+            question: "没有合适的 PDB 结构怎么办？",
+            answer: "可导入已有的 PDB/mmCIF 文件，或检查预测结构来源是否可用。记录来源和限制，确认输入满足所选插件要求后再运行。",
           },
           structureStorage: {
-            question: '所选结构文件存储在哪里？',
-            answer:
-              '确认的结构注册为 MinIO 项目制品，并通过 artifact UUID 引用。3D 查看器使用短期预签名制品 URL。',
+            question: "结构文件存在哪里？",
+            answer: "文件保存在项目对象存储中；数据库保存制品标识、大小、校验和及来源关系。查看器通过授权下载地址读取文件。",
           },
         },
       },
@@ -1927,24 +1921,20 @@ export const bundleZh = {
         title: 'PDB 下载与结构清理',
         items: {
           pdbDownloadFailures: {
-            question: 'PDB 下载可能出现什么问题？',
-            answer:
-              '常见失败：无效 PDB ID、RCSB API 超时、网络代理阻止出站 HTTPS 或文件格式不匹配（CIF vs PDB）。API 不可达时 UI 显示错误提示和 BackendHealthBanner。在 rcsb.org 确认 ID 且 8100 端口可用后重试。',
+            question: "PDB 下载失败怎么办？",
+            answer: "先核对结构 ID，再查看任务中的失败原因。来源不可达时可稍后重试，或上传已取得的有效结构文件；不要反复提交同一任务。",
           },
           missingResidues: {
-            question: 'PDB 有缺失残基、多链、配体或辅因子怎么办？',
-            answer:
-              '结构准备步骤应识别缺失环区、未解析区域和非蛋白质杂原子。多链复合物需明确选择靶点和结合蛋白伙伴链。配体和辅因子可为设计剥离或保留作上下文——在提交工作流前于 3D 查看器验证清理后结构。',
+            question: "缺失残基、多链和配体如何处理？",
+            answer: "在结构视图中检查链、编号缺口和配体。根据研究问题决定保留范围，记录处理方法，并在提交前检查准备后的结构。",
           },
           wrongChain: {
-            question: '选错链会怎样？',
-            answer:
-              '设计节点将针对错误结合表面优化，产生无关骨架。在结构元数据面板检查链 ID，与 UniProt 序列长度比对，在运行 RFdiffusion 前重新选择或重新上传。选错链的已完成运行须丢弃并重新执行。',
+            question: "发现选错链怎么办？",
+            answer: "提交前修正输入并重新校验。已经提交的运行保留原快照；创建新的方案纠正输入，并记录旧结果为何不适用。",
           },
           metadataDisplay: {
-            question: '结构元数据应如何展示？',
-            answer:
-              '显示 PDB ID、方法（X 射线、cryo-EM、预测）、分辨率、链 ID、残基范围、物种和构建备注。将预测模型与实验结构明确区分。靶点智能分析确认的热点残基应交叉链接到 3D 查看器选择。',
+            question: "结构页需要核对什么？",
+            answer: "核对来源 ID、实验或预测类型、链、残基范围及可用的物种和分辨率信息。引用的位点应与查看器中的编号一致。",
           },
         },
       },
@@ -1953,24 +1943,20 @@ export const bundleZh = {
         title: '工作流模式与代理行为',
         items: {
           designModes: {
-            question: '支持哪些设计模式？',
-            answer:
-              '工作流 DAG 支持结合蛋白设计（RFdiffusion + ProteinMPNN）、酶重设计与稳定化（Rosetta relax/评分）、约束采样特异性重设计、Mask RGN 诱饵/探索性分析，以及靶点智能分析的抗体 CDR 聚焦路线。模式选择取决于已注册模型插件和 Campaign 轮次目标。',
+            question: "可以运行哪些设计路线？",
+            answer: "以当前路线目录、已启用插件和站点验证为准。可以选模板或手动建图；缺插件、输入或运行验证的路线会提示原因，不能直接执行。",
           },
           clarifyingQuestions: {
-            question: '代理为什么提出澄清问题？',
-            answer:
-              'Copilot 和靶点智能分析需要结合位点定义、支架偏好、可开发性约束和验证实验背景，才能提出与项目匹配的路线。模糊目标（如未指定靶点位的「提高结合」）会导致肤浅或不安全的建议。',
+            question: "Bot 为什么需要补充信息？",
+            answer: "目标、输入、约束或成功标准不明确时，Bot 需要补充信息才能给出可用方案。无法确认的内容应列为待解决问题。",
           },
           changeGoal: {
-            question: '开始后能否更改设计目标？',
-            answer:
-              '提交前可编辑工作流参数并添加节点。运行开始后该次 DAG 为只读。要更改目标，创建新工作流运行或通过已批准参数补丁推进 Campaign 轮次。应更新项目综述和靶点确认以反映新目标。',
+            question: "中途可以修改目标吗？",
+            answer: "可以修改项目目标并重新规划。提交前检查草稿参数；提交后运行快照不可改，应创建新工作流。目标变化后旧方案需要重新检查。",
           },
           intermediateSteps: {
-            question: '中间步骤应如何展示？',
-            answer:
-              '工作流画布显示节点状态（排队、运行中、已完成、失败）及端口级制品链接。引导模式简化视图；高级模式显示完整 DAG、边类型和图例。集群节点可通过任务面板查看日志和 stdout 尾部。',
+            question: "如何查看执行过程？",
+            answer: "工作流显示节点和依赖；任务面板显示状态、日志和产物。人工门控需要在查看结果后放行；排队不表示已经完成。",
           },
         },
       },
@@ -1979,24 +1965,20 @@ export const bundleZh = {
         title: '评分、结构与可视化',
         items: {
           interpretResults: {
-            question: '如何解读序列、评分、结构和排名？',
-            answer:
-              '候选物表按综合评分排序（预测 Kd 代理、界面 ddG、AF2 pLDDT/ipTM、Rosetta 能量、可开发性标记）。更高排名不保证湿实验成功。使用术语表工具提示了解指标定义。查看器中的结构为预测复合物——将置信度值视为计算结果，非实验验证。',
+            question: "如何解读候选评分？",
+            answer: "先核对指标定义、单位、计算方法和测量条件，再比较候选。缺失值不等于零；结构预测、评分和湿实验结果应分开判断。",
           },
           modelDifferences: {
-            question: '不同模型为何可能产生不同结果？',
-            answer:
-              'RFdiffusion、ProteinMPNN、AlphaFold2 和 Rosetta 使用不同训练数据、能量函数和采样策略。随机采样（温度、种子）也会改变输出。在候选物漏斗中跨模型比较，优先选择在多个指标上一致的设计，而非单一指标最高者。',
+            question: "不同模型结果不一致怎么办？",
+            answer: "核对输入、版本、参数和随机种子，分别保留结果及来源。比较一致和冲突的证据，再决定是否需要进一步计算或实验。",
           },
           visualizationFails: {
-            question: '可视化失败该怎么办？',
-            answer:
-              '确认制品文件存在且后端预览端点返回 200。Mol* 需要有效 PDB/mmCIF 格式——损坏或空文件在某些浏览器中静默失败。打开开发者工具查看错误，重试下载或上传修正结构。演示模式可能无后端预览使用本地回退。',
+            question: "结构无法显示怎么办？",
+            answer: "使用页面重试，并检查文件是否能下载、格式是否为有效 PDB/mmCIF。若仍失败，记录错误信息和制品标识供管理员定位。",
           },
           partialResults: {
-            question: '失败或部分结果应如何展示？',
-            answer:
-              '失败节点在任务面板显示红色失败状态和错误摘要。部分输出（如部分骨架完成、AF2 超时）列出可用制品并带警告标记。候选物表仅包含通过 BDA 过滤器的设计；检查原始评分表查看被拒绝序列。',
+            question: "如何处理部分结果或失败？",
+            answer: "查看任务终态、错误原因和已登记产物。部分结果不能当成整个流程成功；保留失败记录，通过重试入口或新方案继续。",
           },
         },
       },
@@ -2005,29 +1987,24 @@ export const bundleZh = {
         title: '项目生命周期与集成问题',
         items: {
           projectCrud: {
-            question: '如何创建、启动、保存和删除项目？',
-            answer:
-              '在项目页创建新项目。选择项目将上下文保存到 URL（?project=id）和本地存储。通过提交工作流启动运行。删除将工作区移至 project_trash/（可通过扫描恢复）——非立即擦除。所有操作需要研究员或更高角色。',
+            question: "如何创建、运行和删除项目？",
+            answer: "在项目页创建或打开项目，运行从工作流预览确认开始。删除前检查确认提示与保留规则；不要把归档、回收站和永久清理混为一谈。",
           },
           buttonFailures: {
-            question: '「启动」「入门」「删除项目」等按钮失败怎么办？',
-            answer:
-              '变更进行中按钮禁用。失败显示带 API 错误详情的 Toast。常见原因：未选项目、缺少认证令牌（跳转登录）、后端离线或权限不足。检查 BackendHealthBanner，API 可用后重试。',
+            question: "按钮不可用怎么办？",
+            answer: "先查看按钮旁的原因：可能缺少项目、权限、必需输入或有效版本。正在处理时等待任务结果；失败后按提示修正或重试。",
           },
           apiTimeout: {
-            question: 'API 请求超时怎么办？',
-            answer:
-              'TanStack Query 对瞬时失败最多重试三次并指数退避。长时间操作（文献摄取、靶点档案）可能超过默认超时——刷新页面并检查任务状态，勿重复提交。集群任务在服务端持久化；Copilot 聊天超时可能截断回复。',
+            question: "操作超时怎么办？",
+            answer: "先在任务列表确认是否已经受理。刷新不会取消后台任务；避免重复提交。如果长期无进展，记录任务标识和错误信息。",
           },
           schemaMismatch: {
-            question: '前后端响应模式不匹配怎么办？',
-            answer:
-              'Zod 验证错误出现在控制台并可能导致 UI 章节空白。通常表示前后端版本不一致。从同一提交对齐部署，查阅 /api/docs 当前模式，并向团队报告失败端点和响应载荷。',
+            question: "页面提示数据格式不兼容怎么办？",
+            answer: "刷新后仍失败时，记录页面、操作和错误标识，由管理员核对前后端版本。不要把空白区域当成没有数据。",
           },
           incompleteState: {
-            question: '项目工作流状态不完整怎么办？',
-            answer:
-              '缺少工作流运行、孤立制品或中断任务的项目在候选物和结果页显示部分数据。打开工作流检查节点状态，通过刷新同步任务，或启动新运行。任务仍在运行时 Campaign 轮次无法评估。',
+            question: "项目状态与结果看起来不一致怎么办？",
+            answer: "查看对应工作流和任务的最新状态，并核对产物来源。先确认后台服务正常，再决定重试或新建运行；不要直接覆盖旧结果。",
           },
         },
       },
@@ -2036,49 +2013,40 @@ export const bundleZh = {
         title: '常见执行问题',
         items: {
           loadingNeverEnds: {
-            question: '加载状态一直不结束',
-            answer:
-              '通常由挂起的 API 请求或后端进程引起。打开网络面板——若请求一直 pending，重启 8100 端口的 uvicorn。若返回 401 请重新登录。刷新清除过期的 React Query 缓存。未配置 API 密钥时 Copilot 流可能挂起。',
+            question: "页面一直加载怎么办？",
+            answer: "先重试或刷新，登录失效时重新登录。若提示后台服务未就绪，已有资料可能仍可浏览，异步任务需要服务恢复后继续。",
           },
           emptyResearch: {
-            question: '研究后结果为空',
-            answer:
-              '冷门靶点的靶点智能分析可能无 PDB 命中或文献。核对拼写，尝试 UniProt 登录号而非基因名，并通过 Copilot 文献工具手动摄取论文。项目综述空白章节表示代理未完成——用更具体的提示重新运行。',
+            question: "研究资料为空怎么办？",
+            answer: "先确认选中了正确项目，检查研究任务状态和检索词。无结果、任务失败和未导入资料是不同情况；按对应原因补充资料。",
           },
           citationLinksMissing: {
-            question: '引用链接缺失',
-            answer:
-              'Europe PMC 返回不完整记录时，仅元数据的论文缺少 DOI/PMID 链接。开放获取状态影响链接生成。pending_review 声明有意省略未验证引用。在项目综述引用轨道手动添加参考文献。',
+            question: "引用打不开怎么办？",
+            answer: "查看来源是否有 DOI、PMID 或原始链接，以及对应片段是否已保存。来源未验证或只有元数据时应显示限制；不要用无关文献补齐编号。",
           },
           pdbDownloadFailed: {
-            question: 'PDB 下载失败',
-            answer:
-              '确认 PDB ID 存在，检查后端容器出站网络并重试。大型 mmCIF 可能超时——增加超时或手动下载后通过结构拖放区上传。RCSB 维护窗口偶尔导致 503 错误。',
+            question: "结构来源暂时不可达怎么办？",
+            answer: "保留失败任务，待来源恢复后重试；也可上传已有的有效结构，并记录来源和版本。",
           },
           shallowAgent: {
-            question: '代理回复过于肤浅',
-            answer:
-              '无 LLM API 密钥时 Copilot 降级为规则模式。在设置中配置 OpenAI 兼容凭证。提供项目上下文（选择项目），用靶点名称提出具体问题，对深度档案使用靶点智能分析而非简短聊天提示。',
+            question: "Bot 回答没有完成任务怎么办？",
+            answer: "确认项目上下文、模型可用性和授权能力，检查任务交付状态及缺失项。给出具体问题和评价标准；一段回复不代表任务已经完成。",
           },
           lockedStep: {
-            question: '工作流步骤被锁定',
-            answer:
-              'DAG 节点在上游端口完成制品前锁定。已完成的工作流运行为只读。Campaign 门控在所有任务结束前阻止评估。在画布检查边依赖，在重试前解决失败的上游节点。',
+            question: "工作流为什么被锁定？",
+            answer: "查看锁定原因：可能缺少输入、上游未完成、等待人工放行，或该运行已提交。已提交的快照不能修改；新方案需要新建工作流。",
           },
           deleteConfirmation: {
-            question: '删除操作需要确认',
-            answer:
-              '项目删除需明确确认以防误删。工作区移至回收站而非立即删除。集群任务草稿需确认并提交——Copilot 不能自动提交任务。若确认对话框未出现，检查弹窗拦截器。',
+            question: "为什么需要确认？",
+            answer: "删除、计算提交和关键研究决定会改变数据或使用资源。确认前检查对象、输入、参数及预算；Bot 提案不会替你批准。",
           },
           backendNotRunning: {
-            question: '后端未运行',
-            answer:
-              '8100 端口不可达时显示 BackendHealthBanner。使用 docker compose up、uvicorn 或部署脚本启动 API。前端演示模式可只读浏览，但无后端无法创建项目或提交工作流。',
+            question: "服务未就绪时还能做什么？",
+            answer: "页面会说明受影响的服务。已有项目和结果可能仍可浏览；模型任务、检索和计算需要对应后台服务恢复。管理员应按部署检查服务状态。",
           },
           missingEnvVars: {
-            question: '环境变量缺失',
-            answer:
-              '后端需要 DATABASE_URL、REDIS_URL、JWT_SECRET 和存储路径。Copilot 需要 LLM_API_KEY 和 LLM_BASE_URL。集群适配器需要 SSH/LSF 凭证。对照 docs 部署指南检查 .env。设置 → 连接显示关键服务的验证状态。',
+            question: "模型或计算环境未配置怎么办？",
+            answer: "请管理员检查模型、信息来源、对象存储及计算站点配置。前端可用不等于外部服务已就绪；没有启明会话时仍可浏览本地资料和编辑草稿。",
           },
         },
       },
@@ -2093,33 +2061,33 @@ export const bundleZh = {
     },
     hero: {
       pill: 'AI 蛋白质设计工作流',
-      title: '从科研检索到可交付设计结果',
+      title: '了解研究工作流程',
       subtitle:
-        '沿着蛋白质设计园区的连接路径，逐步了解完整流程。代理引导您从文献综述到实验交接——全程可追溯。',
-      disclaimer: '本页面为教学指南，与实时项目状态分离，不反映您当前的工作流进度。',
+        '查看每一步需要什么、产出什么，以及在哪里操作。',
+      disclaimer: '本指南说明操作流程，不代表当前项目进度。',
       scrollPrompt: '滚动以跟随工作流',
     },
     map: {
       title: '工作流地图',
-      subtitle: '每个站点代表 AI 蛋白质设计流水线中的一个阶段。滚动以沿路径前进。',
+      subtitle: '选择一个步骤，查看输入、操作和产出。',
     },
     models: {
       eyebrow: '模型原理',
-      title: '三个核心模型如何协同工作',
-      subtitle: '从三维骨架生成、氨基酸序列设计到结构复核，下面的原理图展示了每个模型在设计闭环中解决的问题。',
+      title: '三种模型方法',
+      subtitle: '不同方法解决不同问题。根据目标选择路线，并确认模型已可用。',
       inputLabel: '输入',
       mechanismLabel: '核心机制',
       outputLabel: '输出',
       enlarge: '查看原图',
       chainLabel: '核心模型工作链路',
-      chainCaption: '生成骨架 → 设计序列 → 预测并验证结构',
+      chainCaption: '示例路线：骨架 → 序列 → 预测结构；功能需通过实验验证',
       rfdiffusion: {
         role: '骨架生成',
         summary: '从随机原子噪声出发，在结构与功能约束下逐步生成可设计的蛋白质三维骨架。',
         input: '随机噪声，以及可选的靶标、基序、对称性或长度约束。',
-        mechanism: '扩散模型反复去噪，先形成主链轨迹，再进行全原子几何细化。',
-        output: '满足给定几何条件的候选蛋白质骨架。',
-        alt: 'RFdiffusion 原理图：原子噪声经过逐步去噪、主链生成和全原子细化，形成蛋白质设计候选结构。',
+        mechanism: '原版 RFdiffusion 对残基位置和朝向逐步去噪，生成蛋白主链。序列设计是后续独立步骤。',
+        output: '供序列设计和后续评估使用的候选蛋白主链。',
+        alt: 'RFdiffusion：残基框架从噪声中逐步去噪，生成候选蛋白主链。',
       },
       proteinmpnn: {
         role: '序列设计',
@@ -2130,12 +2098,12 @@ export const bundleZh = {
         alt: 'ProteinMPNN 原理图：输入目标主链，在蛋白质图上传递信息并更新几何特征，得到逐位置氨基酸概率并采样设计序列。',
       },
       alphafold3: {
-        role: '结构预测与复核',
+        role: '结构预测',
         summary: '整合序列、模板和化学信息，预测蛋白质及其相互作用伙伴的三维结构与置信度。',
         input: '蛋白质、DNA 或 RNA 序列、小分子，以及可用的 MSA、模板和化学特征。',
-        mechanism: 'Evoformer 进行全局关系推理，结构模块迭代生成并优化三维几何。',
+        mechanism: 'Pairformer 更新单体与成对表示，扩散模块预测原子坐标。',
         output: '预测的复合物三维结构，以及 pLDDT、PAE 等置信度指标。',
-        alt: 'AlphaFold 3 原理图：异构生物数据被编码为统一表示，经 Evoformer 和结构模块推理，输出三维结构与置信度。',
+        alt: 'AlphaFold 3：分子输入经 Pairformer 和扩散模块处理，得到预测坐标与置信度。',
       },
     },
     faq: {
@@ -2145,8 +2113,8 @@ export const bundleZh = {
       empty: '暂无 FAQ 内容。',
     },
     cta: {
-      title: '准备好开始设计了吗？',
-      body: '创建项目、确认靶点，让代理为您构建从科研到候选物的可追溯工作流。',
+      title: '进入你的项目',
+      body: '打开项目，明确目标，检查现有证据，再规划计算。',
       startProject: '开始项目',
       signIn: '登录以开始',
       backToLogin: '返回登录',

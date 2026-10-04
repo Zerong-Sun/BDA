@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../../components/ui/AppFrame'
 import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
 import { structureSourceFromCandidate } from '../pdb-viewer/types'
-import { downloadCandidateStructures } from '../../lib/api/candidates'
-import { getArtifact } from '../../lib/api/artifacts'
+import { downloadArtifact, getArtifact } from '../../lib/api/artifacts'
 import { promoteCandidateToBench } from '../../lib/api/wetlab'
 import { explainCandidate, type InterpretationReasoning } from '../../lib/api/copilot'
 import { candidateScore, candidateText, type Candidate } from '../../lib/schemas/candidate'
@@ -36,7 +35,7 @@ const metricGuideKeys = [
 ] as const
 
 export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const showToast = useToastStore((s) => s.show)
   const uiDensity = useAppStore((s) => s.uiDensity)
   const advanced = uiDensity === 'advanced'
@@ -49,7 +48,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const hasMonomer = Boolean(candidate?.structure_artifact_id)
   const hasComplex = Boolean(candidate?.complex_artifact_id)
   const hasStructure = hasMonomer || hasComplex
-  const selectedArtifactId = structureMode === 'complex'
+  const effectiveStructureMode = !hasMonomer && hasComplex ? 'complex' : !hasComplex ? 'monomer' : structureMode
+  const selectedArtifactId = effectiveStructureMode === 'complex'
     ? candidate?.complex_artifact_id
     : candidate?.structure_artifact_id ?? candidate?.complex_artifact_id
   const artifactQuery = useQuery({
@@ -71,7 +71,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const nextAction = candidateText(candidate, 'next_action')
 
   const structureSource = structureSourceFromCandidate(candidate, {
-    structureMode,
+    structureMode: effectiveStructureMode,
     downloadUrl: artifactQuery.data?.download_url ?? undefined,
   })
 
@@ -107,11 +107,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const downloadStructure = async () => {
     setIsDownloading(true)
     try {
-      await downloadCandidateStructures(
-        candidate.project_id,
-        [candidate.id],
-        `${candidate.id}_structure.zip`,
-      )
+      if (!selectedArtifactId) throw new Error(t.candidatesExt.toasts.downloadFailed)
+      await downloadArtifact(await getArtifact(selectedArtifactId))
       showToast(t.candidatesExt.toasts.structureDownloaded, 'success')
     } catch (err) {
       const message = err instanceof Error ? err.message : t.candidatesExt.toasts.downloadFailed
@@ -151,7 +148,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           <CandidateStructureOverlay
             candidate={candidate}
             metadata={null}
-            structureMode={structureMode}
+            structureMode={effectiveStructureMode}
             projectId={projectId}
           />
         </>
@@ -161,13 +158,16 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
         </div>
       )}
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{candidate.id}</h2>
+        <h2 className="text-lg font-semibold">{candidate.candidate_key || candidate.id}</h2>
         <StatusPill label={decision ?? '—'} tone={statusTone(decision ?? '')} />
       </div>
+      {candidate.name && candidate.name !== (candidate.candidate_key || candidate.id) ? (
+        <p className="mb-2 font-medium">{candidate.name}</p>
+      ) : null}
       <p className="mb-4 text-sm text-text-secondary">
         {format(t.candidatesExt.detail.familyLine, {
-          family: candidate.name,
-          nextAction,
+          family: candidateText(candidate, 'family') ?? '—',
+          nextAction: nextAction ?? (language === 'zh' ? '尚未指定下一步。' : 'No next action specified.'),
         })}
       </p>
       {explanation && explanation.subject_id === candidate.id ? (
@@ -175,12 +175,21 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           <InterpretationCard reasoning={explanation} />
         </div>
       ) : null}
+      {candidateText(candidate, 'source_dataset') ? <div className="grid grid-cols-2 gap-3">
+        {[
+          ['pLDDT', candidateScore(candidate, 'plddt'), ''],
+          ['ipTM', candidateScore(candidate, 'iptm'), ''],
+          [language === 'zh' ? '跨链 PAE' : 'Cross-chain PAE', candidateScore(candidate, 'pae_interaction'), ' Å'],
+          [language === 'zh' ? 'Rosetta 界面能' : 'Rosetta interface energy', candidateScore(candidate, 'rosetta_interface_dg'), ' REU'],
+        ].filter(([,value]) => typeof value === 'number').map(([label,value,unit]) => <div key={String(label)} className="rounded-lg border border-border-soft p-3"><p className="text-xs text-text-secondary">{label}</p><p className="mt-2 text-xl font-semibold">{Number(value).toFixed(2)}<span className="text-xs font-normal">{unit}</span></p></div>)}
+      </div> : (
       <ScoreBars
         affinity={candidateScore(candidate, 'interface_score') ?? candidate.score}
         stability={candidateScore(candidate, 'plddt')}
         solubility={candidateScore(candidate, 'solubility_score')}
-        rosettaScore={candidateScore(candidate, 'rosetta_score')}
+        rosettaScore={(candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'rosetta_interface_dg'))}
       />
+      )}
       {!advanced ? (
         <p className="mt-4 rounded-md border border-border-soft bg-bg-app p-3 text-xs text-text-secondary">
           {format(t.candidatesExt.detail.simplifiedView, {
@@ -203,7 +212,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
             description={t.candidatesExt.detail.interfacePaeHelp}
             good={t.candidatesExt.detail.interfacePaeGood}
           />
-          : <span className="text-text-primary">{candidateScore(candidate, 'interface_pae') != null ? `${candidateScore(candidate, 'interface_pae')} Å` : t.candidatesExt.table.notScored}</span>
+          : <span className="text-text-primary">{(candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction')) != null ? `${(candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction'))} Å` : t.candidatesExt.table.notScored}</span>
         </div>
         <div>
           <GlossaryTooltip
@@ -211,7 +220,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
             description={t.candidatesExt.detail.rosettaHelp}
             good={t.candidatesExt.detail.rosettaGood}
           />
-          : <span className="text-text-primary">{candidateScore(candidate, 'rosetta_score') ?? t.candidatesExt.table.notScored}</span>
+          : <span className="text-text-primary">{(candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'rosetta_interface_dg')) ?? t.candidatesExt.table.notScored}</span>
         </div>
         <div>
           {t.candidatesExt.detail.expressionRisk}:{' '}
@@ -233,7 +242,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           </div>
         ) : null}
       </div>
-      {advanced ? <CandidateConditionMetrics candidateId={candidate.id} /> : null}
+      {advanced || candidate.properties.source_dataset ? <CandidateConditionMetrics candidateId={candidate.id} /> : null}
       {advanced ? (
         <div className="mt-4 rounded-md border border-border-soft bg-bg-app p-3 text-xs text-text-secondary">
           <p className="uppercase tracking-wide text-accent">{t.candidatesExt.detail.metricGuideTitle}</p>

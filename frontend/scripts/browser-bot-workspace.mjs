@@ -391,8 +391,12 @@ try {
   console.log(JSON.stringify({ passed: checks.length, output, checks }, null, 2))
 } catch (error) {
   for (const context of browser.contexts()) for (const page of context.pages()) {
-    await screenshot(page, 'failure')
-    await writeFile(`${output}/failure.txt`, await page.locator('body').innerText())
+    try {
+      await screenshot(page, 'failure')
+      await writeFile(`${output}/failure.txt`, await page.locator('body').innerText())
+    } catch (captureError) {
+      console.error('Failure capture unavailable:', captureError.message)
+    }
   }
   throw error
 } finally {

@@ -595,7 +595,7 @@ describe('Layer 8 product contract pages', () => {
 
     renderWithProviders(<ResultsPage />)
 
-    expect(await screen.findByText('No wet-lab readouts are recorded for this project yet. Upload experiment results or run a validation workflow to populate this view.')).toBeInTheDocument()
+    expect(await screen.findByText('No wet-lab readouts are recorded. Upload measurements and link them to the tested candidates.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Prepare delivery package' })).toBeDisabled()
     expect(
       screen.getByText('No delivery package has been generated from verified project artifacts yet.'),

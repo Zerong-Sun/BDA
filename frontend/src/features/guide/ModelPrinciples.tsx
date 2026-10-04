@@ -1,12 +1,9 @@
-import { ArrowRight, ArrowsOut } from '@phosphor-icons/react'
+import { ArrowRight, ArrowSquareOut } from '@phosphor-icons/react'
 import { AppFrame } from '@/components/ui/AppFrame'
-import alphaFold3Diagram from '../../assets/guide-models/alphafold3.png'
-import proteinMpnnDiagram from '../../assets/guide-models/proteinmpnn.png'
-import rfDiffusionDiagram from '../../assets/guide-models/rfdiffusion.png'
 import { useI18n } from '../../lib/i18n'
 
 export function ModelPrinciples() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const models = [
     {
       id: 'rfdiffusion',
@@ -16,7 +13,8 @@ export function ModelPrinciples() {
       input: t.guide.models.rfdiffusion.input,
       mechanism: t.guide.models.rfdiffusion.mechanism,
       output: t.guide.models.rfdiffusion.output,
-      image: rfDiffusionDiagram,
+      source: 'https://doi.org/10.1038/s41586-023-06415-8',
+      reference: 'Watson et al., Nature (2023)',
       alt: t.guide.models.rfdiffusion.alt,
     },
     {
@@ -27,7 +25,8 @@ export function ModelPrinciples() {
       input: t.guide.models.proteinmpnn.input,
       mechanism: t.guide.models.proteinmpnn.mechanism,
       output: t.guide.models.proteinmpnn.output,
-      image: proteinMpnnDiagram,
+      source: 'https://doi.org/10.1126/science.add2187',
+      reference: 'Dauparas et al., Science (2022)',
       alt: t.guide.models.proteinmpnn.alt,
     },
     {
@@ -38,7 +37,8 @@ export function ModelPrinciples() {
       input: t.guide.models.alphafold3.input,
       mechanism: t.guide.models.alphafold3.mechanism,
       output: t.guide.models.alphafold3.output,
-      image: alphaFold3Diagram,
+      source: 'https://doi.org/10.1038/s41586-024-07487-w',
+      reference: 'Abramson et al., Nature (2024)',
       alt: t.guide.models.alphafold3.alt,
     },
   ]
@@ -78,29 +78,6 @@ export function ModelPrinciples() {
               <p className="max-w-xl text-sm leading-relaxed text-text-secondary sm:text-right">{model.summary}</p>
             </div>
 
-            <figure className="bg-background">
-              <a
-                href={model.image}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative block aspect-video focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-                aria-label={`${t.guide.models.enlarge}: ${model.name}`}
-              >
-                <img
-                  src={model.image}
-                  alt={model.alt}
-                  className="h-full w-full object-contain"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground opacity-0 shadow-sm backdrop-blur transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <ArrowsOut className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t.guide.models.enlarge}
-                </span>
-              </a>
-              <figcaption className="sr-only">{model.alt}</figcaption>
-            </figure>
-
             <div className="grid gap-4 border-t border-border-soft px-5 py-5 sm:grid-cols-[1fr_auto_1.35fr_auto_1fr] sm:items-start sm:px-7">
               <PrincipleStep label={t.guide.models.inputLabel} text={model.input} />
               <ArrowRight className="mt-6 hidden h-4 w-4 text-border-strong sm:block" aria-hidden="true" />
@@ -108,6 +85,12 @@ export function ModelPrinciples() {
               <ArrowRight className="mt-6 hidden h-4 w-4 text-border-strong sm:block" aria-hidden="true" />
               <PrincipleStep label={t.guide.models.outputLabel} text={model.output} />
             </div>
+            <p className="border-t border-border-soft px-5 py-3 text-xs text-text-secondary sm:px-7">
+              {language === 'zh' ? '方法依据：' : 'Method reference: '}
+              <a href={model.source} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
+                {model.reference}<ArrowSquareOut aria-hidden="true" />
+              </a>
+            </p>
           </AppFrame>
         ))}
       </div>

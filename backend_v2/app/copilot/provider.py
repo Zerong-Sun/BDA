@@ -43,6 +43,13 @@ def completion_message(
 ) -> dict[str, Any]:
     if not provider.endpoint:
         raise DomainError("llm_endpoint_missing", "LLM provider endpoint is not configured", status_code=503)
+    reserved = sorted({"model", "messages", "stream"} & provider.config.keys())
+    if reserved:
+        raise DomainError(
+            "llm_config_reserved_fields",
+            "LLM provider config cannot set reserved request fields: " + ", ".join(reserved),
+            status_code=422,
+        )
     token = credential_value(provider.credential_ref)
     endpoint = provider.endpoint.rstrip("/")
     if not endpoint.endswith("/chat/completions"):

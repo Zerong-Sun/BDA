@@ -1,18 +1,7 @@
 import type { ProjectOverview } from '../../lib/api/projects'
 
-/**
- * Single source of truth for the design loop the whole app navigates through:
- * Research -> Workflow -> Candidates -> Lab -> Results.
- *
- * Lab sits where a design stops being a prediction: candidates are made and
- * measured there, which is where the results in the last stage come from.
- *
- * The stage-gating semantics here are the product contract exercised by
- * WorkflowProgress.test / stage6VerticalSlice.test: a project that is not
- * target-ready must keep the user on Research, and a stage never unlocks from
- * historical artifacts alone. Both the launchpad cards and the persistent
- * pipeline rail derive their state from this module so they can never drift.
- */
+/** Navigation reflects available project records. Execution readiness is enforced
+ * by workflow preflight and submission, not by hiding imported evidence. */
 export type StageKey = 'research' | 'workflow' | 'candidates' | 'lab' | 'results'
 export type StageState = 'done' | 'current' | 'locked' | 'not_started'
 
@@ -36,11 +25,11 @@ export function currentStageIndex(
   overview?: ProjectOverview | null,
 ): number {
   if (!hasProject) return 0
-  if (overview?.target_readiness?.ready_for_workflow !== true) return 0
   if ((overview?.experiment_result_count ?? 0) > 0) return 4
   if ((overview?.funnel.ordered ?? 0) > 0) return 3
-  if ((overview?.funnel.generated ?? 0) > 0) return 2
-  return 1
+  if ((overview?.candidate_count ?? overview?.funnel.generated ?? 0) > 0) return 2
+  if (overview?.latest_workflow_id || overview?.target_readiness?.ready_for_workflow === true) return 1
+  return 0
 }
 
 export function pipelineStageState(
@@ -50,30 +39,17 @@ export function pipelineStageState(
   currentIndex: number,
 ): StageState {
   if (!hasProject) return index === 0 ? 'current' : 'locked'
-  const hasGeneratedCandidates = (overview?.funnel.generated ?? 0) > 0
+  const hasCandidates = (overview?.candidate_count ?? overview?.funnel.generated ?? 0) > 0
   const hasResults = (overview?.experiment_result_count ?? 0) > 0
+  const hasOrders = (overview?.funnel.ordered ?? 0) > 0
+  const hasWorkflow = Boolean(overview?.latest_workflow_id)
   const targetReady = overview?.target_readiness?.ready_for_workflow === true
-  const done =
-    index === 0
-      ? targetReady
-      : index === 1 || index === 2
-        ? hasGeneratedCandidates
-        : index === 3
-          ? hasResults // the bench is done once it has produced a measurement
-          : hasResults
-  if (done && index < currentIndex) return 'done'
+  const done = [targetReady, hasWorkflow && hasCandidates, hasCandidates && (hasOrders || hasResults), hasResults, hasResults]
+  const available = [true, targetReady || hasWorkflow, hasCandidates, hasCandidates || hasResults, hasCandidates || hasResults]
   if (index === currentIndex) return 'current'
-  if (index < currentIndex) return 'done'
-  if (index > 0 && !hasProject) return 'locked'
-  const prevDone =
-    index === 0
-      ? true
-      : index === 1
-        ? targetReady
-        : index === 2
-          ? hasGeneratedCandidates
-          : hasGeneratedCandidates
-  return prevDone ? 'not_started' : 'locked'
+  if (done[index] && index < currentIndex) return 'done'
+  return available[index] ? 'not_started' : 'locked'
+
 }
 
 export interface DerivedStage extends PipelineStageMeta {

@@ -67,6 +67,8 @@ publisher 用 `FOR UPDATE SKIP LOCKED` 发布任务。队列为 `dispatch`、`po
 
 Artifact 状态为 uploading、available、failed、deleted。reconciliation 检查超时 staging、孤儿对象、缺失对象、共享 checksum 引用和软删除项目。
 
+对象清理仅处理本库已登记的对象或本库项目/作业命名空间内的孤儿对象。其他项目/作业前缀保留并计入 `foreign_objects`；未能确认归属的 staging、无前缀对象保留并计入 `unattributed_objects`，不能只因本库无引用而删除。复制数据库会复制项目/作业 ID；这样的独立部署仍必须配置独立存储桶，避免相同命名空间互相影响。
+
 ## 7. 高级领域
 
 - Project 支持多个 target，`primary_target_id` 只是主目标指针。

@@ -380,3 +380,55 @@ def test_checksum_ignores_key_order() -> None:
 
 def test_checksum_is_sensitive_to_content_changes() -> None:
     assert research_package_checksum({"a": 1}) != research_package_checksum({"a": 2})
+
+
+@pytest.mark.parametrize("pdb_id", [" 1ABC", "1ABC/"])
+def test_structure_identifiers_reject_whitespace_and_path_characters(pdb_id: str) -> None:
+    package = minimal_package()
+    duplicate_structures(package)
+    package["projects"][0]["structures"] = [package["projects"][0]["structures"][0]]
+    package["projects"][0]["structures"][0]["pdb_id"] = pdb_id
+    with pytest.raises(ResearchPackageValidationError, match="pdb_id must be canonical"):
+        validate_research_package(package)
+
+
+@pytest.mark.parametrize("reference_ids", ["R001;", " R001"])
+def test_candidate_reference_list_rejects_empty_or_padded_segments(reference_ids: str) -> None:
+    package = minimal_package()
+    package["candidates"] = [candidate_payload(reference_ids=reference_ids)]
+    with pytest.raises(ResearchPackageValidationError, match="canonical semicolon-separated identifiers"):
+        validate_research_package(package)
+
+
+def test_reference_cannot_be_assigned_to_an_undeclared_project() -> None:
+    package = minimal_package()
+    package["references"][0]["project_ids"] = ["BASE", "UNDECLARED"]
+    with pytest.raises(ResearchPackageValidationError, match="unique declared projects"):
+        validate_research_package(package)
+
+
+@pytest.mark.parametrize("url", ["https://doi.org/", "https://doi.org/not-a-doi"])
+def test_trusted_hostname_alone_does_not_identify_a_reference(url: str) -> None:
+    package = minimal_package()
+    package["references"][0].update(pmid="", doi="", url=url)
+    with pytest.raises(ResearchPackageValidationError, match="valid PMID, DOI, or trusted HTTPS"):
+        validate_research_package(package)
+
+
+@pytest.mark.parametrize("locator", [
+    {"doi": "10.1234/example"},
+    {"doi_url": "https://doi.org/10.1234/example"},
+    {"pmc_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1234/"},
+])
+def test_reference_locators_work_without_a_pubmed_identifier(locator: dict) -> None:
+    package = minimal_package()
+    package["references"][0].update(pmid="", **locator)
+    normalized, version = normalize_research_package(package)
+    assert version == "1.1"
+    for field, value in locator.items():
+        assert normalized["references"][0][field] == value
+
+
+def test_checksum_preserves_boolean_semantics_when_normalizing_numbers() -> None:
+    assert research_package_checksum({"nested": [True, False, 1.0]}) == research_package_checksum({"nested": [True, False, 1]})
+    assert research_package_checksum({"nested": [True, False]}) != research_package_checksum({"nested": [1, 0]})

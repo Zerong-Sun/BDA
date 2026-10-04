@@ -213,7 +213,7 @@ def test_a_tool_result_is_persisted_before_the_next_provider_call(
     roles = [turn.role for turn in agent_runs.transcript(session, run)]
     assert roles == ["assistant", "tool", "assistant"]
     # The second call saw the tool result, which means it came back out of a row.
-    assert seen[1][-1]["role"] == "tool"
+    assert any(message.get("tool_call_id") == "call_1" and message["role"] == "tool" for message in seen[1])
     assert run.status == "succeeded"
 
 

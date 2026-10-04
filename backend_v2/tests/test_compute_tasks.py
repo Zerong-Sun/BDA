@@ -610,7 +610,8 @@ def test_domain_background_tasks(task_database, monkeypatch) -> None:
 
     assert delivery_tasks.build_delivery_package.run(str(domain_ids[0]))["status"] == "available"
     assert delivery_tasks.build_delivery_package.run(str(domain_ids[0]))["status"] == "ignored"
-    assert literature_tasks.literature_ingest.run(str(domain_ids[1]))["status"] == "available"
+    # The fixture has a title only, which cannot stand in for paper content.
+    assert literature_tasks.literature_ingest.run(str(domain_ids[1]))["status"] == "metadata_only"
     monkeypatch.setattr(literature_tasks.literature_search, "run", lambda run_id: {"status": "completed", "result_count": 0})
     assert literature_tasks.subscription_run.run(str(domain_ids[6]))["status"] == "completed"
     assert intelligence_tasks.intelligence_run.run(str(domain_ids[2]))["status"] == "succeeded"
@@ -768,6 +769,104 @@ def test_literature_search_preserves_search_full_text_and_evidence_trace(task_da
             )
         )
         assert {"search", "search_hit", "metadata_verification", "full_text"} <= stages
+        old_provenance = dict(provenance)
+        old_artifact_id = document.artifact_id
+        old_artifact = session.get(Artifact, old_artifact_id)
+        old_key = old_artifact.object_key
+        old_bytes = FakeStorage.objects[old_key]
+        old_chunk = session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document.id))
+        old_chunk_id, old_text = old_chunk.id, old_chunk.content
+        second = LiteratureSearchRun(
+            project_id=ids["project"], query="Updated paper", sources=["europe_pmc"],
+            requested_limit=3, fetch_full_text=True, extract_claims=True, created_by=ids["user"],
+        )
+        session.add(second)
+        session.commit()
+        second_id = second.id
+
+    xml = xml.replace(b"reduced the measured", b"did not reduce the measured")
+    assert literature_tasks.literature_search.run(str(second_id))["status"] == "completed"
+    with factory() as session:
+        document = session.get(LiteratureDocument, packaged_document_id)
+        assert document.metadata_json["content_provenance"] == old_provenance
+        latest = document.metadata_json["latest_retrieval_provenance"]
+        assert latest["content_checksum_sha256"] != old_provenance["content_checksum_sha256"]
+        assert document.artifact_id == old_artifact_id
+        assert session.get(LiteratureChunk, old_chunk_id).content == old_text
+        assert FakeStorage.objects[old_key] == old_bytes
+        latest_artifact = session.get(Artifact, uuid.UUID(latest["raw_content_artifact_id"]))
+        assert latest_artifact.object_key != old_key
+        assert FakeStorage.objects[latest_artifact.object_key] == xml
+
+
+def test_empty_full_text_xml_falls_back_to_abstract_without_mixing_artifact(task_database, monkeypatch) -> None:
+    from backend_v2.app.literature.retrieval import text_checksum
+
+    factory, ids = task_database
+    with factory() as session:
+        run = LiteratureSearchRun(
+            project_id=ids["project"], query="abstract fallback", sources=["europe_pmc"],
+            requested_limit=1, fetch_full_text=True, extract_claims=True, created_by=ids["user"],
+        )
+        session.add(run)
+        session.commit()
+        run_id = run.id
+    abstract = "The original database abstract describes the observation."
+    xml = b'<article><front><article-meta><permissions><license><license-p>XML license</license-p></license></permissions></article-meta></front></article>'
+    audit = {"tool": "europe_pmc.search", "query": {}, "status": "completed", "http_status": 200}
+
+    class FakeEvidenceTools:
+        def __init__(self, **_kwargs):
+            self.audits = []
+
+        def search_europe_pmc(self, query, page_size):
+            self.audits.append(audit)
+            return SimpleNamespace(audit=audit, data={"resultList": {"result": [{
+                "id": "empty-xml", "title": "Abstract fallback", "abstractText": abstract,
+                "pmcid": "PMC123", "isOpenAccess": "Y",
+            }]}})
+
+        def get_europe_pmc_full_text(self, pmcid):
+            xml_audit = {**audit, "tool": "europe_pmc.full_text_xml"}
+            self.audits.append(xml_audit)
+            return SimpleNamespace(audit=xml_audit, content=xml)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("backend_v2.app.research.evidence_tools.EvidenceToolService", FakeEvidenceTools)
+    assert literature_tasks.literature_search.run(str(run_id))["status"] == "completed"
+    with factory() as session:
+        document = session.scalar(select(LiteratureDocument).where(LiteratureDocument.project_id == ids["project"]))
+        provenance = document.metadata_json["content_provenance"]
+        assert provenance["content_kind"] == "database_abstract"
+        assert provenance["content_checksum_sha256"] == text_checksum([abstract])
+        assert provenance["raw_content_artifact_id"] is None
+        assert provenance["license_text"] == ""
+        assert document.artifact_id is None
+        chunk = session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document.id))
+        assert chunk.content == abstract
+        abstract_trace = session.get(LiteratureRetrievalTrace, uuid.UUID(provenance["retrieval_trace_id"]))
+        assert abstract_trace.stage == "abstract"
+        full_text_trace = session.scalar(select(LiteratureRetrievalTrace).where(
+            LiteratureRetrievalTrace.search_run_id == run_id, LiteratureRetrievalTrace.stage == "full_text",
+        ))
+        artifact = session.get(Artifact, uuid.UUID(full_text_trace.response_metadata["raw_content_artifact_id"]))
+        assert FakeStorage.objects[artifact.object_key] == xml
+
+
+def test_ingest_does_not_turn_a_title_into_evidence(task_database) -> None:
+    factory, ids = task_database
+    with factory() as session:
+        row = LiteratureDocument(project_id=ids["project"], title="Unverified title", source="manual")
+        session.add(row)
+        session.commit()
+        document_id = row.id
+    assert literature_tasks.literature_ingest.run(str(document_id))["status"] == "metadata_only"
+    with factory() as session:
+        row = session.get(LiteratureDocument, document_id)
+        assert row.metadata_json["content_provenance"]["content_kind"] == "metadata_only"
+        assert session.scalar(select(LiteratureChunk).where(LiteratureChunk.document_id == document_id)) is None
 
 
 def test_research_target_accession_resolves_exact_supported_alias(
@@ -1024,7 +1123,8 @@ def test_copilot_task_failure_marks_pending_source_message_failed(
 def test_reconciliation_and_purge(task_database) -> None:
     factory, ids = task_database
     expired_key, failed_key = "staging/expired", "staging/failed"
-    active_key, missing_key, orphan_key = "staging/active", "objects/missing", "objects/orphan"
+    active_key, missing_key = "staging/active", "objects/missing"
+    orphan_key = f"projects/{ids['project']}/sha256/orphan"
     FakeStorage.objects[expired_key] = b"expired"
     FakeStorage.objects[failed_key] = b"failed"
     FakeStorage.objects[active_key] = b"active"
@@ -1076,7 +1176,10 @@ def test_reconciliation_and_purge(task_database) -> None:
         )
         session.commit()
     result = tasks.reconcile_artifacts.run()
-    assert result == {"expired_uploads": 1, "missing_objects": 1, "orphaned_objects": 2}
+    assert result == {
+        "expired_uploads": 1, "missing_objects": 1, "orphaned_objects": 2,
+        "foreign_objects": 0, "unattributed_objects": 0,
+    }
     assert active_key in FakeStorage.objects
     assert failed_key not in FakeStorage.objects
 
@@ -1696,3 +1799,53 @@ def test_a_refused_credential_stops_a_lookup_instead_of_spending_every_request(t
         assert failed["status"] == "failed"
         assert session.get(LiteratureRetrievalTrace, uuid.UUID(failed["retrieval_trace_id"])).status == "failed"
         assert session.get(LiteratureDocument, second).metadata_json["patent_legal_status"]["status"] == "not_attempted"
+
+
+def test_gc_preserves_foreign_and_unattributed_shared_bucket_objects(task_database) -> None:
+    factory, ids = task_database
+    foreign_project = f"projects/{uuid.uuid4()}/sha256/evidence"
+    foreign_job = f"jobs/{uuid.uuid4()}/attempt-1/output.json"
+    own_orphan = f"projects/{ids['project']}/sha256/unreferenced"
+    live_input = f"jobs/{ids['job']}/attempt-1/input.json"
+    unowned = {"staging/other-upload", "objects/other-evidence", "unprefixed", "projects/incomplete"}
+    protected = {foreign_project, foreign_job, live_input, *unowned}
+    FakeStorage.objects.update({key: b"preserve" for key in protected})
+    FakeStorage.objects[own_orphan] = b"orphan"
+
+    result = tasks.reconcile_artifacts.run()
+
+    assert set(FakeStorage.removed) == {own_orphan}
+    assert protected <= FakeStorage.objects.keys()
+    assert result["foreign_objects"] == 2
+    assert result["unattributed_objects"] == len(unowned)
+    assert result["orphaned_objects"] == 1
+
+
+def test_gc_reclaims_local_terminal_job_and_known_failed_upload(task_database) -> None:
+    factory, ids = task_database
+    terminal_key = f"jobs/{ids['job']}/attempt-1/output.json"
+    failed_upload = "staging/local-failed"
+    referenced = f"projects/{ids['project']}/sha256/referenced"
+    foreign_key = f"jobs/{uuid.uuid4()}/attempt-1/output.json"
+    with factory() as session:
+        session.get(Job, ids["job"]).status = "failed"
+        session.add(ArtifactUpload(
+            project_id=ids["project"], created_by=ids["user"], filename="failed",
+            artifact_type="data", content_type="text/plain", object_key=failed_upload,
+            status="failed", expires_at=datetime.now(UTC) - timedelta(hours=2),
+        ))
+        session.add(Artifact(
+            project_id=ids["project"], artifact_type="data", filename="reference.txt",
+            object_key=referenced, content_type="text/plain", size_bytes=4,
+            checksum_sha256="a" * 64, status="available", created_by=ids["user"],
+        ))
+        session.commit()
+    FakeStorage.objects.update({key: b"data" for key in (terminal_key, failed_upload, referenced, foreign_key)})
+
+    result = tasks.reconcile_artifacts.run()
+
+    assert set(FakeStorage.removed) == {terminal_key, failed_upload}
+    assert set(FakeStorage.objects) == {referenced, foreign_key}
+    assert result["orphaned_objects"] == 2
+    assert result["foreign_objects"] == 1
+    assert result["missing_objects"] == 0

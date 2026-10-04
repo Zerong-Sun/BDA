@@ -54,7 +54,15 @@ def _text(value: Any, *, field: str, required: bool = True) -> str:
             f"Handover {field} must not be empty.",
             status_code=422,
         )
-    return text[:MAX_TEXT]
+    if len(text) > MAX_TEXT:
+        raise DomainError(
+            "copilot_handoff_text_too_long",
+            f"Handover {field} must contain at most {MAX_TEXT} characters; "
+            f"received {len(text)}. Shorten the field and retry; nothing was saved.",
+            status_code=422,
+            errors=[{"field": field, "max_length": MAX_TEXT, "actual_length": len(text)}],
+        )
+    return text
 
 
 def normalise_claims(raw: Any) -> list[dict[str, str]]:

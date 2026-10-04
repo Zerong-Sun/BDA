@@ -1,3 +1,6 @@
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
+import { FOLD_CONFIDENCE_FLOOR, canonicalFoldConfidence, screenByFoldConfidence } from '../features/candidates/foldConfidence'
+import { candidatesCsv } from '../features/candidates/candidatesCsv'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
@@ -16,7 +19,7 @@ import { CandidateFilters } from '../features/candidates/CandidateFilters'
 import { CandidateTable } from '../features/candidates/CandidateTable'
 import { CandidateDetail } from '../features/candidates/CandidateDetail'
 import { ComputeStatusStrip } from '../features/workflow/ComputeStatusStrip'
-import { candidateText, resolveActiveCandidate, type Candidate } from '../lib/schemas/candidate'
+import { candidateScore, candidateText, resolveActiveCandidate, type Candidate } from '../lib/schemas/candidate'
 import { NextStep } from '../components/ui/NextStep'
 import { GlossaryTooltip } from '../components/ui/GlossaryTooltip'
 
@@ -34,13 +37,15 @@ function CandidateGridSkeleton({ label }: { label: string }) {
 }
 
 export function CandidatesPage() {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
+  const zh = language === 'zh'
   const { projectId } = useProjectContext()
   const showToast = useToastStore((s) => s.show)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('All')
   const [priorityOnly, setPriorityOnly] = useState(false)
-  const [searchParams] = useSearchParams()
+  const [confidenceFilter, setConfidenceFilter] = useState({ scope: '', enabled: false })
+  const [searchParams, setSearchParams] = useSearchParams()
   const linkedCandidateId = searchParams.get('candidate')?.trim() || null
   const [selected, setSelected] = useState<Candidate | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
@@ -65,11 +70,13 @@ export function CandidatesPage() {
   })
 
   const allCandidates = useMemo(() => data?.items ?? [], [data])
-  const candidates = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase()
-    const normalizedStatus = status.toLocaleLowerCase()
-
-    return allCandidates.filter((candidate) => {
+  const sources = [...new Set(allCandidates.map((c) => String(c.properties.source_dataset ?? '')).filter(Boolean))].sort()
+  const linkedSource = linkedCandidateId ? String(allCandidates.find((c) => c.id === linkedCandidateId)?.properties.source_dataset ?? 'all') : null
+  const requestedSource = searchParams.get('dataset') ?? linkedSource ?? sources[0] ?? 'all'
+  const activeSource = sources.includes(requestedSource) ? requestedSource : 'all'
+  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const normalizedStatus = status.toLocaleLowerCase()
+  const matching = allCandidates.filter((candidate) => {
       const matchesSearch =
         !normalizedSearch ||
         [
@@ -83,9 +90,17 @@ export function CandidatesPage() {
       const matchesPriority =
         !priorityOnly ||
         priorityDecisions.has((candidateText(candidate, 'decision') ?? '').toLocaleLowerCase())
-      return matchesSearch && matchesStatus && matchesPriority
-    })
-  }, [allCandidates, priorityOnly, search, status])
+      const matchesSource = activeSource === 'all' || candidate.properties.source_dataset === activeSource
+      return matchesSearch && matchesStatus && matchesPriority && matchesSource
+  })
+
+  const confidenceScope = `${projectId}:${activeSource}`
+  const foldScreen = confidenceFilter.scope === confidenceScope && confidenceFilter.enabled
+  const confidenceScreen = screenByFoldConfidence(matching)
+  const candidates = foldScreen
+    ? matching.filter(candidate => !confidenceScreen.screenedOut.includes(candidate) || candidate.id === linkedCandidateId)
+    : matching
+  const hiddenCount = matching.length - candidates.length
 
   useEffect(() => {
     const resetSelection = window.setTimeout(() => {
@@ -106,14 +121,7 @@ export function CandidatesPage() {
 
   const exportCsv = () => {
     if (!candidates.length) return
-    const header = [
-      'candidate_id', 'family', 'interface_score', 'pred_kd', 'plddt',
-      'solubility_score', 'clash_count', 'buried_sasa', 'status', 'decision',
-    ]
-    const rows = candidates.map((c) =>
-      header.map((h) => (c as Record<string, unknown>)[h] ?? '').join(','),
-    )
-    const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv' })
+    const blob = new Blob([candidatesCsv(candidates)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -219,6 +227,14 @@ export function CandidatesPage() {
       />
       <ComputeStatusStrip />
 
+      {activeSource !== 'all' ? <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-tour-id="candidate-funnel">
+        {[
+          [zh ? '计算候选' : 'Candidates', candidates.length],
+          [zh ? '可用三维结构' : 'Structures', candidates.filter(c => c.complex_artifact_id || c.structure_artifact_id).length],
+          [zh ? '平均 pLDDT（已确认 0–100）' : 'Mean pLDDT (confirmed 0–100)', (() => { const values = candidates.map(canonicalFoldConfidence).filter((v): v is number => v !== null); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : '—' })()],
+          [zh ? '界面预测覆盖' : 'Interface metrics', candidates.filter(c => candidateScore(c, 'iptm') !== null).length],
+        ].map(([label, value]) => <AppFrame key={label} panelClassName="p-4"><span className="text-xs text-text-secondary">{label}</span><strong className="mt-2 block text-2xl">{value}</strong></AppFrame>)}
+      </div> : (
       <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5" data-tour-id="candidate-funnel">
         {funnelStageKeys.map((stageKey) => {
           const label = t.candidatesExt.funnel[stageKey]
@@ -235,7 +251,22 @@ export function CandidatesPage() {
           )
         })}
       </div>
+      )}
 
+      {sources.length ? <label className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+        {zh ? '候选数据集' : 'Candidate dataset'}
+        <Select value={activeSource}
+          onValueChange={(value) => {
+            if (!value) return
+            const next = new URLSearchParams(searchParams); next.set('dataset', String(value)); next.delete('candidate')
+            setSearchParams(next); setSelected(null); setSelectedIds(new Set())
+          }}>
+          <SelectTrigger aria-label={zh ? '候选数据集' : 'Candidate dataset'} className="max-w-full"><SelectValue>{activeSource === 'all' ? (zh ? '全部项目记录' : 'All project records') : activeSource}</SelectValue></SelectTrigger>
+          <SelectContent>{sources.map((source) => <SelectItem key={source} value={source}>{source}</SelectItem>)}
+          <SelectItem value="all">{zh ? '全部项目记录' : 'All project records'}</SelectItem></SelectContent>
+        </Select>
+        <span className="text-text-secondary">{zh ? '按来源数据集查看候选、结构与预测指标。' : 'Filters the candidate table; workflow counts above cover the whole project.'}</span>
+      </label> : null}
       <div data-tour-id="candidate-filters">
       <CandidateFilters
         search={search}
@@ -246,6 +277,23 @@ export function CandidatesPage() {
         onPriorityOnlyChange={setPriorityOnly}
       />
       </div>
+
+      {(confidenceScreen.screenedOut.length > 0 || confidenceScreen.uncertain.length > 0) ? (
+        <AppFrame className="mb-4" panelClassName="flex flex-wrap items-center justify-between gap-3 p-3">
+          <div className="text-sm text-text-secondary" role="status">
+            {confidenceScreen.screenedOut.length > 0 ? <p>{format(
+              foldScreen ? t.candidatesExt.foldScreen.withheld : t.candidatesExt.foldScreen.included,
+              { count: foldScreen ? hiddenCount : confidenceScreen.screenedOut.length, floor: FOLD_CONFIDENCE_FLOOR },
+            )}</p> : null}
+            {confidenceScreen.uncertain.length > 0 ? <p>{format(t.candidatesExt.foldScreen.uncertain, { count: confidenceScreen.uncertain.length })}</p> : null}
+          </div>
+          {confidenceScreen.screenedOut.length > 0 ? <Button type="button" variant="outline" onClick={() => {
+            setConfidenceFilter({ scope: confidenceScope, enabled: !foldScreen })
+            setSelected(null)
+            setSelectedIds(new Set())
+          }}>{foldScreen ? t.candidatesExt.foldScreen.show : t.candidatesExt.foldScreen.hide}</Button> : null}
+        </AppFrame>
+      ) : null}
 
       <ApiState
         isLoading={isLoading}
@@ -258,7 +306,7 @@ export function CandidatesPage() {
           <div className="flex min-h-[34rem] flex-col overflow-hidden xl:min-h-0">
             <AppFrame className="min-h-0 flex-1" panelClassName="min-h-0 overflow-hidden">
               <CandidateTable
-                key={`${projectId}:${search}:${status}:${priorityOnly}`}
+                key={`${projectId}:${activeSource}:${search}:${status}:${priorityOnly}:${foldScreen}`}
                 data={candidates}
                 selectedId={activeCandidate?.id}
                 selectedIds={selectedIds}

@@ -48,22 +48,42 @@ def _text(artifact: Artifact) -> str:
     )
 
 
-def _run(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, work: Any) -> dict[str, Any]:
+def _provenance(artifact: Artifact) -> dict[str, Any]:
+    """Expose only interpretation metadata, never arbitrary lineage or signed URLs."""
+    lineage = artifact.lineage if isinstance(artifact.lineage, dict) else {}
+    containers = [lineage, *(lineage[key] for key in ("metadata", "context") if isinstance(lineage.get(key), dict))]
+    result: dict[str, Any] = {}
+    for container in containers:
+        for key in ("source", "method", "predicted", "synthetic", "b_factor_metric", "fixture_version", "execution"):
+            value = container.get(key)
+            if key not in result and isinstance(value, (str, bool)):
+                result[key] = value[:300] if isinstance(value, str) else value
+    if any(container.get("synthetic") is True for container in containers):
+        result["synthetic"] = True
+    return result
+
+
+def _run(
+    session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, work: Any, *, with_confidence: bool = False
+) -> dict[str, Any]:
     artifact = _artifact(session, project_id, artifact_id)
+    provenance = _provenance(artifact)
     try:
-        result = work(_text(artifact))
+        text = _text(artifact)
+        result = work(text, provenance=provenance) if with_confidence else work(text)
     except kernels.StructureFormatError as error:
         raise DomainError("structure_unreadable", str(error), status_code=422) from error
     return {
         "artifact_id": str(artifact.id),
         "filename": artifact.filename,
         "checksum_sha256": artifact.checksum_sha256,
+        "provenance": provenance,
         **result,
     }
 
 
 def analyse(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> dict[str, Any]:
-    return _run(session, project_id, artifact_id, kernels.analyse)
+    return _run(session, project_id, artifact_id, kernels.analyse, with_confidence=True)
 
 
 def contacts(
@@ -117,11 +137,13 @@ def superpose(
             "artifact_id": str(reference.id),
             "filename": reference.filename,
             "checksum_sha256": reference.checksum_sha256,
+            "provenance": _provenance(reference),
         },
         "mobile": {
             "artifact_id": str(mobile.id),
             "filename": mobile.filename,
             "checksum_sha256": mobile.checksum_sha256,
+            "provenance": _provenance(mobile),
         },
         **result,
     }
@@ -217,6 +239,7 @@ def view(
         "artifact_id": str(artifact.id),
         "filename": artifact.filename,
         "checksum_sha256": artifact.checksum_sha256,
+        "provenance": _provenance(artifact),
         "format": fmt,
         "highlighted": list(residues or []),
         "scene_format": f"molviewspec/{molviewspec.MVS_VERSION}",

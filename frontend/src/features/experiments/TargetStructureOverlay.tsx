@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/statusBadge'
 import type { ProjectTargetStructure, TargetReadiness } from '../../lib/schemas/target'
 import { useI18n } from '../../lib/i18n'
+import { projectActionText } from '../../lib/i18n/projectText'
 
 interface TargetStructureOverlayProps {
   target: ProjectTargetStructure
@@ -50,7 +51,7 @@ export function TargetStructureOverlay({
       {readiness?.next_action ? (
         <p className="mt-2">
           <span className="font-medium text-text-primary">{labels.targetReadinessStatus}: </span>
-          {readiness.next_action}
+          {projectActionText(readiness.next_action, t)}
         </p>
       ) : null}
 

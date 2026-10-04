@@ -8,8 +8,15 @@ interface CandidateConditionMetricsProps {
 }
 
 export function CandidateConditionMetrics({ candidateId }: CandidateConditionMetricsProps) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const detail = t.candidatesExt.detail
+  const names: Record<string, string> = language === 'zh' ? {
+    plddt: '复合物平均 pLDDT', ptm: 'pTM', iptm: 'ipTM', mean_pae: '全矩阵平均 PAE',
+    pae_interaction: '跨链平均 PAE', design_chain_plddt: '设计链平均 pLDDT',
+    design_chain_ca_rmsd: '设计链 CA RMSD（单链叠合）', source_first_chain_rmsd: '固定伙伴链 CA RMSD（单链叠合）',
+    rosetta_interface_dg: 'Rosetta 接口 dG（上游原值）',
+  } : {}
+
   const metricsQuery = useQuery({
     queryKey: ['candidate-metrics', candidateId],
     queryFn: () => listCandidateMetrics(candidateId),
@@ -38,7 +45,7 @@ export function CandidateConditionMetrics({ candidateId }: CandidateConditionMet
       <div className="mt-3 grid gap-3">
         {groups.map((group) => (
           <div key={group.metricKey} className="rounded-md border border-border-soft/70 p-2">
-            <p className="font-mono text-text-primary">{group.metricKey}</p>
+            <p className="font-mono text-text-primary">{names[group.metricKey] ?? group.metricKey}</p>
             {group.predictedVsMeasured ? (
               <p className="mt-1 rounded bg-surface-2 px-2 py-1 text-text-primary">
                 {format(detail.predictedVsMeasured, {
@@ -58,7 +65,7 @@ export function CandidateConditionMetrics({ candidateId }: CandidateConditionMet
                   key={row.id}
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2"
                 >
-                  <dt className="truncate">
+                  <dt className="min-w-0 break-words">
                     {row.condition || detail.conditionMetricsUnconditioned}
                     <span
                       className={
@@ -75,11 +82,12 @@ export function CandidateConditionMetrics({ candidateId }: CandidateConditionMet
                       {row.evidence_kind === MEASURED ? detail.evidenceMeasured : detail.evidencePredicted}
                     </span>
                     <span className="ml-2 rounded-full border border-border-soft px-1.5 py-0.5 text-[10px] text-text-muted">
-                      {row.assessor}
+                      {row.assessor === 'unknown' ? (language === 'zh' ? '评估独立性未确认' : 'Independence unverified') : row.assessor}
                     </span>
+                    <span className="mt-1 block text-text-secondary">{row.method}{row.model_variant ? ` · ${row.model_variant}` : ''}</span>
                   </dt>
                   <dd className="text-right text-text-primary">
-                    {row.value}
+                    {Number.isInteger(row.value) ? row.value : row.value.toFixed(3)}
                     {row.unit ? ` ${row.unit}` : ''}
                   </dd>
                 </div>

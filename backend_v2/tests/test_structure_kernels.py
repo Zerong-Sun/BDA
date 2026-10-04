@@ -217,7 +217,7 @@ def test_confidence_is_labelled_plddt_only_when_the_file_supports_it() -> None:
     writes a B-factor (high is bad). Guessing wrong inverts every judgement made
     from it, so the test pins both branches.
     """
-    predicted = kernels.analyse(PDB_TEXT)["confidence"]
+    predicted = kernels.analyse(PDB_TEXT, provenance={"source": "alphafold_db", "predicted": True})["confidence"]
     refined = kernels.analyse(_pdb(with_resolution=True))["confidence"]
 
     assert predicted["looks_like_plddt"] is True
@@ -376,11 +376,7 @@ def test_an_unknown_residue_or_component_is_refused() -> None:
 
 
 def test_a_malformed_resolution_is_treated_as_absent_not_as_zero() -> None:
-    """And therefore the B-factor column is still read as possible pLDDT.
-
-    A resolution that cannot be parsed is not evidence of a refined structure,
-    so inferring one from it would mislabel a predicted model's confidence.
-    """
+    """An unreadable resolution establishes neither refinement nor prediction."""
     text = PDB_TEXT.replace(
         "HEADER    TEST STRUCTURE",
         "HEADER    TEST STRUCTURE\nREMARK   2 RESOLUTION.    1.8.0 ANGSTROMS.",
@@ -389,7 +385,8 @@ def test_a_malformed_resolution_is_treated_as_absent_not_as_zero() -> None:
     result = kernels.analyse(text)
 
     assert result["resolution_angstrom"] is None
-    assert result["confidence"]["looks_like_plddt"] is True
+    assert result["confidence"]["looks_like_plddt"] is False
+    assert result["confidence"]["metric"] == "unknown"
 
 
 def test_a_chain_holding_only_a_ligand_is_not_reported_as_a_polymer_chain() -> None:

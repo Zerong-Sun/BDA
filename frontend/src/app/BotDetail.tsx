@@ -1,3 +1,4 @@
+import { botDisplayText } from '../features/copilot/bots/displayText'
 import { useEffect } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -84,7 +85,7 @@ function BotResponsibility({ botId }: { botId: string }) {
               {bot ? <Tabs value={view} onValueChange={(value) => setParam('view', value === 'chat' ? 'chat' : null)}>
                 <div className="bot-selected-header"><BotAvatar id={bot.id} stance={bot.stance} /><div className="min-w-0">
                   <p className="bot-selected-stance">{stanceLabel[bot.stance] ?? bot.stance}</p>
-                  <h2>{name(bot)}</h2><p>{bot.summary}</p>
+                  <h2>{name(bot)}</h2><p>{botDisplayText(bot, language).summary}</p>
                 </div></div>
                 <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? 'Bot 职责页视图' : 'Bot page views'}>
                   <TabsTrigger value="work">{zh ? '职责与工作' : 'Responsibilities & work'}</TabsTrigger>
@@ -94,7 +95,10 @@ function BotResponsibility({ botId }: { botId: string }) {
                   {runId ? <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setParam('run', null)} />
                     : <BotWork bot={bot} bots={bots.data ?? []} projectId={projectId} onOpenRun={(id) => setParam('run', id)} onChat={() => setParam('view', 'chat')} />}
                 </TabsContent>
-                <TabsContent value="chat"><div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div></TabsContent>
+                <TabsContent value="chat">
+                  <p className="mb-3 text-sm text-text-secondary"><Link to={`${team}&view=room`} className="text-accent underline">{zh ? '查看已保存的团队对话记录' : 'View saved team conversation history'}</Link></p>
+                  <div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div>
+                </TabsContent>
               </Tabs> : <div className="science-empty">
                 <h2>{zh ? '名录中没有这个 Bot' : 'This Bot is not in the roster'}</h2>
                 <p>{zh ? '它可能已被移出名录；以它身份运行过的任务记录仍会保留。' : 'It may have been retired; tasks that ran as it are still recorded.'}</p>
@@ -140,7 +144,7 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   return <div className="bot-work">
     <section aria-label={zh ? '职责与边界' : 'Mandate and refusals'}>
       <h3>{zh ? '职责与边界' : 'Mandate and refusals'}</h3>
-      <p className="text-sm text-text-secondary">{bot.charter}</p>
+      <div className="space-y-3 text-sm leading-7 text-text-secondary">{botDisplayText(bot, language).charter.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
     </section>
     <section aria-label={zh ? '托管任务' : 'Guided tasks'}>
       <h3>{zh ? '托管任务' : 'Guided tasks'}</h3>

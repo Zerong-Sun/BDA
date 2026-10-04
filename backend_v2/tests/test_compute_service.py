@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
@@ -18,13 +19,14 @@ from backend_v2.app.compute.service import (
     transition_job,
 )
 from backend_v2.app.core.models import Base
+from backend_v2.app.core.pagination import decode_cursor, encode_cursor
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
 from backend_v2.tests._sqlite import enforce_foreign_keys
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -54,6 +56,59 @@ def test_terminal_job_stream_drains_pages_with_equal_timestamps(compute_session,
     assert len(test_events) == count
     assert {event["id"] for event in test_events} == expected
     assert received[-1]["event"] == "done"
+
+
+@pytest.mark.parametrize("limit", [1, 2, 3, 10])
+def test_job_log_pages_follow_time_with_uuid_ties_and_legacy_cursors(compute_session, limit) -> None:
+    session, user, project, workflow = compute_session
+    _, jobs = create_submission(
+        session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend="demo"),
+        idempotency_key="log-pages", user=user,
+    )
+    job = jobs[0]
+    session.execute(delete(JobEvent).where(JobEvent.job_id == job.id))
+    timestamp = datetime(2026, 9, 30, 9, 0, tzinfo=UTC)
+    # Insertion order, UUID order and chronological order intentionally disagree.
+    events = [
+        JobEvent(id=uuid.UUID(int=number), job_id=job.id, event_type=f"test.{number}",
+                 payload={}, created_at=timestamp + timedelta(seconds=offset))
+        for number, offset in [(1, 3), (900, 0), (70, 1), (10, 1), (20, 1), (500, 2)]
+    ]
+    session.add_all(events)
+    session.commit()
+    expected = [uuid.UUID(int=number) for number in (900, 10, 20, 70, 500, 1)]
+    received = []
+    cursor = None
+    while True:
+        page = compute_api.get_job_logs(job.id, cursor=cursor, limit=limit, session=session, user=user)
+        received.extend(item.id for item in page.items)
+        if page.next_cursor is None:
+            break
+        # Existing clients can still decode and reuse their opaque UUID cursor.
+        assert decode_cursor(page.next_cursor) == page.items[-1].id
+        cursor = page.next_cursor
+        assert len(received) <= len(expected), "Pagination must advance"
+    assert received == expected
+    assert len(received) == len(set(received))
+    # A saved old UUID cursor is now resolved to the event's chronological position.
+    page = compute_api.get_job_logs(job.id, cursor=encode_cursor(expected[2]), limit=10, session=session, user=user)
+    assert [item.id for item in page.items] == expected[3:]
+
+
+def test_job_log_cursor_must_belong_to_requested_job(compute_session) -> None:
+    session, user, project, workflow = compute_session
+    _, jobs = create_submission(
+        session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend="demo"),
+        idempotency_key="log-cursor-scope", user=user,
+    )
+    session.commit()
+    other_event = session.scalar(select(JobEvent).where(JobEvent.job_id == jobs[1].id))
+    assert other_event is not None
+    for cursor in (encode_cursor(other_event.id), encode_cursor(uuid.uuid4()), "not-a-valid-cursor"):
+        with pytest.raises(DomainError) as error:
+            compute_api.get_job_logs(jobs[0].id, cursor=cursor, limit=10, session=session, user=user)
+        assert error.value.error_code == "invalid_cursor"
+        assert error.value.status_code == 422
 
 
 @pytest.fixture

@@ -75,8 +75,18 @@ class ComputeRepository:
     def events_page(self, job_id: uuid.UUID, *, after: uuid.UUID | None, limit: int) -> list[JobEvent]:
         query = select(JobEvent).where(JobEvent.job_id == job_id)
         if after:
-            query = query.where(JobEvent.id > after)
-        return list(self.session.scalars(query.order_by(JobEvent.id).limit(limit + 1)))
+            # Keep the public UUID cursor format, but resolve its time within this job.
+            # Random UUID order otherwise puts e.g. "succeeded" before "queued" and
+            # cannot paginate a chronology without skipping or repeating entries.
+            anchor = self.session.execute(
+                select(JobEvent.created_at, JobEvent.id).where(JobEvent.id == after, JobEvent.job_id == job_id)
+            ).first()
+            if anchor is None:
+                from ..core.problem import DomainError
+
+                raise DomainError("invalid_cursor", "The pagination cursor is invalid", status_code=422)
+            query = query.where(tuple_(JobEvent.created_at, JobEvent.id) > tuple(anchor))
+        return list(self.session.scalars(query.order_by(JobEvent.created_at, JobEvent.id).limit(limit + 1)))
 
     def append_event(self, job: Job, event_type: str, payload: dict | None = None) -> None:
         self.session.add(JobEvent(job_id=job.id, event_type=event_type, payload=payload or {}))

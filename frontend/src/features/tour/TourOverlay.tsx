@@ -41,6 +41,7 @@ import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
 import { findDemoProject } from './demoProject'
 import { getTourSection, getTourStep, TOUR_SECTIONS, type TourSection, type TourStep } from './tourData'
+import './tour.css'
 
 const ANCHOR_ATTEMPTS = 40
 const ANCHOR_POLL_MS = 125
@@ -108,10 +109,24 @@ function useTourAnchor(
       if (disposed || target) return
       const root = document.querySelector<HTMLElement>(step.anchor!.selector)
       // Use the actual dropdown control rather than its label and surrounding whitespace.
-      const candidate = step.anchor!.id === 'project-selector'
-        ? root?.querySelector<HTMLElement>('[role="combobox"]') ?? root
-        : root
+      const controls: Record<string, string> = {
+        'project-selector': '[role="combobox"]',
+        'research-tabs': '[role="tablist"]',
+        'research-operations': 'button[aria-expanded]',
+        'candidate-filters': 'button[aria-haspopup]',
+        'faq-content': 'button[aria-expanded]',
+      }
+      const selector = controls[step.anchor!.id]
+      const candidate = selector ? root?.querySelector<HTMLElement>(selector) ?? root : root
       if (!candidate) {
+        // Imported results keep the older result panels collapsed. Expand only
+        // that read-only disclosure when a step explicitly needs its contents.
+        if (step.anchor!.id.startsWith('results-')) {
+          const disclosure = document.querySelector<HTMLButtonElement>(
+            '[data-tour-id="results-history"] [data-slot="accordion-trigger"][aria-expanded="false"]',
+          )
+          disclosure?.click()
+        }
         attempts += 1
         if (attempts === ANCHOR_ATTEMPTS) {
           setResolution({ stepId: step.id, target: null, missing: true })
@@ -145,7 +160,7 @@ function useTourAnchor(
         }
         // Keep the guide in place until the dropdown closes. Advancing on open
         // would put the next callout over the options the user is choosing.
-        if (candidate.getAttribute('role') === 'combobox') {
+        if (candidate.hasAttribute('aria-expanded') && (candidate.getAttribute('role') === 'combobox' || candidate.hasAttribute('aria-haspopup'))) {
           let opened = candidate.getAttribute('aria-expanded') === 'true'
           const observer = new MutationObserver(() => {
             if (candidate.getAttribute('aria-expanded') === 'true') opened = true
@@ -154,8 +169,28 @@ function useTourAnchor(
           observer.observe(candidate, { attributes: true, attributeFilter: ['aria-expanded'] })
           removeTargetListener = () => observer.disconnect()
         } else {
-          candidate.addEventListener('click', advance, { once: true })
-          removeTargetListener = () => candidate.removeEventListener('click', advance)
+          const onClick = (event: MouseEvent) => {
+            // A tab group's whitespace is not a selection. Keep the step until
+            // someone uses a tab, or chooses the explicit Next button.
+            if (candidate.getAttribute('role') === 'tablist'
+              && !(event.target instanceof Element && event.target.closest('[role="tab"]'))) return
+            if (step.anchor!.id === 'workflow-canvas'
+              && !(event.target instanceof Element && event.target.closest('.react-flow__node'))) return
+            advance()
+          }
+          candidate.addEventListener('click', onClick)
+          // React Flow's keyboard selection changes the selected class without
+          // dispatching a click. Observe that selection for the same tour step.
+          const selectionObserver = step.anchor!.id === 'workflow-canvas'
+            ? new MutationObserver(() => {
+              if (candidate.querySelector('.react-flow__node.selected')) advance()
+            })
+            : null
+          selectionObserver?.observe(candidate, { subtree: true, attributes: true, attributeFilter: ['class'] })
+          removeTargetListener = () => {
+            candidate.removeEventListener('click', onClick)
+            selectionObserver?.disconnect()
+          }
         }
       }
     }
@@ -210,7 +245,7 @@ function TourSpotlight({ target, clickable }: { target: HTMLElement; clickable: 
   if (right <= left || bottom <= top) return null
   return (
     <div data-testid="tour-spotlight" aria-hidden="true"
-      className="pointer-events-none fixed z-[45] rounded-lg border-[3px] border-primary"
+      className="tour-spotlight pointer-events-none fixed z-[45] rounded-lg border-[3px] border-primary"
       style={{ left, top, width: right - left, height: bottom - top,
         boxShadow: '0 0 0 9999px rgb(0 0 0 / 24%)' }}>
       <span className="absolute left-0 top-0 flex -translate-y-full items-center gap-1 rounded-t-md bg-primary px-2 py-1 text-sm font-semibold text-primary-foreground"
@@ -252,10 +287,10 @@ function TourCard({
   const Description = modal ? DialogDescription : PopoverDescription
 
   return (
-    <div className="grid min-w-0 gap-3" data-testid="tour-card">
+    <div key={step.id} className="tour-step grid min-w-0 gap-3" data-testid="tour-card" data-tour-step={step.id}>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {labels.controls.chapter} · {section.title[language]} · {stepIndex + 1}/{section.steps.length}
           </p>
           <Heading className="mt-1 text-xl leading-7">{copy.title}</Heading>
@@ -352,7 +387,9 @@ function TourCard({
           {labels.controls.back}
         </Button>
         <Button type="button" className="min-h-11 text-base!" onClick={advanceTour}>
-          {labels.controls.next}
+          {stepIndex === section.steps.length - 1
+            ? language === 'zh' ? '完成本章' : 'Finish chapter'
+            : labels.controls.next}
           <CaretRightIcon aria-hidden="true" />
         </Button>
       </div>
@@ -377,6 +414,7 @@ export function TourOverlay() {
   const step = getTourStep(tourState.sectionId, tourState.stepId)
   const section = getTourSection(tourState.sectionId)
   const prefersReducedMotion = usePrefersReducedMotion()
+  const enteredStepRef = useRef('')
   const focusOriginRef = useRef<HTMLElement | null>(null)
   const [focusOriginTarget, setFocusOriginTarget] = useState<HTMLElement | null>(null)
   const [menuReturnFocusTarget, setMenuReturnFocusTarget] = useState<HTMLElement | null>(null)
@@ -389,7 +427,8 @@ export function TourOverlay() {
   const [expandedTarget, setExpandedTarget] = useState<HTMLElement | null>(null)
   useEffect(() => {
     const target = anchorResolution.target
-    if (!target || target.getAttribute('role') !== 'combobox') return
+    if (!target || !target.hasAttribute('aria-expanded')
+      || !(target.getAttribute('role') === 'combobox' || target.hasAttribute('aria-haspopup'))) return
     const update = () => setExpandedTarget(target.getAttribute('aria-expanded') === 'true' ? target : null)
     update()
     const observer = new MutationObserver(update)
@@ -441,13 +480,19 @@ export function TourOverlay() {
   }, [rememberFocusOrigin])
 
   useEffect(() => {
-    if (tourState.status !== 'active' || tourMenuOpen || !step) return
+    if (tourState.status !== 'active' || tourMenuOpen || !step) {
+      enteredStepRef.current = ''
+      return
+    }
+    const entry = `${step.id}:${projectId}`
+    if (enteredStepRef.current === entry) return
     const targetRoute = routeWithProject(step.route, projectId)
     const [targetPath, targetSearch = ''] = targetRoute.split('?')
     const desired = new URLSearchParams(targetSearch)
     const current = new URLSearchParams(location.search)
     const searchMatches = [...desired.entries()].every(([key, value]) => current.get(key) === value)
     if (location.pathname !== targetPath || !searchMatches) navigate(targetRoute)
+    else enteredStepRef.current = entry
   }, [location.pathname, location.search, navigate, projectId, step, tourMenuOpen, tourState.status])
 
   useEffect(() => {
@@ -458,6 +503,12 @@ export function TourOverlay() {
     } else if (step.prepare === 'settings') {
       setCopilotOpen(false)
       setSettingsOpen(true)
+    }
+    // Drawers opened by a tour step belong to that step. Leaving the chapter,
+    // pausing or finishing must not leave a modal over the next destination.
+    return () => {
+      if (step.prepare === 'copilot') setCopilotOpen(false)
+      if (step.prepare === 'settings') setSettingsOpen(false)
     }
   }, [setCopilotOpen, setSettingsOpen, step, tourMenuOpen, tourState.status])
 
@@ -549,7 +600,9 @@ export function TourOverlay() {
 
   if (expandedTarget === anchorResolution.target) {
     return <div role="status" className="pointer-events-none fixed inset-x-3 bottom-4 z-50 mx-auto w-fit max-w-[calc(100vw-1.5rem)] rounded-lg bg-popover px-5 py-3 text-base leading-7 text-popover-foreground shadow-lg">
-      {language === 'zh' ? '请选择项目；关闭列表后，导览会继续。' : 'Choose a project. The tour continues when the list closes.'}
+      {step.anchor.id === 'project-selector'
+        ? language === 'zh' ? '请选择项目；关闭列表后，导览会继续。' : 'Choose a project. The tour continues when the list closes.'
+        : language === 'zh' ? '完成选择后关闭列表，继续导览。' : 'Make a selection, then close the list to continue.'}
     </div>
   }
 
@@ -560,7 +613,10 @@ export function TourOverlay() {
         open
         modal={false}
         onOpenChange={(open, eventDetails) => {
-          if (!open && eventDetails.reason === 'escape-key') handleSkip()
+          // A fast Escape can arrive before the expanded-target observer has
+          // removed this callout. It belongs to the control's menu, not Pause.
+          if (!open && eventDetails.reason === 'escape-key'
+            && anchorResolution.target?.getAttribute('aria-expanded') !== 'true') handleSkip()
         }}
       >
         <PopoverContent
@@ -598,7 +654,7 @@ export function TourMenu({
 }) {
   const { t, language } = useI18n()
   const { projects, setProjectId } = useProjectContext()
-  const { tourState, startTour, restartTour, setTourMenuOpen, setAppMode } = useAppStore()
+  const { tourState, startTour, resumeTour, restartTour, setTourMenuOpen, setAppMode } = useAppStore()
   const [demoUnavailable, setDemoUnavailable] = useState(false)
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusTarget?.isConnected
@@ -608,6 +664,10 @@ export function TourMenu({
         : null,
   )
   const labels = t.tour
+  const pausedSection = getTourSection(tourState.sectionId)
+  const canResume = tourState.status === 'paused'
+    && (!tourState.completedSections.includes(tourState.sectionId)
+      || pausedSection?.steps.at(-1)?.id !== tourState.stepId)
 
   const closeMenu = useCallback(() => {
     const returnTarget = returnFocusRef.current
@@ -655,7 +715,12 @@ export function TourMenu({
                 <QuestionIcon className="size-5 text-primary" aria-hidden="true" />
                 {labels.menu.title}
               </DialogTitle>
-              <DialogDescription className="mt-1 text-base leading-7">{labels.menu.body}</DialogDescription>
+            <DialogDescription className="mt-1 text-base leading-7">{labels.menu.body}</DialogDescription>
+            <p className="mt-2 text-sm text-muted-foreground" role="status">
+              {language === 'zh'
+                ? `已完成 ${tourState.completedSections.length} / ${TOUR_SECTIONS.length} 章`
+                : `${tourState.completedSections.length} of ${TOUR_SECTIONS.length} chapters completed`}
+            </p>
             </div>
             <DialogClose
               render={(
@@ -707,7 +772,12 @@ export function TourMenu({
           </Alert>
         ) : null}
 
-        <div>
+        <div className="flex flex-wrap gap-2">
+          {canResume ? (
+            <Button type="button" size="sm" onClick={() => { if (prepareDemo()) resumeTour() }}>
+              {language === 'zh' ? '继续导览' : 'Continue tour'}
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={restart}>
             <ArrowCounterClockwiseIcon aria-hidden="true" />
             {labels.menu.restart}

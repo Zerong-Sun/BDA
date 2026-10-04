@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .actions import CopilotActionService
-from .citations import citations_for
+from .citations import citations_for, inline_citation_instructions
 from .citations import dedupe as dedupe_citations
 from .project_context import ProjectContextService
 from .provider import completion_message
@@ -203,6 +203,26 @@ class ResearchAgentResult:
     citations: list[dict[str, Any]]
     tool_calls: list[dict[str, Any]]
     limit_reached: bool = False
+    reasoning_content: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
+class ScientificAnswer:
+    content: str
+    reasoning_content: str | None = field(default=None, repr=False)
+
+
+def _response_reasoning(message: dict[str, Any]) -> str | None:
+    """Preserve provider protocol state exactly; absence is never synthesized."""
+    value = message.get("reasoning_content")
+    return value if isinstance(value, str) else None
+
+
+def _scientific_answer(message: dict[str, Any], error: str) -> ScientificAnswer:
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError(error)
+    return ScientificAnswer(content.strip(), _response_reasoning(message))
 
 
 def complete_research_turn(
@@ -235,7 +255,7 @@ def complete_research_turn(
         offered = {tool["function"]["name"] for tool in tools}
         message = completion_message(
             provider,
-            conversation,
+            [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
             tools=tools if max_tool_calls > 0 and tools else None,
         )
         requested = message.get("tool_calls")
@@ -243,7 +263,10 @@ def complete_research_turn(
             content = message.get("content")
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("llm_response_empty")
-            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log)
+            return ResearchAgentResult(
+                content.strip(), dedupe_citations(citations), call_log,
+                reasoning_content=_response_reasoning(message),
+            )
         if len(call_log) - len(initial_tool_calls) >= max_tool_calls:
             conversation.append(
                 {
@@ -251,11 +274,16 @@ def complete_research_turn(
                     "content": "The 12-call Research tool limit was reached. Answer now and state the uncovered scope.",
                 }
             )
-            final = completion_message(provider, conversation)
+            final = completion_message(
+                provider,
+                [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
+            )
             content = final.get("content")
+            reasoning = _response_reasoning(final)
             if not isinstance(content, str) or not content.strip():
                 content = "Research tool-call limit reached; the remaining workspace scope was not covered."
-            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True)
+                reasoning = None
+            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True, reasoning)
         assistant_turn: dict[str, Any] = {
             "role": "assistant",
             "content": message.get("content"),
@@ -267,8 +295,8 @@ def complete_research_turn(
         # to the API", which made every tool-using turn on such a model fail at
         # the second round. Copied through only when the provider sent it, so
         # providers that do not use the field see no change.
-        reasoning = message.get("reasoning_content")
-        if isinstance(reasoning, str) and reasoning:
+        reasoning = _response_reasoning(message)
+        if reasoning is not None:
             assistant_turn["reasoning_content"] = reasoning
         conversation.append(assistant_turn)
         answered: set[str] = set()
@@ -339,6 +367,10 @@ def complete_research_turn(
 
 
 def review_scientific_answer(provider: LLMProvider, request: str, draft: str) -> str:
+    return review_scientific_answer_result(provider, request, draft).content
+
+
+def review_scientific_answer_result(provider: LLMProvider, request: str, draft: str) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -350,10 +382,7 @@ def review_scientific_answer(provider: LLMProvider, request: str, draft: str) ->
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_review_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_review_response_empty")
 
 
 def review_computational_experiment_answer(
@@ -397,6 +426,15 @@ def review_grounded_scientific_answer(
     draft: str,
     evidence_packet: str,
 ) -> str:
+    return review_grounded_scientific_answer_result(provider, request, draft, evidence_packet).content
+
+
+def review_grounded_scientific_answer_result(
+    provider: LLMProvider,
+    request: str,
+    draft: str,
+    evidence_packet: str,
+) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -412,10 +450,7 @@ def review_grounded_scientific_answer(
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_grounded_review_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_grounded_review_response_empty")
 
 
 def grounded_answer_issues(answer: str) -> list[str]:
@@ -452,6 +487,16 @@ def repair_grounded_scientific_answer(
     evidence_packet: str,
     issues: list[str],
 ) -> str:
+    return repair_grounded_scientific_answer_result(provider, request, reviewed_answer, evidence_packet, issues).content
+
+
+def repair_grounded_scientific_answer_result(
+    provider: LLMProvider,
+    request: str,
+    reviewed_answer: str,
+    evidence_packet: str,
+    issues: list[str],
+) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -468,10 +513,7 @@ def repair_grounded_scientific_answer(
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_grounded_repair_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_grounded_repair_response_empty")
 
 
 def _execute(

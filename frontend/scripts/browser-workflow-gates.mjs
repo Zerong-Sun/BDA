@@ -41,6 +41,14 @@ async function routeApi(request) {
   const method = request.method()
   const body = request.postDataJSON()
   if (method !== 'GET') mutations.push({ method, path, body })
+  if (path === '/api/v2/copilot/route-plans' && method === 'POST') return ok({
+    project_id: graph.workflow.project_id, goal: body.goal, knowledge_context: [], rationale: [],
+    route_options: [{ route_id: 'reviewed-template', label: 'Reviewed template', rank: 1, recommended: true,
+      summary: 'A complete synthetic route', rationale: [], risks: [], constraints: {}, estimated_steps: 1,
+      modules: [{ module_id: plugin.id, model_plugin_id: plugin.id, model_name: plugin.name,
+        node_type: plugin.plugin_key, available: true, summary: 'Synthetic folding step', default_parameters: { threshold: 0.8 } }],
+    }],
+  })
   if (path.endsWith('/graph')) return ok(graph)
   if (path === '/api/v2/workflow-runs/run_browser') return ok(graph.workflow)
   if (path.endsWith('/registry/model-plugins')) return ok({ items: [plugin], next_cursor: null })
@@ -121,6 +129,18 @@ try {
   page.setDefaultTimeout(10000)
   const button = (name) => page.getByRole('button', { name, exact: true })
   await page.goto(`${origin}/#/workflow`)
+  await button('New route').click()
+  assert.equal(mutations.filter((item) => item.path.endsWith('/workflow-runs')).length, 0)
+  await page.getByLabel('Objective for this workflow').fill('Review the target before folding')
+  await button('Plan routes').click()
+  await button('Create workflow from selected route').waitFor()
+  assert.equal(await page.getByRole('checkbox').count(), 0, 'Template steps must not offer unsupported partial application')
+  await page.screenshot({ path: `${output}/route-choice.png`, fullPage: true })
+  await page.getByLabel('Objective for this workflow').fill('A revised folding objective')
+  await page.getByText('The objective changed. Generate a new route before creating the workflow.', { exact: true }).waitFor()
+  assert.equal(await button('Create workflow from selected route').count(), 0)
+  await button('Return to current workflow').click()
+  steps.push('Choose a complete route without creating a run, invalidate its plan when the objective changes, and return to the current draft')
   await page.locator('.react-flow__node[data-id="node_browser"]').click()
   await button('Add next node').click()
   await page.getByLabel('Node name', { exact: true }).fill('downstream-check')
@@ -159,7 +179,7 @@ try {
     handle('node_1', 'target', '__order_in'),
   )
   // The badge on an ordering arrow says what it does rather than asking for a gate.
-  await page.getByRole('button', { name: 'Wait for completion' }).waitFor()
+  await page.getByRole('button', { name: 'Configured · dependency' }).waitFor()
   assert.equal(graph.edges.length, 1)
   assert.equal(graph.edges[0].gate.mode, 'dependency')
   assert.equal(graph.edges[0].source_port, null)
@@ -169,7 +189,7 @@ try {
   steps.push('Create an ordering-only connection by dragging between the ordering handles')
 
   // Back to the data connection the rest of this run configures gates against.
-  await page.getByRole('button', { name: 'Wait for completion' }).click()
+  await page.getByRole('button', { name: 'Configured · dependency' }).click()
   await button('Delete connection').click()
   await page.getByText('Connection gate', { exact: true }).waitFor({ state: 'hidden' })
   await handle('node_browser', 'source', 'sequences').dragTo(handle('node_1', 'target', 'sequences'))

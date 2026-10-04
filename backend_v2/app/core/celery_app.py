@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from contextvars import ContextVar, Token
 from datetime import UTC, datetime
+from os import getpid
 from socket import gethostname
 
 from celery import Celery  # type: ignore[import-untyped]
@@ -37,7 +39,11 @@ from .config import get_settings
 from .database import session_scope
 
 settings = get_settings()
-_worker_context_tokens: dict[str, object] = {}
+# Redelivery may run the same task ID concurrently. A token must remain in the
+# context that created it; a stack also restores nested eager task invocations.
+_worker_context_tokens: ContextVar[tuple[tuple[str, Token[str | None]], ...]] = ContextVar(
+    "bda_worker_context_tokens", default=()
+)
 celery_app = Celery("bda-v2", broker=settings.celery_broker_url, backend=settings.redis_url)
 
 # Every module that registers a task. A worker imports these at startup, so no module
@@ -138,7 +144,13 @@ def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
     """Publish worker identity without making task execution depend on telemetry."""
     from ..platform.models import WorkerHeartbeat
 
-    instance_id = str(getattr(sender, "hostname", "") or gethostname())
+    # Celery emits this signal from Heart, not from the Worker. Its dispatcher
+    # carries --hostname; using the machine hostname collapses separately named
+    # queue workers on one host into one row that they continually overwrite.
+    eventer = getattr(sender, "eventer", None)
+    instance_id = str(
+        getattr(eventer, "hostname", "") or getattr(sender, "hostname", "") or f"{gethostname()}:{getpid()}"
+    )
     try:
         with session_scope() as session:
             row = session.get(WorkerHeartbeat, instance_id)
@@ -160,18 +172,21 @@ def _bind_operation_project(sender=None, task_id=None, **_kwargs) -> None:
     headers = getattr(getattr(sender, "request", None), "headers", None) or {}
     project_id = headers.get("bda_project_id") if isinstance(headers, Mapping) else None
     if task_id is not None:
-        _worker_context_tokens[str(task_id)] = bind_worker_project_context(project_id)
+        token = bind_worker_project_context(project_id)
+        _worker_context_tokens.set((*_worker_context_tokens.get(), (str(task_id), token)))
 
 
 @task_postrun.connect
 def _reset_operation_project(task_id=None, **_kwargs) -> None:
-    from contextvars import Token
-
     from .database import reset_worker_project_context
 
-    token = _worker_context_tokens.pop(str(task_id), None)
-    if isinstance(token, Token):
-        reset_worker_project_context(token)
+    tokens = _worker_context_tokens.get()
+    for index in range(len(tokens) - 1, -1, -1):
+        identifier, token = tokens[index]
+        if identifier == str(task_id):
+            reset_worker_project_context(token)
+            _worker_context_tokens.set(tokens[:index] + tokens[index + 1:])
+            break
 
 
 @task_prerun.connect

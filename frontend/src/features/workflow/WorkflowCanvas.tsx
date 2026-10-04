@@ -27,7 +27,8 @@ import {
   type WorkflowNodeData,
 } from './workflowTypes'
 import { useToastStore } from '../../components/ui/toastStore'
-import { saveWorkflowLayout, addWorkflowNode } from '../../lib/api/workflow'
+import { saveWorkflowLayout, addWorkflowNode, getWorkflowGraph } from '../../lib/api/workflow'
+import { saveConnections } from '../../lib/api/workflowGates'
 import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
 import { useI18n } from '../../lib/i18n'
@@ -94,7 +95,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     const showToast = useToastStore(s => s.show)
     const [addingNode, setAddingNode] = useState(false)
     useAppStore((s) => s.themePreference)
-    const { t } = useI18n()
+    const { t, language } = useI18n()
     const gridColor = themeColor('--border-soft', '#202020')
     const accentColor = themeColor('--accent', '#D08A2A')
     const maskColor = themeColor('--border-soft', 'rgba(0,0,0,0.45)')
@@ -104,6 +105,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     const edgesRef = useRef(edges)
     nodesRef.current = nodes
     edgesRef.current = edges
+
+    useEffect(() => () => {
+      if (saveTimer.current !== null) {
+        window.clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+    }, [readOnly, workflowRunId])
 
     useEffect(() => {
       if (!initialNodes) return
@@ -184,9 +192,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
 
     const persistLayout = useCallback(
       (currentNodes: Node[], currentEdges: BdaWorkflowEdge[]) => {
-        if (!workflowRunId) return
+        if (!workflowRunId || readOnly) return
         if (saveTimer.current) window.clearTimeout(saveTimer.current)
         saveTimer.current = window.setTimeout(() => {
+          saveTimer.current = null
           void saveWorkflowLayout(workflowRunId, {
             nodes: currentNodes.map((node) => ({
               id: node.id,
@@ -201,7 +210,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             .catch(error => showToast(error instanceof Error ? error.message : 'Layout save failed', 'error'))
         }, 500)
       },
-      [workflowRunId, onLayoutSaved, showToast],
+      [workflowRunId, readOnly, onLayoutSaved, showToast],
     )
 
     const onEdgesChange = useCallback(
@@ -383,8 +392,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           setNodes(nextNodes)
           setEdges(nextEdges)
           if (workflowRunId && !readOnly) {
-            const { getWorkflowGraph } = await import('../../lib/api/workflow')
-            const { saveConnections } = await import('../../lib/api/workflowGates')
             const latest = await getWorkflowGraph(workflowRunId)
             await saveConnections(workflowRunId, [...latest.edges, ...newEdges.map(e => ({ id: e.id, source: e.source, target: e.target }))], latest.workflow.version)
           }
@@ -404,6 +411,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     ])
 
     const proOptions = useMemo(() => ({ hideAttribution: true }), [])
+    // Node deletion has no canvas persistence handler. React Flow's default
+    // Backspace removal would only hide server nodes locally (even read-only
+    // ones) and can also remove their connections. Keep those nodes inspectable.
+    const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, deletable: false })), [nodes])
     const flowKey = useMemo(
       () => `${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
       [nodes, edges],
@@ -421,7 +432,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             present the legend was drawn straight over the read-only sentence. */}
         {readOnly ? (
           <p className="shrink-0 border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
-            {t.workflowExt.canvas.readOnlyBanner}
+            {language === 'zh' ? '当前工作流只读。可选择节点和连线查看详情。' : 'This workflow is read-only. Select nodes and connections to inspect details.'}
           </p>
         ) : null}
         {addingNode ? (
@@ -461,7 +472,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
         <ReactFlow
           className="min-h-0 flex-1"
           key={flowKey}
-          nodes={nodes}
+          nodes={renderedNodes}
           edges={edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
@@ -487,6 +498,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           nodesConnectable={!readOnly}
           edgesFocusable={false}
           edgesReconnectable={false}
+          deleteKeyCode={readOnly ? null : 'Backspace'}
           panOnScroll
           selectionOnDrag={false}
         >

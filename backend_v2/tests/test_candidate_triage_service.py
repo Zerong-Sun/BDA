@@ -87,6 +87,7 @@ def _candidate(session: Session, project: Project, metrics: list[tuple[str, floa
             CandidateMetric(
                 candidate_id=candidate.id, metric_key=key, value=value,
                 method=method, assessor=assessor, evidence_kind="predicted",
+                unit="pLDDT_0_100" if key == "plddt" else "",
                 model_variant=f"seed-{index}_sample-0",
             )
         )
@@ -140,7 +141,7 @@ def test_the_verdict_says_who_produced_the_deciding_number(session: Session) -> 
     assert {item["method"] for item in verdict["criteria"]} == {"alphafold2_superfold"}
 
 
-def test_a_design_nobody_has_measured_is_missing_rather_than_failed(session: Session) -> None:
+def test_a_design_without_recorded_metrics_is_missing_rather_than_failed(session: Session) -> None:
     project, _user = _project(session)
     candidate = _candidate(session, project, [])
 
@@ -149,6 +150,11 @@ def test_a_design_nobody_has_measured_is_missing_rather_than_failed(session: Ses
     assert verdict["tier"] is None
     assert verdict["missing"] == 2
     assert verdict["failed"] == 0
+    for criterion in verdict["criteria"]:
+        assert criterion["value"] is criterion["method"] is criterion["assessor"] is None
+        assert "supplied metrics" in criterion["note"]
+        assert "unknown" in criterion["note"]
+        assert "nothing has measured" not in criterion["note"]
 
 
 def test_a_partially_measured_design_separates_the_two_reasons(session: Session) -> None:
@@ -162,6 +168,39 @@ def test_a_partially_measured_design_separates_the_two_reasons(session: Session)
     outcomes = {item["name"]: item["outcome"] for item in verdict["criteria"]}
     assert outcomes == {"pae_interaction": "fail", "binder_plddt": "missing"}
     assert verdict["failed"] == 1 and verdict["missing"] == 1
+
+
+def test_tool_result_names_the_fallback_tier_and_preserves_all_comparisons(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(
+        session, project,
+        [("pae_interaction", 18.0, "synthetic_fixture", "synthetic_fixture"),
+         ("plddt", 62.0, "synthetic_fixture", "synthetic_fixture")],
+    )
+
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+
+    assert verdict["criteria_tier"] == "tier_a"
+    assert verdict["tier"] is None
+    for tier, assessment in verdict["tier_assessments"].items():
+        assert assessment["outcome"] == "fail"
+        assert (assessment["passed"], assessment["failed"], assessment["missing"]) == (0, 2, 0)
+        assert [item["threshold"] for item in assessment["criteria"]] == list(TIERS[tier].values())
+        assert {item["method"] for item in assessment["criteria"]} == {"synthetic_fixture"}
+
+
+def test_tool_result_does_not_extend_recorded_provenance_to_missing_criteria(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(session, project, [("plddt", 92.0, "synthetic_fixture", "synthetic_fixture")])
+
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+
+    for assessment in verdict["tier_assessments"].values():
+        assert assessment["outcome"] == "missing"
+        assert (assessment["passed"], assessment["failed"], assessment["missing"]) == (1, 0, 1)
+        absent, present = assessment["criteria"]
+        assert absent["method"] is absent["assessor"] is absent["value"] is None
+        assert present["method"] == present["assessor"] == "synthetic_fixture"
 
 
 def test_another_projects_candidate_is_not_judged(session: Session) -> None:
@@ -182,3 +221,28 @@ def test_an_unknown_candidate_is_a_404(session: Session) -> None:
         triage_candidate(session, project, uuid.uuid4(), TIERS)
 
     assert failure.value.status_code == 404
+
+
+def test_scale_metadata_and_counts_survive_service_serialization(session: Session) -> None:
+    project, _user = _project(session)
+    candidate = _candidate(session, project, [("plddt", 0.94, "boltz2", "design_model")])
+    from sqlalchemy import select
+    row = session.scalar(select(CandidateMetric).where(CandidateMetric.candidate_id == candidate.id))
+    assert row is not None
+    row.unit = ""
+    row.context = {"stored_scale": "fraction_0_1"}
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+    assert verdict["conflicted"] == 1 and verdict["failed"] == 0
+    assert all(item["conflicted"] == 1 and item["outcome"] == "scale_conflict" for item in verdict["tier_assessments"].values())
+    row.context = {"stored_scale": "percent_0_100", "reported_value": 0.94}
+    row.value = 94
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, {"a": {"binder_plddt": "> 70"}})
+    assert verdict["passed"] == 1 and verdict["conflicted"] == 0
+    row.method = "unverified"
+    row.context = {}
+    session.flush()
+    verdict = triage_candidate(session, project, candidate.id, TIERS)
+    assert verdict["scale_unknown"] == 1 and verdict["failed"] == 0
+    assert all(item["outcome"] == "scale_unknown" for item in verdict["tier_assessments"].values())

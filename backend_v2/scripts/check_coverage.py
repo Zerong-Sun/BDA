@@ -16,6 +16,9 @@ import json
 import os
 from pathlib import Path
 
+RESEARCH_BRANCH_FILE = "backend_v2/app/research/package_validation.py"
+RESEARCH_BRANCH_THRESHOLD = 95.0
+
 CORE_THRESHOLDS = {
     "backend_v2/app/identity/service.py": 95.0,
     "backend_v2/app/identity/deps.py": 95.0,
@@ -42,11 +45,37 @@ def db_tests_ran() -> bool:
     return os.environ.get("BDA_V2_RUN_DB_TESTS") == "1"
 
 
+def research_branch_gate(data: dict) -> int:
+    """Enforce branch outcomes alone, independently of statement coverage."""
+    try:
+        if data["meta"]["branch_coverage"] is not True:
+            raise ValueError("branch measurement was not enabled")
+        summary = data["files"][RESEARCH_BRANCH_FILE]["summary"]
+        total = summary["num_branches"]
+        covered = summary["covered_branches"]
+        if type(total) is not int or type(covered) is not int or total <= 0 or not 0 <= covered <= total:
+            raise ValueError("branch counts must be valid integers with a positive denominator")
+    except (KeyError, TypeError, ValueError) as exc:
+        print(f"research package branch coverage unavailable: {exc}; export JSON with --cov-branch")
+        return 1
+    actual = covered * 100.0 / total
+    if actual < RESEARCH_BRANCH_THRESHOLD:
+        print(f"{RESEARCH_BRANCH_FILE} branch coverage {actual:.2f}% ({covered}/{total} branches) "
+              f"is below {RESEARCH_BRANCH_THRESHOLD:.2f}%")
+        return 1
+    print(f"research package branch coverage gate passed: {actual:.2f}% ({covered}/{total} branches)")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Enforce BDA v2 total and core-package coverage gates")
     parser.add_argument("coverage_json", type=Path)
+    parser.add_argument("--research-branch", action="store_true",
+                        help="Check research package covered_branches/num_branches >= 95%%; excludes statement coverage")
     args = parser.parse_args()
     data = json.loads(args.coverage_json.read_text())
+    if args.research_branch:
+        return research_branch_gate(data)
     failures: list[str] = []
     total = float(data["totals"]["percent_covered"])
     if total < 85.0:
