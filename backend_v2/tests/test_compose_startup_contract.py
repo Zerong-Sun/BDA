@@ -56,6 +56,20 @@ def test_scheduler_is_required_and_has_an_isolated_database_login() -> None:
         assert services[name]["environment"]["BDA_V2_SCHEDULER_DATABASE_URL"] == ""
 
 
+def test_required_background_services_recover_after_daemon_restart() -> None:
+    services = _services()
+    for name in ("worker-v2", "research-worker-v2", "copilot-worker-v2", "scheduler-worker-v2", "beat-v2"):
+        # A healthy API alone cannot complete queued work. Preserve explicit stops,
+        # but bring these services back after a crash or a host/daemon restart.
+        assert services[name]["restart"] == "unless-stopped", name
+
+
+def test_staging_smoke_accepts_the_readiness_success_status() -> None:
+    workflow = (COMPOSE_PATH.parent / ".github/workflows/staging.yml").read_text()
+    assert '.status == "ok"' in workflow
+    assert '.status == "ready"' not in workflow
+
+
 def test_rendered_compose_does_not_expose_scheduler_credentials_to_other_services(tmp_path):
     compose = shutil.which("docker-compose")
     if not compose:

@@ -42,7 +42,7 @@ export function GuideHero() {
 
         <div className="mt-10 flex flex-col items-center gap-2 motion-reduce:hidden">
           <span className="font-mono text-caption uppercase tracking-widest text-accent">{t.guide.hero.scrollPrompt}</span>
-          <CaretDown className="h-5 w-5 animate-bounce text-accent motion-reduce:animate-none" aria-hidden="true" />
+          <CaretDown className="h-5 w-5 text-accent" aria-hidden="true" />
         </div>
       </AppFrame>
     </header>

@@ -43,7 +43,7 @@ export function WorkflowResourceSidebar({
     queryFn: listModelPlugins,
   })
   const nodeArtifacts = selectedNode
-    ? artifacts.filter((artifact) => artifact.lineage.workflow_node_id === selectedNode.id)
+    ? artifacts.filter((artifact) => artifact.lineage.workflow_node_id === selectedNode.id || (Array.isArray(selectedNode.parameters.evidence_artifact_ids) && selectedNode.parameters.evidence_artifact_ids.includes(artifact.id)))
     : artifacts
   const visibleArtifacts = selectedNode ? nodeArtifacts : artifacts
 

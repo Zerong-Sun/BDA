@@ -118,7 +118,7 @@ describe('WorkflowProgress', () => {
     )
   })
 
-  it('does not unlock the supported path from historical artifacts when readiness is blocked', () => {
+  it('opens imported results without falsely completing target preparation', () => {
     renderWithProviders(
       <WorkflowProgress
         projectQuery="?project=proj_test"
@@ -129,8 +129,9 @@ describe('WorkflowProgress', () => {
 
     expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute(
       'href',
-      '#/research?project=proj_test',
+      '#/results?project=proj_test',
     )
-    expect(screen.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Research/i })).toBeEnabled()
+    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeDisabled()
   })
 })

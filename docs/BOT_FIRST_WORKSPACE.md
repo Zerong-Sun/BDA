@@ -268,7 +268,7 @@ top bar, so no route issues extra requests on arrival.
 Branch: `claude/bot-interaction-decision-display-fb5506`, stacked on the
 six-operator roster and the decision inbox. Five steps, each separately
 mergeable; the plan they follow is
-[研究室与结构位点选择规划](plans/BOT_ROOM_PLAN.md).
+[研究室与结构位点选择规划](archive/2026-09-30/BOT_ROOM_PLAN.md).
 
 ### The room
 

@@ -30,7 +30,7 @@ interface WorkflowProgressProps {
 }
 
 export function WorkflowProgress({ projectQuery, overview, hasProject }: WorkflowProgressProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const navigate = useNavigate()
   const currentIndex = currentStageIndex(hasProject, overview)
 
@@ -52,6 +52,12 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
       title: t.projects.workflowProgress.candidates,
       path: '/candidates',
       body: t.projects.workflowProgress.candidatesBody,
+    },
+    {
+      key: 'lab',
+      title: t.nav.lab,
+      path: '/lab',
+      body: language === 'zh' ? '准备样品，导入测量并关联实验记录。' : 'Prepare samples and connect measurements to experimental records.',
     },
     {
       key: 'results',
@@ -86,7 +92,7 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
     const step = steps[index]
     if (!step) return
     const state = pipelineStageState(index, hasProject, overview, currentIndex)
-    if (state === 'done' || state === 'current') {
+    if (state !== 'locked') {
       navigate(`${step.path}${projectQuery}`)
     }
   }
@@ -108,7 +114,7 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
                 key={step.key}
                 step={index + 1}
                 completed={state === 'done'}
-                disabled={state === 'locked' || state === 'not_started'}
+                disabled={state === 'locked'}
               >
                 <StepperTrigger
                   type="button"
@@ -132,7 +138,7 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
           ))}
         </StepperPanel>
       </Stepper>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {steps.map((step, index) => {
           const state = pipelineStageState(index, hasProject, overview, currentIndex)
           return (
@@ -153,13 +159,13 @@ export function WorkflowProgress({ projectQuery, overview, hasProject }: Workflo
                 >
                   {t.projects.workflowProgress.continue}
                 </Button>
-              ) : state === 'done' ? (
+              ) : state === 'done' || state === 'not_started' ? (
                 <Button
                   render={<Link to={`${step.path}${projectQuery}`} />}
                   variant="ghost"
                   className="mt-3 w-fit"
                 >
-                  {t.projects.workflowProgress.review}
+                  {state === 'done' ? t.projects.workflowProgress.review : language === 'zh' ? '打开' : 'Open'}
                 </Button>
               ) : null}
             </AppFrame>

@@ -1,5 +1,6 @@
+import { WorkflowEvidence } from './WorkflowEvidence'
 import { ModelResultGuide } from '../results/ModelResultGuide'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Copy, Download, FileCode, FloppyDisk, Gear, Network, PlugsConnected } from '@phosphor-icons/react'
 import type { WorkflowInputBinding, WorkflowNode } from '../../lib/schemas/workflow'
 import type { Artifact } from '../../lib/schemas/artifact'
@@ -56,6 +57,7 @@ interface WorkflowInspectorProps {
    * refusal as a 409 after the user had already done the work.
    */
   readOnly?: boolean
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function WorkflowInspector(props: WorkflowInspectorProps) {
@@ -73,6 +75,7 @@ function WorkflowInspectorContent({
   artifactCount = 0,
   nodes = [],
   readOnly = false,
+  onDirtyChange,
 }: WorkflowInspectorProps) {
   const [baseVersion, setBaseVersion] = useState(workflowVersion)
   const parameters = selectedNode?.parameters ?? {}
@@ -89,6 +92,13 @@ function WorkflowInspectorContent({
   const [previewBackend, setPreviewBackend] = useState<'lsf' | 'docker'>('lsf')
   const unsavedPreviewInputs = (queueName.trim() || null) !== (selectedNode?.queue || null)
     || JSON.stringify(draftBindings) !== JSON.stringify(selectedNode?.input_bindings ?? [])
+  const dirty = Boolean(selectedNode) && !readOnly && (unsavedPreviewInputs
+    || JSON.stringify(draftParameters) !== JSON.stringify(parameters)
+    || JSON.stringify(draftConfiguration) !== JSON.stringify(selectedNode?.configuration ?? {}))
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+    return () => onDirtyChange?.(false)
+  }, [dirty, onDirtyChange])
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const { t, language } = useI18n()
@@ -177,6 +187,13 @@ function WorkflowInspectorContent({
       showToast(t.workflowExt.toasts.paramsSaved, 'success')
       const latest = await getWorkflowGraph(workflowRunId!)
       setBaseVersion(latest.workflow.version)
+      const savedNode = latest.nodes.find((node) => node.id === selectedNode?.id)
+      if (savedNode) {
+        setDraftParameters(savedNode.parameters)
+        setDraftConfiguration(savedNode.configuration ?? {})
+        setDraftBindings(savedNode.input_bindings)
+        setQueueName(savedNode.queue ?? '')
+      }
       queryClient.setQueryData(['workflow-graph', workflowRunId], latest)
       await queryClient.invalidateQueries({ queryKey: ['workflow-graph', workflowRunId] })
       await queryClient.invalidateQueries({ queryKey: ['workflow-preflight', workflowRunId] })
@@ -267,6 +284,7 @@ function WorkflowInspectorContent({
               <StatusPill label={selectedNode.status} tone={statusTone(selectedNode.status)} />
             </div>
 
+            <WorkflowEvidence nodes={[selectedNode]} artifacts={projectArtifacts} projectId={projectId ?? ''} expanded />
             <ModelResultGuide pluginKey={activePlugin?.plugin_key ?? selectedNode.model_plugin ?? selectedNode.node_type} />
 
             <RouteDisplayCatalog
@@ -286,7 +304,7 @@ function WorkflowInspectorContent({
                 artifacts={projectArtifacts}
                 bindings={draftBindings}
                 onChange={setDraftBindings}
-                readOnly={readOnly}
+                readOnly={readOnly || saveParameters.isPending}
               />
             </InspectorBlock>
 
@@ -298,7 +316,7 @@ function WorkflowInspectorContent({
                 schema={parameterSchema}
                 values={effectiveParameters}
                 onChange={setDraftParameters}
-                disabled={readOnly}
+                disabled={readOnly || saveParameters.isPending}
                 // Same reason as the node builder: the declared slot count drives three
                 // things that must agree, so a value it pins says so rather than looking
                 // like any other editable number.
@@ -315,7 +333,7 @@ function WorkflowInspectorContent({
                   <Input
                     className="rounded border border-border-soft bg-surface-1 px-2 py-1.5 text-xs text-text-primary"
                     value={queueName}
-                    disabled={readOnly}
+                    disabled={readOnly || saveParameters.isPending}
                     onChange={(event) => setQueueName(event.target.value)}
                     placeholder={t.workflowExt.inspector.lsfQueuePlaceholder}
                   />
@@ -342,7 +360,7 @@ function WorkflowInspectorContent({
                   </p>
                 </div>
               </div>
-              {workflowRunId && selectedNode && <NodeAssistance workflowId={workflowRunId} node={{ ...selectedNode, parameters: draftParameters }} nodes={nodes} configuration={draftConfiguration} onConfiguration={setDraftConfiguration} onParameter={(key, value) => setDraftParameters(p => ({ ...p, [key]: value }))} readOnly={readOnly} allowedParameters={parameterFields.map(f => f.key)} />}
+              {workflowRunId && selectedNode && <NodeAssistance workflowId={workflowRunId} node={{ ...selectedNode, parameters: draftParameters }} nodes={nodes} configuration={draftConfiguration} onConfiguration={setDraftConfiguration} onParameter={(key, value) => setDraftParameters(p => ({ ...p, [key]: value }))} readOnly={readOnly || saveParameters.isPending} allowedParameters={parameterFields.map(f => f.key)} />}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button"
                   variant="outline"
@@ -355,6 +373,13 @@ function WorkflowInspectorContent({
                     ? t.workflowExt.inspector.saving
                     : t.workflowExt.inspector.saveParameters}
                 </Button>
+                {dirty ? <Button type="button" variant="ghost" size="sm" disabled={saveParameters.isPending} onClick={() => {
+                  setDraftParameters(parameters)
+                  setDraftConfiguration(selectedNode?.configuration ?? {})
+                  setDraftBindings(selectedNode?.input_bindings ?? [])
+                  setQueueName(selectedNode?.queue ?? '')
+                  setPreviewSnapshot(null)
+                }}>{language === 'zh' ? '放弃修改' : 'Discard changes'}</Button> : null}
                 <Button type="button"
                   size="sm"
                   disabled={previewScript.isPending || saveParameters.isPending || unsavedPreviewInputs}

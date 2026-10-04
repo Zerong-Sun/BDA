@@ -96,7 +96,7 @@ services:
         BDA_V2_DATABASE_POOL_SIZE: "5"
         BDA_V2_DATABASE_MAX_OVERFLOW: "5"
         BDA_V2_BUILD_REVISION: local
-        BDA_V2_SCHEMA_REVISION: 0070_af3_msa_port
+        BDA_V2_SCHEMA_REVISION: 0071_copilot_reasoning_content
         BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot,scheduler
         # Mask the retired shared scheduler credential if an old .env still has it.
         BDA_V2_SCHEDULER_DATABASE_URL: ""
@@ -127,6 +127,7 @@ services:
 
   worker-v2:
     image: bda-api-v2:local
+    restart: unless-stopped
     env_file: .env
     environment:
       <<: *v2_environment
@@ -141,6 +142,7 @@ services:
 
   research-worker-v2:
     image: bda-api-v2:local
+    restart: unless-stopped
     env_file: .env
     environment:
       <<: *v2_environment
@@ -155,6 +157,7 @@ services:
 
   copilot-worker-v2:
     image: bda-api-v2:local
+    restart: unless-stopped
     env_file: .env
     environment:
       <<: *v2_environment
@@ -189,6 +192,7 @@ services:
 
   beat-v2:
     image: bda-api-v2:local
+    restart: unless-stopped
     env_file: .env
     environment:
       <<: *v2_environment

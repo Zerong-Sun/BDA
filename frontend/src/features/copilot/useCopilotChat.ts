@@ -154,7 +154,9 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         streamed += chunk
         writeMessages((prev) => {
           const copy = [...prev]
-          copy[copy.length - 1] = { role: 'assistant', content: streamed }
+          // JSON SSE sends metadata before the matching text chunk. Preserve
+          // that metadata so the final answer retains citations and tool links.
+          copy[copy.length - 1] = { ...copy[copy.length - 1], role: 'assistant', content: streamed }
           return copy
         })
       }, (stage) => {

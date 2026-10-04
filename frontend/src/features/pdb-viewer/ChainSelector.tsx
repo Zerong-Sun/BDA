@@ -31,7 +31,7 @@ export function ChainSelector({ chains, value, onChange }: ChainSelectorProps) {
         }
       >
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.chain}>
-          <SelectValue />
+          <SelectValue>{value ?? t.viewer.allChains}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL_CHAINS_VALUE} data-value={ALL_CHAINS_VALUE}>

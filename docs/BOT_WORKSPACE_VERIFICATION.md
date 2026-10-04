@@ -96,7 +96,7 @@ Publication target: `bda-public` (`Zerong-Sun/BDA`), branch
 
 Scope: `claude/bot-interaction-decision-display-fb5506`, stacked on
 `codex/bot-first-science-workspace` (8007e022). The work is P0–P4 of
-[研究室与结构位点选择规划](plans/BOT_ROOM_PLAN.md); the behaviour it produced is
+[研究室与结构位点选择规划](archive/2026-09-30/BOT_ROOM_PLAN.md); the behaviour it produced is
 described in [Bot 优先工作区](BOT_FIRST_WORKSPACE.md) iteration 7.
 
 ### Repair checklist

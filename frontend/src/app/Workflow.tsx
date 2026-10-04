@@ -13,11 +13,11 @@ import { mapApiGraphToGraph } from '../features/workflow/workflowMapper'
 import { WorkflowResourceSidebar } from '../features/workflow/WorkflowResourceSidebar'
 import { RunLineage } from '../features/workflow/RunLineage'
 import { WorkflowInspector } from '../features/workflow/WorkflowInspector'
+import { DemoWorkflowInspector } from '../features/workflow/DemoWorkflowInspector'
+import { getDemoWorkflow } from '../features/workflow/demoWorkflow'
 import { WorkflowContextBar } from '../features/workflow/WorkflowContextBar'
 import { WorkflowToolbar } from '../features/workflow/WorkflowToolbar'
 import {
-  defaultWorkflowEdges,
-  defaultWorkflowNodes,
   isOrderingHandle,
   type NodeTemplate,
 } from '../features/workflow/workflowTypes'
@@ -41,12 +41,13 @@ import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listModelPlugins, validateModelPlugin } from '../lib/api/registry'
 import { awaitOperation } from '../lib/api/operations'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
+import { useProjectAccess } from '../lib/hooks/useProjectAccess'
 import { useSearchParamPatch } from '../lib/nav/useSearchParamPatch'
 import { useTargetReadiness } from '../lib/hooks/useProjectTargetStructure'
 import { useAppStore } from '../lib/store/appStore'
 import { useToastStore } from '../components/ui/toastStore'
 import { useI18n } from '../lib/i18n'
-import { projectText } from '../lib/i18n/projectText'
+import { projectText, projectActionText } from '../lib/i18n/projectText'
 import type { Artifact } from '../lib/schemas/artifact'
 import type { ModelPlugin } from '../lib/schemas/registry'
 import type { TranslationDict } from '../lib/i18n/types'
@@ -59,7 +60,6 @@ import {
   FrameTitle,
 } from '../components/reui/frame'
 import { Button } from '../components/ui/Button'
-import { Checkbox } from '../components/ui/checkbox'
 import { Textarea } from '../components/ui/textarea'
 import { Skeleton } from '../components/ui/Skeleton'
 import { currentRole } from '../features/research/jsonHelpers'
@@ -239,7 +239,27 @@ function WorkflowLegend({ advanced }: { advanced: boolean }) {
 }
 
 export function WorkflowPage() {
+  const { projectId } = useProjectContext()
+  const [, patchSearch] = useSearchParamPatch()
+  const previousProjectId = useRef(projectId)
+  useEffect(() => {
+    const previous = previousProjectId.current
+    previousProjectId.current = projectId
+    if (previous && previous !== projectId) patchSearch({ run: null, node: null }, { replace: true })
+  }, [patchSearch, projectId])
+  // A project owns its entire draft, including late asynchronous responses.
+  return <WorkflowWorkspace key={projectId} />
+}
+
+function WorkflowWorkspace() {
   const { projectId, activeProject } = useProjectContext()
+  const { t, format, language } = useI18n()
+  const showToast = useToastStore((s) => s.show)
+  const active = useRef(true)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
   const workflowSeed = useAppStore((s) => s.workflowSeed)
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
@@ -248,7 +268,9 @@ export function WorkflowPage() {
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
   )
   const [confirmRun, setConfirmRun] = useState(false)
-  const [routePlan, setRoutePlan] = useState<RoutePlan | null>(null)
+  const [planningMode, setPlanningMode] = useState<boolean | null>(() => workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? true : null)
+  const [unsavedNodeChanges, setUnsavedNodeChanges] = useState(false)
+  const [plannedRoute, setPlannedRoute] = useState<{ plan: RoutePlan; objective: string } | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   // The run and node you are looking at live in the URL, so the workbench can be
   // linked to, reloaded, and stepped back through like any other page. The edge,
@@ -258,8 +280,15 @@ export function WorkflowPage() {
   const requestedWorkflowRunId = search.get('run')
   const selectedNodeId = search.get('node')
   const setSelectedNodeId = useCallback(
-    (nodeId: string | null) => patchSearch({ node: nodeId }, { replace: true }),
-    [patchSearch],
+    (nodeId: string | null) => {
+      if (unsavedNodeChanges && nodeId !== selectedNodeId) {
+        showToast(language === 'zh' ? '请先保存或放弃节点修改。' : 'Save or discard node changes first.', 'info')
+        return false
+      }
+      patchSearch({ node: nodeId }, { replace: true })
+      return true
+    },
+    [language, patchSearch, selectedNodeId, showToast, unsavedNodeChanges],
   )
   // Runs this page chose itself - created, planned, or picked from the run list -
   // belong to this project by construction. Remembering them lets the check
@@ -273,34 +302,27 @@ export function WorkflowPage() {
     },
     [patchSearch],
   )
-  const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([])
   const [artifacts, setArtifacts] = useState<Artifact[]>([])
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | undefined>()
   const canvasRef = useRef<WorkflowCanvasHandle>(null)
-  const { t, format, language } = useI18n()
   const appMode = useAppStore((s) => s.appMode)
   const uiDensity = useAppStore((s) => s.uiDensity)
-  const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
   const isDemoMode = appMode === 'demo'
+  const demoWorkflow = useMemo(() => getDemoWorkflow(language), [language])
+  const projectAccess = useProjectAccess(projectId)
+  const canEdit = !isDemoMode && projectAccess.isSuccess && projectAccess.data?.permissions.write === true
+  const canCompute = canEdit && projectAccess.data?.permissions.compute === true
+  const accessMessage = language === 'zh' ? '当前项目无编辑权限。' : 'You do not have edit access to this project.'
   const routeObjective =
     goal.trim() || projectObjective(activeProject, t.workflowExt.routePlanner, format)
   const targetReadiness = useTargetReadiness(projectId)
-
-  // Switching project clears the run and node, which belong to the old one. Only
-  // a real switch: the first resolution of the project on load must not wipe a
-  // run that arrived in a link.
-  const previousProjectId = useRef(projectId)
-  useEffect(() => {
-    const previous = previousProjectId.current
-    previousProjectId.current = projectId
-    if (previous && previous !== projectId) patchSearch({ run: null, node: null }, { replace: true })
-  }, [patchSearch, projectId])
 
   useEffect(() => {
     if (workflowSeed?.projectId === projectId && workflowSeed.goal.trim()) {
       const applySeed = window.setTimeout(() => {
         setGoal(workflowSeed.goal)
+        setPlanningMode(true)
         setWorkflowSeed(null)
       }, 0)
       return () => window.clearTimeout(applySeed)
@@ -340,8 +362,9 @@ export function WorkflowPage() {
       !workflowRunsQuery.isFetching &&
       !projectWorkflowRuns.some((run) => run.id === requestedWorkflowRunId),
   )
-  const selectedWorkflowRunId = linkedRunIsForeign ? null : requestedWorkflowRunId
-  const workflowRunId = selectedWorkflowRunId ?? currentWorkflowRun?.id
+  const linkedRunIsPending = Boolean(requestedWorkflowRunId && !ownRunIds.has(requestedWorkflowRunId) && !projectWorkflowRuns.some((run) => run.id === requestedWorkflowRunId) && (!workflowRunsQuery.isSuccess || workflowRunsQuery.isFetching))
+  const selectedWorkflowRunId = linkedRunIsForeign || linkedRunIsPending ? null : requestedWorkflowRunId
+  const workflowRunId = linkedRunIsPending ? undefined : selectedWorkflowRunId ?? currentWorkflowRun?.id
 
   const {
     data: workflowGraph,
@@ -431,11 +454,12 @@ export function WorkflowPage() {
         },
       }
     })
-    mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { setSelectedEdgeId(e.id); setSelectedNodeId(null); setSelectedArtifactId(undefined) } } }))
+    mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { if (!setSelectedNodeId(null)) return; setSelectedEdgeId(e.id); setSelectedArtifactId(undefined) } } }))
     return mapped
   }, [workflowNodes, workflowGraph?.edges, modelPlugins, gateQuery.data, language, setSelectedEdgeId, setSelectedNodeId, setSelectedArtifactId])
   const selectedEdge = workflowGraph?.edges.find(e => e.id === selectedEdgeId)
   const persistConnections = async (edges: WorkflowEdge[]) => {
+    if (!canEdit) throw new Error(accessMessage)
     if (!workflowRunId || !workflowGraph) return
     const saved = await saveConnections(workflowRunId, edges, workflowGraph.workflow.version)
     queryClient.setQueryData(['workflow-graph', workflowRunId], saved)
@@ -498,19 +522,33 @@ export function WorkflowPage() {
 
   const workflowRun = workflowGraph?.workflow ?? currentWorkflowRun
   const targetReady = targetReadiness.data?.ready_for_workflow === true
-  const readOnly = isDemoMode || !targetReady || Boolean(workflowRun && workflowRun.status !== 'draft')
-  const showRoutePlanner =
-    !isDemoMode &&
-    targetReady &&
-    (!workflowRunId || workflowNodes.length === 0 || Boolean(goal.trim()))
+  const readOnly = !canEdit || !targetReady || Boolean(workflowRun && workflowRun.status !== 'draft')
+  const showRoutePlanner = !isDemoMode && targetReady &&
+    (planningMode ?? (!workflowRunId || (workflowRun?.status === 'draft' && workflowNodes.length === 0)))
+  const routePlan = plannedRoute?.objective === routeObjective ? plannedRoute.plan : null
   const routeTargetLabel = routeTarget(activeProject, routeObjective)
 
   const selectedRoute =
     routePlan?.route_options.find((route) => route.route_id === selectedRouteId) ?? null
 
+  const selectedModuleIds = selectedRoute?.modules.filter((module) => module.available).map((module) => module.module_id) ?? []
+  const missingRouteModules = selectedRoute?.modules.filter((module) => !module.available) ?? []
+  const draftWorkflow = workflowRun?.status === 'draft'
+  const openRoutePlanner = () => {
+    setPlanningMode(true)
+    setPlannedRoute(null)
+    setGoal('')
+  }
+
   const createWorkflow = useMutation({
-    mutationFn: () => createWorkflowRun(projectId),
+    mutationFn: () => {
+      if (!canEdit) throw new Error(accessMessage)
+      return createWorkflowRun(projectId)
+    },
     onSuccess: (run) => {
+      if (!active.current) return
+      setPlanningMode(false)
+      setBuilderOpen(true)
       selectWorkflowRun(run.id)
       queryClient.invalidateQueries({ queryKey: ['workflow-runs', projectId] })
       queryClient.invalidateQueries({ queryKey: ['workflow-graph', run.id] })
@@ -522,22 +560,15 @@ export function WorkflowPage() {
   })
 
   const generatePlan = useMutation({
-    mutationFn: () =>
-      planRoute({
-        project_id: projectId,
-        target: routeTargetLabel,
-        objective: routeObjective,
-      }),
-    onSuccess: (plan) => {
-      const recommended =
-        plan.route_options.find((route) => route.recommended)
-      setRoutePlan(plan)
+    mutationFn: (objective: string) => {
+      if (!canEdit) throw new Error(accessMessage)
+      return planRoute({ project_id: projectId, target: routeTargetLabel, objective })
+    },
+    onSuccess: (plan, objective) => {
+      if (!active.current) return
+      const recommended = plan.route_options.find((route) => route.recommended) ?? plan.route_options[0]
+      setPlannedRoute({ plan, objective })
       setSelectedRouteId(recommended?.route_id ?? '')
-      setSelectedModuleIds(
-        recommended?.modules
-          .filter((module) => module.available)
-          .map((module) => module.module_id) ?? [],
-      )
       showToast(t.workflowExt.toasts.routePrepared, 'success')
     },
     onError: (error) =>
@@ -551,6 +582,7 @@ export function WorkflowPage() {
 
   const applyPlannedRoute = useMutation({
     mutationFn: async () => {
+      if (!canEdit) throw new Error(accessMessage)
       if (!selectedRoute) throw new Error(t.workflowExt.toasts.selectRouteFirst)
       return applyRoutePlan({
         project_id: projectId,
@@ -567,6 +599,10 @@ export function WorkflowPage() {
       })
     },
     onSuccess: (result) => {
+      if (!active.current) return
+      setPlanningMode(false)
+      setPlannedRoute(null)
+      setGoal('')
       const runId = String(result.workflow_run.id)
       selectWorkflowRun(runId)
       showToast(t.workflowExt.toasts.routeCreated, 'success')
@@ -583,8 +619,8 @@ export function WorkflowPage() {
     enabled: confirmRun && Boolean(workflowRunId),
     retry: false,
     queryFn: () => {
-      const backend = workflowPreflight.data?.checks.compute_backend ?? 'lsf'
-      if (backend !== 'lsf' && backend !== 'docker') throw new Error('Unsupported compute backend')
+      const backend = workflowPreflight.data?.checks.compute_backend
+      if (backend !== 'lsf' && backend !== 'docker') throw new Error(language === 'zh' ? '预检未返回可用的计算后端，请重新检查。' : 'Preflight did not return a supported compute backend. Run the check again.')
       return Promise.all(workflowNodes.filter((node) => node.execution_mode !== 'manual').map(async (node) => ({
         name: node.model_plugin, ...(await previewWorkflowNodeScript(node.id, { compute_backend: backend })),
       })))
@@ -592,12 +628,14 @@ export function WorkflowPage() {
   })
   const startWorkflow = useMutation({
     mutationFn: () => {
+      if (!canCompute) throw new Error(language === 'zh' ? '当前项目无计算提交权限。' : 'You do not have compute access to this project.')
       if (!workflowRunId) {
         throw new Error(t.workflowExt.toasts.noWorkflowRun)
       }
+      if (unsavedNodeChanges) throw new Error(language === 'zh' ? '请先保存节点修改，再预览提交。' : 'Save node changes before reviewing submission.')
       if (!submissionPreview.isSuccess || submissionPreview.isFetching || !workflowGraph) throw new Error(language === 'zh' ? '请等待提交预览完成' : 'Wait for the submission preview')
       return submitWorkflowRun(workflowRunId, workflowGraph.workflow.version, {
-        backend: String(workflowPreflight.data?.checks.compute_backend ?? 'lsf'),
+        backend: String(workflowPreflight.data?.checks.compute_backend),
         fingerprints: Object.fromEntries(submissionPreview.data.map((item) => [item.workflow_node_id, item.review_fingerprint])),
       })
     },
@@ -656,10 +694,21 @@ export function WorkflowPage() {
         workflowStatus={workflowRun?.status}
         projectWorkflowRuns={projectWorkflowRuns}
         onSelectRun={(runId) => {
+          if (unsavedNodeChanges) {
+            showToast(language === 'zh' ? '请先保存节点修改，再切换工作流。' : 'Save node changes before switching workflows.', 'info')
+            return
+          }
+          setPlanningMode(false)
+          setConfirmRun(false)
+          setConnectionPicker(null)
+          setSelectedEdgeId(null)
           selectWorkflowRun(runId)
           setSelectedArtifactId(undefined)
         }}
       />
+
+      {!isDemoMode && projectAccess.isError ? <Alert variant="destructive" className="mb-3"><AlertDescription>{language === 'zh' ? '项目权限读取失败，编辑暂不可用。' : 'Project permissions could not be loaded. Editing is unavailable.'}</AlertDescription><Button type="button" variant="outline" onClick={() => void projectAccess.refetch()}>{language === 'zh' ? '重试权限检查' : 'Retry permission check'}</Button></Alert>
+        : !isDemoMode && projectAccess.isSuccess && !canEdit ? <p role="status" className="mb-3 text-sm">{accessMessage}</p> : null}
 
       {linkedRunIsForeign ? (
         <Alert className="mb-4" variant="warning">
@@ -681,19 +730,19 @@ export function WorkflowPage() {
           </AlertTitle>
           <AlertDescription>
           <p>
-            {targetReadiness.data.next_action || t.workflowExt.routePlanner.targetBlockedBody}
+            {projectActionText(targetReadiness.data.next_action, t) || t.workflowExt.routePlanner.targetBlockedBody}
           </p>
           {targetReadiness.data.blockers.length > 0 ? (
             <ul className="mt-2 list-disc pl-5">
               {targetReadiness.data.blockers.map((blocker) => (
-                <li key={blocker}>{blocker}</li>
+                <li key={blocker}>{projectActionText(blocker, t)}</li>
               ))}
             </ul>
           ) : null}
           {/* The structure flow can only help a protein that needs coordinates. When the
               blocker is identity, offer the fix inline - a small-molecule target has no
               structure to prepare and would be sent in a circle by that link. */}
-          {targetReadiness.data.blockers.includes('target_identity_unconfirmed') ? (
+          {canEdit && targetReadiness.data.blockers.includes('target_identity_unconfirmed') ? (
             <TargetIdentityFix
               projectId={projectId}
               defaultName={activeProject ? projectText(activeProject, 'name', language) : undefined}
@@ -718,21 +767,41 @@ export function WorkflowPage() {
         <Alert className="mb-4" variant="destructive">
           <AlertTitle>{t.workflowExt.routePlanner.readinessUnavailableTitle}</AlertTitle>
           <AlertDescription>{t.workflowExt.routePlanner.readinessUnavailableBody}</AlertDescription>
+          <Button type="button" variant="outline" onClick={() => void targetReadiness.refetch()}>{language === 'zh' ? '重新检查目标' : 'Check target again'}</Button>
         </Alert>
       ) : null}
 
-      <WorkflowToolbar
+      {!isDemoMode ? <div className="mb-4 space-y-2" aria-label={language === 'zh' ? '工作流步骤' : 'Workflow steps'}>
+        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+          {(language === 'zh' ? ['目标与输入', '选择路线', '参数与筛选', '预览确认', '运行与结果'] : ['Target and inputs', 'Choose route', 'Parameters and screening', 'Review submission', 'Run and results']).map((label, index) => {
+            const step = !targetReady ? 0 : showRoutePlanner || !workflowRunId ? 1 : !draftWorkflow ? 4 : workflowPreflight.data?.allowed && !unsavedNodeChanges ? 3 : 2
+            return <li key={label} aria-current={index === step ? 'step' : undefined} className={index === step ? 'font-medium text-text-primary' : undefined}>{index + 1}. {label}</li>
+          })}
+        </ol>
+        {unsavedNodeChanges ? <p role="status" className="text-sm text-warning">{language === 'zh' ? '节点有未保存修改。请先保存，再预览提交。' : 'This node has unsaved changes. Save them before reviewing submission.'}</p> : null}
+        {workflowRunId && draftWorkflow && workflowNodes.length === 0 && !showRoutePlanner ? <p className="text-sm text-text-secondary">{language === 'zh' ? '添加第一个节点，再配置参数、输入和筛选规则。' : 'Add the first node, then configure its parameters, inputs and screening rules.'}</p> : null}
+        {workflowRunId && !draftWorkflow ? <p className="text-sm text-text-secondary">{language === 'zh' ? '此工作流已提交。选择节点查看任务和输出，选择连线处理待审核结果。新方案请另建路线。' : 'This workflow has been submitted. Select a node to inspect jobs and outputs, or a connection to review results. Create a new route for another plan.'}</p> : null}
+      </div> : null}
+      {!isDemoMode && targetReady && workflowRunId && draftWorkflow && workflowPreflight.isPending ? <p className="mb-3 text-sm" role="status">{language === 'zh' ? '正在检查输入、参数和执行条件…' : 'Checking inputs, parameters and execution requirements…'}</p> : null}
+      {!isDemoMode && targetReady && workflowRunId && draftWorkflow && workflowPreflight.isError ? <Alert variant="destructive" className="mb-3">
+        <AlertTitle>{language === 'zh' ? '执行检查失败' : 'Execution check failed'}</AlertTitle>
+        <AlertDescription>{workflowPreflight.error.message}</AlertDescription>
+        <Button type="button" variant="outline" onClick={() => void workflowPreflight.refetch()}>{language === 'zh' ? '重新检查' : 'Run check again'}</Button>
+      </Alert> : null}
+
+      {!showRoutePlanner ? <WorkflowToolbar
         isDemoMode={isDemoMode}
-        readOnly={readOnly}
+        readOnly={readOnly || unsavedNodeChanges}
         workflowRunId={workflowRunId}
         createPending={createWorkflow.isPending}
+        creationDisabled={!canEdit || !targetReady || !projectId || unsavedNodeChanges}
         startPending={startWorkflow.isPending}
-        submitDisabled={readOnly || workflowPreflight.data?.allowed !== true}
+        submitDisabled={!canCompute || readOnly || unsavedNodeChanges || workflowNodes.length === 0 || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true}
         onCreateRun={() => createWorkflow.mutate()}
-        onNewRoute={() => createWorkflow.mutate()}
+        onNewRoute={openRoutePlanner}
         onAddNode={() => setBuilderOpen((v) => !v)}
-        onStart={() => setConfirmRun(true)}
-      />
+        onStart={() => { if (!unsavedNodeChanges) setConfirmRun(true) }}
+      /> : null}
 
       <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
@@ -743,7 +812,7 @@ export function WorkflowPage() {
           {submissionPreview.isPending ? <p role="status">{language === 'zh' ? '正在准备提交预览…' : 'Preparing submission preview…'}</p> : null}
           {submissionPreview.isError ? <div role="alert"><p>{submissionPreview.error.message}</p><Button type="button" variant="outline" onClick={() => void submissionPreview.refetch()}>{language === 'zh' ? '重新生成预览' : 'Retry preview'}</Button></div> : null}
           {submissionPreview.data?.map((preview) => <Disclosure key={preview.workflow_node_id} className="rounded border p-3" title={preview.name}><pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs">{preview.script}</pre></Disclosure>)}
-          <Button type="button" disabled={startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
+          <Button type="button" disabled={!canCompute || startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || unsavedNodeChanges || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
         </DialogContent>
       </Dialog>
 
@@ -755,7 +824,7 @@ export function WorkflowPage() {
         </Frame>
       ) : null}
 
-      {!isDemoMode && targetReady && workflowRunId && workflowPreflight.data ? (
+      {!isDemoMode && targetReady && workflowRunId && draftWorkflow && workflowPreflight.data && !workflowPreflight.isError ? (
         <Alert
           className="mb-4"
           variant={workflowPreflight.data.allowed ? 'success' : 'warning'}
@@ -845,18 +914,19 @@ export function WorkflowPage() {
       ) : null}
 
       <ApiState
-        isError={workflowError || workflowGraphError}
-        error={workflowQueryError ?? workflowGraphQueryError}
+        isError={workflowError || workflowGraphError || (Boolean(requestedWorkflowRunId) && workflowRunsQuery.isError)}
+        error={workflowQueryError ?? workflowGraphQueryError ?? workflowRunsQuery.error}
         onRetry={() => {
           void refetchWorkflow()
           void refetchWorkflowGraph()
+          void workflowRunsQuery.refetch()
         }}
       >
         {showRoutePlanner ? (
           <Frame variant="inverse" spacing="sm" className="mb-4">
             <FrameHeader>
-              <FrameTitle>{t.workflowExt.routePlanner.label}</FrameTitle>
-              <FrameDescription>{t.workflowExt.routePlanner.emptyHint}</FrameDescription>
+              <FrameTitle>{language === 'zh' ? '选择路线或手工搭建' : 'Choose a route or build manually'}</FrameTitle>
+              <FrameDescription>{language === 'zh' ? '根据目标生成完整路线，创建草稿后检查输入、参数和筛选规则。' : 'Generate a route from your objective, then review inputs, parameters and screening rules in its draft.'}</FrameDescription>
             </FrameHeader>
             <FramePanel>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
@@ -865,25 +935,33 @@ export function WorkflowPage() {
                   htmlFor="workflow-goal"
                   className="mb-1 block text-xs uppercase tracking-wide text-accent"
                 >
-                  {t.workflowExt.routePlanner.label}
+                  {language === 'zh' ? '本次计算目标' : 'Objective for this workflow'}
                 </label>
                 <Textarea
                   id="workflow-goal"
                   rows={2}
                   className="w-full resize-none rounded-md border border-border-soft bg-bg-app px-3 py-2 text-sm text-text-primary"
                   value={goal}
+                  disabled={applyPlannedRoute.isPending}
                   onChange={(e) => setGoal(e.target.value)}
                   placeholder={projectObjective(activeProject, t.workflowExt.routePlanner, format)}
                 />
               </div>
               <Button type="button"
-                disabled={generatePlan.isPending || readOnly || !routeObjective.trim()}
-                onClick={() => generatePlan.mutate()}
+                disabled={!canEdit || generatePlan.isPending || applyPlannedRoute.isPending || !targetReady || !routeObjective.trim()}
+                onClick={() => generatePlan.mutate(routeObjective)}
               >
-                <Sparkle className="h-4 w-4" />
+                {generatePlan.isPending ? <SpinnerGap className="h-4 w-4 animate-spin" /> : <Sparkle className="h-4 w-4" />}
                 {t.workflowExt.routePlanner.planRoutes}
               </Button>
             </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" disabled={!canEdit || createWorkflow.isPending || applyPlannedRoute.isPending || unsavedNodeChanges} onClick={() => createWorkflow.mutate()}>{language === 'zh' ? '手工创建空白工作流' : 'Create a blank workflow manually'}</Button>
+              {workflowRunId ? <Button type="button" variant="ghost" onClick={() => setPlanningMode(false)}>{language === 'zh' ? '返回当前工作流' : 'Return to current workflow'}</Button> : null}
+            </div>
+            {generatePlan.isError || applyPlannedRoute.isError || createWorkflow.isError ? <Alert variant="destructive" className="mt-3"><AlertDescription>{(generatePlan.error ?? applyPlannedRoute.error ?? createWorkflow.error)?.message}</AlertDescription></Alert> : null}
+            {plannedRoute && !routePlan ? <p className="mt-3 text-sm text-text-secondary" role="status">{language === 'zh' ? '目标已改变，请重新生成路线。' : 'The objective changed. Generate a new route before creating the workflow.'}</p> : null}
+            {routePlan?.route_options.length === 0 ? <p className="mt-3 text-sm" role="status">{language === 'zh' ? '没有可用路线。请调整目标或手工搭建。' : 'No routes are available. Adjust the objective or build manually.'}</p> : null}
             {routePlan ? (
               <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
                 <div className="grid gap-3">
@@ -899,11 +977,6 @@ export function WorkflowPage() {
                         }`}
                         onClick={() => {
                           setSelectedRouteId(route.route_id)
-                          setSelectedModuleIds(
-                            route.modules
-                              .filter((module) => module.available)
-                              .map((module) => module.module_id),
-                          )
                         }}
                       >
                         <span className="block font-medium">{route.label}</span>
@@ -925,9 +998,11 @@ export function WorkflowPage() {
                           ))}
                         </ul>
                       </div>
+                      <p className="text-xs text-text-secondary">{language === 'zh' ? '模板包含以下全部步骤。创建后可在草稿中修改节点和连接。' : 'The template includes every step below. You can edit nodes and connections after creating its draft.'}</p>
+                      {missingRouteModules.length > 0 ? <Alert variant="warning"><AlertDescription>{language === 'zh' ? '缺少可用插件：' : 'Unavailable plugins: '}{missingRouteModules.map((module) => module.model_name).join(', ')}</AlertDescription></Alert> : null}
                       <div className="grid gap-2 sm:grid-cols-2">
                         {selectedRoute.modules.map((module) => (
-                          <label
+                          <div
                             key={module.module_id}
                             className={`flex items-start gap-2 rounded-md border border-border-soft bg-bg-app p-3 text-sm ${
                               module.available
@@ -935,18 +1010,6 @@ export function WorkflowPage() {
                                 : 'text-text-secondary opacity-70'
                             }`}
                           >
-                            <Checkbox
-                              className="mt-1"
-                              disabled={!module.available}
-                              checked={selectedModuleIds.includes(module.module_id)}
-                              onCheckedChange={(checked) => {
-                                setSelectedModuleIds((current) =>
-                                  checked === true
-                                    ? [...new Set([...current, module.module_id])]
-                                    : current.filter((id) => id !== module.module_id),
-                                )
-                              }}
-                            />
                             <span className="min-w-0">
                               <span className="block font-medium">{module.model_name}</span>
                               <span className="block text-xs text-text-secondary">
@@ -954,7 +1017,7 @@ export function WorkflowPage() {
                               </span>
                               <RouteModuleDefaults parameters={module.default_parameters} />
                             </span>
-                          </label>
+                          </div>
                         ))}
                       </div>
                       {selectedRoute.risks.length > 0 ? (
@@ -973,7 +1036,7 @@ export function WorkflowPage() {
                       <Button type="button"
                         className="w-fit"
                         disabled={
-                          readOnly || applyPlannedRoute.isPending || selectedModuleIds.length !== selectedRoute.modules.length || Boolean((selectedRoute.constraints.missing_plugins as unknown[] | undefined)?.length)
+                          !canEdit || !targetReady || applyPlannedRoute.isPending || selectedModuleIds.length === 0 || selectedModuleIds.length !== selectedRoute.modules.length || Boolean((selectedRoute.constraints.missing_plugins as unknown[] | undefined)?.length)
                         }
                         onClick={() => applyPlannedRoute.mutate()}
                       >
@@ -1007,25 +1070,8 @@ export function WorkflowPage() {
                 </aside>
               </div>
             ) : (
-              <p className="mt-3 text-xs text-text-secondary">
-                {t.workflowExt.routePlanner.emptyHint}
-              </p>
+              null
             )}
-            </FramePanel>
-          </Frame>
-        ) : null}
-
-        {!workflowRunId && !isDemoMode ? (
-          <Frame variant="inverse" spacing="sm" className="mb-4 text-center">
-            <FrameHeader>
-              <FrameTitle className="text-lg text-text-primary">
-                {t.workflowExt.routePlanner.createWorkflowTitle}
-              </FrameTitle>
-            </FrameHeader>
-            <FramePanel className="text-sm text-text-secondary">
-              <FrameDescription className="mx-auto max-w-2xl">
-                {t.workflowExt.routePlanner.createWorkflowBody}
-              </FrameDescription>
             </FramePanel>
           </Frame>
         ) : null}
@@ -1045,12 +1091,10 @@ export function WorkflowPage() {
                   ...current.filter((item) => item.id !== artifact.id),
                 ])
                 queryClient.invalidateQueries({ queryKey: ['project-artifacts', projectId] })
-                setSelectedArtifactId(artifact.id)
-                setSelectedNodeId(null)
+                if (setSelectedNodeId(null)) setSelectedArtifactId(artifact.id)
               }}
               onArtifactSelected={(artifact) => {
-                setSelectedArtifactId(artifact.id)
-                setSelectedNodeId(null)
+                if (setSelectedNodeId(null)) setSelectedArtifactId(artifact.id)
               }}
               onPluginAdd={(plugin) => void addPluginNode(plugin)}
               readOnly={readOnly || !workflowRunId}
@@ -1063,7 +1107,7 @@ export function WorkflowPage() {
               <Button type="button" size="sm" variant="outline" onClick={() => void gateQuery.refetch()}>{language === 'zh' ? '重新加载门控' : 'Reload gates'}</Button>
             </Alert>}
             {connectionPicker && <ConnectionPicker nodes={workflowNodes} plugins={modelPlugins} {...connectionPicker} onConnect={connectPorts} onClose={() => setConnectionPicker(null)} />}
-            {selectedNode && !readOnly && <div className="mb-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ target: selectedNode.id })}>{language === 'zh' ? '连接上一步' : 'Connect previous'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ source: selectedNode.id })}>{language === 'zh' ? '连接下一步' : 'Connect next'}</Button><Button type="button" size="sm" variant="outline" onClick={() => { setPendingNextSource(selectedNode.id); setBuilderOpen(true) }}>{language === 'zh' ? '添加下一步节点' : 'Add next node'}</Button></div>}
+            {selectedNode && !readOnly && !unsavedNodeChanges && <div className="mb-2 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ target: selectedNode.id })}>{language === 'zh' ? '连接上一步' : 'Connect previous'}</Button><Button type="button" size="sm" variant="outline" onClick={() => setConnectionPicker({ source: selectedNode.id })}>{language === 'zh' ? '连接下一步' : 'Connect next'}</Button><Button type="button" size="sm" variant="outline" onClick={() => { setPendingNextSource(selectedNode.id); setBuilderOpen(true) }}>{language === 'zh' ? '添加下一步节点' : 'Add next node'}</Button></div>}
             {currentWorkflowLoading || workflowGraphLoading ? (
               <Frame className="h-full min-h-96" aria-label={t.shared.apiState.loadingDefault}>
                 <FramePanel className="grid h-full gap-3 p-4">
@@ -1073,10 +1117,14 @@ export function WorkflowPage() {
               </Frame>
             ) : isDemoMode ? (
               <WorkflowCanvas
-                initialNodes={defaultWorkflowNodes}
-                initialEdges={defaultWorkflowEdges}
+                initialNodes={demoWorkflow.nodes}
+                initialEdges={demoWorkflow.edges}
                 readOnly
-                onNodeSelected={setSelectedNodeId}
+                onNodeSelected={(nodeId) => {
+                  if (!setSelectedNodeId(nodeId)) return
+                  setSelectedEdgeId(null)
+                  setSelectedArtifactId(undefined)
+                }}
                 selectedNodeId={selectedNodeId}
               />
             ) : workflowRunId ? (
@@ -1114,14 +1162,14 @@ export function WorkflowPage() {
                   initialNodes={graph?.nodes ?? []}
                   initialEdges={graph?.edges ?? []}
                   workflowRunId={workflowRunId}
-                  readOnly={readOnly}
+                  readOnly={readOnly || unsavedNodeChanges}
                   onConnectionRequested={requestConnection}
                   onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
-                  onEdgeSelected={setSelectedEdgeId}
+                  onEdgeSelected={(edgeId) => { if (setSelectedNodeId(null)) setSelectedEdgeId(edgeId) }}
                   selectedNodeId={selectedNodeId}
                   onNodeSelected={(nodeId) => {
+                    if (!setSelectedNodeId(nodeId)) return
                     setSelectedEdgeId(null)
-                    setSelectedNodeId(nodeId)
                     setSelectedArtifactId(undefined)
                   }}
                   onNodeAdded={() => {
@@ -1144,7 +1192,11 @@ export function WorkflowPage() {
           </main>
 
           <div className="order-2 min-h-0 xl:order-3" data-tour-id="workflow-inspector">
-            {selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
+            {isDemoMode && !selectedArtifact ? <DemoWorkflowInspector
+              selectedStep={demoWorkflow.steps.find(step => step.node.id === selectedNodeId)}
+              stepCount={demoWorkflow.steps.length}
+            /> : (
+            selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} canOperate={canEdit} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
               workflowRunId={workflowRunId}
               workflowVersion={workflowGraph?.workflow.version}
               readOnly={readOnly}
@@ -1153,12 +1205,13 @@ export function WorkflowPage() {
               nodeCount={workflowNodes.length}
               artifactCount={visibleArtifacts.length}
               nodes={workflowNodes}
-            />}
+              onDirtyChange={setUnsavedNodeChanges}
+            />)}
           </div>
         </div>
       </ApiState>
 
-      {!isDemoMode ? <NextStep stage="workflow" /> : null}
+      {!isDemoMode && workflowRun?.status === 'succeeded' ? <NextStep stage="workflow" /> : null}
     </Frame>
   )
 }

@@ -1,3 +1,4 @@
+import { botDisplayText } from './bots/displayText'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowRightIcon, SparkleIcon } from '@phosphor-icons/react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
@@ -121,7 +122,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     {preview && assignee && service ? <section aria-label={zh ? '任务计划' : 'Task plan'} className="space-y-3 rounded-lg border border-border p-3">
       <div className="task-plan-owner"><BotAvatar id={assignee.bot.id} stance={assignee.bot.stance} /><div className="min-w-0">
         <h4 className="font-semibold">{zh ? `${name(assignee.bot)} 负责：${service.title_zh}` : `${name(assignee.bot)} owns: ${service.title}`}</h4>
-        <p className="text-xs text-text-secondary">{assignee.bot.summary}</p>
+        <p className="text-xs text-text-secondary">{botDisplayText(assignee.bot, language).summary}</p>
         {reviewers.length ? <p className="text-xs text-text-secondary">{zh ? `复核：${reviewers.map(name).join('、')}` : `Reviewed by ${reviewers.map(name).join(', ')}`}</p> : null}
       </div></div>
       <p className="text-sm">{zh ? service.deliverable_zh : service.deliverable}</p>

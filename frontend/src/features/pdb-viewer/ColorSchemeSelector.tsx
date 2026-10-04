@@ -30,7 +30,7 @@ export function ColorSchemeSelector({ value, onChange }: ColorSchemeSelectorProp
         }}
       >
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.color}>
-          <SelectValue />
+          <SelectValue>{options.find(option => option.id === value)?.label ?? value}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

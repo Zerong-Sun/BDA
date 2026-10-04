@@ -1,0 +1,7 @@
+@media (prefers-reduced-motion: no-preference) {
+  .guide-flow[data-active="true"] .guide-flow-node { animation: guide-flow-enter 220ms ease-out backwards; }
+  @keyframes guide-flow-enter {
+    from { opacity: 0.4; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

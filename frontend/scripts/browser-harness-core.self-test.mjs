@@ -86,6 +86,8 @@ test('seeds complete deterministic guest and authenticated browser storage', () 
   assert.equal(persisted.state.copilotOpen, false)
   assert.equal(persisted.state.settingsOpen, false)
   assert.equal(persisted.state.tourMenuOpen, false)
+  assert.equal(Object.hasOwn(persisted.state, 'appMode'), false,
+    'Session-only operating mode must be selected through the UI, not storage hydration')
 
   const guest = createStorageSeed({
     authenticated: false,

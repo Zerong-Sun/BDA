@@ -14,11 +14,13 @@ of the loop that only just arrived.
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
 from sqlalchemy import select
 
+from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -325,7 +327,14 @@ _register(
     ToolSpec(
         id="get_reference_content",
         citation="research_items",
-        description="Read saved excerpts and evidence for one reference.",
+        description=(
+            "Read a page of saved excerpts for one reference. The first row's "
+            "data.read_window reports offset, returned_count, total_count, has_more, "
+            "next_offset and truncation. Page length is not the total: follow "
+            "next_offset to read more. Counts cover saved indexed chunks, not proof "
+            "that the complete publication was retrieved. An empty list means no "
+            "accessible chunks in this window, not that the publication has no content."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -1468,9 +1477,10 @@ def _read_handoffs(ctx: ToolContext, args: dict[str, Any]) -> Any:
 _CLAIM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "statement": {"type": "string"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
         "evidence_ref": {
             "type": "string",
+            "maxLength": MAX_TEXT,
             "description": (
                 "The artifact, job, result, reference or goal id this rests on. "
                 "A claim with none is recorded as unsupported."
@@ -1488,20 +1498,23 @@ _register(
         description=(
             "Leave a structured handover for the next operator: what you did, the "
             "claims you are making with the evidence behind each one, what you "
-            "could not settle, and the ids the next operator needs. Append-only."
+            "could not settle, and the ids the next operator needs. Append-only. "
+            "Each summary, claim statement, evidence reference, open question and ref "
+            f"is limited to {MAX_TEXT} characters. Oversized input is rejected before saving; "
+            "shorten it and retry. Text is never truncated."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "to_bot": {"type": "string"},
-                "summary": {"type": "string"},
-                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": 20},
+                "summary": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
+                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": MAX_CLAIMS},
                 "open_questions": {
                     "type": "array",
-                    "items": {"type": "string"},
-                    "maxItems": 20,
+                    "items": {"type": "string", "maxLength": MAX_TEXT},
+                    "maxItems": MAX_OPEN_QUESTIONS,
                 },
-                "refs": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+                "refs": {"type": "array", "items": {"type": "string", "maxLength": MAX_TEXT}, "maxItems": MAX_REFS},
             },
             "required": ["to_bot", "summary"],
             "additionalProperties": False,
@@ -1565,11 +1578,16 @@ def _list_operator_charters(ctx: ToolContext, args: dict[str, Any]) -> Any:
     ]
 
 
+_REVIEW_TOOL_RESULT_CHARS = 8_000
+_REVIEW_TOOL_RESULTS_CHARS = 32_000
+
+
 def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
     """What an operator actually called, not what it said it did.
 
     The gap between the two is the whole subject of review, so this returns the
-    recorded tool calls rather than the assistant text around them.
+    recorded tool calls and their bounded results, not unrelated conversation.
+    Tool output lives in turn.content; turn.tool_calls only identifies its call.
     """
     from . import agent_runs
 
@@ -1581,9 +1599,37 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
 
     turns = agent_runs.turns_for(ctx.session, run, limit=_arg_int(args, "limit", 40))
     calls: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    remaining_chars = _REVIEW_TOOL_RESULTS_CHARS
     for turn in turns:
         for call in turn.tool_calls or []:
             calls.append({"sequence": turn.sequence, "role": turn.role, **dict(call)})
+        if turn.role != "tool":
+            continue
+        metadata = (turn.tool_calls or [{}])[0]
+        content = turn.content or ""
+        allowance = min(_REVIEW_TOOL_RESULT_CHARS, remaining_chars)
+        truncated = len(content) > allowance
+        evidence: dict[str, Any] = {
+            "sequence": turn.sequence,
+            "tool_call_id": metadata.get("tool_call_id"),
+            "name": metadata.get("name"),
+            "result": None,
+            "content_chars": len(content),
+            "truncated": truncated,
+            "parse_error": None,
+        }
+        if truncated:
+            # A fragment is not a JSON result and must never look like one.
+            evidence["content_preview"] = content[:allowance]
+        else:
+            try:
+                evidence["result"] = json.loads(content)
+            except (ValueError, RecursionError):
+                evidence["parse_error"] = "invalid_json"
+                evidence["content_preview"] = content
+        remaining_chars -= min(len(content), allowance)
+        results.append(evidence)
     return {
         "run_id": str(run.id),
         "bot": run.bot,
@@ -1592,6 +1638,8 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "turn_count": run.turn_count,
         "allowed_tools": list(run.allowed_tools or []),
         "tool_calls": calls,
+        "tool_results": results,
+        "transcript_truncated": len(turns) < run.turn_count,
     }
 
 
@@ -1620,7 +1668,8 @@ _register(
         description=(
             "What an operator's run actually called and what came back, turn by "
             "turn. Use this rather than its summary: the summary is the thing "
-            "under review."
+            "under review. Tool results are bounded; truncation or parse errors "
+            "mean the evidence is incomplete, not verified."
         ),
         parameters={
             "type": "object",
@@ -2087,6 +2136,8 @@ _register(
             "scene the viewer renders. Use it to make 'the interface I mean' "
             "unambiguous before arguing about it. It shows; it concludes "
             "nothing - the residues you pass are the ones you already measured."
+            " Read measurement results before choosing residues; call this in a subsequent turn, "
+            "not in the same batch as those measurements. A label applies to every highlighted residue."
         ),
         parameters={
             "type": "object",
@@ -2107,6 +2158,7 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_render_structure_view,
+        defer_with=("analyse_structure", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
     )
 )
 
@@ -2339,9 +2391,15 @@ def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "tier_order": list(tiers),
         "verdicts": verdicts,
         "reading_note": (
-            "A criterion is pass, fail or missing. Missing means nothing has "
-            "measured it - not that the design failed - so a design with "
-            "missing criteria has not been rejected by this route."
+            "A criterion is pass, fail or missing. Missing means the supplied "
+            "metrics contain no value - not that the design failed. Whether "
+            "it was measured elsewhere is unknown. Preserve each criterion's "
+            "method and assessor, including nulls; missing criteria do not "
+            "reject a design by this route. criteria_tier names the tier behind "
+            "the top-level criteria and counts; tier_assessments contains every "
+            "tier's comparisons. A recorded value that misses a threshold is "
+            "fail, not unassessable. Tier outcomes describe these supplied metrics, "
+            "not experimental validation."
         ),
     }
 
@@ -2352,7 +2410,7 @@ _register(
         description=(
             "Judge named candidates against a design route's declared "
             "acceptance tiers and say, per criterion, whether the recorded "
-            "metrics pass, fail, or were never measured. The thresholds are "
+            "metrics pass, fail, or have no recorded value. The thresholds are "
             "the route's own; this applies them rather than inventing any. "
             "A missing measurement is reported as missing and blocks a tier "
             "without condemning the design. Up to 25 candidates per call."

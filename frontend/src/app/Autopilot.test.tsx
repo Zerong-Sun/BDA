@@ -115,6 +115,7 @@ async function withCampaign(
   )
 
   renderWithProviders(<AutopilotPage />)
+  await waitFor(() => expect(screen.getByLabelText('Research request')).toBeEnabled())
 
   fireEvent.change(
     await screen.findByPlaceholderText(
@@ -127,7 +128,7 @@ async function withCampaign(
     target: { value: 'PD-1 campaign' },
   })
   fireEvent.change(screen.getByLabelText('GPU-hour hard limit'), { target: { value: '1' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm immutable campaign' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm plan and budget' }))
   // Wait on the key this campaign actually declares, not a fixed one: the
   // helper is reused for `submit` and `research` stages too.
   await screen.findByText(String(stages[0].stage_key ?? 'review'))
@@ -174,7 +175,7 @@ describe('Autopilot stages', () => {
       }),
     ])
 
-    expect(await screen.findByRole('link', { name: 'Open in Workflow' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Open workflow' })).toBeInTheDocument()
     expect(
       await screen.findByRole('button', { name: 'Mark this stage done' }),
     ).toBeInTheDocument()
@@ -222,17 +223,18 @@ describe('Autopilot stages', () => {
     // front of somebody whose only possible result is a 409.
     await withCampaign([stage({ status: 'succeeded' })], { status: 'succeeded' })
 
-    expect(screen.getByRole('button', { name: 'Reserve budget and start' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Idempotent cancel' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Start confirmed plan' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel campaign' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Take over' })).toBeDisabled()
     // Reading the stages back is still allowed; it changes nothing.
     expect(screen.getByRole('button', { name: 'Refresh stages' })).toBeEnabled()
   })
 
-  it('still offers them while a campaign is running', async () => {
+  it('offers cancel and takeover, but never starts a running campaign twice', async () => {
     await withCampaign([stage()])
 
-    expect(screen.getByRole('button', { name: 'Idempotent cancel' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Start confirmed plan' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel campaign' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Take over' })).toBeEnabled()
   })
 

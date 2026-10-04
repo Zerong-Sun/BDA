@@ -184,6 +184,11 @@ body { line-height: 1.6; }
 /* Consistent application hierarchy; no external fonts or decorative project imagery. */
 .science-desktop-utilities { display: flex; align-items: center; gap: .375rem; }
 .science-mobile-utilities { display: none; }
+/* Keep intermediate window widths usable before the full desktop toolbar fits. */
+@media (width < 64rem) {
+  .science-desktop-utilities { display: none; }
+  .science-mobile-utilities { display: block; }
+}
 .science-utility-menu [role="menuitem"] { min-height: 44px; font-size: .875rem; }
 .science-topbar { min-height: 68px; background: var(--bg-surface-1); }
 .science-brand { display: inline-flex; align-items: center; gap: .65rem; letter-spacing: -.02em; }

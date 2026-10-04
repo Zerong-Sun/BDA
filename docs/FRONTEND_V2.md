@@ -60,7 +60,7 @@ Campaign、Literature、Intelligence、Registry、Knowledge 使用各自领域�
 
 默认 Copilot 使用统一任务工作区，简单问题进入对话，连续任务预览步骤和授权；旧聊天/后台任务的切换不再作为首层入口。交付状态优先于 runner 状态，技术轮次默认折叠。
 
-各入口的实际服务、13 类能力、29 个工具及完整 Copilot HTTP 接口见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)。页面 AI、模型工具和用户确认后的执行接口有不同权限与副作用，不应混为一类服务。
+各入口的实际服务、能力权限、工具及 Copilot HTTP 接口见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)。页面 AI、模型工具和用户确认后的执行接口有不同权限与副作用，不应混为一类服务。
 
 ## 7. 历史 URL
 

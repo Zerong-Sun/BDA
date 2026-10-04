@@ -1,7 +1,7 @@
 FROM python:3.14-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0070_af3_msa_port
+ARG BDA_SCHEMA_REVISION=0071_copilot_reasoning_content
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)

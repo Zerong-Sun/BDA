@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialTourState, useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { TourOverlay } from './TourOverlay'
+import { TOUR_SECTIONS } from './tourData'
 
 const projectContext = vi.hoisted(() => ({
   projectId: 'pd1-demo',
@@ -186,6 +187,25 @@ describe('TourOverlay', () => {
     expect(useAppStore.getState().tourState.stepId).toBe('project-library')
   })
 
+  it('lets a filter menu own Escape while the tour callout is being hidden', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'candidates', stepId: 'candidate-filters' } })
+    renderWithProviders(<>
+      <div data-tour-id="candidate-filters"><button type="button" aria-haspopup="menu" aria-expanded="false">Add filter</button></div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Filter candidates')
+    const target = screen.getByRole('button', { name: 'Add filter' })
+    await act(async () => {
+      target.setAttribute('aria-expanded', 'true')
+      fireEvent.keyDown(target, { key: 'Escape' })
+    })
+    expect(useAppStore.getState().tourState.status).toBe('active')
+    expect(screen.queryByTestId('tour-card')).not.toBeInTheDocument()
+    await act(async () => target.setAttribute('aria-expanded', 'false'))
+    expect(useAppStore.getState().tourState.stepId).toBe('candidate-table')
+  })
+
   it('falls back to a modal Dialog and localized Alert when an anchor cannot be found', async () => {
     vi.useFakeTimers()
     startAtProjectSelector()
@@ -231,7 +251,7 @@ describe('TourOverlay', () => {
         status: 'active',
         sectionId: 'faq',
         stepId: 'faq-content',
-        completedSections: ['projects', 'research', 'workflow', 'candidates', 'results', 'copilot-settings'],
+        completedSections: TOUR_SECTIONS.filter((section) => section.id !== 'faq').map((section) => section.id),
         updatedAt: null,
       },
     })
@@ -247,7 +267,7 @@ describe('TourOverlay', () => {
       tourMenuOpen: false,
       tourState: {
         status: 'completed',
-        completedSections: ['projects', 'research', 'workflow', 'candidates', 'results', 'copilot-settings', 'faq'],
+        completedSections: TOUR_SECTIONS.map((section) => section.id),
       },
     })
   })
@@ -398,7 +418,7 @@ describe('TourOverlay', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Finish chapter' }))
 
     expect(screen.getByRole('dialog', { name: 'Interface tour' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
@@ -475,7 +495,106 @@ describe('TourOverlay', () => {
     await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: true, settingsOpen: false }))
     act(() => useAppStore.getState().advanceTour())
     await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: false, settingsOpen: true }))
+    act(() => useAppStore.getState().advanceTour())
+    await waitFor(() => expect(useAppStore.getState()).toMatchObject({ copilotOpen: false, settingsOpen: false }))
     view.unmount()
+  })
+
+  it('advances research navigation only from a tab, not surrounding text', async () => {
+    setReducedMotion(true)
+    useAppStore.getState().startTour('research')
+    renderWithProviders(<>
+      <div data-tour-id="research-tabs">
+        <h1>Project heading</h1>
+        <div role="tablist"><span>Tab spacing</span><button role="tab" type="button">Evidence</button></div>
+      </div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Research views')
+    fireEvent.click(screen.getByText('Project heading'))
+    fireEvent.click(screen.getByText('Tab spacing'))
+    expect(useAppStore.getState().tourState.stepId).toBe('research-tabs')
+    fireEvent.click(screen.getByRole('tab', { name: 'Evidence' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('research-workspace')
+  })
+
+  it('waits for a workflow node selection instead of advancing on canvas controls or whitespace', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'workflow', stepId: 'workflow-canvas' } })
+    renderWithProviders(<>
+      <div data-tour-id="workflow-canvas">
+        <div>Canvas whitespace</div>
+        <button type="button">Zoom in</button>
+        <div className="react-flow__node" role="button" tabIndex={0}>Fold step</div>
+      </div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Connected steps')
+    fireEvent.click(screen.getByText('Canvas whitespace'))
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-canvas')
+    fireEvent.click(screen.getByRole('button', { name: 'Fold step' }))
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-inspector')
+  })
+
+  it('continues a paused chapter from its saved step through the chapter menu', async () => {
+    projectContext.projects = [{ id: 'pd1-demo', name: 'PD-1', source_project_key: 'PD1' }]
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'project-library' }, tourMenuOpen: true })
+    renderWithProviders(<><div data-tour-id="project-library">Library</div><TourOverlay /></>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue tour' }))
+    expect(useAppStore.getState()).toMatchObject({ appMode: 'demo', tourMenuOpen: false,
+      tourState: { status: 'active', sectionId: 'projects', stepId: 'project-library' } })
+    expect(projectContext.setProjectId).toHaveBeenCalledWith('pd1-demo')
+    expect(await screen.findByText('Project library')).toBeInTheDocument()
+  })
+
+  it('recognizes a workflow node selected with the keyboard without a synthetic click', async () => {
+    setReducedMotion(true)
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'active', sectionId: 'workflow', stepId: 'workflow-canvas' } })
+    renderWithProviders(<>
+      <div data-tour-id="workflow-canvas"><div className="react-flow__node" role="button" tabIndex={0}>Fold step</div></div>
+      <TourOverlay />
+    </>)
+    await screen.findByText('Connected steps')
+    await act(async () => { screen.getByRole('button', { name: 'Fold step' }).classList.add('selected') })
+    expect(useAppStore.getState().tourState.stepId).toBe('workflow-inspector')
+  })
+
+  it('shows localized feedback when continuing has no usable demo project', async () => {
+    projectContext.projects = [{ id: 'old-demo', name: 'PD-1', source_project_key: 'PD1', status: 'trashed' }]
+    useAppStore.setState({ language: 'zh', tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'project-library' }, tourMenuOpen: true })
+    renderWithProviders(<TourOverlay />)
+    fireEvent.click(await screen.findByRole('button', { name: '继续导览' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('PD‑1 演示项目不可用')
+    expect(useAppStore.getState().tourState.status).toBe('paused')
+    expect(projectContext.setProjectId).not.toHaveBeenCalled()
+  })
+
+  it('does not offer to continue a chapter whose final step is already completed', async () => {
+    useAppStore.setState({ tourState: { ...initialTourState, status: 'paused', sectionId: 'projects', stepId: 'main-navigation', completedSections: ['projects'] }, tourMenuOpen: true })
+    renderWithProviders(<TourOverlay />)
+    expect(await screen.findByRole('dialog', { name: 'Interface tour' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue tour' })).not.toBeInTheDocument()
+  })
+
+  it('opens the result history only when its panels are needed', async () => {
+    setReducedMotion(true)
+    const expand = vi.fn(() => {
+      const result = document.createElement('div')
+      result.dataset.tourId = 'results-metrics'
+      result.textContent = 'Stored metrics'
+      document.querySelector('[data-tour-id="results-history"]')!.append(result)
+    })
+    useAppStore.getState().startTour('results')
+    renderWithProviders(<>
+      <div data-tour-id="results-history">
+        <button type="button" data-slot="accordion-trigger" aria-expanded="false" onClick={expand}>Result history</button>
+      </div>
+      <TourOverlay />
+    </>)
+    await waitFor(() => expect(document.querySelector('[data-tour-anchor="results-metrics"]')).toBeInTheDocument())
+    expect(expand).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('updates copy in place when the language changes', async () => {
@@ -514,7 +633,7 @@ describe('TourOverlay', () => {
     const menu = await screen.findByRole('dialog', { name: 'Interface tour' })
     expect(menu).toHaveAttribute('data-slot', 'dialog-content')
     const chapterButtons = screen.getAllByTestId('tour-chapter')
-    expect(chapterButtons).toHaveLength(7)
+    expect(chapterButtons).toHaveLength(TOUR_SECTIONS.length)
     expect(chapterButtons.every((button) => button.getAttribute('data-slot') === 'button')).toBe(true)
 
     const completedChapter = screen.getByRole('button', { name: 'Research workspace, Completed' })

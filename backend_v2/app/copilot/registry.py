@@ -29,6 +29,7 @@ import math
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -143,6 +144,10 @@ class ToolSpec:
     #: Compatibility for handlers that historically accepted numeric strings.
     #: Coercion happens before schema validation, so bounds still apply.
     coerce_numeric_strings: bool = False
+    #: Calls in one model response cannot observe each other's results. Defer
+    #: this tool when one of its evidence sources is requested in that batch;
+    #: the model must consume the receipt before choosing derived arguments.
+    defer_with: tuple[str, ...] = ()
 
     def schema(self) -> dict[str, Any]:
         """The tool as the model sees it."""
@@ -154,6 +159,35 @@ class ToolSpec:
                 "parameters": self.parameters,
             },
         }
+
+
+def _argument_issues(schema: dict[str, Any], arguments: dict[str, Any]) -> list[dict[str, Any]]:
+    """Bounded schema feedback without echoing invalid values or dynamic keys."""
+    issues = []
+    for error in islice(Draft202012Validator(schema).iter_errors(arguments), 5):
+        declared = schema
+        path = []
+        for segment in islice(error.absolute_path, 8):
+            if isinstance(segment, int):
+                path.append(str(segment))
+                declared = declared.get("items", {})
+            elif segment in declared.get("properties", {}):
+                path.append(str(segment).replace("~", "~0").replace("/", "~1"))
+                declared = declared["properties"][segment]
+            else:
+                # A map key can itself contain a credential or a private value.
+                path.append("*")
+                declared = declared.get("additionalProperties", {})
+            if not isinstance(declared, dict):
+                declared = {}
+        issue: dict[str, Any] = {"path": ("/" + "/".join(path))[:128], "constraint": str(error.validator)[:32]}
+        if (error.validator in {"maxLength", "minLength", "maxItems", "minItems", "minimum", "maximum",
+                                "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
+                and isinstance(error.validator_value, int | float)
+                and not isinstance(error.validator_value, bool) and math.isfinite(error.validator_value)):
+            issue["limit"] = error.validator_value
+        issues.append(issue)
+    return issues
 
 
 class ToolRegistry:
@@ -269,8 +303,11 @@ class ToolRegistry:
                             arguments[name] = number
                     except (ValueError, OverflowError):
                         pass  # The original value is rejected by the schema below.
-        if not Draft202012Validator(spec.parameters).is_valid(arguments):
-            raise DomainError("copilot_tool_arguments_invalid", "Tool arguments do not match the declared schema.", status_code=422)
+        issues = _argument_issues(spec.parameters, arguments)
+        if issues:
+            raise DomainError("copilot_tool_arguments_invalid",
+                              "Tool arguments do not match the declared schema.",
+                              status_code=422, errors=issues)
         return spec.handler(context, arguments)
 
 

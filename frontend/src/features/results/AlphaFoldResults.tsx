@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -46,7 +47,8 @@ export function AlphaFoldResults({
   artifacts,
   onDownload,
 }: AlphaFoldResultsProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const zh = language === 'zh'
   const copy = t.resultsExt.alphaFoldResults
   const rows = useMemo(() => candidates
     .filter((candidate) => numericScore(candidate, 'plddt') !== null)
@@ -76,9 +78,18 @@ export function AlphaFoldResults({
       .filter((artifact) => artifact.artifact_type === 'confidence_record')
       .map((artifact) => [String(artifact.lineage.candidate_key), artifact]),
   ), [alphaFoldArtifacts])
+  const extraMetrics = useMemo(() => [
+    ['iptm', 'ipTM', 3],
+    ['pae_interaction', zh ? '跨链 PAE（Å）' : 'Cross-chain PAE (Å)', 2],
+    ['design_chain_plddt', zh ? '设计链 pLDDT' : 'Design-chain pLDDT', 2],
+    ['design_chain_ca_rmsd', zh ? '设计链 CA RMSD（Å）' : 'Design-chain CA RMSD (Å)', 2],
+    ['rosetta_interface_dg', zh ? 'Rosetta 界面能（REU）' : 'Rosetta interface dG (REU)', 2],
+  ] as const, [zh])
   const [sorting, setSorting] = useState<SortingState>([])
+  const [detailedColumns, setDetailedColumns] = useState(false)
   const columns = useMemo(() => [
-    alphaFoldColumnHelper.accessor('name', {
+    alphaFoldColumnHelper.accessor((candidate) => typeof candidate.properties.native_id === 'string' ? candidate.properties.native_id : candidate.name, {
+      id: 'name',
       header: ({ column }) => <DataGridColumnHeader column={column} title={copy.candidate} />,
       meta: { cellClassName: 'font-medium text-text-primary' },
       size: 240,
@@ -106,7 +117,7 @@ export function AlphaFoldResults({
       cell: ({ getValue }) => getValue()?.toFixed(2) ?? '—',
       size: 112,
     }),
-    alphaFoldColumnHelper.accessor(
+    ...(rows.some((c) => numericScore(c, 'alphafold_summary_rmsd_to_input') !== null || numericScore(c, 'alphafold_rmsd_to_input') !== null) ? [alphaFoldColumnHelper.accessor(
       (candidate) => numericScore(candidate, 'alphafold_summary_rmsd_to_input')
         ?? numericScore(candidate, 'alphafold_rmsd_to_input'),
       {
@@ -115,7 +126,12 @@ export function AlphaFoldResults({
         cell: ({ getValue }) => getValue()?.toFixed(2) ?? '—',
         size: 96,
       },
-    ),
+    )] : []),
+    ...extraMetrics.filter(([key]) => rows.some((c) => numericScore(c, key) !== null)).map(([key, label, digits]) =>
+      alphaFoldColumnHelper.accessor((c) => numericScore(c, key), {
+        id: key, header: ({ column }) => <DataGridColumnHeader column={column} title={label} />,
+        cell: ({ getValue }) => getValue()?.toFixed(digits) ?? '—', size: 160,
+      })),
     alphaFoldColumnHelper.accessor(
       (candidate) => confidenceClass(numericScore(candidate, 'plddt') ?? 0),
       {
@@ -130,17 +146,17 @@ export function AlphaFoldResults({
       header: ({ column }) => <DataGridColumnHeader column={column} title={copy.rawResults} />,
       cell: ({ row }) => {
         const candidate = row.original
-        const structure = candidate.structure_artifact_id
-          ? artifactsById.get(candidate.structure_artifact_id)
-          : undefined
+        const structureId = candidate.structure_artifact_id ?? candidate.complex_artifact_id
+        const structure = structureId ? artifactsById.get(structureId) : undefined
         const confidence = confidenceByCandidate.get(candidate.candidate_key)
         return (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {structure ? (
               <Button type="button" variant="outline" size="xs" onClick={() => onDownload(structure)}>
-                PDB
+                {candidate.structure_artifact_id ? 'PDB' : zh ? '复合物 PDB' : 'Complex PDB'}
               </Button>
             ) : null}
+            {structure ? <Button size="xs" variant="outline" render={<Link to={`/candidates?project=${candidate.project_id}&candidate=${candidate.id}`} />}>{zh ? '查看结构' : 'View structure'}</Button> : null}
             {confidence ? (
               <Button type="button" variant="outline" size="xs" onClick={() => onDownload(confidence)}>
                 JSON
@@ -149,15 +165,15 @@ export function AlphaFoldResults({
           </div>
         )
       },
-      size: 132,
+      size: 270,
     }),
-  ], [artifactsById, confidenceByCandidate, copy, onDownload])
+  ], [artifactsById, confidenceByCandidate, copy, onDownload, rows, zh, extraMetrics])
   // TanStack Table intentionally exposes mutable function references.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility: { route: detailedColumns, design_chain_plddt: detailedColumns, design_chain_ca_rmsd: detailedColumns, quality: detailedColumns } },
     onSortingChange: setSorting,
     getRowId: (candidate) => candidate.id,
     getCoreRowModel: getCoreRowModel(),
@@ -172,11 +188,11 @@ export function AlphaFoldResults({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-text-primary">{copy.title}</h2>
-            <p className="mt-1 text-sm text-text-secondary">{copy.description}</p>
+            <p className="mt-1 text-sm text-text-secondary">{zh ? '查看结构置信度、界面指标与可追溯的原始结果。' : 'Review structural confidence, interface metrics and traceable source files.'}</p>
           </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button>
           <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-text-secondary">
-            {(rows.length >= 1000 ? copy.completeCoverage : copy.partialCoverage)
-              .replace('{count}', String(rows.length))}
+            {zh ? `可用预测 · ${rows.length} 条` : `Available predictions · ${rows.length}`}
           </span>
         </div>
 
@@ -213,7 +229,7 @@ export function AlphaFoldResults({
               .replace('{ptm}', numericScore(bestCandidate, 'ptm')?.toFixed(3) ?? '—')
               .replace('{pae}', numericScore(bestCandidate, 'mean_pae')?.toFixed(2) ?? '—')}
           </p>
-          <p className="mt-1">{copy.metricCaveat}</p>
+          <p className="mt-1">{zh ? '这些指标来自计算预测，不能等同实验结合活性。全矩阵 PAE 与跨链 PAE 分开显示；Rosetta 界面能单位为 REU，不是实验 ΔΔG。' : 'Prediction metrics do not establish experimental binding activity. Full-matrix and cross-chain PAE are distinct; Rosetta interface energy is in REU, not experimental ΔΔG.'}</p>
         </div>
 
         {summaryArtifacts.length > 0 ? (

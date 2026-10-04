@@ -16,7 +16,7 @@ export const zh: TranslationDict = {
   },
   lab: {
     title: '实验台',
-    subtitle: '台面上的构建体，以及每次实验开始前要算的那几个数。',
+    subtitle: '管理蛋白构建体、计算浓度、分析仪器导出文件。',
     library: {
       title: '蛋白库',
       empty: '还没有构建体。手动添加一个，或粘贴 FASTA 批量登记。',
@@ -71,7 +71,7 @@ export const zh: TranslationDict = {
     instruments: {
       title: '仪器数据分析',
       intro:
-        '上传仪器导出文件、执行分析，拟合结果会记录在原始文件上。原始文件不会被改写：重新分析只会在旧结果旁新增一条。',
+        '上传仪器导出文件进行分析。每次分析保留原始文件关联和版本。',
       instrument: '仪器',
       bli: 'BLI（ForteBio CSV）',
       akta: 'AKTA（Unicorn ZIP）',
@@ -153,16 +153,16 @@ export const zh: TranslationDict = {
     newExperiment: '新建项目',
     project: '项目',
     selectProject: '选择项目',
-    noWorkflowData: '该项目尚无工作流数据。请打开 PD-1 演示项目体验完整闭环。',
+    noWorkflowData: '该项目尚无工作流数据。前往工作流创建方案，或浏览 PD-1 参考项目中的研究资料。',
   },
   experiments: {
-    eyebrow: '研究项目组合',
+    eyebrow: '项目',
     title: 'BDA 研究项目',
-    copilotTitle: '从设计目标到可追溯的分步闭环',
+    copilotTitle: '选择一项研究任务',
     copilotBody:
-      '让助手规划设计路线、调整工作流设置、解释候选物评分、解读验证结果，并转化为下一轮设计。',
+      '让 Bot 规划路线、复核候选物或解读结果。应用修改前先检查它的建议。',
     planRoute: '规划设计路线',
-    reviewCandidates: '查看头部候选物',
+    reviewCandidates: '查看优先候选物',
     interpretResults: '解读验证结果',
     overview: {
       activeProject: '当前项目',
@@ -250,7 +250,7 @@ export const zh: TranslationDict = {
     predKd: '预测 Kd',
   },
   results: {
-    eyebrow: '闭环证据',
+    eyebrow: '结果',
     title: '结果与交付',
     preparePackage: '准备交付包',
     disclaimer: '预计算的 PD-1 结合蛋白演示。指标与结构为演示用种子数据，非实时模型运行结果。',
@@ -262,7 +262,7 @@ export const zh: TranslationDict = {
     description: '连接验证与运行模式',
     operatingMode: '运行模式',
     applicationMode: '应用模式',
-    applicationModeBody: '创建真实项目、工作流运行与集群任务。',
+    applicationModeBody: '编辑项目，并向已配置的计算服务提交工作流。',
     demoMode: '演示模式',
     demoModeBody: '只读参考项目与种子数据。',
     connections: '服务连接',

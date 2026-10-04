@@ -4,7 +4,7 @@ import { AppFrame } from '@/components/ui/AppFrame'
 import { StatusBadge } from '@/components/ui/statusBadge'
 import type { ProjectOverview } from '../../lib/api/projects'
 import { useI18n } from '../../lib/i18n'
-import { projectText } from '../../lib/i18n/projectText'
+import { projectText, projectActionText } from '../../lib/i18n/projectText'
 import { getClusterHealth } from '../../lib/api/registry'
 
 interface OverviewCardsProps {
@@ -73,7 +73,7 @@ export function OverviewCards({ overview }: OverviewCardsProps) {
         />
         <OverviewMetric
           label={t.experiments.overview.nextAction}
-          value={overview.next_action || t.experimentsExt.overview.noRecommendedAction}
+          value={projectActionText(overview.next_action, t) || t.experimentsExt.overview.noRecommendedAction}
           supporting={t.experimentsExt.overview.recommendedSupporting}
         />
       </div>

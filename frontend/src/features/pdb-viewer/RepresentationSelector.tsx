@@ -30,7 +30,7 @@ export function RepresentationSelector({ value, onChange }: RepresentationSelect
         }}
       >
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.style}>
-          <SelectValue />
+          <SelectValue>{options.find(option => option.id === value)?.label ?? value}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

@@ -4,9 +4,9 @@ The route catalogue has carried `{"pae_interaction": "< 15", ...}` since it was
 written, read by nobody. Automating that comparison is easy; automating it
 *without* telling people to throw away work is the part these tests are about.
 
-The central case is `missing`. A design with no Rosetta number has not failed a
-Rosetta gate - nothing has run Rosetta on it - and a triage that reports those
-alike is at its most confidently wrong exactly when a pipeline stage was
+The central case is `missing`. A design with no recorded Rosetta number cannot
+be judged against a Rosetta gate, and a triage that reports missing as failed
+is at its most confidently wrong exactly when a pipeline stage was
 skipped, which is when somebody most needs to notice.
 """
 
@@ -29,7 +29,7 @@ TIERS = {"tier_b": TIER_B, "tier_a": TIER_A}
 
 
 def _metric(key: str, value: float, method: str = "alphafold3", assessor: str = "independent_model") -> dict:
-    return {"key": key, "value": value, "method": method, "assessor": assessor}
+    return {"key": key, "value": value, "method": method, "assessor": assessor, "unit": "pLDDT_0_100" if key == "plddt" else ""}
 
 
 # --- reading a threshold --------------------------------------------------------
@@ -75,6 +75,23 @@ def test_a_metric_nobody_recorded_is_missing_and_not_a_failure() -> None:
     assert criteria[0].outcome == "missing"
     assert criteria[0].value is None
     assert "Not a failure" in criteria[0].note
+
+
+def test_missing_metrics_report_record_scope_without_inventing_measurement_history() -> None:
+    criteria = triage.evaluate(
+        [_metric("plddt", 91.0, method="synthetic_fixture", assessor="synthetic_fixture")],
+        {"binder_plddt": "> 70", "binder_ca_rmsd_angstrom": "< 2", "rosetta_ddg_reu": "< -20"},
+    )
+
+    assert criteria[0].outcome == "pass"
+    assert criteria[0].method == criteria[0].assessor == "synthetic_fixture"
+    for item in criteria[1:]:
+        assert item.outcome == "missing"
+        assert item.value is item.metric_key is item.method is item.assessor is None
+        assert "supplied metrics" in item.note
+        assert "unknown" in item.note
+        assert "nothing has measured" not in item.note
+        assert "never" not in item.note
 
 
 def test_the_catalogues_name_is_mapped_to_the_stored_metric_key() -> None:
@@ -146,7 +163,7 @@ def test_a_design_that_only_clears_the_lower_bar_gets_the_lower_bar() -> None:
 
 
 def test_a_missing_measurement_blocks_a_tier_without_condemning_the_design() -> None:
-    """Every recorded number clears tier A; Rosetta was never run."""
+    """Every recorded number clears tier A; the Rosetta metric is absent."""
     metrics = [_metric("pae_interaction", 5.0), _metric("plddt", 92.0)]
 
     verdict = triage.triage(metrics, TIERS)
@@ -168,6 +185,28 @@ def test_a_design_that_reaches_nothing_is_explained_against_the_easiest_tier() -
     assert verdict.tier is None
     assert verdict.failed == 3
     assert {item.threshold for item in verdict.criteria} == set(TIER_A.values())
+
+
+def test_failed_and_missing_tiers_remain_distinguishable_after_fallback() -> None:
+    metrics = [_metric("pae_interaction", 22.0), _metric("plddt", 62.0)]
+
+    verdict = triage.triage(metrics, TIERS)
+
+    assert verdict.criteria_tier == "tier_a"
+    assert list(verdict.tier_criteria) == ["tier_b", "tier_a"]
+    for criteria in verdict.tier_criteria.values():
+        assert [item.outcome for item in criteria] == ["fail", "fail", "missing"]
+        assert criteria[-1].method is criteria[-1].assessor is None
+
+
+def test_reaching_lower_tier_keeps_the_stricter_tiers_failed_comparisons() -> None:
+    metrics = [_metric("pae_interaction", 12.0), _metric("plddt", 75.0), _metric("rosetta_ddg_reu", -25.0)]
+
+    verdict = triage.triage(metrics, TIERS)
+
+    assert verdict.tier == verdict.criteria_tier == "tier_a"
+    assert {item.outcome for item in verdict.tier_criteria["tier_b"]} == {"fail"}
+    assert {item.outcome for item in verdict.tier_criteria["tier_a"]} == {"pass"}
 
 
 def test_no_tiers_declared_is_not_a_verdict() -> None:

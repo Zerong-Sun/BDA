@@ -198,4 +198,27 @@ describe('CandidatesPage complete cursor collection', () => {
       screen.queryByRole('button', { name: 'View details for candidate cand_first_page' }),
     ).not.toBeInTheDocument()
   })
+  it('shows all candidates by default and only reversibly filters confirmed low confidence', async () => {
+    const low = { ...candidate('low'), scores: { plddt: 35 }, properties: { folded_by: 'alphafold2_superfold' } }
+    const high = { ...candidate('high'), scores: { plddt: 95 }, properties: { predicted_by: 'alphafold3' } }
+    const uncertain = { ...candidate('uncertain'), scores: { plddt: 0.94 } }
+    server.use(
+      http.get('/api/v2/projects/proj_candidates_integration/candidate-funnel', () => HttpResponse.json({ generated: 3, designed: 3, folded: 3, scored: 3, ordered: 0 })),
+      http.get('/api/v2/projects/proj_candidates_integration/candidates', () => HttpResponse.json({ items: [low, high, uncertain], next_cursor: null })),
+    )
+    server.use(http.get('/api/v2/projects', () => HttpResponse.json({ items: [{
+      id: 'proj_candidates_integration', organization_id: 'org_test', name: 'Confidence candidates',
+      project_type: 'protein_design', status: 'active', owner_id: 'user_test', summary: '',
+      primary_target_id: null, version: 1, created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',
+    }], next_cursor: null })))
+    renderWithProviders(<CandidatesPage />)
+    expect(await screen.findByRole('button', { name: 'View details for candidate low' })).toBeInTheDocument()
+    expect(screen.getByText(/1 candidates have an unknown or conflicting pLDDT scale/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide low-confidence candidates' }))
+    expect(screen.queryByRole('button', { name: 'View details for candidate low' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View details for candidate uncertain' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show low-confidence candidates' }))
+    expect(screen.getByRole('button', { name: 'View details for candidate low' })).toBeInTheDocument()
+  })
+
 })
