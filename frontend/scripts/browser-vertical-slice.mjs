@@ -55,6 +55,7 @@ const ROUTE_SURFACES = Object.freeze({
   faq: '[data-tour-id="faq-content"]',
   timeline: '[data-tour-id="timeline-page"]',
   autopilot: '[data-tour-id="autopilot-page"]',
+  learning: '[data-tour-id="learning-page"]',
   lab: '[data-tour-id="lab-page"]',
 })
 
@@ -1345,6 +1346,23 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'learning') {
+    const root = page.locator('[data-tour-id="learning-page"]')
+    await root.getByRole('button', { name: 'Record an observation', exact: true }).click()
+    const observation = root.locator('form').filter({ has: page.getByRole('button', { name: 'Save observation', exact: true }) })
+    await observation.getByLabel('Batch', { exact: true }).fill('browser-batch')
+    await observation.getByLabel('Biological replicate key', { exact: true }).fill('bio-1')
+    await observation.getByLabel('Value / detection limit (nM)', { exact: true }).fill('12.5')
+    await observation.getByLabel('Result notes and QC rationale', { exact: true }).fill('Synthetic browser measurement')
+    await observation.getByRole('checkbox', { name: 'Source evidence checked; QC accepted', exact: true }).check()
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/learning/observations'))
+    await observation.getByRole('button', { name: 'Save observation', exact: true }).click()
+    const body = (await request).postDataJSON()
+    if (body.value !== 12.5 || body.unit !== 'nM' || body.qc_accepted !== true || body.batch_key !== 'browser-batch' || !body.candidate_id || !body.source_artifact_id) {
+      throw new Error('Observation form did not preserve values, evidence, QC and candidate selection.')
+    }
+    await expectVisible(root.getByText('Saved. Continue when ready.', { exact: true }), 'learning observation receipt')
+    diagnostics.interactions.learningObservation = 'Typed measurement with selected candidate, artifact and QC reaches the generated transport'
   } else if (testCase.routeId === 'lab') {
     await page.getByRole('link', { name: 'Toolbox', exact: true }).click()
     await expectVisible(page.getByRole('heading', { name: 'Lab toolbox' }), 'standalone toolbox')
@@ -1387,6 +1405,7 @@ function assertControlAcceptance(testCase, diagnostics) {
     faq: ['faqDisclosure'],
     timeline: ['timelineViews'],
     autopilot: ['autopilotPromptGuard'],
+    learning: ['learningObservation'],
     lab: [],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
@@ -1707,7 +1726,7 @@ async function run() {
   await access(executablePath, fsConstants.X_OK).catch(() => {
     throw new Error(
       `Playwright Chromium is missing or not executable at ${executablePath}.\n`
-      + 'Install the exact Playwright 1.62.0 browser with: TMPDIR=/tmp npx playwright install chromium',
+      + 'Install the browser matching the locked Playwright version with: TMPDIR=/tmp npx playwright install chromium',
     )
   })
 

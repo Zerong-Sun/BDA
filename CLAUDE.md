@@ -100,13 +100,15 @@ are mainline capabilities; stage-specific research/compute adapters and the
 complete unattended loop are not. Keep that boundary aligned with
 `docs/AUTOPILOT_CAMPAIGNS.md`.
 
+The user-authorized 2.6 development branch exposes an Iteravia learning preview. This does not rename published API/package versions or claim general availability; see `docs/LEARNING_V26.md`.
+
 ## Backend architecture
 
 FastAPI modular monolith under `backend_v2/app/`, one package per domain
 (identity, projects, targets, workflows, compute, artifacts, candidates,
 experiments, campaigns, research, knowledge, timeline, literature,
 intelligence, registry, delivery, copilot, autopilot, wetlab, ligands, audit,
-platform). Each follows the same four-file convention:
+platform, learning). Each follows the same four-file convention:
 
 | File | Responsibility |
 |---|---|

@@ -1,5 +1,7 @@
 # BDA Workbench
 
+**2.6 development preview:** [Iteravia project learning](docs/LEARNING_V26.md) adds frozen assay contracts, traceable datasets, a reproducible project baseline and reviewed experimental batch proposals. This is the first software loop; prospective experimental benefit and the full 2.6 release remain unvalidated.
+
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.
 
 BDA Workbench 面向计算蛋白设计中“证据、设计、计算、实验和决策分散在不同工具里”的问题。分散的记录使研究者难以回答三个基本问题：某个候选为何产生、它由哪些输入和软件版本生成，以及后续结论能否被独立复核。

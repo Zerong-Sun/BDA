@@ -19,6 +19,7 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   faq: { root: '[data-tour-id="faq-content"]', maxSteps: 96 },
   timeline: { root: '[data-tour-id="timeline-page"]', maxSteps: 128 },
   autopilot: { root: '[data-tour-id="autopilot-page"]', maxSteps: 96 },
+  learning: { root: '[data-tour-id="learning-page"]', maxSteps: 128 },
   lab: { root: '[data-tour-id="lab-page"]', maxSteps: 128 },
 })
 
@@ -249,6 +250,7 @@ export const ROUTES = Object.freeze([
   { id: 'autopilot', path: `/autopilot?project=${PROJECT_ID}`, authenticated: true },
   // The last route the matrix did not reach. Its three panels are the ones the React
   // Compiler skips (TanStack Table), so nothing else was watching them either.
+  { id: 'learning', path: `/learning?project=${PROJECT_ID}`, authenticated: true },
   { id: 'lab', path: `/lab?project=${PROJECT_ID}`, authenticated: true },
 ])
 
@@ -304,6 +306,7 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   // No state scenarios: the page reads nothing when it opens, so an empty/loading/error
   // case here would be asserting on a fixture rather than on the page.
   autopilot: [],
+  learning: [],
   lab: ['empty', 'loading', 'recoverable-error'],
 })
 
@@ -958,6 +961,19 @@ function createStrictRoutes({ scenario, routeId }) {
   }
   const ok = (body, options) => routeResponse(200, body, options)
 
+  const learningBase = { project_id: PROJECT_ID, version: 1, created_at: NOW, updated_at: NOW, created_by: 'user_browser' }
+  const learningAssay = { ...learningBase, id: 'assay_browser', name: 'Synthetic affinity assay', method: 'BLI fixture', unit: 'nM', conditions: { pH: '7' } }
+  const learningStudy = { ...learningBase, id: 'study_browser', name: 'Synthetic learning round', assay_id: learningAssay.id, research_goal_id: 'goal_browser_1', goal_snapshot: { version: 1 }, direction: 'minimize', threshold: 10, currency: 'USD', batch_budget_cents: 10000, max_batch_size: 2 }
+  const learningDataset = { ...learningBase, id: 'dataset_browser', study_id: learningStudy.id, digest: 'd'.repeat(64), manifest: { included: [{ result_id: 'result_browser_1' }], excluded: [{ result_id: 'result_browser_2', reason: 'qc_not_accepted' }] } }
+  const learningModel = { ...learningBase, id: 'model_browser', study_id: learningStudy.id, dataset_id: learningDataset.id, algorithm: 'composition-knn-v1', status: 'shadow', parameters: {}, evaluation: { groups: 6, rmse: 8.1, mean_baseline_rmse: 14.2, eligible_for_promotion: true, limitations: ['Synthetic UI fixture; not experimental evidence'] } }
+  const learningDecision = { ...learningBase, id: 'decision_browser', study_id: learningStudy.id, model_id: learningModel.id, timeline_entry_id: null, proposal_digest: 'e'.repeat(64), review_status: 'pending', review_note: null, reviewed_by: null, proposal: { model_status: 'shadow', currency: 'USD', estimated_cost_cents: 5000, action: 'review_batch', execution_authorized: false, selected: [{ candidate_id: 'candidate_browser_1', candidate_name: 'Synthetic candidate', prediction: 18, selection_reason: 'exploration', out_of_domain: true }], excluded: [], limitations: ['Distance heuristic, not calibrated uncertainty'] } }
+  add('POST', `/api/v2/projects/${PROJECT_ID}/learning/observations`, {}, () => routeResponse(201, experimentResultFixture('result_browser_new', 12.5, 'unknown')))
+  const learningRecords = { assays: [learningAssay], studies: [learningStudy], datasets: [learningDataset], models: [learningModel], decisions: [learningDecision] }
+  for (const [kind, items] of Object.entries(learningRecords)) {
+    add('GET', `/api/v2/projects/${PROJECT_ID}/learning/${kind}`, { limit: '50' }, () => ok({ items: empty ? [] : items, next_cursor: null }))
+  }
+  add('GET', `/api/v2/projects/${PROJECT_ID}/candidates`, { limit: '200' }, () => ok({ items: empty ? [] : [candidateFixture('candidate_browser_1', 1), candidateFixture('candidate_browser_2', 2)], next_cursor: null }))
+
   add('GET', '/api/v2/wetlab/concentration', { a280: '1', ext_coeff: '10000', molecular_weight: '12000', path_length_cm: '1' }, () => ok({
     a280: 1, path_length_cm: 1, epsilon: 10000, mw: 12000,
     molar_conc_uM: 100, molar_conc_nM: 100000, molar_conc_M: 0.0001,
@@ -1263,7 +1279,7 @@ function createStrictRoutes({ scenario, routeId }) {
     items: empty
       ? []
       : [
-          experimentResultFixture('result_browser_1', 18, 'pass'),
+          { ...experimentResultFixture('result_browser_1', 18, 'pass'), result_metadata: { learning: { assay_id: 'assay_browser', status: 'measured', replicate_key: 'bio-1', qc_accepted: true } } },
           experimentResultFixture('result_browser_2', 64, 'review'),
         ],
     next_cursor: null,
@@ -1301,7 +1317,7 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
   add('GET', '/api/v2/artifacts', { limit: '200', project_id: PROJECT_ID }, () => ok({
-    items: [],
+    items: routeId === 'learning' && !empty ? [{ ...learningBase, id: 'artifact_learning', artifact_type: 'experiment_data', filename: 'synthetic-assay.csv', content_type: 'text/csv', status: 'available', size_bytes: 256, checksum_sha256: 'a'.repeat(64), lineage: {} }] : [],
     next_cursor: null,
   }))
   add('GET', '/api/v2/registry/model-plugins', { limit: '200' }, () => ok({

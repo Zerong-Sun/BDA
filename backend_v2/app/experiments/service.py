@@ -10,7 +10,7 @@ from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
 from .models import ExperimentResult
-from .schemas import ExperimentResultBatch
+from .schemas import ExperimentResultBatch, ExperimentResultCreate
 
 
 def create_results(
@@ -58,3 +58,30 @@ def create_results(
         payload={"count": len(items)},
     )
     return items
+
+
+def create_idempotent_result(
+    session: Session,
+    project: Project,
+    payload: ExperimentResultCreate,
+    user: User,
+    *,
+    request_key: str,
+) -> ExperimentResult:
+    """Internal adapter for a caller holding its measurement-contract lock.
+
+    This domain owns both the measurement and its uniqueness key. The learning
+    domain must not mutate experiment rows after calling create_results.
+    """
+    existing = session.scalar(
+        select(ExperimentResult).where(
+            ExperimentResult.project_id == project.id,
+            ExperimentResult.legacy_id == request_key,
+        )
+    )
+    if existing is not None:
+        return existing
+    row = create_results(session, project, ExperimentResultBatch(results=[payload]), user)[0]
+    row.legacy_id = request_key
+    session.flush()
+    return row

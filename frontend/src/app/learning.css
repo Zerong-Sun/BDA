@@ -1,0 +1,40 @@
+.learning-workbench { max-width: 1160px; margin: 0 auto; display: grid; gap: 1.5rem; }
+.learning-header { padding: 1rem 0; max-width: 760px; }
+.learning-eyebrow { font-size: .7rem; letter-spacing: .15em; opacity: .65; }
+.learning-header h1 { font-size: clamp(1.6rem, 3vw, 2.35rem); margin: .6rem 0; font-weight: 550; }
+.learning-header p { line-height: 1.7; }
+.learning-limit { font-size: .85rem; opacity: .7; margin-top: .75rem; }
+.learning-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; list-style: none; padding: 0; }
+.learning-steps li { display: flex; align-items: center; gap: .65rem; font-size: .85rem; }
+.learning-steps li > span { display: grid; place-items: center; flex: 0 0 1.65rem; height: 1.65rem; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 50%; font-size: .75rem; }
+.learning-section { border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 1rem; padding: 1.5rem; display: grid; gap: 1rem; min-width: 0; }
+.learning-section h2 { font-size: 1.1rem; font-weight: 600; }
+.learning-section h3 { font-size: .95rem; font-weight: 600; }
+.learning-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.learning-workbench fieldset { display: grid; gap: .9rem; min-width: 0; margin-top: 1rem; }
+.learning-workbench fieldset:disabled { opacity: .6; }
+.learning-field { display: grid; gap: .4rem; font-size: .85rem; min-width: 0; }
+.learning-field input, .learning-field textarea, .learning-field select, .learning-scroll input[type=number] { width: 100%; min-width: 0; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: .4rem; padding: .55rem .7rem; background: transparent; color: inherit; }
+.learning-field select option { color: #111; background: #fff; }
+.learning-field textarea { min-height: 5rem; resize: vertical; }
+.learning-workbench :focus-visible { outline: 2px solid #5b8cbe; outline-offset: 3px; }
+.learning-check { display: flex; align-items: center; gap: .6rem; font-size: .85rem; }
+.learning-workbench summary { cursor: pointer; font-size: .88rem; }
+.learning-section p { font-size: .87rem; line-height: 1.65; }
+.learning-workbench a { text-decoration: underline; text-underline-offset: 3px; margin-left: .5rem; }
+.learning-scroll { overflow: auto; max-height: 24rem; }
+.learning-scroll table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.learning-scroll th, .learning-scroll td { text-align: left; padding: .65rem; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+.learning-scroll th { font-weight: 500; opacity: .75; }
+.learning-scroll input[type=number] { width: 8rem; }
+.learning-record { border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent); padding-top: 1rem; display: grid; gap: .75rem; min-width: 0; }
+.learning-details pre { overflow: auto; max-height: 22rem; font-size: .7rem; line-height: 1.5; margin-top: .75rem; padding: .75rem; background: color-mix(in srgb, currentColor 4%, transparent); border-radius: .4rem; }
+.learning-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.learning-metrics dt { font-size: .75rem; opacity: .7; }
+.learning-metrics dd { margin-top: .3rem; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.learning-message { padding: .85rem; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: .5rem; display: flex; align-items: center; gap: 1rem; }
+@media (max-width: 640px) {
+  .learning-grid, .learning-steps { grid-template-columns: 1fr; }
+  .learning-section { padding: 1rem; }
+  .learning-metrics { grid-template-columns: 1fr; }
+}
