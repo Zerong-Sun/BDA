@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router'
 import clsx from 'clsx'
-import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon, PulseIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
 import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, type AppRoute } from '../../lib/nav/routes'
 import { CommandPalette } from './CommandPalette'
@@ -14,6 +14,7 @@ import { HelpMenu } from './HelpMenu'
 import { StatusPill } from './StatusPill'
 import { statusTone } from './statusTone'
 import { Button } from './Button'
+import { BigoBioLogo } from './BigoBioLogo'
 import { StatusBadge } from './statusBadge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
 import {
@@ -46,7 +47,8 @@ export function Topbar() {
           to={`/projects${projectQuery}`}
           className="science-brand shrink-0 text-sm font-semibold text-text-primary"
         >
-          <span className="science-brand-mark" aria-hidden="true"><AtomIcon weight="duotone" /></span>{t.brand}
+          <BigoBioLogo />
+          <span className="science-brand-product">{t.brand}</span>
         </NavLink>
 
         {/* Project is the anchor of the whole workbench: give it a prominent,

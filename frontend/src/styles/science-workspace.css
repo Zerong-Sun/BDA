@@ -132,7 +132,7 @@
 
 [data-theme="light"] { color-scheme: light; }
 .dark ::selection { background: var(--accent); color: var(--accent-foreground); }
-.dark .science-brand-mark { color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); }
+.dark .bigobio-logo, [data-theme="dark"] .bigobio-logo { filter: brightness(0) invert(1); }
 .dark .science-team-preview { background: var(--bg-surface-1); color: var(--text-primary); border-color: var(--border-soft); }
 .dark .science-team-preview .science-eyebrow { color: var(--accent); }
 .dark .science-preview-footer { border-color: var(--border-soft); }
@@ -245,9 +245,10 @@ body { line-height: 1.6; }
 }
 .science-utility-menu [role="menuitem"] { min-height: 44px; font-size: .875rem; }
 .science-topbar { min-height: 68px; background: var(--bg-surface-1); }
-.science-brand { display: inline-flex; align-items: center; gap: .65rem; letter-spacing: -.02em; }
-.science-brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #171c18; color: #d3ed70; }
-.science-brand-mark svg { width: 23px; height: 23px; }
+.science-brand { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: .2rem; letter-spacing: -.02em; }
+.bigobio-logo { display: block; width: 116px; height: auto; aspect-ratio: 1470 / 445; flex-shrink: 0; overflow: hidden; }
+.bigobio-logo--login { width: 208px; max-width: 100%; }
+.science-brand-product { font-size: .625rem; line-height: 1; font-weight: 500; letter-spacing: .07em; color: var(--text-secondary); }
 .science-topbar [data-slot="button"] { min-height: 36px; border-radius: 6px; }
 .science-topbar [data-tour-id="project-selector"] { margin-left: .5rem; }
 .science-topbar [data-slot="select-trigger"] { min-width: 0; border-color: transparent; border-radius: 6px; font-size: .875rem; max-width: 22rem; }
