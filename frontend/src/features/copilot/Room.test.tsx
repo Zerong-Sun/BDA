@@ -79,6 +79,46 @@ function stub(items: unknown[]) {
 }
 
 describe('Room', () => {
+  it('recovers a pending server reply after a reload without a local chat stream', async () => {
+    stub([])
+    useAppStore.setState({ copilotSessions: {}, copilotMessages: [] })
+    let reads = 0
+    server.use(http.get('/api/v2/copilot/projects/:projectId/room', () => {
+      reads += 1
+      const user = { kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: null,
+        message: message({ id: 'm1', role: 'user', content: 'Reloaded question', status: reads === 1 ? 'pending' : 'completed' }) }
+      const answer = { kind: 'message', id: 'm2', occurred_at: '2026-09-14T08:01:00Z', bot: 'planner',
+        message: message({ id: 'm2', content: 'Reply recovered from the server.' }) }
+      return HttpResponse.json({ items: reads === 1 ? [user] : [answer, user], next_cursor: null })
+    }))
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Reloaded question')).toBeInTheDocument()
+    expect(await screen.findByText('Reply recovered from the server.', {}, { timeout: 6000 })).toBeInTheDocument()
+    expect(reads).toBe(2)
+  }, 10_000)
+
+  it('replaces the accepted echo by id while keeping the reply placeholder and repeated messages', async () => {
+    stub(['m1', 'm2'].map((id) => ({
+      kind: 'message', id, occurred_at: '2026-09-14T08:00:00Z', bot: null,
+      message: message({ id, role: 'user', content: 'hi', status: 'pending' }),
+    })))
+    useAppStore.setState({ copilotSessions: { proj_test: {
+      conversationId: 'c1', bot: null, pending: { id: 'turn-1', stage: 'thinking', detail: null },
+      messages: [
+        { role: 'assistant', content: 'Old reply must not be echoed.' },
+        { id: 'm2', role: 'user', content: 'hi' },
+        { role: 'assistant', content: '' },
+      ],
+    } } })
+    renderWithProviders(<Room />)
+    await waitFor(() => expect(screen.getAllByText('hi')).toHaveLength(2))
+    expect(screen.getByText('Replying')).toBeInTheDocument()
+    expect(screen.getByRole('status')).not.toBeEmptyDOMElement()
+    expect(screen.queryByText('Old reply must not be echoed.')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Say something in the room')).toBeDisabled()
+    useAppStore.setState({ copilotSessions: {} })
+  })
+
   it('receives a project question as an unsent editable draft and consumes it once', async () => {
     stub([])
     useAppStore.setState({ copilotDraft: 'Compare the selected structures using their evidence.' })

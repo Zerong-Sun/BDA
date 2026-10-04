@@ -12,9 +12,12 @@ const MAX_COPILOT_HISTORY = 20
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
 
 function explainCopilotError(err: unknown): string {
-  const { t, format } = getTranslations()
+  const { t, format, language } = getTranslations()
   const e = t.copilot.errors
   const raw = err instanceof Error ? err.message : e.requestFailed
+  if (raw === 'copilot_wait_timeout') return language === 'zh'
+    ? '等待回复超时。消息可能仍在后台处理，请先查看研究室中的回复再决定是否重新发送。'
+    : 'Waiting for the reply timed out. Your message may still be processing. Check the research room before sending again.'
   if (raw.includes('Failed to fetch') || raw.includes('NetworkError')) {
     return e.connectionFailed
   }
@@ -119,6 +122,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
       {
+        id: requestId,
         role: 'user',
         content: trimmed,
         ...(reviewIntent ? { meta: { reviewIntent: true } } : {}),
@@ -172,6 +176,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         writeMessages((prev) => {
           const copy = [...prev]
           copy[copy.length - 1] = {
+            id: message.id,
             role: 'assistant',
             content: message.content,
             meta: { citations: message.citations, toolCalls: message.tool_calls },
@@ -185,6 +190,14 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         if ((message.tool_calls ?? []).some((call) => call?.name === 'post_handoff')) {
           void queryClient.invalidateQueries({ queryKey: copilotHandoffsQueryKey(projectId ?? null) })
         }
+      }, (accepted) => {
+        if (!isCurrent()) return
+        // Remember acceptance before waiting for a reply, including when the
+        // stream later disconnects. The room uses the same id to deduplicate.
+        setConversationId(projectId, accepted.conversationId)
+        writeMessages((prev) => prev.map((message) => message.id === requestId
+          ? { ...message, id: accepted.messageId || requestId }
+          : message))
       })
       if (!isCurrent()) return
       setConversationId(projectId, accepted.conversationId)
@@ -210,7 +223,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   }
 
   return {
-    messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages,
+    messages: usableMessages, pendingMessages: loading ? messages.slice(-2) : [],
+    loading, loadingStage, loadingDetail, error, send, resetMessages,
     lastMode, bots: bots ?? [], bot, setBot,
   }
 }
