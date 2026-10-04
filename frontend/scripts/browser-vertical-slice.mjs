@@ -1553,6 +1553,11 @@ async function navigateCase(page, testCase, caseDirectory) {
   }
   await navigation
   await expectVisible(page.locator(ROUTE_SURFACES[testCase.routeId]).first(), `${testCase.routeId} route surface`)
+  if (testCase.routeId === 'learning') {
+    // The route header precedes the project-scoped async data. Audit controls
+    // only after the actual workbench, rather than its loading header, exists.
+    await expectVisible(page.locator('[data-tour-id="learning-page"]').getByRole('heading', { name: /^01/ }), 'loaded learning contract')
+  }
   if (testCase.scenario === 'loading') {
     const contract = SCENARIO_CONTRACTS[`${testCase.routeId}:loading`]
     const skeleton = page.locator(contract.root).first().locator(contract.loadingSelector).first()
