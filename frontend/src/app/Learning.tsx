@@ -95,7 +95,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
   }
   async function download(decisionId: string) {
     const evidence = await learning.exportLearningDecision(projectId, decisionId)
-    const url = URL.createObjectURL(new Blob([JSON.stringify(evidence, null, 2)], { type: 'application/json' }))
+    const url = URL.createObjectURL(new Blob([evidence], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url; link.download = `learning-evidence-${decisionId}.json`; link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)

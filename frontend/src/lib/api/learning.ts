@@ -18,6 +18,7 @@ import {
   postLearningBatchApiV2ProjectsProjectIdLearningBatchesPost as batchSdk,
   receiveLearningBatchApiV2ProjectsProjectIdLearningBatchesRecordIdReceivePost as receiveSdk,
   exportLearningDeliveryApiV2ProjectsProjectIdLearningStudiesRecordIdDeliveryGet as deliverySdk,
+  getLearningRecordApiV2ProjectsProjectIdLearningKindRecordIdGet as recordSdk,
 } from './generated/sdk.gen'
 import type { AssayCreate, AssayResponse, StudyCreate, StudyResponse, DatasetResponse, ModelResponse,
   LearningDecisionCreate, LearningDecisionResponse, ObservationCreate, ModelCreate, ModelReview,
@@ -77,7 +78,13 @@ export async function reviewLearningDecision(projectId: string, decision: Learni
   return (await decisionReviewSdk<true>({ path: { project_id: projectId, decision_id: decision.id }, headers: { 'If-Match': `W/"${decision.version}"` }, body: { approve, rationale }, throwOnError: true })).data
 }
 export async function exportLearningDecision(projectId: string, decisionId: string) {
-  return (await exportDecisionSdk<true>({ path: { project_id: projectId, decision_id: decisionId }, throwOnError: true })).data
+  return preserveExportText((await exportDecisionSdk<true>({ path: { project_id: projectId, decision_id: decisionId }, parseAs: 'text', throwOnError: true })).data)
+}
+
+/** JSON.parse/stringify changes 10.0 to 10, invalidating the server's hashed numeric representation. */
+function preserveExportText(data: unknown): string {
+  if (typeof data !== 'string') throw new Error('Export transport must preserve the original JSON text.')
+  return data
 }
 
 export async function importObservations(projectId: string, body: ObservationImport) {
@@ -96,7 +103,11 @@ export async function receiveLearningBatch(projectId: string, record: BatchRespo
   return (await receiveSdk<true>({ path: { project_id: projectId, record_id: record.id }, headers: { 'If-Match': `W/"${record.version}"` }, body, throwOnError: true })).data
 }
 export async function exportLearningDelivery(projectId: string, studyId: string) {
-  return (await deliverySdk<true>({ path: { project_id: projectId, record_id: studyId }, throwOnError: true })).data
+  return preserveExportText((await deliverySdk<true>({ path: { project_id: projectId, record_id: studyId }, parseAs: 'text', throwOnError: true })).data)
+}
+
+export async function exportLearningBatch(projectId: string, batchId: string) {
+  return preserveExportText((await recordSdk<true>({ path: { project_id: projectId, kind: 'batches', record_id: batchId }, parseAs: 'text', throwOnError: true })).data)
 }
 
 export async function withdrawObservation(projectId: string, record: ExperimentResultResponse, rationale: string) {

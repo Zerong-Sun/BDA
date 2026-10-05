@@ -122,4 +122,6 @@ BigoBio 是公司品牌；Iteravia（迭原）是候选产品名。平台定位�
 
 摘要算法为 SHA-256，输入是 UTF-8 编码的 `json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)`。跨语言复核需使用相同 JSON 数值和转义表示，不能直接对美化后的下载文件计算文件哈希来代替内容摘要。
 
+前端下载保留服务器原始 JSON 文本，避免 JavaScript 把 `10.0` 重写为 `10` 或改变指数表示。决策包和完整交付包校验 `content → checksum`；实验交接下载保留完整批次记录，校验 `manifest → digest`。三个浏览器下载文件均已用独立 Python 校验通过。
+
 这些记录不构成并发负载达标、14 天稳定性、生产备份恢复或真实实验效果验收。发布审阅和主干合并遵循现有分支保护。
