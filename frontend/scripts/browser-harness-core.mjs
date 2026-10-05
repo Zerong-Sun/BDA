@@ -963,12 +963,12 @@ function createStrictRoutes({ scenario, routeId }) {
 
   const learningBase = { project_id: PROJECT_ID, version: 1, created_at: NOW, updated_at: NOW, created_by: 'user_browser' }
   const learningAssay = { ...learningBase, id: 'assay_browser', name: 'Synthetic affinity assay', method: 'BLI fixture', unit: 'nM', conditions: { pH: '7' } }
-  const learningStudy = { ...learningBase, id: 'study_browser', name: 'Synthetic learning round', assay_id: learningAssay.id, research_goal_id: 'goal_browser_1', goal_snapshot: { version: 1 }, direction: 'minimize', threshold: 10, currency: 'USD', batch_budget_cents: 10000, max_batch_size: 2 }
+  const learningStudy = { ...learningBase, id: 'study_browser', name: 'Synthetic learning round', assay_id: learningAssay.id, research_goal_id: 'goal_browser_1', goal_snapshot: { version: 1 }, direction: 'minimize', threshold: 10, currency: 'USD', batch_budget_cents: 10000, max_batch_size: 2, max_rounds: 12, stop_on_threshold: false, supersedes_id: null }
   const learningDataset = { ...learningBase, id: 'dataset_browser', study_id: learningStudy.id, digest: 'd'.repeat(64), manifest: { included: [{ result_id: 'result_browser_1' }], excluded: [{ result_id: 'result_browser_2', reason: 'qc_not_accepted' }] } }
   const learningModel = { ...learningBase, id: 'model_browser', study_id: learningStudy.id, dataset_id: learningDataset.id, algorithm: 'composition-knn-v1', status: 'shadow', parameters: {}, evaluation: { groups: 6, rmse: 8.1, mean_baseline_rmse: 14.2, eligible_for_promotion: true, limitations: ['Synthetic UI fixture; not experimental evidence'] } }
   const learningDecision = { ...learningBase, id: 'decision_browser', study_id: learningStudy.id, model_id: learningModel.id, timeline_entry_id: null, proposal_digest: 'e'.repeat(64), review_status: 'pending', review_note: null, reviewed_by: null, proposal: { model_status: 'shadow', currency: 'USD', estimated_cost_cents: 5000, action: 'review_batch', execution_authorized: false, selected: [{ candidate_id: 'candidate_browser_1', candidate_name: 'Synthetic candidate', prediction: 18, selection_reason: 'exploration', out_of_domain: true }], excluded: [], limitations: ['Distance heuristic, not calibrated uncertainty'] } }
   add('POST', `/api/v2/projects/${PROJECT_ID}/learning/observations`, {}, () => routeResponse(201, experimentResultFixture('result_browser_new', 12.5, 'unknown')))
-  const learningRecords = { assays: [learningAssay], studies: [learningStudy], datasets: [learningDataset], models: [learningModel], decisions: [learningDecision] }
+  const learningRecords = { assays: [learningAssay], studies: [learningStudy], datasets: [learningDataset], models: [learningModel], decisions: [learningDecision], evidence: [], batches: [] }
   for (const [kind, items] of Object.entries(learningRecords)) {
     add('GET', `/api/v2/projects/${PROJECT_ID}/learning/${kind}`, { limit: '50' }, () => ok({ items: empty ? [] : items, next_cursor: null }))
   }

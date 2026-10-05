@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.models import Base, UUIDVersionMixin
@@ -36,6 +36,9 @@ class LearningStudy(UUIDVersionMixin, Base):
     currency: Mapped[str] = mapped_column(String(3))
     batch_budget_cents: Mapped[int] = mapped_column(Integer)
     max_batch_size: Mapped[int] = mapped_column(Integer)
+    supersedes_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("learning_studies.id"), nullable=True)
+    stop_on_threshold: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    max_rounds: Mapped[int] = mapped_column(Integer, default=12, server_default="12")
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
 
 
@@ -75,4 +78,32 @@ class LearningDecision(UUIDVersionMixin, Base):
     review_status: Mapped[str] = mapped_column(String(24), default="pending")
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+
+class LearningEvidence(UUIDVersionMixin, Base):
+    """Sourced learning state; withdrawal keeps the original assertion and sources."""
+
+    __tablename__ = "learning_evidence"
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learning_studies.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    statement: Mapped[str] = mapped_column(Text)
+    sources: Mapped[dict] = mapped_column(JSON)
+    withdrawal: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+
+class LearningBatch(UUIDVersionMixin, Base):
+    """Evidence bridge to a campaign round; Campaign owns execution state."""
+
+    __tablename__ = "learning_batches"
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learning_studies.id"), index=True)
+    decision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("learning_decisions.id"), unique=True)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    round_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaign_rounds.id"), unique=True)
+    manifest: Mapped[dict] = mapped_column(JSON)
+    digest: Mapped[str] = mapped_column(String(64))
+    receipt: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))

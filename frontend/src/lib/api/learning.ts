@@ -11,12 +11,20 @@ import {
   postLearningDecisionApiV2ProjectsProjectIdLearningDecisionsPost as decisionSdk,
   reviewLearningModelApiV2ProjectsProjectIdLearningModelsModelIdReviewPost as modelReviewSdk,
   reviewLearningDecisionApiV2ProjectsProjectIdLearningDecisionsDecisionIdReviewPost as decisionReviewSdk,
+  withdrawLearningObservationApiV2ProjectsProjectIdLearningObservationsRecordIdWithdrawPost as withdrawObservationSdk,
+  importLearningObservationsApiV2ProjectsProjectIdLearningObservationsImportPost as importSdk,
+  postLearningEvidenceApiV2ProjectsProjectIdLearningEvidencePost as evidenceSdk,
+  withdrawLearningEvidenceApiV2ProjectsProjectIdLearningEvidenceRecordIdWithdrawPost as withdrawSdk,
+  postLearningBatchApiV2ProjectsProjectIdLearningBatchesPost as batchSdk,
+  receiveLearningBatchApiV2ProjectsProjectIdLearningBatchesRecordIdReceivePost as receiveSdk,
+  exportLearningDeliveryApiV2ProjectsProjectIdLearningStudiesRecordIdDeliveryGet as deliverySdk,
 } from './generated/sdk.gen'
 import type { AssayCreate, AssayResponse, StudyCreate, StudyResponse, DatasetResponse, ModelResponse,
-  LearningDecisionCreate, LearningDecisionResponse, ObservationCreate } from './generated/types.gen'
+  LearningDecisionCreate, LearningDecisionResponse, ObservationCreate, ModelCreate, ModelReview,
+  BackendV2AppLearningSchemasEvidenceResponse as EvidenceResponse, EvidenceCreate, BatchResponse, BatchComplete, ObservationImport, ExperimentResultResponse } from './generated/types.gen'
 
-export type { AssayResponse, StudyResponse, DatasetResponse, ModelResponse, LearningDecisionResponse }
-type Records = { assays: AssayResponse; studies: StudyResponse; datasets: DatasetResponse; models: ModelResponse; decisions: LearningDecisionResponse }
+export type { AssayResponse, StudyResponse, DatasetResponse, ModelResponse, LearningDecisionResponse, EvidenceResponse, BatchResponse }
+type Records = { assays: AssayResponse; studies: StudyResponse; datasets: DatasetResponse; models: ModelResponse; decisions: LearningDecisionResponse; evidence: EvidenceResponse; batches: BatchResponse }
 
 /** Refuse an incomplete collection rather than silently optimizing a truncated pool. */
 export async function collectLearningPages<T>(read: (cursor?: string) => Promise<{ items: T[]; next_cursor?: string | null }>): Promise<T[]> {
@@ -56,10 +64,10 @@ export async function createObservation(projectId: string, body: ObservationCrea
 export async function freezeDataset(projectId: string, studyId: string, resultIds: string[]) {
   return (await datasetSdk<true>({ path: { project_id: projectId }, body: { study_id: studyId, result_ids: resultIds }, throwOnError: true })).data
 }
-export async function trainLearningModel(projectId: string, datasetId: string) {
-  return (await modelSdk<true>({ path: { project_id: projectId }, body: { dataset_id: datasetId }, throwOnError: true })).data
+export async function trainLearningModel(projectId: string, datasetId: string, options: Omit<ModelCreate, 'dataset_id'> = {}) {
+  return (await modelSdk<true>({ path: { project_id: projectId }, body: { dataset_id: datasetId, ...options }, throwOnError: true })).data
 }
-export async function reviewLearningModel(projectId: string, model: ModelResponse, action: 'promote' | 'retire', rationale: string) {
+export async function reviewLearningModel(projectId: string, model: ModelResponse, action: ModelReview['action'], rationale: string) {
   return (await modelReviewSdk<true>({ path: { project_id: projectId, model_id: model.id }, headers: { 'If-Match': `W/"${model.version}"` }, body: { action, rationale }, throwOnError: true })).data
 }
 export async function createLearningDecision(projectId: string, body: LearningDecisionCreate) {
@@ -70,4 +78,27 @@ export async function reviewLearningDecision(projectId: string, decision: Learni
 }
 export async function exportLearningDecision(projectId: string, decisionId: string) {
   return (await exportDecisionSdk<true>({ path: { project_id: projectId, decision_id: decisionId }, throwOnError: true })).data
+}
+
+export async function importObservations(projectId: string, body: ObservationImport) {
+  return (await importSdk<true>({ path: { project_id: projectId }, body, throwOnError: true })).data
+}
+export async function createEvidence(projectId: string, body: EvidenceCreate) {
+  return (await evidenceSdk<true>({ path: { project_id: projectId }, body, throwOnError: true })).data
+}
+export async function withdrawEvidence(projectId: string, record: EvidenceResponse, rationale: string) {
+  return (await withdrawSdk<true>({ path: { project_id: projectId, record_id: record.id }, headers: { 'If-Match': `W/"${record.version}"` }, body: { rationale }, throwOnError: true })).data
+}
+export async function createLearningBatch(projectId: string, decision: LearningDecisionResponse, rationale: string, workflowRunId?: string) {
+  return (await batchSdk<true>({ path: { project_id: projectId }, headers: { 'If-Match': `W/"${decision.version}"` }, body: { decision_id: decision.id, rationale, workflow_run_id: workflowRunId }, throwOnError: true })).data
+}
+export async function receiveLearningBatch(projectId: string, record: BatchResponse, body: BatchComplete) {
+  return (await receiveSdk<true>({ path: { project_id: projectId, record_id: record.id }, headers: { 'If-Match': `W/"${record.version}"` }, body, throwOnError: true })).data
+}
+export async function exportLearningDelivery(projectId: string, studyId: string) {
+  return (await deliverySdk<true>({ path: { project_id: projectId, record_id: studyId }, throwOnError: true })).data
+}
+
+export async function withdrawObservation(projectId: string, record: ExperimentResultResponse, rationale: string) {
+  return (await withdrawObservationSdk<true>({ path: { project_id: projectId, record_id: record.id }, headers: { 'If-Match': `W/"${record.version}"` }, body: { rationale }, throwOnError: true })).data
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -84,4 +86,32 @@ def create_idempotent_result(
     row = create_results(session, project, ExperimentResultBatch(results=[payload]), user)[0]
     row.legacy_id = request_key
     session.flush()
+    return row
+
+
+def withdraw_learning_result(
+    session: Session, project: Project, row: ExperimentResult, user: User, *, expected: int, rationale: str
+) -> ExperimentResult:
+    """Retain the original measurement; a versioned withdrawal changes eligibility."""
+    if row.project_id != project.id or not isinstance(row.result_metadata.get("learning"), dict):
+        raise DomainError("learning_result_not_found", "Learning result was not found", status_code=404)
+    if row.version != expected:
+        raise DomainError("version_conflict", "Measurement changed; reload before withdrawal", status_code=412)
+    if row.result_metadata.get("learning_withdrawal"):
+        raise DomainError("learning_result_withdrawn", "Measurement is already withdrawn", status_code=409)
+    row.result_metadata = {
+        **row.result_metadata,
+        "learning_withdrawal": {"rationale": rationale, "by": str(user.id), "at": datetime.now(UTC).isoformat()},
+    }
+    row.version += 1
+    session.flush()
+    record_audit(
+        session,
+        action="learning.observation.withdraw",
+        entity_type="experiment_result",
+        entity_id=row.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        actor_id=user.id,
+    )
     return row

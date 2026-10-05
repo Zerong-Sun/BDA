@@ -72,7 +72,7 @@
 }
 .learning-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   list-style: none;
   padding: 0;
   border: 1px solid var(--border-soft);
@@ -84,13 +84,14 @@
   display: flex;
   align-items: center;
   gap: .7rem;
-  padding: .85rem 1rem;
+  min-width: 0;
   font-size: .78rem;
   line-height: 1.5;
   color: var(--text-secondary);
 }
 .learning-steps li + li { border-left: 1px solid var(--border-soft); }
-.learning-steps li > span {
+.learning-steps li > button { width: 100%; height: 100%; padding: .8rem .55rem; white-space: normal; justify-content: flex-start; border-radius: 0; font-size: .75rem; }
+.learning-steps li > button > span {
   display: grid;
   place-items: center;
   flex: 0 0 1.75rem;
@@ -112,6 +113,7 @@
   min-width: 0;
 }
 .learning-section > h2 {
+  scroll-margin-top: 9rem;
   display: flex;
   align-items: center;
   gap: .75rem;
@@ -168,6 +170,9 @@
   min-width: 0;
 }
 .learning-record h3 { overflow-wrap: anywhere; }
+.learning-record code { overflow-wrap: anywhere; font-size: .75rem; }
+.learning-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.learning-source-list { display: grid; gap: .75rem; max-height: 16rem; overflow: auto; padding: .5rem; }
 .learning-details pre {
   overflow: auto;
   max-height: 22rem;
@@ -195,7 +200,7 @@
   .learning-overview > div + div { border-left: 1px solid var(--border-soft); }
   .learning-overview > div:nth-child(odd) { border-right: 0; }
   .learning-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .learning-steps li:nth-child(3) { border-left: 0; }
+  .learning-steps li:nth-child(odd) { border-left: 0; }
   .learning-steps li:nth-child(n+3) { border-top: 1px solid var(--border-soft); }
 }
 @media (max-width: 640px) {
@@ -209,5 +214,5 @@
   .learning-overview > div:nth-child(-n+2) { border-bottom: 1px solid var(--border-soft); }
   .learning-overview > div { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: .3rem; }
   .learning-overview dd { margin-top: 0; font-size: 1.25rem; }
-  .learning-steps li { padding: .7rem; gap: .5rem; font-size: .73rem; }
+  .learning-steps li { padding: 0; gap: .5rem; font-size: .73rem; }
 }

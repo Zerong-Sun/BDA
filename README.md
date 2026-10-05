@@ -1,6 +1,6 @@
 # BDA Workbench
 
-**2.6 development preview:** [Iteravia project learning](docs/LEARNING_V26.md) adds frozen assay contracts, traceable datasets, a reproducible project baseline and reviewed experimental batch proposals. This is the first software loop; prospective experimental benefit and the full 2.6 release remain unvalidated.
+**2.6 development preview:** [Iteravia project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Workflow outcomes now settle Autopilot compute stages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
 
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.
 

@@ -13,13 +13,19 @@ from ..experiments.schemas import ExperimentResultResponse
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..projects.service import require_project, require_project_permission
-from . import service
+from . import imports, lifecycle, service
 from .repository import KINDS, LearningRepository
 from .schemas import (
     AssayCreate,
     AssayResponse,
+    BatchComplete,
+    BatchCreate,
+    BatchResponse,
     DatasetCreate,
     DatasetResponse,
+    EvidenceCreate,
+    EvidenceResponse,
+    EvidenceWithdraw,
     LearningDecisionCreate,
     LearningDecisionResponse,
     LearningDecisionReview,
@@ -29,19 +35,31 @@ from .schemas import (
     ModelResponse,
     ModelReview,
     ObservationCreate,
+    ObservationImport,
+    ObservationImportResult,
     StudyCreate,
     StudyResponse,
 )
 
 router = APIRouter(prefix="/projects/{project_id}/learning", tags=["learning"])
-Kind = Literal["assays", "studies", "datasets", "models", "decisions"]
-ResponseRecord = AssayResponse | StudyResponse | DatasetResponse | ModelResponse | LearningDecisionResponse
+Kind = Literal["assays", "studies", "datasets", "models", "decisions", "evidence", "batches"]
+ResponseRecord = (
+    AssayResponse
+    | StudyResponse
+    | DatasetResponse
+    | ModelResponse
+    | LearningDecisionResponse
+    | EvidenceResponse
+    | BatchResponse
+)
 RESPONSES: dict[str, type[ResponseRecord]] = {
     "assays": AssayResponse,
     "studies": StudyResponse,
     "datasets": DatasetResponse,
     "models": ModelResponse,
     "decisions": LearningDecisionResponse,
+    "evidence": EvidenceResponse,
+    "batches": BatchResponse,
 }
 
 
@@ -65,7 +83,7 @@ def list_learning_records(
 
 @router.get(
     "/{kind}/{record_id}",
-    response_model=AssayResponse | StudyResponse | DatasetResponse | ModelResponse | LearningDecisionResponse,
+    response_model=ResponseRecord,
 )
 def get_learning_record(
     project_id: uuid.UUID,
@@ -149,7 +167,9 @@ def post_learning_model(
     user: User = Depends(require_command),
 ):
     project = require_project_permission(session, project_id, user, "write")
-    return service.train_model(session, project, user, payload.dataset_id)
+    return service.train_model(
+        session, project, user, payload.dataset_id, payload.algorithm, payload.validation, payload.calibrate
+    )
 
 
 @router.post(
@@ -215,3 +235,137 @@ def export_learning_decision(
 ):
     project = require_project(session, project_id, user)
     return service.export_decision(session, project, decision_id)
+
+
+@router.post(
+    "/observations/import",
+    response_model=ObservationImportResult,
+    openapi_extra={"x-permission": "learning.observation.import"},
+)
+def import_learning_observations(
+    project_id: uuid.UUID,
+    payload: ObservationImport,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    project = require_project_permission(session, project_id, user, "experiment")
+    return imports.import_observations(session, project, user, payload)
+
+
+@router.post(
+    "/observations/{record_id}/withdraw",
+    response_model=ExperimentResultResponse,
+    openapi_extra={"x-permission": "learning.observation.withdraw"},
+)
+def withdraw_learning_observation(
+    project_id: uuid.UUID,
+    record_id: uuid.UUID,
+    payload: EvidenceWithdraw,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    from ..experiments.service import withdraw_learning_result
+    from .models import LearningAssay
+
+    project = require_project_permission(session, project_id, user, "experiment")
+    row = lifecycle._result(session, project, record_id)
+    metadata = row.result_metadata.get("learning", {})
+    try:
+        assay_id = uuid.UUID(metadata["assay_id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        from ..core.problem import DomainError
+
+        raise DomainError("learning_result_not_found", "Learning result was not found", status_code=404) from exc
+    service.require_record(session, LearningAssay, project, assay_id, lock=True)
+    session.refresh(row, with_for_update=True)
+    row = withdraw_learning_result(
+        session, project, row, user, expected=parse_if_match(if_match), rationale=payload.rationale
+    )
+    response.headers["ETag"] = etag(row.version)
+    return row
+
+
+@router.post(
+    "/evidence",
+    response_model=EvidenceResponse,
+    status_code=201,
+    openapi_extra={"x-permission": "learning.evidence.create"},
+)
+def post_learning_evidence(
+    project_id: uuid.UUID,
+    payload: EvidenceCreate,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    project = require_project_permission(session, project_id, user, "write")
+    return lifecycle.create_evidence(session, project, user, payload)
+
+
+@router.post(
+    "/evidence/{record_id}/withdraw",
+    response_model=EvidenceResponse,
+    openapi_extra={"x-permission": "learning.evidence.withdraw"},
+)
+def withdraw_learning_evidence(
+    project_id: uuid.UUID,
+    record_id: uuid.UUID,
+    payload: EvidenceWithdraw,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    project = require_project_permission(session, project_id, user, "write")
+    row = lifecycle.withdraw_evidence(session, project, user, record_id, payload, parse_if_match(if_match))
+    response.headers["ETag"] = etag(row.version)
+    return row
+
+
+@router.post(
+    "/batches", response_model=BatchResponse, status_code=201, openapi_extra={"x-permission": "learning.batch.create"}
+)
+def post_learning_batch(
+    project_id: uuid.UUID,
+    payload: BatchCreate,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    project = require_project_permission(session, project_id, user, "experiment")
+    require_project_permission(session, project_id, user, "write")
+    return lifecycle.create_batch(session, project, user, payload, parse_if_match(if_match))
+
+
+@router.post(
+    "/batches/{record_id}/receive",
+    response_model=BatchResponse,
+    openapi_extra={"x-permission": "learning.batch.receive"},
+)
+def receive_learning_batch(
+    project_id: uuid.UUID,
+    record_id: uuid.UUID,
+    payload: BatchComplete,
+    response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+):
+    project = require_project_permission(session, project_id, user, "experiment")
+    row = lifecycle.complete_batch(session, project, user, record_id, payload, parse_if_match(if_match))
+    response.headers["ETag"] = etag(row.version)
+    return row
+
+
+@router.get("/studies/{record_id}/delivery", response_model=LearningPackage)
+def export_learning_delivery(
+    project_id: uuid.UUID,
+    record_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+):
+    from .delivery import export_study
+
+    project = require_project(session, project_id, user)
+    return export_study(session, project, record_id)

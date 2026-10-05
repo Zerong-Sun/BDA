@@ -161,11 +161,7 @@ describe('Autopilot stages', () => {
     expect(screen.queryByRole('button', { name: 'Mark this stage done' })).not.toBeInTheDocument()
   })
 
-  it('offers it for a workflow draft, which is handed over rather than reporting back', async () => {
-    // The adapter creates a draft for somebody to open in the Workflow page and
-    // finish, so the person who finished it is the one who can say the step is
-    // over. Refusing every product left a compute stage unfinishable - the same
-    // dead end `review` had one stage earlier.
+  it('waits for the workflow outcome instead of allowing a manual success claim', async () => {
     await withCampaign([
       stage({
         stage_key: 'compute',
@@ -176,9 +172,8 @@ describe('Autopilot stages', () => {
     ])
 
     expect(await screen.findByRole('link', { name: 'Open workflow' })).toBeInTheDocument()
-    expect(
-      await screen.findByRole('button', { name: 'Mark this stage done' }),
-    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark this stage done' })).not.toBeInTheDocument()
+    expect(screen.getByText('The workflow reports its outcome and advances automatically')).toBeInTheDocument()
   })
 
   it('offers release rather than completion for a held stage', async () => {

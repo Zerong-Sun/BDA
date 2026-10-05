@@ -1,14 +1,10 @@
-import { Children, isValidElement, useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Checkbox } from '../components/ui/checkbox'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/textarea'
 import { Disclosure } from '../components/ui/Disclosure'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
-import { getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { DataGrid } from '../components/reui/data-grid/data-grid'
-import { DataGridTable } from '../components/reui/data-grid/data-grid-table'
 import { Button } from '../components/ui/Button'
 import { useI18n } from '../lib/i18n'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
@@ -17,9 +13,11 @@ import { listAllCandidates } from '../lib/api/candidates'
 import { ArtifactUploadDropzone } from '../features/artifacts/ArtifactUploadDropzone'
 import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listResearchGoals } from '../lib/api/researchGoals'
-import { getProjectAccess } from '../lib/api/projects'
+import { getProjectAccess, listProjectWorkflowRuns } from '../lib/api/projects'
 import * as learning from '../lib/api/learning'
-import type { ObservationCreate, StudyCreate } from '../lib/api/generated/types.gen'
+import type { ObservationCreate, StudyCreate, ModelCreate, ModelReview } from '../lib/api/generated/types.gen'
+import { Choice, LearningTable, Field, Section, JsonDetails } from './learningComponents'
+import { LearningLifecycle } from './LearningLifecycle'
 import './learning.css'
 
 const values = (event: FormEvent<HTMLFormElement>) => new FormData(event.currentTarget)
@@ -27,42 +25,8 @@ const text = (data: FormData, key: string) => String(data.get(key) ?? '').trim()
 const numeric = (data: FormData, key: string) => Number(text(data, key))
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const rows = (value: unknown): Record<string, unknown>[] => Array.isArray(value) ? value.map(object) : []
+const newest = <T extends { created_at: string }>(items: T[]) => [...items].sort((a, b) => b.created_at.localeCompare(a.created_at))
 const numberLabel = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value.toPrecision(4) : '—'
-
-function Choice({ children, name, value, onChange, required }: {
-  children: ReactNode; name?: string; value?: string; required?: boolean;
-  onChange?: (event: { target: { value: string } }) => void;
-}) {
-  const options = Children.toArray(children).filter(isValidElement<{ value?: string; children: ReactNode }>).map((child) => ({
-    value: child.props.value ?? String(child.props.children), label: child.props.children,
-  }))
-  const [chosen, setChosen] = useState('')
-  const selected = value ?? (options.some((o) => o.value === chosen) ? chosen : options[0]?.value ?? '')
-  return <Select name={name} required={required} value={selected} onValueChange={(next) => {
-    if (next === null) return
-    setChosen(next); onChange?.({ target: { value: next } })
-  }} items={options}>
-    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-    <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-  </Select>
-}
-
-function LearningTable({ headings, cells }: { headings: string[]; cells: ReactNode[][] }) {
-  const table = useReactTable<ReactNode[]>({ data: cells, columns: headings.map((header, index) => ({
-    id: String(index), header, cell: ({ row }) => row.original[index],
-  })), getCoreRowModel: getCoreRowModel() })
-  return <DataGrid table={table} recordCount={cells.length}><DataGridTable /></DataGrid>
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="learning-field"><span>{label}</span>{children}</label>
-}
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="learning-section"><h2>{title}</h2>{children}</section>
-}
-function JsonDetails({ label, data }: { label: string; data: unknown }) {
-  return <Disclosure className="learning-details" title={label}><pre>{JSON.stringify(data, null, 2)}</pre></Disclosure>
-}
 
 export function LearningPage() {
   const { projectId } = useProjectContext()
@@ -82,21 +46,27 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
   const [failure, setFailure] = useState('')
   const [selectedResults, setSelectedResults] = useState<string[]>([])
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, string>>({})
+  const [algorithm, setAlgorithm] = useState<ModelCreate['algorithm']>('knn')
+  const [validation, setValidation] = useState<ModelCreate['validation']>('sequence')
+  const [calibrate, setCalibrate] = useState(false)
+  const [assayTemplate, setAssayTemplate] = useState('custom')
+  const [retests, setRetests] = useState<string[]>([])
   const [measurementStatus, setMeasurementStatus] = useState<ObservationCreate['status']>('measured')
   const access = useQuery({ queryKey: ['project-access', projectId], queryFn: () => getProjectAccess(projectId) })
   const query = useQuery({ queryKey: ['learning-workspace', projectId], queryFn: async () => {
-    const [assays, studies, datasets, models, decisions, results, candidates, artifacts, goals] = await Promise.all([
+    const [assays, studies, datasets, models, decisions, results, candidates, artifacts, goals, evidence, batches, workflows] = await Promise.all([
       learning.listLearning(projectId, 'assays'), learning.listLearning(projectId, 'studies'),
       learning.listLearning(projectId, 'datasets'), learning.listLearning(projectId, 'models'),
       learning.listLearning(projectId, 'decisions'), learning.listLearningResults(projectId),
       listAllCandidates(projectId, { limit: 200 }), listProjectArtifacts(projectId), listResearchGoals(projectId),
+      learning.listLearning(projectId, 'evidence'), learning.listLearning(projectId, 'batches'), listProjectWorkflowRuns(projectId),
     ])
-    return { assays, studies, datasets, models, decisions, results, candidates: candidates.items, artifacts, goals }
+    return { assays, studies: newest(studies), datasets: newest(datasets), models: newest(models), decisions: newest(decisions), results: newest(results), candidates: candidates.items, artifacts, goals, evidence: newest(evidence), batches: newest(batches).reverse(), workflows }
   } })
   const writable = !demo && access.data?.permissions.write === true
   const experimentWritable = !demo && access.data?.permissions.experiment === true
   const data = query.data
-  const study = data?.studies.find((row) => row.id === studyId) ?? data?.studies[0]
+  const study = data?.studies.find((row) => row.id === studyId) ?? data?.studies.find((s) => !data.studies.some((revision) => revision.supersedes_id === s.id)) ?? data?.studies[0]
   const assay = data?.assays.find((row) => row.id === study?.assay_id)
   const datasets = data?.datasets.filter((row) => row.study_id === study?.id) ?? []
   const models = data?.models.filter((row) => row.study_id === study?.id) ?? []
@@ -137,7 +107,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
         <div className="learning-eyebrow"><span>ITERAVIA</span><span className="learning-version">2.6 PREVIEW</span></div>
         <h1>{copy('项目学习工作台', 'Project learning workbench')}</h1>
         <p>{copy('把每轮实验变成下一轮决策的依据。', 'Turn each experimental round into evidence for the next decision.')}</p>
-        <p className="learning-limit">{copy('当前提供可复现的单测定基线。模型提升表示通过回顾性检查；实验效果仍需前瞻验证。', 'A reproducible single-assay baseline. Promotion passes retrospective checks; experimental benefit still needs prospective validation.')}</p>
+        <p className="learning-limit">{copy('从实验契约、模型验证到下一轮实验与学习交付。模型提升通过回顾性检查；实际实验增益仍需前瞻验证。', 'From assay contracts and model validation to the next experimental round and learning delivery. Promotion passes retrospective checks; experimental benefit needs prospective validation.')}</p>
       </div>
       <dl className="learning-overview" aria-label={copy('当前学习目标的数据概况', 'Current study evidence summary')}>
         {[
@@ -148,7 +118,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
         ].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{evidenceLoaded ? count : '—'}</dd></div>)}
       </dl>
     </header>
-    <ol className="learning-steps">{[copy('定义目标与测定', 'Define goal & assay'), copy('录入与冻结证据', 'Record & freeze evidence'), copy('评估项目模型', 'Evaluate project model'), copy('审阅下一批实验', 'Review the next batch')].map((label, index) => <li key={label}><span>{index + 1}</span>{label}</li>)}</ol>
+    <ol className="learning-steps" aria-label={copy('跳转到工作步骤', 'Jump to a work step')}>{[copy('目标契约', 'Goal & assay'), copy('实验数据', 'Observations'), copy('模型验证', 'Model validation'), copy('批次决策', 'Batch decisions'), copy('交接回流', 'Handoff & results'), copy('学习记录', 'Learning record'), copy('项目交付', 'Delivery')].map((label, index) => <li key={label}><Button type="button" variant="ghost" disabled={!data || (index > 0 && !study)} onClick={() => { const heading = document.getElementById(`learning-step-${String(index + 1).padStart(2, '0')}`); heading?.scrollIntoView({ block: 'start' }); heading?.focus({ preventScroll: true }) }}><span>{index + 1}</span>{label}</Button></li>)}</ol>
     {(query.isPending || access.isPending) && <p role="status">{copy('正在读取项目证据…', 'Loading project evidence…')}</p>}
     {(query.isError || access.isError) && <div role="alert"><p>{copy('项目数据加载失败，操作已暂停。', 'Project data could not be loaded. Actions are paused.')}</p><Button type="button" variant="outline" onClick={() => { void query.refetch(); void access.refetch() }}>{copy('重试', 'Retry')}</Button></div>}
     {failure && <div role="alert" className="learning-message">{failure}<Button type="button" variant="outline" onClick={() => void query.refetch()}>{copy('刷新数据', 'Refresh data')}</Button></div>}
@@ -158,11 +128,12 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
       <Section title={copy('01 · 目标与测定契约', '01 · Goal and assay contract')}>
         <div className="learning-grid">
           <Disclosure defaultOpen={!data.assays.length} title={copy('新建测定方法', 'Define an assay')}>
-            <form onSubmit={(event) => submit(event, (form) => learning.createAssay(projectId, { name: text(form, 'name'), method: text(form, 'method'), unit: text(form, 'unit'), conditions: { context: text(form, 'conditions') } }))}>
+            <Field label={copy('应用模板', 'Assay template')}><Choice value={assayTemplate} onChange={(event) => setAssayTemplate(event.target.value)}><option value="custom">{copy('自定义测定', 'Custom assay')}</option><option value="enzyme">{copy('酶活性优化', 'Enzyme activity')}</option><option value="binder">{copy('结合蛋白亲和力', 'Binder affinity')}</option></Choice></Field>
+            <form key={assayTemplate} onSubmit={(event) => submit(event, (form) => learning.createAssay(projectId, { name: text(form, 'name'), method: text(form, 'method'), unit: text(form, 'unit'), conditions: { context: text(form, 'conditions') } }))}>
               <fieldset disabled={!experimentWritable || busy}>
-                <Field label={copy('测定名称', 'Assay name')}><Input name="name" required maxLength={200} /></Field>
-                <Field label={copy('方法、仪器与处理方式', 'Method, instrument and processing')}><Textarea name="method" required maxLength={4000} /></Field>
-                <Field label={copy('单位（例如 nM）', 'Unit (for example nM)')}><Input name="unit" required maxLength={40} /></Field>
+                <Field label={copy('测定名称', 'Assay name')}><Input name="name" required maxLength={200} defaultValue={assayTemplate === 'enzyme' ? copy('酶比活性', 'Enzyme specific activity') : assayTemplate === 'binder' ? copy('结合亲和力 KD', 'Binding affinity KD') : ''} /></Field>
+                <Field label={copy('方法、仪器与处理方式', 'Method, instrument and processing')}><Textarea name="method" required maxLength={4000} defaultValue={assayTemplate === 'enzyme' ? copy('填写底物、检测波长、温度和初始速率拟合方法。', 'Specify substrate, readout, temperature and initial-rate fitting method.') : assayTemplate === 'binder' ? copy('填写 BLI/SPR 仪器、固定化方式、浓度梯度与结合/解离拟合方法。', 'Specify BLI/SPR instrument, immobilization, concentration series and kinetic fitting.') : ''} /></Field>
+                <Field label={copy('单位（例如 nM）', 'Unit (for example nM)')}><Input name="unit" required maxLength={40} defaultValue={assayTemplate === 'enzyme' ? 'U/mg' : assayTemplate === 'binder' ? 'nM' : ''} /></Field>
                 <Field label={copy('条件与对照', 'Conditions and controls')}><Textarea name="conditions" required maxLength={3000} /></Field>
                 <Button type="submit">{copy('保存测定', 'Save assay')}</Button>
               </fieldset>
@@ -171,8 +142,8 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
           <Disclosure defaultOpen={!data.studies.length} title={copy('新建学习目标', 'Create a learning study')}>
             {!data.goals.length && <p><Link to={`/research?project=${projectId}`}>{copy('先在研究页面建立项目目标', 'Create a project goal in Research first')}</Link></p>}
             <form onSubmit={(event) => submit(event, async (form) => {
-              const created = await learning.createStudy(projectId, { name: text(form, 'name'), assay_id: text(form, 'assay'), research_goal_id: text(form, 'goal'), direction: text(form, 'direction') as StudyCreate['direction'], threshold: text(form, 'threshold') ? numeric(form, 'threshold') : null, currency: text(form, 'currency') as StudyCreate['currency'], batch_budget_cents: Math.round(numeric(form, 'budget') * 100), max_batch_size: numeric(form, 'size') })
-              setStudyId(created.id); setSelectedResults([]); setSelectedCandidates({})
+              const created = await learning.createStudy(projectId, { name: text(form, 'name'), assay_id: text(form, 'assay'), research_goal_id: text(form, 'goal'), direction: text(form, 'direction') as StudyCreate['direction'], threshold: text(form, 'threshold') ? numeric(form, 'threshold') : null, currency: text(form, 'currency') as StudyCreate['currency'], batch_budget_cents: Math.round(numeric(form, 'budget') * 100), max_batch_size: numeric(form, 'size'), max_rounds: numeric(form, 'rounds'), stop_on_threshold: form.get('stop') === 'on', supersedes_id: text(form, 'previous') === 'new' ? null : text(form, 'previous'), selection_constraints: { min_length: numeric(form, 'minLength'), max_length: numeric(form, 'maxLength'), forbidden_motifs: text(form, 'motifs').toUpperCase().split(/[\s,]+/).filter(Boolean), allow_out_of_domain: form.get('noOod') !== 'on' } })
+              setStudyId(created.id); setSelectedResults([]); setSelectedCandidates({}); setRetests([])
             })}>
               <fieldset disabled={!writable || busy || !data.assays.length || !data.goals.length}>
                 <Field label={copy('学习目标名称', 'Study name')}><Input name="name" required maxLength={200} /></Field>
@@ -182,12 +153,18 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
                 <Field label={copy('目标阈值（可选）', 'Target threshold (optional)')}><Input name="threshold" type="number" step="any" /></Field>
                 <div className="learning-grid"><Field label={copy('每批预算', 'Budget per batch')}><Input name="budget" type="number" min="0.01" max="1000000" step="0.01" required /></Field><Field label={copy('币种', 'Currency')}><Choice name="currency">{['USD', 'EUR', 'GBP', 'CNY'].map((c) => <option key={c}>{c}</option>)}</Choice></Field></div>
                 <Field label={copy('每批最多候选数', 'Maximum candidates per batch')}><Input name="size" type="number" min="1" max="96" defaultValue="12" required /></Field>
+                <div className="learning-grid"><Field label={copy('最短序列长度', 'Minimum sequence length')}><Input name="minLength" type="number" min="1" max="10000" defaultValue="1" required /></Field><Field label={copy('最长序列长度', 'Maximum sequence length')}><Input name="maxLength" type="number" min="1" max="10000" defaultValue="10000" required /></Field></div>
+                <Field label={copy('排除的氨基酸片段（空格分隔，可选）', 'Forbidden amino acid motifs (space separated, optional)')}><Input name="motifs" maxLength={2019} /></Field>
+                <label className="learning-check"><Checkbox name="noOod" />{copy('禁止选择训练域外候选', 'Exclude candidates outside the model domain')}</label>
+                <Field label={copy('最多实验轮数', 'Maximum experimental rounds')}><Input name="rounds" type="number" min="1" max="100" defaultValue="12" required /></Field>
+                <Field label={copy('目标版本', 'Study revision')}><Choice name="previous"><option value="new">{copy('独立新目标', 'New study')}</option>{data.studies.map((s) => <option key={s.id} value={s.id}>{copy('修订', 'Revise')} · {s.name}</option>)}</Choice></Field>
+                <label className="learning-check"><Checkbox name="stop" />{copy('已有合格测量达到目标阈值时建议停止', 'Recommend stopping when accepted measurements reach the target')}</label>
                 <Button type="submit">{copy('冻结目标与预算', 'Freeze goal and budget')}</Button>
               </fieldset>
             </form>
           </Disclosure>
         </div>
-        {study && <Field label={copy('当前学习目标', 'Current study')}><Choice value={study.id} onChange={(event) => { setStudyId(event.target.value); setSelectedResults([]); setSelectedCandidates({}) }}>{data.studies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Choice></Field>}
+        {study && <Field label={copy('当前学习目标', 'Current study')}><Choice value={study.id} onChange={(event) => { setStudyId(event.target.value); setSelectedResults([]); setSelectedCandidates({}); setRetests([]) }}>{data.studies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Choice></Field>}
         {study && <p>{assay?.name} · {assay?.unit} · {study.direction === 'maximize' ? copy('最大化', 'Maximize') : copy('最小化', 'Minimize')} · {study.currency} {(study.batch_budget_cents / 100).toFixed(2)} / {copy('批', 'batch')} · ≤ {study.max_batch_size} {copy('个候选', 'candidates')}</p>}
         {study && <JsonDetails label={copy('查看冻结目标与测定依据', 'Inspect frozen goal and assay')} data={{ study, assay }} />}
       </Section>
@@ -198,14 +175,17 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
           </Disclosure>
           <Disclosure title={copy('录入实验结果', 'Record an observation')}>
             <p>{copy('先把原始文件上传至项目；方法或条件变化时建立新测定。重复编号表示同一次生物学重复，技术重复使用相同编号。', 'Upload the source file to the project first. Use a new assay when methods or conditions change. Replicate keys identify a biological replicate; technical repeats share that key.')}</p>
-            <form onSubmit={(event) => submit(event, (form) => learning.createObservation(projectId, { assay_id: assay.id, candidate_id: text(form, 'candidate'), source_artifact_id: text(form, 'artifact'), batch_key: text(form, 'batch'), replicate_key: text(form, 'replicate'), replicate_type: text(form, 'replicateType') as ObservationCreate['replicate_type'], status: measurementStatus, value: measuredValue ? numeric(form, 'value') : null, unit: assay.unit, qc_accepted: form.get('qc') === 'on', note: text(form, 'note') }))}>
+            <form onSubmit={(event) => submit(event, (form) => learning.createObservation(projectId, { assay_id: assay.id, candidate_id: text(form, 'candidate'), source_artifact_id: text(form, 'artifact'), batch_key: text(form, 'batch'), replicate_key: text(form, 'replicate'), replicate_type: text(form, 'replicateType') as ObservationCreate['replicate_type'], status: measurementStatus, value: measuredValue ? numeric(form, 'value') : null, unit: assay.unit, qc_accepted: form.get('qc') === 'on', note: text(form, 'note'), family_key: text(form, 'family') || null, measurement_key: text(form, 'measurementKey') || null, observed_at: text(form, 'observed') ? new Date(text(form, 'observed')).toISOString() : null, sample_role: text(form, 'role') as ObservationCreate['sample_role'] }))}>
               <fieldset disabled={!experimentWritable || busy || !data.candidates.length || !data.artifacts.some((a) => a.status === 'available')}>
                 <div className="learning-grid">
                   <Field label={copy('候选', 'Candidate')}><Choice name="candidate" required>{data.candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Choice></Field>
                   <Field label={copy('原始证据文件', 'Source artifact')}><Choice name="artifact" required>{data.artifacts.filter((a) => a.status === 'available').map((a) => <option key={a.id} value={a.id}>{a.filename}</option>)}</Choice></Field>
                   <Field label={copy('实验批次', 'Batch')}><Input name="batch" required maxLength={200} /></Field>
-                  <Field label={copy('生物学重复编号', 'Biological replicate key')}><Input name="replicate" required maxLength={120} /></Field>
+                  <Field label={copy('测量编号 / 孔位（可选，文件内唯一）', 'Measurement key / well (optional, unique within source file)')}><Input name="measurementKey" maxLength={120} /></Field><Field label={copy('生物学重复编号', 'Biological replicate key')}><Input name="replicate" required maxLength={120} /></Field>
                   <Field label={copy('重复类型', 'Replicate type')}><Choice name="replicateType"><option value="biological">{copy('生物学重复', 'Biological')}</option><option value="technical">{copy('技术重复', 'Technical')}</option></Choice></Field>
+                  <Field label={copy('序列家族（用于家族隔离验证）', 'Sequence family (for held-out family validation)')}><Input name="family" maxLength={120} /></Field>
+                  <Field label={copy('实验观测时间（本地时区）', 'Observation time (local timezone)')}><Input name="observed" type="datetime-local" /></Field>
+                  <Field label={copy('样本角色', 'Sample role')}><Choice name="role"><option value="candidate">{copy('候选样本', 'Candidate')}</option><option value="positive_control">{copy('阳性对照', 'Positive control')}</option><option value="negative_control">{copy('阴性对照', 'Negative control')}</option></Choice></Field>
                   <Field label={copy('结果状态', 'Result status')}><Choice value={measurementStatus} onChange={(event) => setMeasurementStatus(event.target.value as ObservationCreate['status'])}>{(['measured', 'failed', 'below_limit', 'above_limit', 'missing'] as const).map((s, i) => <option key={s} value={s}>{zh ? ['测得数值', '实验失败', '低于检测限', '高于检测限', '数据缺失'][i] : s.replaceAll('_', ' ')}</option>)}</Choice></Field>
                   {measuredValue && <Field label={`${copy('测量值 / 检测限', 'Value / detection limit')} (${assay.unit})`}><Input name="value" type="number" step="any" required /></Field>}
                 </div>
@@ -217,39 +197,44 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
           </Disclosure>
           {!observations.length ? <p>{copy('当前测定还没有结果。', 'No observations for this assay yet.')}</p> : <>
             <p>{copy('选择本轮纳入审查的结果（最多 256 条）；失败、检测限和未通过质控的结果会保留并注明排除原因。', 'Select up to 256 observations for review. Failed, censored and unaccepted results remain in the manifest with exclusion reasons.')}</p>
-            <div className="learning-scroll" tabIndex={0} role="region" aria-label={copy('可滚动数据表', 'Scrollable data table')}><LearningTable headings={[copy('纳入', 'Include'), copy('候选', 'Candidate'), copy('结果', 'Result'), copy('批次 / 重复', 'Batch / replicate'), 'QC']} cells={observations.map((r) => {
+            <div className="learning-scroll" tabIndex={0} role="region" aria-label={copy('可滚动数据表', 'Scrollable data table')}><LearningTable headings={[copy('纳入', 'Include'), copy('候选', 'Candidate'), copy('结果', 'Result'), copy('批次 / 重复', 'Batch / replicate'), 'QC', copy('审阅', 'Review')]} cells={observations.map((r) => {
  const meta = object(r.result_metadata.learning)
- return [<><Checkbox aria-label={`${copy('选择结果', 'Select result')} ${r.id}`} checked={selectedResults.includes(r.id)} disabled={busy || !writable || (selectedResults.length >= 256 && !selectedResults.includes(r.id))} onCheckedChange={(checked) => setSelectedResults((current) => checked ? [...current, r.id] : current.filter((id) => id !== r.id))} /></>, <>{data.candidates.find((c) => c.id === r.candidate_id)?.name ?? r.candidate_ref ?? '—'}</>, <>{numberLabel(r.value)} {r.unit} · {String(meta.status)}</>, <>{r.batch_key} / {String(meta.replicate_key)}</>, <>{meta.qc_accepted === true ? '✓' : '—'}</>]
+ return [<><Checkbox aria-label={`${copy('选择结果', 'Select result')} ${r.id}`} checked={selectedResults.includes(r.id)} disabled={busy || !writable || (selectedResults.length >= 256 && !selectedResults.includes(r.id))} onCheckedChange={(checked) => setSelectedResults((current) => checked ? [...current, r.id] : current.filter((id) => id !== r.id))} /></>, <>{data.candidates.find((c) => c.id === r.candidate_id)?.name ?? r.candidate_ref ?? '—'}</>, <>{numberLabel(r.value)} {r.unit} · {String(meta.status)}</>, <>{r.batch_key} / {String(meta.replicate_key)}</>, <>{r.result_metadata.learning_withdrawal ? copy('已撤回', 'Withdrawn') : meta.qc_accepted === true ? '✓' : '—'}</>, <>{!r.result_metadata.learning_withdrawal && <Disclosure title={copy('撤回结果', 'Withdraw result')}><form onSubmit={(event) => submit(event, (form) => learning.withdrawObservation(projectId, r, text(form, 'reason')))}><fieldset disabled={!experimentWritable || busy}><Field label={copy('撤回测量的理由', 'Measurement withdrawal reason')}><Input name="reason" required maxLength={2000} /></Field><Button type="submit" variant="outline">{copy('确认撤回', 'Withdraw measurement')}</Button></fieldset></form></Disclosure>}</>]
  })} /></div>
             <Button type="button" disabled={!writable || busy || !selectedResults.length} onClick={() => void perform(() => learning.freezeDataset(projectId, study.id, selectedResults))}>{copy('冻结所选数据', 'Freeze selected data')} ({selectedResults.length})</Button>
           </>}
-          {datasets.map((d) => <article className="learning-record" key={d.id}><p><strong>{copy('冻结数据集', 'Frozen dataset')} · {d.digest.slice(0, 12)}</strong> · {rows(d.manifest.included).length} {copy('纳入', 'included')} / {rows(d.manifest.excluded).length} {copy('排除', 'excluded')}</p><JsonDetails label={copy('查看来源与排除原因', 'Inspect sources and exclusions')} data={d.manifest} /><Button type="button" variant="outline" disabled={!writable || busy} onClick={() => void perform(() => learning.trainLearningModel(projectId, d.id))}>{copy('训练并评估基线', 'Train and evaluate baseline')}</Button></article>)}
+          <div className="learning-grid"><Field label={copy('预先选择模型', 'Predeclared model')}><Choice value={algorithm} onChange={(event) => setAlgorithm(event.target.value as ModelCreate['algorithm'])}><option value="knn">KNN</option><option value="ridge">{copy('岭回归', 'Ridge regression')}</option></Choice></Field><Field label={copy('验证划分', 'Validation split')}><Choice value={validation} onChange={(event) => setValidation(event.target.value as ModelCreate['validation'])}><option value="sequence">{copy('留出序列', 'Leave sequences out')}</option><option value="family">{copy('留出家族', 'Leave families out')}</option><option value="batch">{copy('留出批次', 'Leave batches out')}</option><option value="time">{copy('按时间前后划分', 'Forward temporal holdout')}</option></Choice></Field></div>
+          <label className="learning-check"><Checkbox checked={calibrate && ['sequence', 'family'].includes(validation || '')} disabled={!['sequence', 'family'].includes(validation || '')} onCheckedChange={(checked) => setCalibrate(checked === true)} />{copy('保留独立校准集，计算名义 90% 区间（至少 20 个独立组；分布变化时不保证覆盖率）', 'Reserve independent calibration groups for nominal 90% intervals (20+ groups; distribution shift can invalidate coverage)')}</label>
+          {datasets.map((d) => <article className="learning-record" key={d.id}><p><strong>{copy('冻结数据集', 'Frozen dataset')} · {d.digest.slice(0, 12)}</strong> · {rows(d.manifest.included).length} {copy('纳入', 'included')} / {rows(d.manifest.excluded).length} {copy('排除', 'excluded')}</p><JsonDetails label={copy('查看来源与排除原因', 'Inspect sources and exclusions')} data={d.manifest} /><Button type="button" variant="outline" disabled={!writable || busy} onClick={() => void perform(() => learning.trainLearningModel(projectId, d.id, { algorithm, validation, calibrate: calibrate && ['sequence', 'family'].includes(validation || '') }))}>{copy('训练并评估基线', 'Train and evaluate baseline')}</Button></article>)}
         </Section>
         <Section title={copy('03 · 项目模型与验证', '03 · Project models and validation')}>
           {!models.length && <p>{copy('冻结至少四组不同序列的有效结果后，训练项目基线。', 'Train a project baseline after freezing valid measurements for at least four distinct sequences.')}</p>}
           {models.map((m) => <article className="learning-record" key={m.id}>
             <h3>{m.algorithm} · {m.status} · {m.id.slice(0, 8)}</h3>
             <dl className="learning-metrics"><div><dt>{copy('独立序列组', 'Sequence groups')}</dt><dd>{String(m.evaluation.groups)}</dd></div><div><dt>RMSE</dt><dd>{numberLabel(m.evaluation.rmse)}</dd></div><div><dt>{copy('均值基线 RMSE', 'Mean baseline RMSE')}</dt><dd>{numberLabel(m.evaluation.mean_baseline_rmse)}</dd></div></dl>
-            <p>{copy('按序列整组留出验证；相似家族与批次偏差仍可能影响评估。', 'Validation holds out entire sequences; family and batch confounding may remain.')}</p>
+            <p>{copy('验证划分和模型在训练前指定；每折排除测试序列在训练集中的重复。家族标签与实验时间需要准确填写。', 'Model and validation split are declared before training. Test sequences are purged from each training fold; family labels and timestamps must be accurate.')}</p>
             <JsonDetails label={copy('查看验证记录与限制', 'Inspect evaluation and limits')} data={m.evaluation} />
-            {m.status !== 'retired' && <form onSubmit={(event) => submit(event, (form) => learning.reviewLearningModel(projectId, m, text(form, 'action') as 'promote' | 'retire', text(form, 'reason')))}><fieldset disabled={!writable || busy}><Field label={copy('模型审阅理由', 'Model review rationale')}><Input name="reason" required maxLength={2000} /></Field><Field label={copy('处理方式', 'Review action')}><Choice name="action">{m.status === 'shadow' && m.evaluation.eligible_for_promotion === true && <option value="promote">{copy('提升为项目模型', 'Promote to project model')}</option>}<option value="retire">{copy('停用模型', 'Retire model')}</option></Choice></Field><Button type="submit" variant="outline">{copy('保存模型审阅', 'Save model review')}</Button></fieldset></form>}
+            {(m.status !== 'retired' || rows(m.evaluation.reviews).some((r) => r.action === 'promote' || r.action === 'rollback')) && <form onSubmit={(event) => submit(event, (form) => learning.reviewLearningModel(projectId, m, text(form, 'action') as ModelReview['action'], text(form, 'reason')))}><fieldset disabled={!writable || busy}><Field label={copy('模型审阅理由', 'Model review rationale')}><Input name="reason" required maxLength={2000} /></Field><Field label={copy('处理方式', 'Review action')}><Choice name="action">{m.status === 'retired' && <option value="rollback">{copy('回滚至此模型', 'Roll back to this model')}</option>}{m.status === 'shadow' && m.evaluation.eligible_for_promotion === true && <option value="promote">{copy('提升为项目模型', 'Promote to project model')}</option>}<option value="retire">{copy('停用模型', 'Retire model')}</option></Choice></Field><Button type="submit" variant="outline">{copy('保存模型审阅', 'Save model review')}</Button></fieldset></form>}
           </article>)}
         </Section>
         <Section title={copy('04 · 下一轮候选与决策', '04 · Next batch and decision')}>
           <p>{copy('预算为本批估算上限；当前建议采用贪心探索与利用策略。审阅建议不会预订预算或提交实验。', 'The budget caps estimated batch cost. Selection uses a greedy exploration/exploitation policy. Reviewing a proposal does not reserve budget or submit experiments.')}</p>
-          <form onSubmit={(event) => submit(event, (form) => learning.createLearningDecision(projectId, { study_id: study.id, model_id: text(form, 'model'), exploration_fraction: numeric(form, 'explore') / 100, candidates: Object.entries(selectedCandidates).map(([candidate_id, cost]) => ({ candidate_id, cost_cents: Math.round(Number(cost) * 100) })) }))}>
+          <form onSubmit={(event) => submit(event, (form) => learning.createLearningDecision(projectId, { study_id: study.id, model_id: text(form, 'model'), exploration_fraction: numeric(form, 'explore') / 100, retest_candidates: retests.filter((id) => id in selectedCandidates), secondary_model_id: text(form, 'secondary') === 'none' ? null : text(form, 'secondary'), candidates: Object.entries(selectedCandidates).map(([candidate_id, cost]) => ({ candidate_id, cost_cents: Math.round(Number(cost) * 100) })) }))}>
             <fieldset disabled={!writable || busy || !models.some((m) => m.status !== 'retired')}>
               <Field label={copy('使用模型', 'Model')}><Choice name="model" required>{models.filter((m) => m.status !== 'retired').map((m) => <option key={m.id} value={m.id}>{m.algorithm} · {m.status} · {m.id.slice(0, 8)}</option>)}</Choice></Field>
+              <Field label={copy('第二测定目标（可选，按 Pareto 前沿选择）', 'Secondary assay (optional Pareto selection)')}><Choice name="secondary"><option value="none">{copy('仅当前测定', 'Primary assay only')}</option>{data.models.filter((m) => m.status === 'promoted' && m.study_id !== study.id && data.studies.find((s) => s.id === m.study_id)?.assay_id !== study.assay_id).map((m) => <option key={m.id} value={m.id}>{data.studies.find((s) => s.id === m.study_id)?.name} · {m.algorithm}</option>)}</Choice></Field>
               <Field label={copy('探索比例（%）', 'Exploration share (%)')}><Input name="explore" type="number" min="0" max="100" defaultValue="25" required /></Field>
-              <p>{copy('选择待评估候选并填写每个候选的完整实验估价（最多 256 个）。训练中已测得的序列会自动排除。', 'Select up to 256 candidates and enter the complete experimental estimate for each. Sequences already measured in training are automatically excluded.')}</p>
+              <p>{copy('选择候选并填写完整实验估价。已测序列默认排除；需要重复确认时，明确勾选复测。复测优先计入预算，第二目标采用预测 Pareto 排序。', 'Select candidates and enter complete estimates. Measured sequences are excluded unless marked for retest. Retests receive budget priority; a secondary objective uses predicted Pareto ranking.')}</p>
               <div className="learning-scroll" tabIndex={0} role="region" aria-label={copy('可滚动数据表', 'Scrollable data table')}><LearningTable headings={[copy('选择', 'Select'), copy('候选', 'Candidate'), `${copy('实验估价', 'Experiment estimate')} (${study.currency})`]} cells={data.candidates.map((c) => [<><Checkbox aria-label={`${copy('选择候选', 'Select candidate')} ${c.name}`} checked={c.id in selectedCandidates} disabled={Object.keys(selectedCandidates).length >= 256 && !(c.id in selectedCandidates)} onCheckedChange={(checked) => setSelectedCandidates((current) => { const next = { ...current }; if (checked) next[c.id] = ''; else delete next[c.id]; return next })} /></>, <>{c.name}</>, <>{c.id in selectedCandidates && <Input aria-label={`${copy('实验估价', 'Estimate')} ${c.name}`} type="number" min="0.01" max="1000000" step="0.01" value={selectedCandidates[c.id]} required onChange={(event) => setSelectedCandidates((current) => ({ ...current, [c.id]: event.target.value }))} />}</>])} /></div>
+              <Disclosure title={copy('指定优先复测候选', 'Prioritize candidates for retesting')}><div className="learning-source-list">{data.candidates.filter((c) => c.id in selectedCandidates).map((c) => <label key={c.id} className="learning-check"><Checkbox checked={retests.includes(c.id)} onCheckedChange={(checked) => setRetests((current) => checked ? [...current, c.id] : current.filter((id) => id !== c.id))} />{c.name}</label>)}</div></Disclosure>
               <Button type="submit" disabled={!Object.keys(selectedCandidates).length}>{copy('生成批次建议', 'Generate batch proposal')}</Button>
             </fieldset>
           </form>
           {decisions.map((d) => <article className="learning-record" key={d.id}>
-            <h3>{d.proposal.action === 'stop_no_feasible_candidate' ? copy('停止：当前预算内无可行候选', 'Stop: no feasible candidate in budget') : copy('候选批次建议', 'Candidate batch proposal')} · {d.review_status}</h3>
+            <h3>{String(d.proposal.action).startsWith('stop_') ? copy('停止建议', 'Stop recommendation') : copy('候选批次建议', 'Candidate batch proposal')} · {d.review_status}</h3>
+            {String(d.proposal.action).startsWith('stop_') && <p>{d.proposal.action === 'stop_round_limit' ? copy('已达到冻结的实验轮次上限。继续前请修订目标契约。', 'The frozen round limit has been reached. Revise the study contract before continuing.') : d.proposal.action === 'stop_target_reached' ? copy('实测结果已达到目标阈值，当前契约要求停止。', 'Measured results reached the target threshold; this contract requires stopping.') : copy('当前候选池、约束和预算下没有可选批次。', 'No batch is feasible within the current candidate pool, constraints and budget.')}</p>}
             <p>{String(d.proposal.currency)} {(Number(d.proposal.estimated_cost_cents) / 100).toFixed(2)} · {copy('模型状态', 'Model state')}: {String(d.proposal.model_status)}</p>
-            <div className="learning-scroll" tabIndex={0} role="region" aria-label={copy('可滚动数据表', 'Scrollable data table')}><LearningTable headings={[copy('候选', 'Candidate'), copy('预测', 'Prediction'), copy('选择理由', 'Selection reason'), copy('训练域外', 'Out of domain')]} cells={rows(d.proposal.selected).map((r) => [<>{String(r.candidate_name)}</>, <>{numberLabel(r.prediction)} {assay.unit}</>, <>{String(r.selection_reason)}</>, <>{r.out_of_domain ? copy('是', 'Yes') : copy('否', 'No')}</>])} /></div>
+            <div className="learning-scroll" tabIndex={0} role="region" aria-label={copy('可滚动数据表', 'Scrollable data table')}><LearningTable headings={[copy('候选', 'Candidate'), copy('预测', 'Prediction'), copy('名义 90% 区间', 'Nominal 90% interval'), copy('选择理由', 'Selection reason'), copy('训练域外', 'Out of domain')]} cells={rows(d.proposal.selected).map((r) => [<>{String(r.candidate_name)}</>, <>{numberLabel(r.prediction)} {assay.unit}</>, <>{Array.isArray(r.nominal_interval) ? `${numberLabel(r.nominal_interval[0])} – ${numberLabel(r.nominal_interval[1])} ${assay.unit}` : copy('未校准或域外', 'Uncalibrated / out of domain')}</>, <>{String(r.selection_reason)}</>, <>{r.out_of_domain ? copy('是', 'Yes') : copy('否', 'No')}</>])} /></div>
             <JsonDetails label={copy('审查所有评分、排除原因与限制', 'Inspect all scores, exclusions and limits')} data={d.proposal} />
             {d.review_status === 'pending' && <form onSubmit={(event) => submit(event, (form) => learning.reviewLearningDecision(projectId, d, text(form, 'review') === 'approve', text(form, 'reason')))}><fieldset disabled={!writable || busy}><Field label={copy('决策理由', 'Decision rationale')}><Textarea name="reason" required maxLength={2000} /></Field><Field label={copy('决策', 'Decision')}><Choice name="review"><option value="reject">{copy('拒绝，补充证据', 'Reject; gather more evidence')}</option>{d.proposal.model_status === 'promoted' && <option value="approve">{copy('同意建议', 'Approve proposal')}</option>}</Choice></Field><Button type="submit" variant="outline">{copy('记录决策', 'Record decision')}</Button></fieldset></form>}
             {d.review_note && <p>{d.review_note}</p>}
@@ -257,6 +242,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
             {d.timeline_entry_id && <Link to={`/timeline?project=${projectId}`}>{copy('查看项目决策时间线', 'Open decision timeline')}</Link>}
           </article>)}
         </Section>
+        <LearningLifecycle key={study.id} projectId={projectId} study={study} assay={assay} evidence={data.evidence.filter((e) => e.study_id === study.id)} batches={data.batches.filter((b) => b.study_id === study.id)} decisions={decisions} results={observations} artifacts={data.artifacts} workflows={data.workflows} writable={writable} experimentWritable={experimentWritable} busy={busy} perform={perform} copy={copy} />
       </>}
     </>}
   </div>

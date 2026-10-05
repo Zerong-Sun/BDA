@@ -20,8 +20,8 @@ from ..research import goals
 from ..research.models import ResearchGoal
 from ..timeline.schemas import TimelineEntryCreate
 from ..timeline.service import create_entry
-from . import engine
-from .models import LearningAssay, LearningDataset, LearningDecision, LearningModel, LearningStudy
+from . import engine, validation
+from .models import LearningAssay, LearningBatch, LearningDataset, LearningDecision, LearningModel, LearningStudy
 from .repository import LearningRepository, Record
 from .schemas import (
     AssayCreate,
@@ -73,6 +73,12 @@ def create_study(session: Session, project: Project, user: User, payload: StudyC
     goal = session.get(ResearchGoal, payload.research_goal_id)
     if goal is None or goal.project_id != project.id:
         raise DomainError("research_goal_not_found", "Project research goal was not found", status_code=404)
+    if payload.supersedes_id:
+        previous = require_record(session, LearningStudy, project, payload.supersedes_id, lock=True)
+        if previous.research_goal_id != goal.id:
+            raise DomainError("learning_revision_goal", "A revision must retain its research goal", status_code=422)
+    if payload.stop_on_threshold and payload.threshold is None:
+        raise DomainError("learning_stop_threshold", "Stopping on target requires a numeric threshold", status_code=422)
     return _save(
         session,
         project,
@@ -87,14 +93,17 @@ def create_study(session: Session, project: Project, user: User, payload: StudyC
                 "detail": goal.detail,
                 "assay_version": assay.version,
                 "unit": assay.unit,
+                "selection_constraints": payload.selection_constraints.model_dump(mode="json"),
             },
-            **payload.model_dump(),
+            **payload.model_dump(exclude={"selection_constraints"}),
         ),
         "learning.study.create",
     )
 
 
-def create_observation(session: Session, project: Project, user: User, payload: ObservationCreate) -> ExperimentResult:
+def validate_observation(
+    session: Session, project: Project, payload: ObservationCreate
+) -> tuple[LearningAssay, Candidate, str, dict]:
     assay = require_record(session, LearningAssay, project, payload.assay_id, lock=True)
     if payload.unit != assay.unit:
         raise DomainError("learning_unit_mismatch", "Observation unit must match the assay contract", status_code=422)
@@ -102,6 +111,60 @@ def create_observation(session: Session, project: Project, user: User, payload: 
     fingerprint = engine.digest(payload.model_dump(mode="json"))
     key = f"learning-observation:{project.id}:{fingerprint}"
     values = payload.model_dump(mode="json")
+    if payload.measurement_key:
+        key = f"learning-measurement:{project.id}:" + engine.digest(
+            [str(assay.id), str(payload.source_artifact_id), payload.measurement_key]
+        )
+    keys = [key]
+    if (
+        not payload.measurement_key
+        and not payload.family_key
+        and not payload.observed_at
+        and payload.sample_role == "candidate"
+    ):
+        legacy = payload.model_dump(
+            mode="json", exclude={"family_key", "observed_at", "sample_role", "measurement_key"}
+        )
+        keys.append(f"learning-observation:{project.id}:{engine.digest(legacy)}")
+    existing = session.scalar(
+        select(ExperimentResult)
+        .where(ExperimentResult.project_id == project.id, ExperimentResult.legacy_id.in_(keys))
+        .order_by(ExperimentResult.created_at)
+        .limit(1)
+    )
+    if (
+        existing is not None
+        and ObservationCreate.model_validate(existing.result_metadata.get("learning")).model_dump(mode="json") != values
+    ):
+        raise DomainError(
+            "learning_measurement_conflict",
+            "Measurement key already identifies different data; withdraw the original and use a new measurement key",
+            status_code=409,
+        )
+    if existing is not None:
+        key = existing.legacy_id or key
+    if payload.batch_key.startswith("learning:"):
+        try:
+            batch_id = uuid.UUID(payload.batch_key.removeprefix("learning:"))
+        except ValueError as exc:
+            raise DomainError("learning_batch_key", "Malformed learning batch key", status_code=422) from exc
+        batch = require_record(session, LearningBatch, project, batch_id)
+        if batch.manifest["assay_id"] != str(assay.id):
+            raise DomainError("learning_batch_mismatch", "Batch uses a different assay", status_code=422)
+        if batch.receipt is not None and existing is None:
+            raise DomainError(
+                "learning_batch_received",
+                "Batch is already received; use a new batch for additional results",
+                status_code=409,
+            )
+    artifact = session.get(Artifact, payload.source_artifact_id)
+    if artifact is None or artifact.project_id != project.id or artifact.status != "available":
+        raise DomainError("learning_source_unavailable", "Project source artifact is not available", status_code=404)
+    return assay, candidate, key, values
+
+
+def create_observation(session: Session, project: Project, user: User, payload: ObservationCreate) -> ExperimentResult:
+    assay, candidate, key, values = validate_observation(session, project, payload)
     return create_idempotent_result(
         session,
         project,
@@ -174,8 +237,12 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
             }
         )
         reason = None
-        if not context.get("qc_accepted"):
+        if result.result_metadata.get("learning_withdrawal"):
+            reason = "measurement_withdrawn"
+        elif not context.get("qc_accepted"):
             reason = "qc_not_accepted"
+        elif observation.sample_role != "candidate":
+            reason = "assay_control"
         elif context.get("status") != "measured" or result.value is None:
             reason = "failed_missing_or_censored"
         artifact = session.get(Artifact, result.source_artifact_id) if result.source_artifact_id else None
@@ -206,6 +273,8 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
                 "batch_key": result.batch_key,
                 "replicate_key": context["replicate_key"],
                 "replicate_type": context["replicate_type"],
+                "family_key": observation.family_key,
+                "observed_at": observation.observed_at.isoformat() if observation.observed_at else None,
                 **vector,
             }
         )
@@ -246,15 +315,24 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
     )
 
 
-def train_model(session: Session, project: Project, user: User, dataset_id: uuid.UUID) -> LearningModel:
+def train_model(
+    session: Session,
+    project: Project,
+    user: User,
+    dataset_id: uuid.UUID,
+    algorithm: str = "knn",
+    strategy: str = "sequence",
+    calibrate: bool = False,
+) -> LearningModel:
     dataset = require_record(session, LearningDataset, project, dataset_id, lock=True)
     if engine.digest(dataset.manifest) != dataset.digest:
         raise DomainError("learning_dataset_integrity", "Frozen dataset digest does not match", status_code=409)
     try:
-        parameters, evaluation = engine.train(dataset.manifest["included"])
+        parameters, evaluation = validation.train(dataset.manifest["included"], algorithm, strategy, calibrate)
     except ValueError as exc:
         raise DomainError("learning_insufficient_data", str(exc), status_code=422) from exc
-    key = f"learning-model:{dataset.id}:{engine.ALGORITHM}"
+    algorithm_name = f"composition-{algorithm}-{strategy}-v2" + ("-conformal" if calibrate else "")
+    key = f"learning-model:{dataset.id}:{algorithm_name}"
     existing = session.scalar(select(LearningModel).where(LearningModel.legacy_id == key))
     if existing is not None:
         return existing
@@ -269,7 +347,7 @@ def train_model(session: Session, project: Project, user: User, dataset_id: uuid
             created_by=user.id,
             study_id=dataset.study_id,
             dataset_id=dataset.id,
-            algorithm=engine.ALGORITHM,
+            algorithm=algorithm_name,
             parameters=parameters,
             evaluation=evaluation,
             status="shadow",
@@ -290,9 +368,17 @@ def review_model(
     if model.version != expected:
         raise DomainError("version_conflict", "Model was changed; reload before review", status_code=412)
     _check_model_integrity(model)
-    if payload.action == "promote":
-        if model.status != "shadow":
+    if payload.action in {"promote", "rollback"}:
+        _check_model_sources(session, project, model)
+        required_status = "retired" if payload.action == "rollback" else "shadow"
+        if model.status != required_status:
             raise DomainError("learning_model_final", "Only a shadow model can be promoted", status_code=409)
+        if payload.action == "rollback" and not any(
+            r["action"] in {"promote", "rollback"} for r in model.evaluation.get("reviews", [])
+        ):
+            raise DomainError(
+                "learning_rollback_unreviewed", "Rollback requires a previously promoted model", status_code=409
+            )
         if not model.evaluation["eligible_for_promotion"]:
             raise DomainError(
                 "learning_model_not_eligible", "Model did not beat its frozen mean baseline", status_code=409
@@ -328,18 +414,47 @@ def review_model(
 def create_decision(
     session: Session, project: Project, user: User, payload: LearningDecisionCreate
 ) -> LearningDecision:
-    study = require_record(session, LearningStudy, project, payload.study_id)
+    study = require_record(session, LearningStudy, project, payload.study_id, lock=True)
     model = require_record(session, LearningModel, project, payload.model_id)
     if model.study_id != study.id or model.status == "retired":
         raise DomainError("learning_model_mismatch", "Choose a current model from this study", status_code=409)
     _check_model_integrity(model)
+    _check_model_sources(session, project, model)
+    secondary = None
+    secondary_study = None
+    if payload.secondary_model_id:
+        secondary = require_record(session, LearningModel, project, payload.secondary_model_id)
+        secondary_study = require_record(session, LearningStudy, project, secondary.study_id)
+        if secondary.id == model.id or secondary.status == "retired" or secondary_study.assay_id == study.assay_id:
+            raise DomainError(
+                "learning_secondary_model", "Choose a current model of a different assay", status_code=422
+            )
+        _check_model_integrity(secondary)
+        _check_model_sources(session, project, secondary)
+    batches = list(session.scalars(select(LearningBatch).where(LearningBatch.study_id == study.id)))
+    stop_reason = "stop_round_limit" if len(batches) >= study.max_rounds else None
+    if study.stop_on_threshold and study.threshold is not None:
+        dataset = require_record(session, LearningDataset, project, model.dataset_id)
+        values = [p["value"] for p in validation.aggregate(dataset.manifest["included"])]
+        if max(values) >= study.threshold if study.direction == "maximize" else min(values) <= study.threshold:
+            stop_reason = "stop_target_reached"
     pool = []
+    constraints = study.goal_snapshot.get("selection_constraints", {})
+    constrained_out = []
     for item in payload.candidates:
         candidate = _candidate(session, project, item.candidate_id)
         try:
             vector = _features(candidate)
         except ValueError as exc:
             raise DomainError("learning_candidate_sequence", str(exc), status_code=422) from exc
+        sequence = "".join(candidate.properties["sequence"].split()).upper()
+        if (
+            not constraints.get("min_length", 1) <= len(sequence) <= constraints.get("max_length", 10000)
+            or any(motif in sequence for motif in constraints.get("forbidden_motifs", []))
+            or item.cost_cents > (constraints.get("max_candidate_cost_cents") or 100_000_000)
+        ):
+            constrained_out.append({"candidate_id": str(candidate.id), "reason": "frozen_selection_constraint"})
+            continue
         pool.append(
             {
                 "candidate_id": str(candidate.id),
@@ -356,7 +471,14 @@ def create_decision(
         budget=study.batch_budget_cents,
         batch_size=study.max_batch_size,
         exploration_fraction=payload.exploration_fraction,
+        retest_candidates=[str(i) for i in payload.retest_candidates],
+        secondary_parameters=secondary.parameters if secondary else None,
+        secondary_direction=secondary_study.direction if secondary_study else "maximize",
+        stop_reason=stop_reason,
+        allow_out_of_domain=constraints.get("allow_out_of_domain", True),
     )
+    proposal["excluded"].extend(constrained_out)
+    proposal["selection_constraints"] = constraints
     proposal.update(
         {
             "model_id": str(model.id),
@@ -370,8 +492,23 @@ def create_decision(
             "threshold": study.threshold,
             "direction": study.direction,
             "status": "shadow" if model.status == "shadow" else "proposed",
+            "secondary_model": {
+                "id": str(secondary.id),
+                "version": secondary.version,
+                "study_id": str(secondary.study_id),
+                "direction": secondary_study.direction,
+                "unit": secondary_study.goal_snapshot["unit"],
+                "status": secondary.status,
+            }
+            if secondary and secondary_study
+            else None,
         }
     )
+    from .lifecycle import learning_state_digest
+
+    proposal["learning_state_digest"] = learning_state_digest(session, project, study)
+    if secondary_study:
+        proposal["secondary_model"]["learning_state_digest"] = learning_state_digest(session, project, secondary_study)
     return _save(
         session,
         project,
@@ -393,6 +530,47 @@ def _check_model_integrity(model: LearningModel) -> None:
         raise DomainError("learning_model_integrity", "Model parameters do not match their digest", status_code=409)
 
 
+def _check_model_sources(session: Session, project: Project, model: LearningModel) -> None:
+    """New results may coexist with an older model; changed/withdrawn sources may not."""
+    dataset = require_record(session, LearningDataset, project, model.dataset_id)
+    if engine.digest(dataset.manifest) != dataset.digest:
+        raise DomainError("learning_dataset_integrity", "Frozen dataset digest does not match", status_code=409)
+    for source in dataset.manifest.get("sources", []):
+        result = session.get(ExperimentResult, uuid.UUID(source["id"]))
+        if (
+            result is None
+            or result.project_id != project.id
+            or result.version != source["version"]
+            or result.value != source["value"]
+            or result.unit != source["unit"]
+            or result.result_metadata != source["metadata"]
+            or str(result.source_artifact_id) != source["source_artifact_id"]
+        ):
+            raise DomainError(
+                "learning_source_changed",
+                "Model source results changed; freeze and train a new dataset",
+                status_code=409,
+            )
+    for included in dataset.manifest.get("included", []):
+        result = session.get(ExperimentResult, uuid.UUID(included["result_id"]))
+        artifact = session.get(Artifact, result.source_artifact_id) if result and result.source_artifact_id else None
+        candidate = session.get(Candidate, uuid.UUID(included["candidate_id"]))
+        try:
+            same_sequence = (
+                candidate is not None and _features(candidate)["sequence_sha256"] == included["sequence_sha256"]
+            )
+        except ValueError:
+            same_sequence = False
+        if (
+            artifact is None
+            or artifact.project_id != project.id
+            or artifact.status != "available"
+            or artifact.checksum_sha256 != included["artifact_sha256"]
+            or not same_sequence
+        ):
+            raise DomainError("learning_source_changed", "Model source artifact or sequence changed", status_code=409)
+
+
 def review_decision(
     session: Session,
     project: Project,
@@ -411,23 +589,9 @@ def review_decision(
     if row.review_status != "pending":
         raise DomainError("learning_decision_final", "Create a new proposal to revise this decision", status_code=409)
     if payload.approve:
-        model = require_record(session, LearningModel, project, row.model_id)
-        if model.status != "promoted" or model.version != row.proposal["model_version"]:
-            raise DomainError("learning_decision_stale", "Recompute with the currently promoted model", status_code=409)
-        _check_model_integrity(model)
-        goal = session.get(ResearchGoal, study.research_goal_id) if study.research_goal_id else None
-        if goal is None or goal.version != study.goal_snapshot["version"]:
-            raise DomainError(
-                "learning_goal_changed", "Freeze a new study for the changed research goal", status_code=409
-            )
-        for item in row.proposal["selected"]:
-            candidate = _candidate(session, project, uuid.UUID(item["candidate_id"]))
-            try:
-                sequence_digest = _features(candidate)["sequence_sha256"]
-            except ValueError:
-                sequence_digest = None
-            if candidate.version != item["candidate_version"] or sequence_digest != item["sequence_sha256"]:
-                raise DomainError("learning_candidate_changed", "Recompute after candidate changes", status_code=409)
+        from .lifecycle import check_current
+
+        check_current(session, project, row, study)
     row.review_status = "approved" if payload.approve else "rejected"
     row.review_note, row.reviewed_by = payload.rationale, user.id
     entry = create_entry(
@@ -478,4 +642,26 @@ def export_decision(session: Session, project: Project, decision_id: uuid.UUID) 
             "Review does not authorize experimental execution or spending",
         ],
     }
+    secondary = decision.proposal.get("secondary_model")
+    if secondary:
+        content["secondary_evidence"] = export_model_context(session, project, uuid.UUID(secondary["id"]))
     return {"schema_version": 1, "checksum": engine.digest(content), "content": content}
+
+
+def export_model_context(session: Session, project: Project, model_id: uuid.UUID) -> dict:
+    """Include the source contract and frozen data behind another assay's prediction."""
+    from .schemas import AssayResponse, DatasetResponse, ModelResponse, StudyResponse
+
+    model = require_record(session, LearningModel, project, model_id)
+    study = require_record(session, LearningStudy, project, model.study_id)
+    assay = require_record(session, LearningAssay, project, study.assay_id)
+    dataset = require_record(session, LearningDataset, project, model.dataset_id)
+    _check_model_integrity(model)
+    if engine.digest(dataset.manifest) != dataset.digest or model.evaluation["dataset_digest"] != dataset.digest:
+        raise DomainError("learning_export_integrity", "Secondary dataset integrity check failed", status_code=409)
+    return {
+        "study": StudyResponse.model_validate(study).model_dump(mode="json"),
+        "assay": AssayResponse.model_validate(assay).model_dump(mode="json"),
+        "dataset": DatasetResponse.model_validate(dataset).model_dump(mode="json"),
+        "model": ModelResponse.model_validate(model).model_dump(mode="json"),
+    }

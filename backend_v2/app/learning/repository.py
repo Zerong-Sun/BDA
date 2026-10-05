@@ -6,9 +6,25 @@ from typing import TypeVar
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import LearningAssay, LearningDataset, LearningDecision, LearningModel, LearningStudy
+from .models import (
+    LearningAssay,
+    LearningBatch,
+    LearningDataset,
+    LearningDecision,
+    LearningEvidence,
+    LearningModel,
+    LearningStudy,
+)
 
-LearningRecord = LearningAssay | LearningStudy | LearningDataset | LearningModel | LearningDecision
+LearningRecord = (
+    LearningAssay
+    | LearningStudy
+    | LearningDataset
+    | LearningModel
+    | LearningDecision
+    | LearningEvidence
+    | LearningBatch
+)
 Record = TypeVar("Record", bound=LearningRecord)
 KINDS: dict[str, type[LearningRecord]] = {
     "assays": LearningAssay,
@@ -16,6 +32,8 @@ KINDS: dict[str, type[LearningRecord]] = {
     "datasets": LearningDataset,
     "models": LearningModel,
     "decisions": LearningDecision,
+    "evidence": LearningEvidence,
+    "batches": LearningBatch,
 }
 
 
