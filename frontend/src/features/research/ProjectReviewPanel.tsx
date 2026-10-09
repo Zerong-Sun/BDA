@@ -63,6 +63,7 @@ import { firstSentenceForTitle } from './parseReviewFinding'
 import { ReviewMarkdown } from './ReviewMarkdown'
 import { isReviewTrack, REVIEW_SECTION_ORDER, reviewSectionLabel } from './reviewTracks'
 import { localizeToken, shouldTruncateReviewStatement } from './researchUi'
+import { filterReviewSections, READING_STAGES } from './reviewReading'
 
 interface AddNoteState {
   track: string
@@ -153,6 +154,8 @@ export function ProjectReviewPanel({
   const setWorkflowSeed = useAppStore((state) => state.setWorkflowSeed)
   const [selectedTrack, setSelectedTrack] = useState('')
   const [note, setNote] = useState<AddNoteState>(emptyNote())
+  const [readingStage, setReadingStage] = useState('all')
+  const [readingQuery, setReadingQuery] = useState('')
 
   const brief = workspace.review_document
   const briefTitle = brief ? workspaceText(brief.title, language) : ''
@@ -187,6 +190,8 @@ export function ProjectReviewPanel({
     }))
   }, [brief?.id, language, projectId, workspace.review_sections])
   const populatedSections = sections.filter((section) => section.items.length > 0)
+  const visibleSections = filterReviewSections(sections, readingStage, readingQuery)
+  const zh = language === 'zh'
   const actionTrack = selectedTrack || populatedSections[0]?.track || sections[0]?.track || ''
   const actionSection = sections.find((section) => section.track === actionTrack)
   const sources = new Set(
@@ -262,6 +267,25 @@ export function ProjectReviewPanel({
     >
       <Frame spacing="lg">
         <FramePanel>
+      <section className="mb-5 border-b border-border-soft pb-5" aria-label={zh ? '研究阅读导览' : 'Research reading guide'}>
+        <p className="text-xs uppercase tracking-wide text-accent">{zh ? '理解研究，再作判断' : 'From question to decision'}</p>
+        <h3 className="mt-1 text-lg font-semibold">{zh ? '这项研究为什么做，下一步凭什么继续？' : 'Why this research, and what would justify the next step?'}</h3>
+        <p className="mt-2 text-sm text-text-secondary">{zh ? '按问题、机制、路线和验证阅读。记录数量表示文档覆盖，不代表科学结论已经成立。' : 'Read the question, mechanism, route and validation together. Record counts describe documentation, not scientific validation.'}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6" role="group" aria-label={zh ? '按研究环节筛选' : 'Filter by research stage'}>
+          {READING_STAGES.map((stage, index) => {
+            const count = sections.filter((section) => (stage.tracks as readonly string[]).includes(section.track)).reduce((sum, section) => sum + section.items.length, 0)
+            return <Button key={stage.id} type="button" variant="outline" aria-pressed={readingStage === stage.id} onClick={() => { setReadingStage(stage.id); setSelectedTrack(stage.tracks[0]) }} className={`h-auto flex-col items-start gap-0 rounded-lg p-3 text-left whitespace-normal ${readingStage === stage.id ? 'border-accent bg-accent/10' : 'border-border-soft hover:bg-bg-app'}`}>
+              <span className="font-mono text-xs text-text-muted">0{index + 1}</span>
+              <span className="mt-1 block text-sm font-medium text-text-primary">{stage[language]}</span>
+              <span className="mt-1 block text-xs text-text-secondary">{count ? `${count} ${zh ? '条记录' : 'records'}` : (zh ? '暂无记录' : 'No records yet')}</span>
+            </Button>
+          })}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="outline" aria-pressed={readingStage === 'all'} onClick={() => { setReadingStage('all'); setReadingQuery('') }}>{zh ? '全部记录' : 'All records'}</Button>
+          <Input className="min-w-0 flex-1 sm:min-w-60" value={readingQuery} onChange={(event) => setReadingQuery(event.target.value)} aria-label={zh ? '搜索研究记录' : 'Search research records'} placeholder={zh ? '搜索结论、疑点或来源…' : 'Search conclusions, uncertainties or sources…'} />
+        </div>
+      </section>
       {showDocument && briefContent ? (
         <div className="mb-5 border-b border-border-soft pb-5">
           <p className="text-xs uppercase tracking-wide text-accent">{r.eyebrow}</p>
@@ -288,7 +312,7 @@ export function ProjectReviewPanel({
             onValueChange={(value) => setSelectedTrack(value ?? '')}
           >
             <SelectTrigger aria-label={r.chooseSection}>
-              <SelectValue />
+              <SelectValue>{actionSection?.label}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {sections.map((section) => <SelectItem key={section.track} value={section.track}>{section.label}</SelectItem>)}
@@ -308,9 +332,9 @@ export function ProjectReviewPanel({
         </div>
       </div>
 
-      {populatedSections.length ? (
+      {visibleSections.length ? (
         <div className="mt-5 grid gap-4">
-          {populatedSections.map((section) => (
+          {visibleSections.map((section) => (
             <Frame key={section.track} spacing="sm">
               <FramePanel>
                 <FrameHeader className="flex-row items-center justify-between">
@@ -371,7 +395,7 @@ export function ProjectReviewPanel({
             </Frame>
           ))}
         </div>
-      ) : <Alert className="mt-5"><AlertDescription>{r.notesEmpty}</AlertDescription></Alert>}
+      ) : <Alert className="mt-5"><AlertDescription>{readingQuery || readingStage !== 'all' ? (zh ? '当前筛选下没有记录。可清除筛选，或为所选环节补充依据；缺少记录不等于研究失败。' : 'No records match this view. Clear the filters or add evidence for this stage; missing documentation is not a failed study.') : r.notesEmpty}</AlertDescription></Alert>}
         </FramePanel>
       </Frame>
 

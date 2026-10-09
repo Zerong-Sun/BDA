@@ -84,6 +84,20 @@ describe('ProjectReviewPanel', () => {
     expect(await screen.findByRole('dialog')).toHaveAttribute('data-slot', 'dialog-content')
     expect(screen.getByRole('textbox', { name: 'Short title' })).toHaveFocus()
   })
+
+  it('lets readers focus a missing stage and recover the complete record', async () => {
+    renderWithProviders(<ProjectReviewPanel workspace={workspace} showDocument={false} />)
+    fireEvent.click(screen.getByRole('button', { name: /Mechanism/ }))
+    expect(screen.getByRole('combobox', { name: 'Choose a project section' })).toHaveTextContent('Target mechanism')
+    expect(screen.queryByTestId('research-finding')).not.toBeInTheDocument()
+    expect(screen.getByText(/missing documentation is not a failed study/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'All records' }))
+    expect(screen.getByTestId('research-finding')).toHaveAttribute('data-finding-id', 'finding-one')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search research records' }), { target: { value: 'no matching evidence' } })
+    expect(screen.queryByTestId('research-finding')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'All records' }))
+    expect(screen.getByRole('textbox', { name: 'Search research records' })).toHaveValue('')
+  })
 })
 
 describe('an over-long finding', () => {

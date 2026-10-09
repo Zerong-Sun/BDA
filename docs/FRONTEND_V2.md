@@ -54,6 +54,8 @@ target structure、candidate structure、script asset、实验导入和 dossier 
 
 ## 6. 科研与 Copilot
 
+Research 的研究笔记提供六段阅读导览：科学问题、机制与原理、技术路线、验证与风险、判断与下一步、文献依据。筛选在已加载的项目记录中完成，支持检索正文、疑点和引用；全部记录保留未知扩展章节。计数表示记录数量，不表示科学验证进度；没有匹配记录时可清除筛选或为当前环节补充依据，不能据此判定研究失败。
+
 Campaign、Literature、Intelligence、Registry、Knowledge 使用各自领域路径；Copilot 不再承载 Literature 等跨域旧接口。Copilot chat 先返回 202 conversation/message，再连接 conversation SSE；连接前后不依赖长持有数据库会话。
 
 聊天、后台 agent、任务书/决策树草案、外部检索和作业执行走异步任务；模型连接测试及路线推荐在当前 HTTP 请求中调用模型。前端按各自契约展示等待和失败，不把预测或 LLM 总结标记为实验事实，审核页面保留证据来源、置信度、限制与人工 decision。

@@ -1132,6 +1132,18 @@ async function exerciseCandidateGrid(page, diagnostics) {
 }
 
 async function exerciseResearchGrids(page, diagnostics) {
+  const readingGuide = page.getByRole('region', { name: 'Research reading guide' })
+  await expectVisible(readingGuide, 'research reading guide')
+  const notesBefore = await page.getByTestId('research-finding').count()
+  const readingSearch = readingGuide.getByRole('textbox', { name: 'Search research records' })
+  await readingSearch.fill('no-matching-review-record')
+  await expectVisible(page.getByText(/No records match this view/), 'research reading empty filter')
+  await readingGuide.getByRole('button', { name: 'All records', exact: true }).click()
+  if ((await page.getByTestId('research-finding').count()) !== notesBefore) {
+    throw new Error('Clearing the research reading filter did not restore the full record.')
+  }
+  diagnostics.interactions.researchReadingGuide = 'search, empty state and restore without data mutation'
+  diagnostics.interactions.researchReadingGuideOverflow = await assertNoPageOverflow(page)
   const dataTab = page.getByRole('navigation', { name: 'Evidence categories' }).getByRole('button', { name: /Data/i })
   await dataTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await dataTab.click()
