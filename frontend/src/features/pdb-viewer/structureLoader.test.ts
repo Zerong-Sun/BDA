@@ -1,6 +1,28 @@
 import type { PluginContext } from 'molstar/lib/mol-plugin/context'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { enumerateChainsFromPlugin, loadStructureFromAuthenticatedUrl, structureFormatFromName } from './structureLoader'
+import { applyVisualPreset, enumerateChainsFromPlugin, loadStructureFromAuthenticatedUrl, structureFormatFromName } from './structureLoader'
+
+describe('switching the displayed structure preset', () => {
+  it('replaces the previous scene instead of retaining its cartoon and colors', async () => {
+    const root = { obj: { data: {} } }
+    const scene: Array<{ parent: unknown; type: string; color: string }> = []
+    const components = new Set<unknown>()
+    const plugin = {
+      managers: { structure: { hierarchy: { current: { structures: [{ cell: root }] } }, component: {
+        clear: async () => { for (let i = scene.length - 1; i >= 0; i--) if (components.has(scene[i].parent)) scene.splice(i, 1); components.clear() },
+      } } },
+      builders: { structure: {
+        tryCreateComponentStatic: async () => { const component = {}; components.add(component); return component },
+        representation: { addRepresentation: async (parent: unknown, props: { type: string; color: string }) => { scene.push({ parent, ...props }) } },
+      } },
+    } as unknown as PluginContext
+    await applyVisualPreset(plugin, 'cartoon', 'chain-id')
+    await applyVisualPreset(plugin, 'ball-and-stick', 'hydrophobicity')
+    expect(scene).toHaveLength(1)
+    expect(scene[0]).toMatchObject({ type: 'ball-and-stick', color: 'hydrophobicity' })
+    expect(scene[0].parent).not.toBe(root)
+  })
+})
 
 describe('structureFormatFromName', () => {
   it('detects mmcif extensions', () => {

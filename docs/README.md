@@ -12,6 +12,9 @@
 
 ## 开始使用
 
+- [Iteravia 2.6 RC1 安装、升级和发布说明](RELEASE_2_6_RC1.md)
+- [Iteravia / BDA 2.6 项目学习](LEARNING_V26.md)
+
 - [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)

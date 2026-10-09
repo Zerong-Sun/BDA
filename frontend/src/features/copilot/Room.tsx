@@ -66,7 +66,7 @@ export function Room({
   const bots = useCopilotBots()
   const roster = bots.data ?? []
   const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, messages } = useCopilotChat(
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages } = useCopilotChat(
     projectId,
     pageContext,
     language,
@@ -107,9 +107,10 @@ export function Room({
     endRef.current?.scrollIntoView?.({ block: 'end' })
   }, [visible.length, loading])
 
-  // The turn in flight. Its user message is already a row, but the room only
-  // refetches when the turn ends, so both halves are echoed until then.
-  const pending = loading ? messages.slice(-2) : []
+  // Project events can refresh the feed before the reply arrives. Replace
+  // local echoes by persisted message id, never by text (two "hi"s are valid).
+  const recordedMessageIds = new Set(entries.flatMap((entry) => entry.message ? [entry.message.id] : []))
+  const pending = pendingMessages.filter((message) => !message.id || !recordedMessageIds.has(message.id))
 
   // Who this message is addressed to, recomputed as it is typed so the room can
   // show the addressee before it is sent rather than after.
@@ -158,7 +159,7 @@ export function Room({
               />
             ))}
             {pending.map((message, index) => (
-              <article className="room-entry" key={`pending-${index}`}>
+              <article className={`room-entry${message.role === 'user' ? ' room-entry--mine' : ''}`} key={message.id ?? `pending-${index}`}>
                 <div className="room-entry-body">
                   <p className="room-speaker">
                     {message.role === 'user' ? (zh ? '你' : 'You') : zh ? '正在回复' : 'Replying'}

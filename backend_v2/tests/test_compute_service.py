@@ -200,7 +200,10 @@ def test_submission_idempotency_dependency_progress_and_retry(compute_session) -
     transition_job(session, by_node["b"], "failed")
     schedule_ready_jobs(session, submission, workflow)
     assert submission.status == "failed" and workflow.status == "failed"
+    failed_version = workflow.version
     retried = retry_job(session, by_node["b"], project, user)
+    assert submission.status == "pending" and workflow.status == "queued"
+    assert workflow.version > failed_version
     assert retried.attempt_number == 2
     assert f"attempt-{retried.attempt_number}" in retried.runtime_spec["output_manifest_key"]
 

@@ -306,7 +306,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
         </>
       ) : null}
 
-      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><FrameHeader className="px-0 py-0"><FrameTitle>{w.structuresTitle}</FrameTitle><FrameDescription>{w.structuresDescription}</FrameDescription></FrameHeader><StructureComparison key={projectId} structures={workspace.structures} projectId={projectId} /></FramePanel></Frame>
+      {view === 'structures' ? <><Frame variant="ghost"><FramePanel className="grid gap-4"><StructureComparison key={projectId} structures={workspace.structures} projectId={projectId} /></FramePanel></Frame>
         {/* Which residues a design targets: an operator's proposal waiting for a
             person, and the person's own picks taken off the structure itself. */}
         <Frame variant="ghost"><FramePanel>

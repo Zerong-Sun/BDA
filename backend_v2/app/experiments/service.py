@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,7 +12,19 @@ from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
 from .models import ExperimentResult
-from .schemas import ExperimentResultBatch
+from .schemas import ExperimentResultBatch, ExperimentResultCreate
+
+
+def reserved_learning_field(values: dict) -> str | None:
+    """Learning observations must enter through their contract-aware adapter."""
+    metadata = values.get("result_metadata")
+    if isinstance(metadata, dict) and {"learning", "learning_withdrawal"}.intersection(metadata):
+        return "result_metadata"
+    if str(values.get("batch_key") or "").startswith("learning:"):
+        return "batch_key"
+    if values.get("experiment_type") == "learning_assay":
+        return "experiment_type"
+    return None
 
 
 def create_results(
@@ -18,6 +32,19 @@ def create_results(
     project: Project,
     payload: ExperimentResultBatch,
     user: User,
+) -> list[ExperimentResult]:
+    for item in payload.results:
+        if reserved_learning_field(item.model_dump()):
+            raise DomainError(
+                "learning_ingestion_required",
+                "Use the project learning observation or CSV import endpoint for learning records",
+                status_code=422,
+            )
+    return _create_results(session, project, payload, user)
+
+
+def _create_results(
+    session: Session, project: Project, payload: ExperimentResultBatch, user: User
 ) -> list[ExperimentResult]:
     items = []
     for item in payload.results:
@@ -37,7 +64,12 @@ def create_results(
             )
         if item.source_artifact_id:
             artifact = session.get(Artifact, item.source_artifact_id)
-            if artifact is None or artifact.project_id != project.id or artifact.status != "available":
+            if (
+                artifact is None
+                or artifact.project_id != project.id
+                or artifact.status != "available"
+                or artifact.deleted_at is not None
+            ):
                 raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
         items.append(
             ExperimentResult(
@@ -58,3 +90,58 @@ def create_results(
         payload={"count": len(items)},
     )
     return items
+
+
+def create_idempotent_result(
+    session: Session,
+    project: Project,
+    payload: ExperimentResultCreate,
+    user: User,
+    *,
+    request_key: str,
+) -> ExperimentResult:
+    """Internal adapter for a caller holding its measurement-contract lock.
+
+    This domain owns both the measurement and its uniqueness key. The learning
+    domain must not mutate experiment rows after calling create_results.
+    """
+    existing = session.scalar(
+        select(ExperimentResult).where(
+            ExperimentResult.project_id == project.id,
+            ExperimentResult.legacy_id == request_key,
+        )
+    )
+    if existing is not None:
+        return existing
+    row = _create_results(session, project, ExperimentResultBatch(results=[payload]), user)[0]
+    row.legacy_id = request_key
+    session.flush()
+    return row
+
+
+def withdraw_learning_result(
+    session: Session, project: Project, row: ExperimentResult, user: User, *, expected: int, rationale: str
+) -> ExperimentResult:
+    """Retain the original measurement; a versioned withdrawal changes eligibility."""
+    if row.project_id != project.id or not isinstance(row.result_metadata.get("learning"), dict):
+        raise DomainError("learning_result_not_found", "Learning result was not found", status_code=404)
+    if row.version != expected:
+        raise DomainError("version_conflict", "Measurement changed; reload before withdrawal", status_code=412)
+    if row.result_metadata.get("learning_withdrawal"):
+        raise DomainError("learning_result_withdrawn", "Measurement is already withdrawn", status_code=409)
+    row.result_metadata = {
+        **row.result_metadata,
+        "learning_withdrawal": {"rationale": rationale, "by": str(user.id), "at": datetime.now(UTC).isoformat()},
+    }
+    row.version += 1
+    session.flush()
+    record_audit(
+        session,
+        action="learning.observation.withdraw",
+        entity_type="experiment_result",
+        entity_id=row.id,
+        project_id=project.id,
+        organization_id=project.organization_id,
+        actor_id=user.id,
+    )
+    return row

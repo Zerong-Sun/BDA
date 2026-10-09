@@ -1563,8 +1563,9 @@ def test_a_topic_with_several_subscribers_reaches_all_of_them(task_database, mon
     assert [name for name, _ in sent] == [
         "bda_v2.campaign_advance",
         "bda_v2.copilot_agent_task_settled",
+        "bda_v2.autopilot_workflow_settled",
     ]
-    assert len({task_id for _, task_id in sent}) == 2
+    assert len({task_id for _, task_id in sent}) == 3
 
 
 _OPS_AUDIT = {

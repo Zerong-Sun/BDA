@@ -428,111 +428,145 @@ export async function streamCopilotMessage(
   onChunk: (text: string) => void,
   onStatus?: (status: CopilotStreamStatus) => void,
   onMessage?: (message: CopilotStreamMessage) => void,
+  onAccepted?: (accepted: { conversationId: string; messageId: string }) => void,
 ): Promise<{ conversationId: string; messageId: string }> {
-  const token = sessionStorage.getItem('bda_token')
-  onStatus?.('connecting')
-  const body: CopilotChatRequest = {
-    ...payload,
-    messages: toCopilotApiMessages(payload.messages),
-  }
-  if (!body.project_id) throw new Error('A project is required for Copilot.')
-  const { data: accepted } = await postChatApiV2CopilotChatPost<true>({ body: {
-    project_id: body.project_id, message: body.messages.at(-1)?.content ?? '',
-    skill: body.skill,
-    bot: body.bot,
-    conversation_id: body.conversation_id ?? undefined,
-    intent: body.intent ?? 'chat',
-    context: {
-      route: body.context?.route,
-      research_tab: body.context?.research_tab,
-      selected_entity_ids: body.context?.selected_entity_ids ?? [],
-      language: body.context?.language ?? 'en',
-    },
-  }, throwOnError: true })
-  const acceptedMessageId = accepted.message?.id ?? ''
-  const streamQuery = acceptedMessageId ? `?after_message_id=${encodeURIComponent(acceptedMessageId)}` : ''
-  const response = await fetch(`${API_BASE}/copilot/conversations/${accepted.conversation_id}/stream${streamQuery}`, {
-    method: 'GET',
-    headers: {
-      'content-type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+  // Bound the entire wait, including POST acceptance and a silent SSE body.
+  // Timing out stops this browser's wait; it does not cancel accepted work.
+  const controller = new AbortController()
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let timedOut = false
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true
+      reject(new Error('copilot_wait_timeout'))
+      controller.abort()
+    }, 120_000)
   })
-  if (!response.ok || !response.body) {
-    let detail = `Copilot connection failed (${response.status})`
-    try {
-      const payload = await response.json()
-      detail = payload?.detail ?? payload?.message ?? detail
-    } catch {
-      // Keep the HTTP status reason when the server did not return JSON.
+  const receive = async () => {
+    const token = sessionStorage.getItem('bda_token')
+    onStatus?.('connecting')
+    const body: CopilotChatRequest = {
+      ...payload,
+      messages: toCopilotApiMessages(payload.messages),
     }
-    throw new Error(detail)
-  }
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const events = buffer.split(/\r?\n\r?\n/)
-    buffer = events.pop() ?? ''
-    for (const evt of events) {
-      const lines = evt.split(/\r?\n/)
-      const dataLines = lines.filter((line) => line.startsWith('data:'))
-      const eventLine = lines.find((line) => line.startsWith('event:'))
-      const eventName = eventLine?.slice(6).trim()
-      const data = dataLines
-        .map((line) => {
-          const value = line.slice(5)
-          return value.startsWith(' ') ? value.slice(1) : value
-        })
-        .join('\n')
-      if (eventName === 'message') {
-        onStatus?.('streaming')
-        let chunk = data
-        try {
-          const message = JSON.parse(data) as { id?: unknown; role?: unknown; content?: unknown; citations?: unknown; tool_calls?: unknown }
-          if (typeof message.role === 'string') {
-            if (message.role !== 'assistant') continue
-            chunk = typeof message.content === 'string' ? message.content : ''
-            onMessage?.({
-              id: typeof message.id === 'string' ? message.id : undefined,
-              content: chunk,
-              citations: Array.isArray(message.citations) ? message.citations as Array<Record<string, unknown>> : [],
-              tool_calls: Array.isArray(message.tool_calls) ? message.tool_calls as Array<Record<string, unknown>> : [],
-            })
-          }
-        } catch {
-          // Older/demo SSE endpoints may stream plain text chunks.
-        }
-        if (chunk) onChunk(chunk)
-      } else if (eventName === 'status') {
-        if (data === 'connected') {
-          onStatus?.('connecting')
-        } else if (data === 'thinking') {
-          onStatus?.('thinking')
-        } else if (data.startsWith('tool:')) {
-          onStatus?.(data as `tool:${string}`)
-        } else if (data === 'streaming') {
+    if (!body.project_id) throw new Error('A project is required for Copilot.')
+    const { data: accepted } = await postChatApiV2CopilotChatPost<true>({ body: {
+      project_id: body.project_id, message: body.messages.at(-1)?.content ?? '',
+      skill: body.skill,
+      bot: body.bot,
+      conversation_id: body.conversation_id ?? undefined,
+      intent: body.intent ?? 'chat',
+      context: {
+        route: body.context?.route,
+        research_tab: body.context?.research_tab,
+        selected_entity_ids: body.context?.selected_entity_ids ?? [],
+        language: body.context?.language ?? 'en',
+      },
+    }, signal: controller.signal, throwOnError: true })
+    controller.signal.throwIfAborted()
+    const acceptedMessageId = accepted.message?.id ?? ''
+    const result = { conversationId: accepted.conversation_id, messageId: acceptedMessageId }
+    onAccepted?.(result)
+    onStatus?.('thinking')
+    const streamQuery = acceptedMessageId ? `?after_message_id=${encodeURIComponent(acceptedMessageId)}` : ''
+    const response = await fetch(`${API_BASE}/copilot/conversations/${accepted.conversation_id}/stream${streamQuery}`, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+    if (!response.ok || !response.body) {
+      let detail = `Copilot connection failed (${response.status})`
+      try {
+        const payload = await response.json()
+        detail = payload?.detail ?? payload?.message ?? detail
+      } catch {
+        // Keep the HTTP status reason when the server did not return JSON.
+      }
+      throw new Error(detail)
+    }
+    reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      controller.signal.throwIfAborted()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split(/\r?\n\r?\n/)
+      buffer = events.pop() ?? ''
+      for (const evt of events) {
+        const lines = evt.split(/\r?\n/)
+        const dataLines = lines.filter((line) => line.startsWith('data:'))
+        const eventLine = lines.find((line) => line.startsWith('event:'))
+        const eventName = eventLine?.slice(6).trim()
+        const data = dataLines
+          .map((line) => {
+            const value = line.slice(5)
+            return value.startsWith(' ') ? value.slice(1) : value
+          })
+          .join('\n')
+        if (eventName === 'message') {
           onStatus?.('streaming')
-        }
-      } else if (eventName === 'error') {
-        throw new Error(data || 'Copilot request failed')
-      } else if (eventName === 'done') {
-        onStatus?.('done')
-        try {
-          const payload = JSON.parse(data)
-          if (payload?.mode) {
-            latestCopilotMode = String(payload.mode)
+          let chunk = data
+          try {
+            const message = JSON.parse(data) as { id?: unknown; role?: unknown; content?: unknown; citations?: unknown; tool_calls?: unknown }
+            if (typeof message.role === 'string') {
+              if (message.role !== 'assistant') continue
+              chunk = typeof message.content === 'string' ? message.content : ''
+              onMessage?.({
+                id: typeof message.id === 'string' ? message.id : undefined,
+                content: chunk,
+                citations: Array.isArray(message.citations) ? message.citations as Array<Record<string, unknown>> : [],
+                tool_calls: Array.isArray(message.tool_calls) ? message.tool_calls as Array<Record<string, unknown>> : [],
+              })
+            }
+          } catch {
+            // Older/demo SSE endpoints may stream plain text chunks.
           }
-        } catch {
-          // Ignore malformed done payloads.
+          if (chunk) onChunk(chunk)
+        } else if (eventName === 'status') {
+          if (data === 'connected') {
+            onStatus?.('connecting')
+          } else if (data === 'thinking') {
+            onStatus?.('thinking')
+          } else if (data.startsWith('tool:')) {
+            onStatus?.(data as `tool:${string}`)
+          } else if (data === 'streaming') {
+            onStatus?.('streaming')
+          }
+        } else if (eventName === 'error') {
+          throw new Error(data || 'Copilot request failed')
+        } else if (eventName === 'done') {
+          try {
+            const payload = JSON.parse(data)
+            if (payload?.mode) {
+              latestCopilotMode = String(payload.mode)
+            }
+          } catch {
+            // Ignore malformed done payloads.
+          }
+          onStatus?.('done')
+          return result
         }
       }
     }
+    return result
   }
-  return { conversationId: accepted.conversation_id, messageId: acceptedMessageId }
+  try {
+    return await Promise.race([receive(), deadline])
+  } catch (error) {
+    if (timedOut) throw new Error('copilot_wait_timeout', { cause: error })
+    throw error
+  } finally {
+    clearTimeout(timer)
+    controller.abort()
+    // A done event is terminal even if a proxy leaves its connection open.
+    if (reader) void reader.cancel().catch(() => {}).finally(() => reader?.releaseLock())
+  }
 }
 
 export const RouteModuleSchema = z.object({

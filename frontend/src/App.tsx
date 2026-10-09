@@ -43,6 +43,7 @@ const queryClient = new QueryClient({
 const ExperimentsPage = lazy(() => import('./app/Experiments').then((module) => ({ default: module.ExperimentsPage })))
 const WorkflowPage = lazy(() => import('./app/Workflow').then((module) => ({ default: module.WorkflowPage })))
 const CandidatesPage = lazy(() => import('./app/Candidates').then((module) => ({ default: module.CandidatesPage })))
+const LearningPage = lazy(() => import('./app/Learning').then((module) => ({ default: module.LearningPage })))
 const LabPage = lazy(() => import('./app/Lab').then((module) => ({ default: module.LabPage })))
 const ResultsPage = lazy(() => import('./app/Results').then((module) => ({ default: module.ResultsPage })))
 const LoginPage = lazy(() => import('./app/Login').then((module) => ({ default: module.LoginPage })))
@@ -199,6 +200,7 @@ export default function App() {
                 <Route path="/candidates" element={<ProjectRequired><CandidatesPage /></ProjectRequired>} />
                 <Route path="/tools" element={<LabPage toolbox />} />
                 <Route path="/lab" element={<ProjectRequired><LabPage /></ProjectRequired>} />
+                <Route path="/learning" element={<ProjectRequired><LearningPage /></ProjectRequired>} />
                 <Route path="/results" element={<ProjectRequired><ResultsPage /></ProjectRequired>} />
                 <Route path="/research" element={<ResearchPage />} />
                 <Route path="/timeline" element={<ProjectRequired><TimelinePage /></ProjectRequired>} />

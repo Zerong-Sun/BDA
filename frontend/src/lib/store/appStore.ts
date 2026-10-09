@@ -13,6 +13,7 @@ export type AppMode = 'application' | 'demo'
 export type UiDensity = 'guided' | 'advanced'
 export type ThemePreference = 'light' | 'dark' | 'system'
 export interface CopilotChatMessage {
+  id?: string
   role: 'user' | 'assistant' | 'system'
   content: string
   meta?: {

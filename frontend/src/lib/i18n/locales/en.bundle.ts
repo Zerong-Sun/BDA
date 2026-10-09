@@ -873,7 +873,7 @@ export const bundleEn = {
     },
     canvas: {
       readOnlyBanner:
-        'Completed run — nodes can be repositioned; adding or rewiring steps is locked.',
+        'Run locked — inspect recorded steps and outputs. Editing and rewiring are unavailable.',
       addingNode: 'Adding node to workflow...',
       emptyTitle: 'Empty workflow',
       emptyBody:
@@ -1705,7 +1705,7 @@ export const bundleEn = {
     colorChainDesc: 'Color by chain ID',
     colorHydrophobicity: 'Hydrophobicity',
     colorHydrophobicityDesc: 'Eisenberg hydrophobicity scale',
-    colorElectrostatics: 'Electrostatics',
+    colorElectrostatics: 'Residue charge',
     colorElectrostaticsDesc: 'Residue charge coloring (red/blue)',
     colorSecondaryStructure: 'Secondary structure',
     colorSecondaryStructureDesc: 'Helix / sheet / loop',

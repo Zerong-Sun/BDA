@@ -25,6 +25,7 @@ export function ChainSelector({ chains, value, onChange }: ChainSelectorProps) {
     <div className="grid min-w-32 gap-1">
       <Label htmlFor={id}>{t.viewer.chain}</Label>
       <Select
+        items={[{ value: ALL_CHAINS_VALUE, label: t.viewer.allChains }, ...chains.map((chain) => ({ value: chain, label: chain }))]}
         value={value ?? ALL_CHAINS_VALUE}
         onValueChange={(nextValue) =>
           onChange(nextValue === ALL_CHAINS_VALUE ? null : nextValue ?? null)
@@ -33,7 +34,7 @@ export function ChainSelector({ chains, value, onChange }: ChainSelectorProps) {
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.chain}>
           <SelectValue>{value ?? t.viewer.allChains}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent positionerClassName="z-[10000]">
           <SelectItem value={ALL_CHAINS_VALUE} data-value={ALL_CHAINS_VALUE}>
             {t.viewer.allChains}
           </SelectItem>

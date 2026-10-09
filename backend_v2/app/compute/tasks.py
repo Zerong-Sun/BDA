@@ -269,7 +269,7 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
             # Retained so events written by a previous release still drain during a
             # rolling deploy; nothing produces this topic any more.
             "job.succeeded": "bda_v2.campaign_advance",
-            "job.settled": ("bda_v2.campaign_advance", "bda_v2.copilot_agent_task_settled"),
+            "job.settled": ("bda_v2.campaign_advance", "bda_v2.copilot_agent_task_settled", "bda_v2.autopilot_workflow_settled"),
             "operation.settled": "bda_v2.copilot_agent_operation_settled",
             "copilot.agent_run.settled": "bda_v2.autopilot_stage_settled",
             "campaign.evaluate": "bda_v2.campaign_evaluate",

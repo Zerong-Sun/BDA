@@ -44,6 +44,9 @@ describe('StructureControls registry contract', () => {
     expect(selectors.every((selector) => selector.dataset.slot === 'select-trigger')).toBe(true)
 
     const chainSelector = screen.getByRole('combobox', { name: 'Chain' })
+    expect(chainSelector).toHaveTextContent('All chains')
+    expect(screen.getByRole('combobox', { name: 'Style' })).toHaveTextContent('Cartoon')
+    expect(screen.getByRole('combobox', { name: 'Color' })).toHaveTextContent('Chain')
     fireEvent.click(chainSelector)
     const allChains = await screen.findByRole('option', { name: 'All chains' })
     expect(allChains).not.toHaveAttribute('data-value', '')

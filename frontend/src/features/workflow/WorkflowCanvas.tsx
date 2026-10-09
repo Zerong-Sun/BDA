@@ -32,6 +32,7 @@ import { saveConnections } from '../../lib/api/workflowGates'
 import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
 import { useI18n } from '../../lib/i18n'
+import { workflowOverview } from './workflowOverview'
 
 const nodeTypes: NodeTypes = { workflowNode: WorkflowNodeCard }
 const edgeTypes: EdgeTypes = { workflowEdge: WorkflowEdge }
@@ -59,6 +60,7 @@ interface WorkflowCanvasProps {
   initialEdges?: BdaWorkflowEdge[]
   workflowRunId?: string
   readOnly?: boolean
+  overview?: boolean
   onNodeAdded?: () => void
   onLayoutSaved?: () => void
   onConnectionRequested?: (connection: Connection) => void
@@ -80,6 +82,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       initialEdges,
       workflowRunId,
       readOnly = false,
+      overview = false,
       onNodeAdded,
       onLayoutSaved,
       onNodeSelected,
@@ -415,9 +418,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     // Backspace removal would only hide server nodes locally (even read-only
     // ones) and can also remove their connections. Keep those nodes inspectable.
     const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, deletable: false })), [nodes])
+    const overviewGraph = useMemo(() => workflowOverview(renderedNodes, edges), [renderedNodes, edges])
+    const completedCount = nodes.filter(node => node.data.status === 'completed').length
+    const activeStatuses = [...new Set(nodes.map(node => node.data.status))]
     const flowKey = useMemo(
-      () => `${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
-      [nodes, edges],
+      () => `${overview ? 'overview' : 'workbench'}::${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
+      [overview, nodes, edges],
     )
 
     // `h-full` rather than a viewport fraction: the page gives the canvas column a
@@ -430,7 +436,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
         {/* Banner and legend sit above the graph rather than floating on it. As overlays
             they covered the top-left corner of the route permanently, and with both
             present the legend was drawn straight over the read-only sentence. */}
-        {readOnly ? (
+        {overview ? <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border-soft bg-surface-1 px-6 py-5">
+          <div><h2 className="text-lg font-semibold text-text-primary">{language === 'zh' ? '流程总览' : 'Workflow overview'}</h2><p className="mt-1 text-xs text-text-secondary">{language === 'zh' ? `${nodes.length} 个步骤 · ${completedCount} 个已完成` : `${nodes.length} stages · ${completedCount} completed`}{edges.length === 0 ? (language === 'zh' ? ' · 无已记录的依赖连线' : ' · Dependency edges not recorded') : ''}</p></div>
+          <div className="flex items-center gap-4 text-xs text-text-secondary">{activeStatuses.map(status => <span key={status} className="inline-flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${status === 'completed' ? 'bg-success' : status === 'running' ? 'bg-info' : status === 'failed' ? 'bg-danger' : 'bg-accent-2'}`} />{status === 'requires_review' ? t.shared.status.needsReview : statusLegendKeys.find(item => item[0] === status) ? t.shared.status[statusLegendKeys.find(item => item[0] === status)![1]] : status.replaceAll('_', ' ')}<span className="font-semibold text-text-primary">{nodes.filter(node => node.data.status === status).length}</span></span>)}</div>
+        </div> : null}
+        {readOnly && !overview ? (
           <p className="shrink-0 border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
             {language === 'zh' ? '当前工作流只读。可选择节点和连线查看详情。' : 'This workflow is read-only. Select nodes and connections to inspect details.'}
           </p>
@@ -451,7 +461,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
               <p className="mt-2 text-xs leading-relaxed text-text-secondary">{t.workflowExt.canvas.emptyBody}</p>
             </div>
           </div>
-        ) : (
+        ) : !overview ? (
           <div className="shrink-0 border-b border-border-soft px-3 py-1.5 text-[11px] text-text-secondary">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>{t.workflowExt.canvas.connectHint}</span>
@@ -468,12 +478,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
               </span>
             </div>
           </div>
-        )}
+        ) : null}
         <ReactFlow
           className="min-h-0 flex-1"
           key={flowKey}
-          nodes={renderedNodes}
-          edges={edges}
+          nodes={overview ? overviewGraph.nodes : renderedNodes}
+          edges={overview ? overviewGraph.edges : edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onKeyDown={(event) => {
@@ -492,21 +502,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           edgeTypes={edgeTypes}
           fitView
           minZoom={0.1}
-          fitViewOptions={{ padding: 0.2, minZoom: 0.1 }}
+          fitViewOptions={{ padding: overview ? 0.07 : 0.2, minZoom: 0.1, maxZoom: overview ? 1.25 : 2 }}
           proOptions={proOptions}
-          nodesDraggable={!readOnly}
-          nodesConnectable={!readOnly}
+          nodesDraggable={!readOnly && !overview}
+          nodesConnectable={!readOnly && !overview}
           edgesFocusable={false}
           edgesReconnectable={false}
-          deleteKeyCode={readOnly ? null : 'Backspace'}
+          deleteKeyCode={readOnly || overview ? null : 'Backspace'}
           panOnScroll
           selectionOnDrag={false}
         >
-          <Background gap={20} color={gridColor} style={{ opacity: 0.15 }} />
+          <Background gap={overview ? 24 : 20} color={gridColor} style={{ opacity: overview ? 0.08 : 0.15 }} />
           {/* Default minimap is 200x150 and covers a corner of the route on the column
               widths this page uses; a route of a handful of stages does not need that
               much of the canvas spent on an overview of itself. */}
-          <MiniMap
+          {!overview ? <MiniMap
             nodeColor={accentColor}
             maskColor={maskColor}
             pannable
@@ -515,8 +525,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             // Hidden on phones: the canvas there is short enough that the overview covers
             // a quarter of the route it is meant to summarise.
             className="!hidden !bg-surface-1 !border-border-soft md:!block"
-          />
-          <Controls fitViewOptions={{ padding: 0.2, minZoom: 0.1 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
+          /> : null}
+          <Controls showInteractive={!overview} fitViewOptions={{ padding: overview ? 0.07 : 0.2, minZoom: 0.1, maxZoom: overview ? 1.25 : 2 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
         </ReactFlow>
         </FramePanel>
       </Frame>

@@ -24,6 +24,7 @@ export function RepresentationSelector({ value, onChange }: RepresentationSelect
     <div className="grid min-w-36 gap-1">
       <Label htmlFor={id}>{t.viewer.style}</Label>
       <Select
+        items={options.map((option) => ({ value: option.id, label: option.label }))}
         value={value}
         onValueChange={(nextValue) => {
           if (nextValue) onChange(nextValue as RepresentationPreset)
@@ -32,7 +33,7 @@ export function RepresentationSelector({ value, onChange }: RepresentationSelect
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.style}>
           <SelectValue>{options.find(option => option.id === value)?.label ?? value}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent positionerClassName="z-[10000]">
           {options.map((option) => (
             <SelectItem key={option.id} value={option.id}>
               {option.label}

@@ -847,7 +847,7 @@ export const bundleZh = {
       submitWorkflow: '提交工作流',
     },
     canvas: {
-      readOnlyBanner: '已完成运行——可移动节点位置；添加或重连步骤已锁定。',
+      readOnlyBanner: '运行已锁定——可查看已有步骤和输出，不能编辑或重连。',
       addingNode: '正在添加工作流节点…',
       emptyTitle: '空工作流',
       emptyBody:

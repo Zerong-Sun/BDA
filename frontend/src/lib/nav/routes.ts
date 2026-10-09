@@ -15,7 +15,7 @@
 
 export interface AppRoute {
   to: string
-  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'results' | 'timeline' | 'faq'
+  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'learning' | 'results' | 'timeline' | 'faq'
 }
 
 /**
@@ -26,7 +26,7 @@ export interface AppRoute {
  * Encoding that here means a caller cannot pass a translator that would be
  * asked for a key it does not have.
  */
-export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots'>
+export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots' | 'learning'>
 
 /** Every route reachable from navigation, in the order a person meets them. */
 export const APP_ROUTES: readonly AppRoute[] = [
@@ -37,6 +37,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
   { to: '/workflow', key: 'workflow' },
   { to: '/candidates', key: 'candidates' },
   { to: '/lab', key: 'lab' },
+  { to: '/learning', key: 'learning' },
   { to: '/results', key: 'results' },
   { to: '/timeline', key: 'timeline' },
   { to: '/faq', key: 'faq' },
@@ -69,6 +70,7 @@ export function routeLabel(
   // Both overrides return before the fallback, which is what narrows `key` to
   // the subset `t.nav` actually carries.
   if (key === 'inbox') return zh ? '待我决定' : 'Decisions'
+  if (key === 'learning') return zh ? '项目学习' : 'Project learning'
   if (key === 'bots') return zh ? '研究团队' : 'Research team'
   return translate(key)
 }

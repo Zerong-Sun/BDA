@@ -2,6 +2,13 @@
   "schema_version": 1,
   "direction": "page -> generated OpenAPI client -> permission dependency -> domain service/UoW -> repository/PostgreSQL; async command -> operation+outbox -> worker/provider -> MinIO -> domain transaction -> SSE/query",
   "resources": [
+    {"table":"learning_assays","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_evidence","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_batches","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_studies","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_datasets","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_models","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
+    {"table":"learning_decisions","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
     {"table":"users","domain":"identity","visibility":"internal","producers":["identity service"],"consumers":["authentication and authorization"],"api_paths":["/api/v2/auth/*"],"ui":["login","account"]},
     {"table":"organizations","domain":"identity","visibility":"business","producers":["organization commands"],"consumers":["project authorization"],"api_paths":["/api/v2/organizations*"],"ui":["administration"]},
     {"table":"organization_members","domain":"identity","visibility":"internal","producers":["membership commands"],"consumers":["command policy"],"api_paths":["/api/v2/organizations/*/members"],"ui":["administration"]},

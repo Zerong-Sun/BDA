@@ -62,6 +62,24 @@ describe('CopilotChat', () => {
     vi.clearAllMocks()
   })
 
+  it('preserves the accepted conversation and unlocks input when waiting times out', async () => {
+    vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, _chunk, _status, _message, accepted) => {
+      accepted?.({ conversationId: 'accepted-conversation', messageId: 'accepted-message' })
+      throw new Error('copilot_wait_timeout')
+    })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    fireEvent.change(input, { target: { value: 'Hello' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(useAppStore.getState().copilotSessions.proj_test?.pending).toBeNull())
+    const session = useAppStore.getState().copilotSessions.proj_test
+    expect(session.conversationId).toBe('accepted-conversation')
+    expect(session.messages[0]).toMatchObject({ id: 'accepted-message', content: 'Hello' })
+    expect(session.error).toContain('may still be processing')
+    expect(input).toBeEnabled()
+    expect(streamCopilotMessage).toHaveBeenCalledOnce()
+  })
+
   it('retains source links when the SSE message metadata arrives before its text chunk', async () => {
     vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, onChunk, _onStatus, onMessage) => {
       const content = 'Saved project observation. [cite:1]'

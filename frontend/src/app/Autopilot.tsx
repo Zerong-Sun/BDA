@@ -196,6 +196,7 @@ function AutopilotWorkspace({ projectId }: { projectId: string }) {
             : 'Review the steps and budget limit before starting. Stages that need a decision pause for your review.'}
         </AlertDescription>
       </Alert>
+      {campaign?.status === 'blocked' && <Alert className="mb-5" variant="destructive"><AlertTitle>{language === 'zh' ? '计算阶段未成功，自动推进已暂停' : 'Compute did not succeed; automatic progression is paused'}</AlertTitle><AlertDescription>{language === 'zh' ? '打开工作流检查失败或取消原因。可人工接管处理，或取消本次计划；后续阶段尚未启动。' : 'Open the workflow to inspect the failure or cancellation. Take over to resolve it, or cancel this campaign. Subsequent stages have not started.'}</AlertDescription></Alert>}
       <div className="grid gap-5 lg:grid-cols-2">
         <AppFrame heading={language === 'zh' ? '1. 自然语言需求' : '1. Natural-language request'} panelClassName="space-y-4 p-5">
           <Textarea
@@ -318,12 +319,7 @@ function AutopilotWorkspace({ projectId }: { projectId: string }) {
                     <Link className="text-xs underline" to={`/workflow?project=${encodeURIComponent(projectId)}&run=${encodeURIComponent(stage.resource_id)}`}>
                       {language === 'zh' ? '打开工作流' : 'Open workflow'}
                     </Link>
-                    {/* A workflow run is a draft handed over, not a product that
-                        reports back - so the person who finished it is the one
-                        who can say the step is over. Without this the chain
-                        reached a compute stage and stopped there, which is the
-                        same dead end `review` had one stage earlier. */}
-                    {completeStageButton(stage)}
+                    <span className="text-xs text-muted-foreground">{language === 'zh' ? '计算工作流结束后自动记录结果并推进' : 'The workflow reports its outcome and advances automatically'}</span>
                   </>
                 ) : stage.resource_type === 'copilot_agent_run' && stage.resource_id ? (
                   // An agent run has no page of its own; naming it is still better than

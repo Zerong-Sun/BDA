@@ -112,7 +112,9 @@ def confirm_draft(
     if payload.manual_campaign_id is not None:
         manual = session.get(Campaign, payload.manual_campaign_id)
         if manual is None or manual.project_id != draft.project_id:
-            raise DomainError("campaign_handoff_invalid", "Manual campaign must belong to this project", status_code=409)
+            raise DomainError(
+                "campaign_handoff_invalid", "Manual campaign must belong to this project", status_code=409
+            )
     campaign = AutopilotCampaign(
         project_id=draft.project_id,
         draft_id=draft.id,
@@ -267,9 +269,7 @@ def _reserve_budget(
         if existing.gpu_seconds != payload.gpu_seconds or existing.money_micros != payload.money_micros:
             raise DomainError("idempotency_conflict", "Reservation key was reused with another budget", status_code=409)
         return existing
-    budget = session.scalar(
-        select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id).with_for_update()
-    )
+    budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id).with_for_update())
     if budget is None:
         raise DomainError("campaign_budget_missing", "Campaign budget is missing", status_code=409)
     next_gpu = budget.gpu_seconds_reserved + budget.gpu_seconds_committed + payload.gpu_seconds
@@ -382,13 +382,23 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
                         project_id=job.project_id,
                         payload={"job_id": str(job.id)},
                     )
+        if stage.resource_type == "workflow_run" and stage.resource_id:
+            from ..compute.service import request_cancel
+
+            project = session.get(Project, campaign.project_id)
+            assert project is not None
+            for job in ComputeRepository(session).jobs_for_workflow(stage.resource_id):
+                if job.status not in {"succeeded", "failed", "cancelled", "cancel_requested"}:
+                    transition_job(session, job, "cancel_requested")
+                    request_cancel(session, job, project, user)
+            if stage.status not in {"succeeded", "failed", "cancelled"}:
+                stage.status = "cancelled"
+                stage.version += 1
         if stage.resource_type == "copilot_agent_run" and stage.resource_id:
             # An agent run left alive is the one stage resource that keeps *spending*
             # after the campaign is cancelled - `agent_runs.cancel` says it outright:
             # a cancelled parent leaving GPU jobs running and subagents thinking is how
-            # a budget disappears without anyone deciding to spend it. A workflow run is
-            # a draft that costs nothing and may still be wanted, which is why the two
-            # resource types are treated differently here rather than uniformly.
+            # a budget disappears without anyone deciding to spend it. Submitted workflow jobs are cancelled above; an unsubmitted draft remains available.
             from ..copilot import agent_runs as copilot_runs
 
             run = session.get(CopilotAgentRun, stage.resource_id)
@@ -421,9 +431,7 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
     return operation
 
 
-def take_over_campaign(
-    session: Session, campaign: AutopilotCampaign, expected: int, user: User
-) -> AutopilotCampaign:
+def take_over_campaign(session: Session, campaign: AutopilotCampaign, expected: int, user: User) -> AutopilotCampaign:
     """Hand authority over a campaign's products from the worker to a person.
 
     Three things happen together, and none of them is optional:
@@ -443,9 +451,7 @@ def take_over_campaign(
     entries claiming two different people took the same thing.
     """
     if campaign.version != expected:
-        raise DomainError(
-            "version_conflict", "Autopilot campaign was modified by another request", status_code=412
-        )
+        raise DomainError("version_conflict", "Autopilot campaign was modified by another request", status_code=412)
     if campaign.status == "manual_takeover":
         return campaign
     if campaign.status == "cancelled":
@@ -574,9 +580,7 @@ def release_stage(
     return stage
 
 
-def _stop_operators(
-    session: Session, campaign: AutopilotCampaign, *, reason: str
-) -> list[str]:
+def _stop_operators(session: Session, campaign: AutopilotCampaign, *, reason: str) -> list[str]:
     """Stop any agent run this campaign's stages are still carrying.
 
     Takeover deliberately leaves the products alone - what changes hands is
@@ -637,15 +641,9 @@ SETTLED_STAGE_STATUSES = ("succeeded", "failed", "cancelled")
 #: matching the row.
 FINISHED_CAMPAIGN_STATUSES = ("succeeded", "failed")
 
-#: Stage products that end their own stage, so a person must not also end it.
-#:
-#: Only the agent run does. A `workflow_run` is the opposite case and the
-#: distinction matters: its adapter deliberately creates a *draft* for somebody
-#: to open in the Workflow page and finish, so it is a product handed over rather
-#: than a product that reports back. Refusing completion for every product - the
-#: first version of this rule - left a `compute` stage with no way to end at all,
-#: which is the same dead end `review` had one stage earlier.
-SELF_SETTLING_RESOURCE_TYPES = frozenset({"copilot_agent_run"})
+#: Agent runs and submitted workflows settle through durable terminal events.
+#: A draft workflow must pass the normal preflight and submission review first.
+SELF_SETTLING_RESOURCE_TYPES = frozenset({"copilot_agent_run", "workflow_run"})
 
 
 def settle_stage(
@@ -706,28 +704,16 @@ def complete_stage(
     expected_version: int,
     user: User,
 ) -> AutopilotStage:
-    """A person marks a human step done, and the chain continues.
+    """Complete a human review step; products report their own terminal outcomes.
 
-    Some stages have no automatic product on purpose - `review` is somebody's
-    judgement, and `operators.UNSTAFFED` records which keys are in that state and
-    why. Those stages reach `ready` and nothing moves them: `release` refuses
-    anything that is not held, so until now a chain that reached one stopped
-    there with no action available anywhere. The default campaign ends with
-    `review`, so that was every default campaign.
-
-    Refused only for a product that ends its own stage - an agent run. A
-    `workflow_run` is the opposite: its adapter creates a *draft* for somebody to
-    open in the Workflow page and finish, so the person who finished it is the
-    one who can say the step is over. Refusing every product, which is what this
-    rule said first, left a `compute` stage unfinishable and reproduced the dead
-    end `review` had one stage earlier.
+    A workflow draft is opened and submitted through its existing reviewed
+    execution path. Its jobs then settle this stage through the outbox; manually
+    completing a draft or failed workflow would manufacture a successful result.
     """
     if stage.version != expected_version:
         raise DomainError("version_conflict", "Autopilot stage changed", status_code=412)
     if stage.campaign_id != campaign.id:
-        raise DomainError(
-            "autopilot_stage_not_found", "Stage does not belong to this campaign", status_code=404
-        )
+        raise DomainError("autopilot_stage_not_found", "Stage does not belong to this campaign", status_code=404)
     if campaign.status in {"cancelled", "manual_takeover"}:
         raise DomainError(
             "autopilot_campaign_not_running",
@@ -826,9 +812,7 @@ def _advance_and_record(
     return reached
 
 
-def finish_campaign(
-    session: Session, campaign: AutopilotCampaign, *, user: User | None = None
-) -> AutopilotCampaign:
+def finish_campaign(session: Session, campaign: AutopilotCampaign, *, user: User | None = None) -> AutopilotCampaign:
     """Mark a campaign whose chain has run out of stages.
 
     A campaign stayed `running` after its last stage, because nothing ever
@@ -844,9 +828,7 @@ def finish_campaign(
     """
     if campaign.status in {"cancelled", "manual_takeover"}:
         return campaign
-    stages = list(
-        session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id))
-    )
+    stages = list(session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id)))
     if not stages:
         # `all([])` is True, so without this a campaign with no stages reports
         # `succeeded` - an outcome for work that was never declared, let alone
@@ -910,7 +892,7 @@ def advance_campaign(
     Returns the stage it reached and whatever its adapter created, so the caller
     can record both. A `None` stage means the chain is finished.
     """
-    if campaign.status in {"cancelled", "manual_takeover"}:
+    if campaign.status in {"cancelled", "manual_takeover", "blocked", "succeeded", "failed"}:
         return None, None
     in_flight = session.scalar(
         select(AutopilotStage).where(
@@ -943,9 +925,7 @@ def _worker_principal_id(session: Session) -> uuid.UUID:
     would answer it wrongly.
     """
     principal = session.scalar(
-        select(AutopilotServicePrincipal).where(
-            AutopilotServicePrincipal.name == "autopilot-worker"
-        )
+        select(AutopilotServicePrincipal).where(AutopilotServicePrincipal.name == "autopilot-worker")
     )
     if principal is None:
         principal = AutopilotServicePrincipal(

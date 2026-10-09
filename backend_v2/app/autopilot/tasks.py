@@ -4,9 +4,11 @@ import uuid
 
 from sqlalchemy import select
 
+from ..compute.models import Job
 from ..copilot.models import CopilotAgentRun
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
+from ..workflows.models import WorkflowRun
 from .models import (
     AutopilotCampaign,
     AutopilotLedgerEntry,
@@ -64,9 +66,7 @@ def execute_campaign(self, campaign_id: str) -> dict:
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(
-            select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update()
-        )
+        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
         reservation = session.scalar(
@@ -149,16 +149,12 @@ def reconcile_cancel(self, campaign_id: str) -> dict:
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(
-            select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update()
-        )
+        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
         if _ledger_exists(session, parsed, "campaign.cancel_reconciled", operation_id):
             return {"campaign_id": campaign_id, "status": "cancelled", "idempotent": True}
-        budget = session.scalar(
-            select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update()
-        )
+        budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update())
         reservations = list(
             session.scalars(
                 select(BudgetReservation)
@@ -217,9 +213,7 @@ def settle_reservation(self, campaign_id: str, reservation_id: str, actual_gpu_s
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(
-            select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update()
-        )
+        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
         reservation = session.scalar(
@@ -236,9 +230,7 @@ def settle_reservation(self, campaign_id: str, reservation_id: str, actual_gpu_s
             # Already settled, or released by a cancellation. Either way there is nothing
             # left to charge, and saying so beats charging it again.
             return {"campaign_id": campaign_id, "status": reservation.status, "idempotent": True}
-        budget = session.scalar(
-            select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update()
-        )
+        budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update())
         actual = max(0, int(actual_gpu_seconds))
         charged = min(actual, reservation.gpu_seconds)
         overrun = actual - charged
@@ -306,9 +298,7 @@ def stage_settled(self, run_id: str) -> dict:
         # one campaign would each read "the next unstarted stage" before either
         # wrote, and both would activate it.
         campaign = session.scalar(
-            select(AutopilotCampaign)
-            .where(AutopilotCampaign.id == stage.campaign_id)
-            .with_for_update()
+            select(AutopilotCampaign).where(AutopilotCampaign.id == stage.campaign_id).with_for_update()
         )
         if campaign is None:
             # Only reachable as a race: `campaign_id` cascades, so a stage cannot
@@ -339,3 +329,72 @@ def stage_settled(self, run_id: str) -> dict:
             "next_stage": str(reached.id),
             "held": bool(reached.held),
         }
+
+
+@celery_app.task(name="bda_v2.autopilot_workflow_settled")
+def workflow_stage_settled(job_id: str) -> dict:
+    """A submitted workflow reports its actual outcome through the durable outbox.
+
+    One terminal job is insufficient: parallel branches and retries can still be
+    running. The compute service owns the aggregate workflow outcome. No compute
+    is submitted here; the existing preflight, authorization and submission path
+    remain the only way to execute a workflow draft.
+    """
+    with session_scope() as session:
+        job = session.get(Job, uuid.UUID(job_id))
+        workflow = session.get(WorkflowRun, job.workflow_run_id) if job else None
+        if workflow is None or workflow.status not in {"succeeded", "failed", "cancelled"}:
+            return {"job_id": job_id, "status": "waiting_for_workflow"}
+        stages = list(
+            session.scalars(
+                select(AutopilotStage).where(
+                    AutopilotStage.resource_type == "workflow_run", AutopilotStage.resource_id == workflow.id
+                )
+            )
+        )
+        settled = []
+        for initial_stage in stages:
+            campaign = session.scalar(
+                select(AutopilotCampaign).where(AutopilotCampaign.id == initial_stage.campaign_id).with_for_update()
+            )
+            stage = session.scalar(
+                select(AutopilotStage)
+                .where(AutopilotStage.id == initial_stage.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            if (
+                campaign is None
+                or stage is None
+                or campaign.project_id != workflow.project_id
+                or campaign.status in {"cancelled", "manual_takeover", "succeeded", "failed", "blocked"}
+                or stage.held
+                or stage.status != "ready"
+            ):
+                continue
+            # Waiting on the campaign can outlast a retry. Serialize the final
+            # outcome check with compute's aggregate update and refresh cached data.
+            session.refresh(workflow, with_for_update=True)
+            if workflow.status not in {"succeeded", "failed", "cancelled"}:
+                continue
+            settle_stage(session, campaign, stage, status=workflow.status)
+            if workflow.status == "succeeded":
+                _advance_and_record(session, campaign, stage)
+            else:
+                campaign.status = "blocked"
+                campaign.version += 1
+                session.add(
+                    AutopilotLedgerEntry(
+                        campaign_id=campaign.id,
+                        service_principal_id=_worker_principal(session).id,
+                        event_type="campaign.blocked",
+                        payload={
+                            "stage_id": str(stage.id),
+                            "workflow_id": str(workflow.id),
+                            "outcome": workflow.status,
+                            "reason": "Compute did not succeed; take over to diagnose or cancel the campaign",
+                        },
+                    )
+                )
+            settled.append(str(stage.id))
+        return {"job_id": job_id, "status": workflow.status, "settled_stage_ids": settled}

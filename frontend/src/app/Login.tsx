@@ -5,6 +5,7 @@ import { BookOpen } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/reui/alert'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { Button } from '@/components/ui/Button'
+import { BigoBioLogo } from '@/components/ui/BigoBioLogo'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { ApiError } from '../lib/api/client'
@@ -69,7 +70,7 @@ export function LoginPage() {
           </Button>
         </section>
         <AppFrame
-          heading={<h1>{t.login.formTitle}</h1>}
+          heading={<div className="grid gap-5"><BigoBioLogo className="bigobio-logo--login" /><h1>{t.login.formTitle}</h1></div>}
           description={t.login.formSubtitle}
           className="w-full max-w-sm justify-self-center md:justify-self-start"
           panelClassName="p-0"
