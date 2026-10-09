@@ -372,6 +372,11 @@ def workflow_stage_settled(job_id: str) -> dict:
                 or stage.status != "ready"
             ):
                 continue
+            # Waiting on the campaign can outlast a retry. Serialize the final
+            # outcome check with compute's aggregate update and refresh cached data.
+            session.refresh(workflow, with_for_update=True)
+            if workflow.status not in {"succeeded", "failed", "cancelled"}:
+                continue
             settle_stage(session, campaign, stage, status=workflow.status)
             if workflow.status == "succeeded":
                 _advance_and_record(session, campaign, stage)

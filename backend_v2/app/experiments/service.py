@@ -15,11 +15,36 @@ from .models import ExperimentResult
 from .schemas import ExperimentResultBatch, ExperimentResultCreate
 
 
+def reserved_learning_field(values: dict) -> str | None:
+    """Learning observations must enter through their contract-aware adapter."""
+    metadata = values.get("result_metadata")
+    if isinstance(metadata, dict) and {"learning", "learning_withdrawal"}.intersection(metadata):
+        return "result_metadata"
+    if str(values.get("batch_key") or "").startswith("learning:"):
+        return "batch_key"
+    if values.get("experiment_type") == "learning_assay":
+        return "experiment_type"
+    return None
+
+
 def create_results(
     session: Session,
     project: Project,
     payload: ExperimentResultBatch,
     user: User,
+) -> list[ExperimentResult]:
+    for item in payload.results:
+        if reserved_learning_field(item.model_dump()):
+            raise DomainError(
+                "learning_ingestion_required",
+                "Use the project learning observation or CSV import endpoint for learning records",
+                status_code=422,
+            )
+    return _create_results(session, project, payload, user)
+
+
+def _create_results(
+    session: Session, project: Project, payload: ExperimentResultBatch, user: User
 ) -> list[ExperimentResult]:
     items = []
     for item in payload.results:
@@ -39,7 +64,12 @@ def create_results(
             )
         if item.source_artifact_id:
             artifact = session.get(Artifact, item.source_artifact_id)
-            if artifact is None or artifact.project_id != project.id or artifact.status != "available":
+            if (
+                artifact is None
+                or artifact.project_id != project.id
+                or artifact.status != "available"
+                or artifact.deleted_at is not None
+            ):
                 raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
         items.append(
             ExperimentResult(
@@ -83,7 +113,7 @@ def create_idempotent_result(
     )
     if existing is not None:
         return existing
-    row = create_results(session, project, ExperimentResultBatch(results=[payload]), user)[0]
+    row = _create_results(session, project, ExperimentResultBatch(results=[payload]), user)[0]
     row.legacy_id = request_key
     session.flush()
     return row

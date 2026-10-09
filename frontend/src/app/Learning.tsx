@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { Fragment, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Checkbox } from '../components/ui/checkbox'
@@ -143,7 +143,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
             {!data.goals.length && <p><Link to={`/research?project=${projectId}`}>{copy('先在研究页面建立项目目标', 'Create a project goal in Research first')}</Link></p>}
             <form onSubmit={(event) => submit(event, async (form) => {
               const created = await learning.createStudy(projectId, { name: text(form, 'name'), assay_id: text(form, 'assay'), research_goal_id: text(form, 'goal'), direction: text(form, 'direction') as StudyCreate['direction'], threshold: text(form, 'threshold') ? numeric(form, 'threshold') : null, currency: text(form, 'currency') as StudyCreate['currency'], batch_budget_cents: Math.round(numeric(form, 'budget') * 100), max_batch_size: numeric(form, 'size'), max_rounds: numeric(form, 'rounds'), stop_on_threshold: form.get('stop') === 'on', supersedes_id: text(form, 'previous') === 'new' ? null : text(form, 'previous'), selection_constraints: { min_length: numeric(form, 'minLength'), max_length: numeric(form, 'maxLength'), forbidden_motifs: text(form, 'motifs').toUpperCase().split(/[\s,]+/).filter(Boolean), allow_out_of_domain: form.get('noOod') !== 'on' } })
-              setStudyId(created.id); setSelectedResults([]); setSelectedCandidates({}); setRetests([])
+              setStudyId(created.id); setSelectedResults([]); setSelectedCandidates({}); setRetests([]); setMeasurementStatus('measured')
             })}>
               <fieldset disabled={!writable || busy || !data.assays.length || !data.goals.length}>
                 <Field label={copy('学习目标名称', 'Study name')}><Input name="name" required maxLength={200} /></Field>
@@ -164,11 +164,11 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
             </form>
           </Disclosure>
         </div>
-        {study && <Field label={copy('当前学习目标', 'Current study')}><Choice value={study.id} onChange={(event) => { setStudyId(event.target.value); setSelectedResults([]); setSelectedCandidates({}); setRetests([]) }}>{data.studies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Choice></Field>}
+        {study && <Field label={copy('当前学习目标', 'Current study')}><Choice value={study.id} disabled={busy} onChange={(event) => { setStudyId(event.target.value); setSelectedResults([]); setSelectedCandidates({}); setRetests([]); setMeasurementStatus('measured') }}>{data.studies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Choice></Field>}
         {study && <p>{assay?.name} · {assay?.unit} · {study.direction === 'maximize' ? copy('最大化', 'Maximize') : copy('最小化', 'Minimize')} · {study.currency} {(study.batch_budget_cents / 100).toFixed(2)} / {copy('批', 'batch')} · ≤ {study.max_batch_size} {copy('个候选', 'candidates')}</p>}
         {study && <JsonDetails label={copy('查看冻结目标与测定依据', 'Inspect frozen goal and assay')} data={{ study, assay }} />}
       </Section>
-      {study && assay && <>
+      {study && assay && <Fragment key={study.id}>
         <Section title={copy('02 · 实验结果与冻结数据集', '02 · Observations and frozen datasets')}>
           <Disclosure title={copy('上传原始实验文件', 'Upload source experimental data')}>
             <ArtifactUploadDropzone projectId={projectId} disabled={busy} readOnly={demo || access.data?.permissions.artifact !== true} onUploaded={() => { void cache.invalidateQueries({ queryKey: ['learning-workspace', projectId] }) }} />
@@ -243,7 +243,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
           </article>)}
         </Section>
         <LearningLifecycle key={study.id} projectId={projectId} study={study} assay={assay} evidence={data.evidence.filter((e) => e.study_id === study.id)} batches={data.batches.filter((b) => b.study_id === study.id)} decisions={decisions} results={observations} artifacts={data.artifacts} workflows={data.workflows} writable={writable} experimentWritable={experimentWritable} busy={busy} perform={perform} copy={copy} />
-      </>}
+      </Fragment>}
     </>}
   </div>
 }

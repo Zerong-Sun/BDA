@@ -44,6 +44,21 @@ describe('learning experiment handoff', () => {
     expect(api.importObservations).not.toHaveBeenCalled()
   })
 
+  it.each(['new-default', 'changed-version', 'removed'] as const)('requires revalidation when source refresh changes the file: %s', async (change) => {
+    api.importObservations.mockResolvedValue({ dry_run: true, row_count: 2, observations: [], result_ids: [] })
+    const initial = props()
+    const { rerender } = renderWithProviders(<LearningLifecycle {...initial} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Validate file' }))
+    expect(await screen.findByRole('button', { name: 'Import validated observations' })).toBeInTheDocument()
+    const first = initial.artifacts[0]
+    const artifacts = change === 'new-default'
+      ? [{ ...first, id: 'file2', filename: 'other.csv' }, first]
+      : change === 'changed-version' ? [{ ...first, version: 2 }] : []
+    rerender(<LearningLifecycle {...initial} artifacts={artifacts} />)
+    expect(screen.queryByRole('button', { name: 'Import validated observations' })).not.toBeInTheDocument()
+    expect(api.importObservations).toHaveBeenCalledTimes(1)
+  })
+
   it('receives every active batch result including failures, excluding withdrawn and other batches', async () => {
     const batch = { ...base, id: 'batch', study_id: 's', decision_id: 'd', campaign_id: 'campaign', round_id: 'round', digest: 'hash', manifest: { batch_key: 'learning:batch', round_number: 1 }, receipt: null }
     const result = (id: string, batchKey: string, withdrawal = false, status = 'measured'): Props['results'][number] => ({ ...base, ...measurement, id, batch_key: batchKey, result_metadata: { learning: { status }, ...(withdrawal ? { learning_withdrawal: { rationale: 'Bad instrument' } } : {}) } })

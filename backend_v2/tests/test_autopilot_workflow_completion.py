@@ -4,12 +4,12 @@ from contextlib import contextmanager
 
 import pytest
 from backend_v2.app.autopilot import adapters, tasks
-from backend_v2.app.autopilot.models import AutopilotLedgerEntry
+from backend_v2.app.autopilot.models import AutopilotCampaign, AutopilotLedgerEntry
 from backend_v2.app.compute.models import Job, JobSubmission
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
 from backend_v2.tests.test_autopilot_lifecycle import _campaign, _stages
 from backend_v2.tests.test_autopilot_lifecycle import session as session  # noqa: F401
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 
 def _execution(session, monkeypatch):
@@ -94,3 +94,27 @@ def test_cancel_requests_cancellation_for_submitted_workflow_jobs(session, monke
     assert job.status == "cancel_requested" and stage.status == "cancelled"
     events = list(session.scalars(select(OutboxEvent).where(OutboxEvent.topic == "job.cancel")))
     assert len(events) == 1 and events[0].payload["job_id"] == str(job.id)
+
+
+def test_retry_committed_while_waiting_for_campaign_does_not_settle_stale_failure(session, monkeypatch):
+    campaign, stage, review, run, job = _execution(session, monkeypatch)
+    run.status = "failed"
+    session.flush()
+    previous_campaign_status = campaign.status
+    scalar = session.scalar
+
+    def concurrent_retry(statement, *args, **kwargs):
+        # Model a commit after the task's initial read, while it waits for the
+        # campaign lock. The identity map deliberately retains the old status.
+        if statement.column_descriptions[0].get("entity") is AutopilotCampaign:
+            session.execute(
+                update(WorkflowRun).where(WorkflowRun.id == run.id).values(status="queued"),
+                execution_options={"synchronize_session": False},
+            )
+        return scalar(statement, *args, **kwargs)
+
+    monkeypatch.setattr(session, "scalar", concurrent_retry)
+    result = tasks.workflow_stage_settled.run(str(job.id))
+    assert result["settled_stage_ids"] == []
+    assert stage.status == "ready" and review.status == "pending"
+    assert campaign.status == previous_campaign_status

@@ -5,8 +5,8 @@ import { DataGrid } from '../components/reui/data-grid/data-grid'
 import { DataGridTable } from '../components/reui/data-grid/data-grid-table'
 import { Disclosure } from '../components/ui/Disclosure'
 
-export function Choice({ children, name, value, onChange, required }: {
-  children: ReactNode; name?: string; value?: string; required?: boolean;
+export function Choice({ children, name, value, onChange, required, disabled }: {
+  children: ReactNode; name?: string; value?: string; required?: boolean; disabled?: boolean;
   onChange?: (event: { target: { value: string } }) => void;
 }) {
   const options = Children.toArray(children).filter(isValidElement<{ value?: string; children: ReactNode }>).map((child) => ({
@@ -14,7 +14,7 @@ export function Choice({ children, name, value, onChange, required }: {
   }))
   const [chosen, setChosen] = useState('')
   const selected = value ?? (options.some((o) => o.value === chosen) ? chosen : options[0]?.value ?? '')
-  return <Select name={name} required={required} value={selected} onValueChange={(next) => {
+  return <Select name={name} required={required} disabled={disabled} value={selected} onValueChange={(next) => {
     if (next === null) return
     setChosen(next); onChange?.({ target: { value: next } })
   }} items={options}>

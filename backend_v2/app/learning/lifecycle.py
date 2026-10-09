@@ -32,7 +32,7 @@ def _result(session: Session, project: Project, record_id: uuid.UUID) -> Experim
 
 def _artifact(session: Session, project: Project, record_id: uuid.UUID) -> Artifact:
     row = session.get(Artifact, record_id)
-    if row is None or row.project_id != project.id or row.status != "available":
+    if row is None or row.project_id != project.id or row.status != "available" or row.deleted_at is not None:
         raise DomainError("learning_source_unavailable", "Project source artifact is not available", status_code=404)
     return row
 
@@ -64,20 +64,25 @@ def learning_state_digest(session: Session, project: Project, study: LearningStu
     }
     known = {r.id for r in results}
     source_state = []
+    result_artifacts = {r.source_artifact_id for r in results if r.source_artifact_id}
     for result_id in sorted(referenced_results - known, key=str):
         result = session.get(ExperimentResult, result_id)
+        if result and result.source_artifact_id:
+            result_artifacts.add(result.source_artifact_id)
         source_state.append(
             [str(result_id), result.version, result.value, result.result_metadata]
             if result
             else [str(result_id), "missing"]
         )
-    artifacts = sorted({r.source_artifact_id for r in results if r.source_artifact_id} | referenced_artifacts, key=str)
+    artifacts = sorted(result_artifacts | referenced_artifacts, key=str)
+    artifact_rows = {a.id: a for a in session.scalars(select(Artifact).where(Artifact.id.in_(artifacts)))}
     artifact_state = []
     for artifact_id in artifacts:
-        a = session.get(Artifact, artifact_id)
-        artifact_state.append(
-            [str(artifact_id), a.version, a.status, a.checksum_sha256] if a else [str(artifact_id), "missing"]
-        )
+        a = artifact_rows.get(artifact_id)
+        state = [str(artifact_id), a.version, a.status, a.checksum_sha256] if a else [str(artifact_id), "missing"]
+        if a and a.deleted_at:
+            state.append(a.deleted_at.isoformat())
+        artifact_state.append(state)
     successors = list(
         session.scalars(
             select(LearningStudy.id).where(LearningStudy.supersedes_id == study.id).order_by(LearningStudy.id)
@@ -99,7 +104,7 @@ def check_current(session: Session, project: Project, row: LearningDecision, stu
     service.require_record(session, LearningAssay, project, study.assay_id, lock=True)
     if engine.digest(row.proposal) != row.proposal_digest:
         raise DomainError("learning_proposal_integrity", "Proposal digest does not match", status_code=409)
-    model = service.require_record(session, LearningModel, project, row.model_id)
+    model = service.require_record(session, LearningModel, project, row.model_id, lock=True)
     if model.status != "promoted" or model.version != row.proposal["model_version"]:
         raise DomainError("learning_decision_stale", "Recompute with the currently promoted model", status_code=409)
     service._check_model_integrity(model)
@@ -116,8 +121,9 @@ def check_current(session: Session, project: Project, row: LearningDecision, stu
         )
     secondary = row.proposal.get("secondary_model")
     if secondary:
-        other = service.require_record(session, LearningModel, project, uuid.UUID(secondary["id"]))
+        other = service.require_record(session, LearningModel, project, uuid.UUID(secondary["id"]), lock=True)
         other_study = service.require_record(session, LearningStudy, project, other.study_id)
+        service.require_current_study(session, project, other_study)
         other_goal = session.get(ResearchGoal, other_study.research_goal_id) if other_study.research_goal_id else None
         if (
             other.status != "promoted"
@@ -136,8 +142,8 @@ def check_current(session: Session, project: Project, row: LearningDecision, stu
             raise DomainError(
                 "learning_secondary_changed", "Secondary evidence changed; regenerate the proposal", status_code=409
             )
-    for item in row.proposal["selected"]:
-        candidate = service._candidate(session, project, uuid.UUID(item["candidate_id"]))
+    for item in sorted(row.proposal["selected"], key=lambda item: item["candidate_id"]):
+        candidate = service._candidate(session, project, uuid.UUID(item["candidate_id"]), lock=True)
         try:
             sequence_digest = service._features(candidate)["sequence_sha256"]
         except ValueError:
@@ -153,6 +159,9 @@ def create_evidence(session: Session, project: Project, user: User, payload: Evi
         raise DomainError(
             "learning_evidence_source_withdrawn", "Withdrawn observations cannot support a new fact", status_code=409
         )
+    if payload.kind == "fact":
+        for artifact_id in sorted({r.source_artifact_id for r in results if r.source_artifact_id}):
+            _artifact(session, project, artifact_id)
     artifacts = [_artifact(session, project, i) for i in sorted(set(payload.artifact_ids), key=str)]
     sources = {
         "results": [
@@ -194,7 +203,10 @@ def withdraw_evidence(
 
 def create_batch(session: Session, project: Project, user: User, payload: BatchCreate, expected: int) -> LearningBatch:
     decision = service.require_record(session, LearningDecision, project, payload.decision_id)
-    study = service.require_record(session, LearningStudy, project, decision.study_id, lock=True)
+    secondary = decision.proposal.get("secondary_model")
+    study = service.lock_study_context(
+        session, project, decision.study_id, uuid.UUID(secondary["id"]) if secondary else None
+    )
     decision = service.require_record(session, LearningDecision, project, decision.id, lock=True)
     if decision.version != expected:
         raise DomainError("version_conflict", "Decision changed; reload before handoff", status_code=412)
@@ -269,16 +281,34 @@ def create_batch(session: Session, project: Project, user: User, payload: BatchC
     )
     campaigns.review_decision(record, DecisionReview(approve=True), record.version, user)
     batch_id = uuid.uuid4()
+    assay = service.require_record(session, LearningAssay, project, study.assay_id)
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "decision_id": str(decision.id),
         "proposal_digest": decision.proposal_digest,
         "assay_id": str(study.assay_id),
+        "assay": {
+            "id": str(assay.id),
+            "version": assay.version,
+            "name": assay.name,
+            "method": assay.method,
+            "unit": assay.unit,
+            "conditions": assay.conditions,
+        },
+        "goal": study.goal_snapshot,
         "batch_key": f"learning:{batch_id}",
         "round_number": round_.round_number,
         "currency": study.currency,
         "estimated_cost_cents": decision.proposal["estimated_cost_cents"],
-        "candidates": decision.proposal["selected"],
+        "candidates": [
+            {
+                **item,
+                "sequence": "".join(
+                    service._candidate(session, project, uuid.UUID(item["candidate_id"])).properties["sequence"].split()
+                ).upper(),
+            }
+            for item in decision.proposal["selected"]
+        ],
         "rationale": payload.rationale,
         "external_submission": False,
         "workflow_run_id": str(workflow.id) if workflow else None,

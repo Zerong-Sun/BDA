@@ -43,6 +43,33 @@ def require_record(
     return row
 
 
+def lock_study_context(
+    session: Session, project: Project, study_id: uuid.UUID, secondary_model_id: uuid.UUID | None = None
+) -> LearningStudy:
+    """Lock studies, then assays in UUID order, including a second objective.
+
+    A primary-only lock leaves secondary evidence and promotions free to race
+    review/handoff. Deterministic order also permits simultaneous A+B and B+A
+    requests without a lock inversion. Observation writes take the assay lock.
+    """
+    study_ids = {study_id}
+    if secondary_model_id:
+        secondary = require_record(session, LearningModel, project, secondary_model_id)
+        study_ids.add(secondary.study_id)
+    studies = {i: require_record(session, LearningStudy, project, i, lock=True) for i in sorted(study_ids)}
+    for assay_id in sorted({s.assay_id for s in studies.values()}):
+        require_record(session, LearningAssay, project, assay_id, lock=True)
+    return studies[study_id]
+
+
+def require_current_study(session: Session, project: Project, study: LearningStudy) -> None:
+    goal = session.get(ResearchGoal, study.research_goal_id) if study.research_goal_id else None
+    if goal is None or goal.project_id != project.id or goal.version != study.goal_snapshot.get("version"):
+        raise DomainError("learning_goal_changed", "Freeze a new study for the changed research goal", status_code=409)
+    if session.scalar(select(LearningStudy.id).where(LearningStudy.supersedes_id == study.id).limit(1)):
+        raise DomainError("learning_study_superseded", "Use the revised study contract", status_code=409)
+
+
 def _save(session: Session, project: Project, user: User, row: Record, action: str) -> Record:
     session.add(row)
     session.flush()
@@ -158,7 +185,12 @@ def validate_observation(
                 status_code=409,
             )
     artifact = session.get(Artifact, payload.source_artifact_id)
-    if artifact is None or artifact.project_id != project.id or artifact.status != "available":
+    if (
+        artifact is None
+        or artifact.project_id != project.id
+        or artifact.status != "available"
+        or artifact.deleted_at is not None
+    ):
         raise DomainError("learning_source_unavailable", "Project source artifact is not available", status_code=404)
     return assay, candidate, key, values
 
@@ -185,8 +217,11 @@ def create_observation(session: Session, project: Project, user: User, payload: 
     )
 
 
-def _candidate(session: Session, project: Project, candidate_id: uuid.UUID) -> Candidate:
-    row = session.get(Candidate, candidate_id)
+def _candidate(session: Session, project: Project, candidate_id: uuid.UUID, *, lock: bool = False) -> Candidate:
+    query = select(Candidate).where(Candidate.id == candidate_id, Candidate.project_id == project.id)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    row = session.scalar(query)
     if row is None or row.project_id != project.id:
         raise DomainError("candidate_not_found", "Project candidate was not found", status_code=404)
     return row
@@ -200,7 +235,7 @@ def _features(candidate: Candidate) -> dict:
 
 
 def freeze_dataset(session: Session, project: Project, user: User, payload: DatasetCreate) -> LearningDataset:
-    study = require_record(session, LearningStudy, project, payload.study_id, lock=True)
+    study = lock_study_context(session, project, payload.study_id)
     assay = require_record(session, LearningAssay, project, study.assay_id)
     included, excluded, sources = [], [], []
     for result_id in sorted(payload.result_ids, key=str):
@@ -246,7 +281,12 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
         elif context.get("status") != "measured" or result.value is None:
             reason = "failed_missing_or_censored"
         artifact = session.get(Artifact, result.source_artifact_id) if result.source_artifact_id else None
-        if artifact is None or artifact.project_id != project.id or artifact.status != "available":
+        if (
+            artifact is None
+            or artifact.project_id != project.id
+            or artifact.status != "available"
+            or artifact.deleted_at is not None
+        ):
             reason = "source_artifact_unavailable"
         if not result.candidate_id:
             reason = "candidate_unlinked"
@@ -327,15 +367,17 @@ def train_model(
     dataset = require_record(session, LearningDataset, project, dataset_id, lock=True)
     if engine.digest(dataset.manifest) != dataset.digest:
         raise DomainError("learning_dataset_integrity", "Frozen dataset digest does not match", status_code=409)
-    try:
-        parameters, evaluation = validation.train(dataset.manifest["included"], algorithm, strategy, calibrate)
-    except ValueError as exc:
-        raise DomainError("learning_insufficient_data", str(exc), status_code=422) from exc
     algorithm_name = f"composition-{algorithm}-{strategy}-v2" + ("-conformal" if calibrate else "")
     key = f"learning-model:{dataset.id}:{algorithm_name}"
     existing = session.scalar(select(LearningModel).where(LearningModel.legacy_id == key))
     if existing is not None:
         return existing
+    try:
+        parameters, evaluation = validation.train(dataset.manifest["included"], algorithm, strategy, calibrate)
+        # Finite input can still overflow during fitting or error computation.
+        engine.digest({"parameters": parameters, "evaluation": evaluation})
+    except (ValueError, OverflowError, FloatingPointError) as exc:
+        raise DomainError("learning_insufficient_data", str(exc), status_code=422) from exc
     evaluation["dataset_digest"] = dataset.digest
     evaluation["model_digest"] = engine.digest(parameters)
     return _save(
@@ -363,7 +405,7 @@ def review_model(
     model = require_record(session, LearningModel, project, model_id)
     # Serialize promotions within the study before locking model rows, avoiding
     # A->study->B / B->study->A deadlocks from concurrent model reviews.
-    require_record(session, LearningStudy, project, model.study_id, lock=True)
+    lock_study_context(session, project, model.study_id)
     model = require_record(session, LearningModel, project, model_id, lock=True)
     if model.version != expected:
         raise DomainError("version_conflict", "Model was changed; reload before review", status_code=412)
@@ -414,8 +456,9 @@ def review_model(
 def create_decision(
     session: Session, project: Project, user: User, payload: LearningDecisionCreate
 ) -> LearningDecision:
-    study = require_record(session, LearningStudy, project, payload.study_id, lock=True)
-    model = require_record(session, LearningModel, project, payload.model_id)
+    study = lock_study_context(session, project, payload.study_id, payload.secondary_model_id)
+    require_current_study(session, project, study)
+    model = require_record(session, LearningModel, project, payload.model_id, lock=True)
     if model.study_id != study.id or model.status == "retired":
         raise DomainError("learning_model_mismatch", "Choose a current model from this study", status_code=409)
     _check_model_integrity(model)
@@ -423,8 +466,9 @@ def create_decision(
     secondary = None
     secondary_study = None
     if payload.secondary_model_id:
-        secondary = require_record(session, LearningModel, project, payload.secondary_model_id)
+        secondary = require_record(session, LearningModel, project, payload.secondary_model_id, lock=True)
         secondary_study = require_record(session, LearningStudy, project, secondary.study_id)
+        require_current_study(session, project, secondary_study)
         if secondary.id == model.id or secondary.status == "retired" or secondary_study.assay_id == study.assay_id:
             raise DomainError(
                 "learning_secondary_model", "Choose a current model of a different assay", status_code=422
@@ -565,6 +609,7 @@ def _check_model_sources(session: Session, project: Project, model: LearningMode
             artifact is None
             or artifact.project_id != project.id
             or artifact.status != "available"
+            or artifact.deleted_at is not None
             or artifact.checksum_sha256 != included["artifact_sha256"]
             or not same_sequence
         ):
@@ -580,7 +625,8 @@ def review_decision(
     expected: int,
 ) -> LearningDecision:
     row = require_record(session, LearningDecision, project, decision_id)
-    study = require_record(session, LearningStudy, project, row.study_id, lock=True)
+    secondary = row.proposal.get("secondary_model")
+    study = lock_study_context(session, project, row.study_id, uuid.UUID(secondary["id"]) if secondary else None)
     row = require_record(session, LearningDecision, project, decision_id, lock=True)
     if row.version != expected:
         raise DomainError("version_conflict", "Decision was changed; reload before review", status_code=412)

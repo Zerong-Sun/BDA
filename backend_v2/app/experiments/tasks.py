@@ -20,6 +20,7 @@ from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.database import SessionFactory, session_scope
 from .schemas import ExperimentResultCreate
+from .service import reserved_learning_field
 
 
 def _validate_headers(headers: Sequence[str]) -> None:
@@ -74,6 +75,13 @@ def _coerce_experiment_row(row: dict, index: int) -> tuple[dict | None, dict | N
     """Validate one row. Returns (values, error) with exactly one of them set."""
     if None in row:
         return None, {"row": index, "column": "", "message": "row has more columns than the header"}
+    reserved = reserved_learning_field(row)
+    if reserved:
+        return None, {
+            "row": index,
+            "column": reserved,
+            "message": "Use the project learning CSV import for learning records",
+        }
     values = {key: row.get(key) for key in EXPERIMENT_IMPORT_COLUMNS if row.get(key) not in ("", None)}
     if not values.get("experiment_type"):
         return None, {"row": index, "column": "experiment_type", "message": "experiment_type is required"}
@@ -149,9 +157,7 @@ def experiment_results_import(artifact_id: str, dry_run: bool = False) -> dict:
         # Checking candidate references is the main reason to dry-run at all: an
         # unmatched ref is the defect that used to reach the database silently.
         with SessionFactory() as session:
-            known = set(
-                session.scalars(select(Candidate.candidate_key).where(Candidate.project_id == project_id))
-            )
+            known = set(session.scalars(select(Candidate.candidate_key).where(Candidate.project_id == project_id)))
         unmatched = [
             {
                 "row": index,

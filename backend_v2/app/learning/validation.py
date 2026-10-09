@@ -35,6 +35,7 @@ def aggregate(rows: list[dict]) -> list[dict]:
     return points
 
 
+@np.errstate(over="raise", invalid="raise", divide="raise")
 def _fit(points: list[dict], algorithm: str) -> dict:
     if algorithm == "knn":
         return {"points": points, "predictor": "knn"}

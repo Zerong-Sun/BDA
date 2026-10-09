@@ -33,10 +33,13 @@ type Props = {
 
 export function LearningLifecycle({ projectId, study, assay, evidence, batches, decisions, results, artifacts, workflows, writable, experimentWritable, busy, perform, copy }: Props) {
   const [artifactId, setArtifactId] = useState('')
-  const [preview, setPreview] = useState<ObservationImportResult | null>(null)
+  const [validatedImport, setValidatedImport] = useState<{ key: string; result: ObservationImportResult } | null>(null)
   const [sources, setSources] = useState<string[]>([])
   const availableFiles = artifacts.filter((a) => a.status === 'available' && a.filename.toLowerCase().endsWith('.csv'))
   const fileId = artifactId || availableFiles[0]?.id || ''
+  const file = availableFiles.find((item) => item.id === fileId)
+  const importKey = JSON.stringify([projectId, assay.id, assay.version, fileId, file?.version, file?.checksum_sha256])
+  const preview = file && validatedImport?.key === importKey ? validatedImport.result : null
   function needsSourceReview(entry: learning.EvidenceResponse) {
     const linkedResults = Array.isArray(entry.sources.results) ? entry.sources.results as { id: string; version: number }[] : []
     const linkedArtifacts = Array.isArray(entry.sources.artifacts) ? entry.sources.artifacts as { id: string; version: number }[] : []
@@ -59,13 +62,13 @@ export function LearningLifecycle({ projectId, study, assay, evidence, batches, 
       <div className="learning-actions">
         <Button type="button" variant="outline" onClick={() => downloadLearningFile('learning-observations.csv', 'candidate_id,batch_key,replicate_key,replicate_type,status,value,unit,qc_accepted,note,family_key,observed_at,sample_role,measurement_key\n', 'text/csv')}>{copy('下载 CSV 空模板', 'Download blank CSV template')}</Button>
       </div>
-      <form onSubmit={(event) => submit(event, async () => { setPreview(null); setPreview(await learning.importObservations(projectId, { assay_id: assay.id, artifact_id: fileId, dry_run: true })) })}>
-        <fieldset disabled={!experimentWritable || busy || !fileId}>
-          <Field label={copy('已上传的 CSV 原始文件', 'Uploaded CSV source artifact')}><Choice value={fileId} onChange={(event) => { setArtifactId(event.target.value); setPreview(null) }}>{availableFiles.map((a) => <option key={a.id} value={a.id}>{a.filename}</option>)}</Choice></Field>
+      <form onSubmit={(event) => submit(event, async () => { setValidatedImport(null); const result = await learning.importObservations(projectId, { assay_id: assay.id, artifact_id: fileId, dry_run: true }); setValidatedImport({ key: importKey, result }) })}>
+        <fieldset disabled={!experimentWritable || busy || !file}>
+          <Field label={copy('已上传的 CSV 原始文件', 'Uploaded CSV source artifact')}><Choice value={fileId} onChange={(event) => { setArtifactId(event.target.value); setValidatedImport(null) }}>{availableFiles.map((a) => <option key={a.id} value={a.id}>{a.filename}</option>)}</Choice></Field>
           <Button type="submit" variant="outline">{copy('验证文件', 'Validate file')}</Button>
         </fieldset>
       </form>
-      {preview && <div className="learning-record"><p>{copy('契约验证通过，待导入记录：', 'Contract validation passed. Rows to import: ')}{preview.row_count}</p><JsonDetails label={copy('查看解析结果', 'Inspect parsed results')} data={preview.observations} /><Button type="button" disabled={!experimentWritable || busy} onClick={() => void perform(async () => { await learning.importObservations(projectId, { assay_id: assay.id, artifact_id: fileId, dry_run: false }); setPreview(null) })}>{copy('确认导入实验记录', 'Import validated observations')}</Button></div>}
+      {preview && <div className="learning-record"><p>{copy('契约验证通过，待导入记录：', 'Contract validation passed. Rows to import: ')}{preview.row_count}</p><JsonDetails label={copy('查看解析结果', 'Inspect parsed results')} data={preview.observations} /><Button type="button" disabled={!experimentWritable || busy} onClick={() => void perform(async () => { await learning.importObservations(projectId, { assay_id: assay.id, artifact_id: fileId, dry_run: false }); setValidatedImport(null) })}>{copy('确认导入实验记录', 'Import validated observations')}</Button></div>}
       <p>{copy('交接单关联已有研究轮次；创建交接单不会向供应商下单。每个候选都要有结果状态，失败和缺失同样计入成本。', 'Handoffs link to research campaign rounds. Creating a handoff does not place a supplier order. Every candidate needs a result status, including failed and missing samples.')}</p>
       {decisions.filter((d) => d.review_status === 'approved' && d.proposal.action === 'review_batch' && !batches.some((b) => b.decision_id === d.id)).map((d) => <form className="learning-record" key={d.id} onSubmit={(event) => submit(event, (form) => learning.createLearningBatch(projectId, d, str(form, 'rationale'), str(form, 'workflow') === 'none' ? undefined : str(form, 'workflow')))}>
         <fieldset disabled={!writable || !experimentWritable || busy}><h3>{copy('已审阅建议', 'Reviewed proposal')} · {d.id.slice(0, 8)}</h3><Field label={copy('本轮实验目的与交接说明', 'Round purpose and handoff instructions')}><Textarea name="rationale" required maxLength={2000} /></Field><Field label={copy('关联计算工作流（可选）', 'Linked compute workflow (optional)')}><Choice name="workflow"><option value="none">{copy('仅实验交接', 'Experimental handoff only')}</option>{workflows.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Choice></Field><Button type="submit">{copy('建立实验轮次与交接单', 'Create round and handoff')}</Button></fieldset>
