@@ -27,6 +27,7 @@ BigoBio 是公司品牌，Iteravia（迭原）是候选产品名。此版本把 
 - 新实验交接单使用 manifest schema 2，冻结完整候选序列、测定方法、条件、单位与研究目标；旧清单保留可读。
 - CSV 验证绑定所选文件及其版本；文件更换或消失后须重新验证。切换研究时清除上一研究的表单草稿。
 - 计算任务重试立即恢复待执行状态；Autopilot 等待锁后重新核验工作流，避免旧的失败事件误结算正在重试的阶段。
+- 更新锁文件中的 `compression` 1.8.2、`proxy-addr` 2.0.8 和 `source-map-js` 1.2.2，修复本次发布前审计发现的三个依赖漏洞。对应公告：[compression](https://github.com/advisories/GHSA-vc2v-76pw-4v95)、[proxy-addr](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)、[source-map-js](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)。
 
 ## 新的本地安装
 
