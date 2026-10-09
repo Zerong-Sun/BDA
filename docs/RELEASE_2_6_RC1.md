@@ -67,9 +67,10 @@ with Path('secrets/scheduler.env').open('x') as out:
 print('Local configuration created. No credentials were printed.')
 PY
 docker compose up -d --build --wait api-v2 frontend
+docker compose exec api-v2 python -c "from backend_v2.app.artifacts.storage import ObjectStorage; ObjectStorage().ensure_bucket()"
 ```
 
-API 启动会迁移数据库。随后用仓库内 SQL 配置独立 scheduler 身份；密码仅经进程环境传入，不放入命令参数或日志：
+API 启动会迁移数据库；第二条命令创建配置的对象存储 bucket。健康检查保持只读，不会替安装者创建 bucket。随后用仓库内 SQL 配置独立 scheduler 身份；密码仅经进程环境传入，不放入命令参数或日志：
 
 ```bash
 python3 - <<'PY'
