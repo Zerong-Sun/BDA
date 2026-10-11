@@ -3651,6 +3651,152 @@ export type EvidenceCreate = {
 };
 
 /**
+ * EvidenceNotePage
+ */
+export type EvidenceNotePage = {
+    /**
+     * Items
+     */
+    items: Array<EvidenceNoteResponse>;
+    /**
+     * Next Cursor
+     */
+    next_cursor?: string | null;
+};
+
+/**
+ * EvidenceNoteResponse
+ */
+export type EvidenceNoteResponse = {
+    /**
+     * Anchor Status
+     */
+    anchor_status: 'matched' | 'changed' | 'unverified';
+    /**
+     * Argument
+     */
+    argument: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Document Id
+     */
+    document_id: string;
+    /**
+     * Document Title
+     */
+    document_title: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Interpretation
+     */
+    interpretation: string;
+    /**
+     * Limitations
+     */
+    limitations: string;
+    /**
+     * Locator
+     */
+    locator: string;
+    /**
+     * Paper Claim
+     */
+    paper_claim: string;
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Relation
+     */
+    relation: 'supports' | 'contradicts' | 'context';
+    /**
+     * Review Status
+     */
+    review_status: string;
+    /**
+     * Reviewed At
+     */
+    reviewed_at: string | null;
+    /**
+     * Reviewed By
+     */
+    reviewed_by: string | null;
+    /**
+     * Source Ref
+     */
+    source_ref: {
+        [key: string]: unknown;
+    };
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Version
+     */
+    version: number;
+};
+
+/**
+ * EvidenceNoteWrite
+ *
+ * One source passage applied to one project argument; interpretation is never a quote.
+ */
+export type EvidenceNoteWrite = {
+    /**
+     * Argument
+     */
+    argument: string;
+    /**
+     * Chunk Id
+     */
+    chunk_id?: string | null;
+    /**
+     * Interpretation
+     */
+    interpretation: string;
+    /**
+     * Limitations
+     */
+    limitations: string;
+    /**
+     * Locator
+     */
+    locator?: string;
+    /**
+     * Paper Claim
+     */
+    paper_claim: string;
+    /**
+     * Quote
+     */
+    quote: string;
+    /**
+     * Quote Start
+     */
+    quote_start?: number | null;
+    /**
+     * Relation
+     */
+    relation: 'supports' | 'contradicts' | 'context';
+    /**
+     * Source Url
+     */
+    source_url: string;
+};
+
+/**
  * EvidencePage
  */
 export type EvidencePage = {
@@ -45474,6 +45620,319 @@ export type ListChunksApiV2LiteratureDocumentsDocumentIdChunksGetResponses = {
 
 export type ListChunksApiV2LiteratureDocumentsDocumentIdChunksGetResponse = ListChunksApiV2LiteratureDocumentsDocumentIdChunksGetResponses[keyof ListChunksApiV2LiteratureDocumentsDocumentIdChunksGetResponses];
 
+export type CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostData = {
+    body: EvidenceNoteWrite;
+    path: {
+        /**
+         * Document Id
+         */
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v2/literature/documents/{document_id}/evidence-notes';
+};
+
+export type CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostError = CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostErrors[keyof CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostErrors];
+
+export type CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: EvidenceNoteResponse;
+};
+
+export type CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostResponse = CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostResponses[keyof CreateEvidenceNoteApiV2LiteratureDocumentsDocumentIdEvidenceNotesPostResponses];
+
 export type ListDocumentRetrievalTracesApiV2LiteratureDocumentsDocumentIdRetrievalTracesGetData = {
     body?: never;
     path: {
@@ -45795,6 +46254,644 @@ export type ListDocumentRetrievalTracesApiV2LiteratureDocumentsDocumentIdRetriev
 };
 
 export type ListDocumentRetrievalTracesApiV2LiteratureDocumentsDocumentIdRetrievalTracesGetResponse = ListDocumentRetrievalTracesApiV2LiteratureDocumentsDocumentIdRetrievalTracesGetResponses[keyof ListDocumentRetrievalTracesApiV2LiteratureDocumentsDocumentIdRetrievalTracesGetResponses];
+
+export type UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutData = {
+    body: EvidenceNoteWrite;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'If-Match'?: string | null;
+    };
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/v2/literature/evidence-notes/{note_id}';
+};
+
+export type UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutError = UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutErrors[keyof UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutErrors];
+
+export type UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutResponses = {
+    /**
+     * Successful Response
+     */
+    200: EvidenceNoteResponse;
+};
+
+export type UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutResponse = UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutResponses[keyof UpdateEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdPutResponses];
+
+export type ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchData = {
+    body: ReviewUpdate;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'If-Match'?: string | null;
+    };
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/v2/literature/evidence-notes/{note_id}/review';
+};
+
+export type ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchError = ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchErrors[keyof ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchErrors];
+
+export type ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: EvidenceNoteResponse;
+};
+
+export type ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchResponse = ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchResponses[keyof ReviewEvidenceNoteApiV2LiteratureEvidenceNotesNoteIdReviewPatchResponses];
 
 export type GetEvidenceApiV2LiteratureEvidenceEvidenceIdGetData = {
     body?: never;
@@ -67020,6 +68117,328 @@ export type ListDocumentsApiV2ProjectsProjectIdLiteratureDocumentsGetResponses =
 };
 
 export type ListDocumentsApiV2ProjectsProjectIdLiteratureDocumentsGetResponse = ListDocumentsApiV2ProjectsProjectIdLiteratureDocumentsGetResponses[keyof ListDocumentsApiV2ProjectsProjectIdLiteratureDocumentsGetResponses];
+
+export type ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/v2/projects/{project_id}/literature/evidence-notes';
+};
+
+export type ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetError = ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetErrors[keyof ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetErrors];
+
+export type ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: EvidenceNotePage;
+};
+
+export type ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetResponse = ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetResponses[keyof ListEvidenceNotesApiV2ProjectsProjectIdLiteratureEvidenceNotesGetResponses];
 
 export type PostIngestionApiV2ProjectsProjectIdLiteratureIngestionsPostData = {
     body: LiteratureIngest;

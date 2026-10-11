@@ -29,7 +29,8 @@ def intelligence_run(run_id: str) -> dict:
         IntelligenceRun,
     )
     from ..knowledge.models import KnowledgeEntry
-    from ..literature.models import LiteratureClaim, LiteratureDocument
+    from ..literature.evidence_notes import is_note, note_evidence, reading_context
+    from ..literature.models import LiteratureChunk, LiteratureClaim, LiteratureDocument
     from ..targets.models import Target
 
     parsed = uuid.UUID(run_id)
@@ -66,12 +67,20 @@ def intelligence_run(run_id: str) -> dict:
                     )
                 )
             for claim_item in claims:
+                curated = is_note(claim_item)
+                citation = {"claim_id": str(claim_item.id), "document_id": str(claim_item.document_id)}
+                content = claim_item.claim
+                if curated:
+                    note = note_evidence(session, claim_item)
+                    chunk = session.get(LiteratureChunk, claim_item.chunk_id) if claim_item.chunk_id else None
+                    content = json.dumps({**reading_context(claim_item, note, chunk), "excerpt": note.content}, ensure_ascii=False)
+                    citation = {**citation, **note.source_ref}
                 evidence_items.append(
                     IntelligenceEvidence(
                         run_id=row.id,
-                        evidence_type="literature_claim",
-                        citation={"claim_id": str(claim_item.id), "document_id": str(claim_item.document_id)},
-                        content=claim_item.claim,
+                        evidence_type="literature_evidence_note" if curated else "literature_claim",
+                        citation=citation,
+                        content=content,
                         confidence=None,
                     )
                 )

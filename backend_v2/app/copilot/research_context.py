@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..literature.evidence_notes import reading_context
 from ..literature.models import (
     LiteratureChunk,
     LiteratureClaim,
@@ -426,15 +427,16 @@ class ResearchContextService:
 
     def _literature_evidence_items(self) -> list[dict[str, Any]]:
         rows = self.session.execute(
-            select(LiteratureEvidence, LiteratureClaim, LiteratureDocument)
+            select(LiteratureEvidence, LiteratureClaim, LiteratureDocument, LiteratureChunk)
             .join(LiteratureClaim, LiteratureClaim.id == LiteratureEvidence.claim_id)
             .join(LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id)
+            .outerjoin(LiteratureChunk, LiteratureChunk.id == LiteratureClaim.chunk_id)
             .where(LiteratureDocument.project_id == self.project_id)
             .order_by(LiteratureDocument.created_at, LiteratureClaim.created_at)
             .limit(2000)
         ).all()
         items: list[dict[str, Any]] = []
-        for evidence, claim, document in rows:
+        for evidence, claim, document, chunk in rows:
             metadata = document.metadata_json or {}
             source_ref = evidence.source_ref or {}
             ref_id = str(metadata.get("ref_id") or document.external_id or document.id)
@@ -449,7 +451,7 @@ class ResearchContextService:
                         "chunk_id": str(claim.chunk_id) if claim.chunk_id else None,
                         "ref_id": ref_id,
                         "title": document.title,
-                        "url": metadata.get("url"),
+                        "url": source_ref.get("url") or metadata.get("url"),
                         "claim": claim.claim,
                         "excerpt": evidence.content,
                         "evidence_type": evidence.evidence_type,
@@ -458,6 +460,7 @@ class ResearchContextService:
                         "source_ref": source_ref,
                         "content_provenance": metadata.get("content_provenance") or {},
                         "verification_status": metadata.get("verification_status"),
+                        **reading_context(claim, evidence, chunk),
                     },
                 }
             )
@@ -518,7 +521,7 @@ class ResearchContextService:
                     "retrieval_trace_id": snapshot.get("retrieval_trace_id"),
                     "verification_status": data.get("verification_status"),
                     "chunk_position": data.get("position", source_ref.get("chunk_position")),
-                    "chunk_version": data.get("chunk_version"),
+                    "chunk_version": data.get("chunk_version", source_ref.get("chunk_version")),
                     "excerpt": excerpt[:1600],
                     "excerpt_truncated": len(excerpt) > 1600,
                     "excerpt_checksum_sha256": (
@@ -526,6 +529,10 @@ class ResearchContextService:
                     ),
                     "retrieved_at": snapshot.get("retrieved_at"),
                     "raw_content_artifact_id": snapshot.get("raw_content_artifact_id"),
+                    **{key: data[key] for key in (
+                        "project_argument", "evidence_relation", "interpretation", "limitations", "anchor_status", "locator"
+                    ) if key in data},
+                    **({"paper_claim": data.get("claim")} if data.get("project_argument") else {}),
                 }
             )
         return citation

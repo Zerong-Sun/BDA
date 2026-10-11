@@ -34,6 +34,7 @@
 
 ## 研究记录与审核
 
+- [文献整理开源方法调研与论据工作台](LITERATURE_EVIDENCE_WORKBENCH.md)
 - [研究工具能力、输入与来源限制](RESEARCH_TOOL_CAPABILITIES.md)
 - [研究记录结构](RESEARCH_RECORD_STRUCTURE.md)
 - [文献综述写作与审核标准](RESEARCH_REVIEW_WRITING_STANDARD.md)

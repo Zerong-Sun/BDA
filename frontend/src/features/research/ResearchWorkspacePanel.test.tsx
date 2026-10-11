@@ -83,6 +83,7 @@ describe('ResearchWorkspacePanel', () => {
     useAppStore.setState({ language: 'en' })
     getWorkspace.mockReset()
     getWorkspace.mockImplementation(async (projectId: string) => fixture(projectId))
+    server.use(http.get('/api/v2/projects/:projectId/literature/evidence-notes', () => HttpResponse.json({ items: [], next_cursor: null })))
     server.use(http.get('/api/v2/projects/:projectId/primary-target', () =>
       HttpResponse.json({ detail: 'Primary target is not configured for this workspace fixture' }, { status: 404 }),
     ))
@@ -98,6 +99,10 @@ describe('ResearchWorkspacePanel', () => {
     ['methods', 'Unique method title'],
   ] satisfies Array<[ResearchTab, string]>)('renders %s from the backend workspace once', async (tab, stableText) => {
     renderWithProviders(<ResearchWorkspacePanel view={tab} />)
+    if (tab === 'references') {
+      expect(await screen.findByRole('heading', { name: stableText })).toBeInTheDocument()
+      return
+    }
     await screen.findByText(stableText)
     expect(screen.getAllByText(stableText)).toHaveLength(1)
   })
@@ -209,7 +214,7 @@ describe('ResearchWorkspacePanel', () => {
     renderWithProviders(<ResearchWorkspacePanel view="references" />)
     expect(await screen.findByText('The research workspace could not be loaded from the backend.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByText('Unique paper title')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Unique paper title' })).toBeInTheDocument()
     expect(getWorkspace).toHaveBeenCalledTimes(2)
   })
 

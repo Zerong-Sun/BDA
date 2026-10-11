@@ -1477,6 +1477,19 @@ function createStrictRoutes({ scenario, routeId }) {
         }],
     next_cursor: null,
   }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/literature/evidence-notes`, { limit: '100' }, () => ok({
+    items: empty ? [] : [{
+      id: 'evidence_note_browser_1', document_id: 'document_browser_1', document_title: 'Browser evidence paper',
+      argument: 'The project needs a controlled comparison.', paper_claim: 'A measured response changed in the study.',
+      quote: 'The response changed under the reported conditions.', interpretation: 'This motivates a controlled comparison.',
+      limitations: 'It does not establish our candidate performance.', relation: 'supports', locator: 'Results, paragraph 1',
+      source_url: 'https://example.test/evidence', source_ref: { chunk_id: 'chunk_browser_1', chunk_position: 0, content_kind: 'database_abstract', selector: [{ type: 'TextPositionSelector', start: 0, end: 51 }] },
+      anchor_status: 'matched', review_status: 'pending', reviewed_by: null, reviewed_at: null, version: 1, created_at: NOW, updated_at: NOW,
+    }], next_cursor: null,
+  }))
+  add('GET', '/api/v2/literature/documents/document_browser_1/chunks', { limit: '50' }, () => ok({
+    items: [{ id: 'chunk_browser_1', document_id: 'document_browser_1', position: 0, content: 'The response changed under the reported conditions.', version: 1, created_at: NOW, updated_at: NOW }], next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/literature/claims`, { limit: '200', review_status: 'pending' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/literature/claims`, { limit: '100' }, () => ok({
     items: [],
