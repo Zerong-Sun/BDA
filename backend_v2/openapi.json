@@ -1909,6 +1909,180 @@
         "title": "BatchResponse",
         "type": "object"
       },
+      "BenchCalculationResult": {
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "assumptions_zh": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions Zh",
+            "type": "array"
+          },
+          "calculation_version": {
+            "const": "bench-v1",
+            "default": "bench-v1",
+            "title": "Calculation Version",
+            "type": "string"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "protein-properties",
+              "nucleic-properties",
+              "protein-a280",
+              "nucleic-a260",
+              "concentration",
+              "solution",
+              "dilution",
+              "dna-ratio",
+              "copy-number",
+              "centrifuge",
+              "serial-dilution"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/BenchReference"
+            },
+            "title": "References",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/BenchDilutionStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/BenchValue"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "warnings_zh": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings Zh",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "values",
+          "formula",
+          "assumptions",
+          "assumptions_zh",
+          "references"
+        ],
+        "title": "BenchCalculationResult",
+        "type": "object"
+      },
+      "BenchDilutionStep": {
+        "properties": {
+          "buffer_vol_uL": {
+            "title": "Buffer Vol Ul",
+            "type": "number"
+          },
+          "conc_uM": {
+            "title": "Conc Um",
+            "type": "number"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "stock_vol_uL": {
+            "title": "Stock Vol Ul",
+            "type": "number"
+          },
+          "total_vol_uL": {
+            "title": "Total Vol Ul",
+            "type": "number"
+          }
+        },
+        "required": [
+          "step",
+          "conc_uM",
+          "stock_vol_uL",
+          "buffer_vol_uL",
+          "total_vol_uL"
+        ],
+        "title": "BenchDilutionStep",
+        "type": "object"
+      },
+      "BenchReference": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "BenchReference",
+        "type": "object"
+      },
+      "BenchValue": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "label_zh": {
+            "title": "Label Zh",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "label_zh",
+          "value",
+          "unit"
+        ],
+        "title": "BenchValue",
+        "type": "object"
+      },
       "BliAnalysisRequest": {
         "properties": {
           "artifact_id": {
@@ -2973,6 +3147,44 @@
         "title": "CandidateUpdate",
         "type": "object"
       },
+      "CentrifugeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "from_unit": {
+            "enum": [
+              "rpm",
+              "rcf"
+            ],
+            "title": "From Unit",
+            "type": "string"
+          },
+          "kind": {
+            "const": "centrifuge",
+            "title": "Kind",
+            "type": "string"
+          },
+          "radius_cm": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 10000.0,
+            "title": "Radius Cm",
+            "type": "number"
+          },
+          "value": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "radius_cm",
+          "from_unit",
+          "value"
+        ],
+        "title": "CentrifugeInput",
+        "type": "object"
+      },
       "ChatAccepted": {
         "properties": {
           "conversation_id": {
@@ -4031,6 +4243,75 @@
         "title": "ComputeNodeResponse",
         "type": "object"
       },
+      "ConcentrationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "from_unit": {
+            "enum": [
+              "M",
+              "mM",
+              "uM",
+              "nM",
+              "pM",
+              "g/L",
+              "mg/mL",
+              "mg/L",
+              "ug/mL",
+              "ng/uL"
+            ],
+            "title": "From Unit",
+            "type": "string"
+          },
+          "kind": {
+            "const": "concentration",
+            "title": "Kind",
+            "type": "string"
+          },
+          "molecular_weight_g_mol": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000000000000000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Molecular Weight G Mol"
+          },
+          "to_unit": {
+            "enum": [
+              "M",
+              "mM",
+              "uM",
+              "nM",
+              "pM",
+              "g/L",
+              "mg/mL",
+              "mg/L",
+              "ug/mL",
+              "ng/uL"
+            ],
+            "title": "To Unit",
+            "type": "string"
+          },
+          "value": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "value",
+          "from_unit",
+          "to_unit"
+        ],
+        "title": "ConcentrationInput",
+        "type": "object"
+      },
       "ConcentrationResult": {
         "properties": {
           "a280": {
@@ -4923,6 +5204,113 @@
         "title": "CopilotTurnContext",
         "type": "object"
       },
+      "CopyNumberInput": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "copy-number",
+            "title": "Kind",
+            "type": "string"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          },
+          "mass_ng": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Mass Ng",
+            "type": "number"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "enum": [
+                  "dsDNA",
+                  "ssDNA",
+                  "RNA"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material"
+          },
+          "molecular_weight_g_mol": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000000000000000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Molecular Weight G Mol"
+          }
+        },
+        "required": [
+          "kind",
+          "mass_ng"
+        ],
+        "title": "CopyNumberInput",
+        "type": "object"
+      },
+      "DNARatioInput": {
+        "additionalProperties": false,
+        "properties": {
+          "insert_length_bp": {
+            "maximum": 1000000000.0,
+            "minimum": 1.0,
+            "title": "Insert Length Bp",
+            "type": "integer"
+          },
+          "insert_to_vector_molar_ratio": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Insert To Vector Molar Ratio",
+            "type": "number"
+          },
+          "kind": {
+            "const": "dna-ratio",
+            "title": "Kind",
+            "type": "string"
+          },
+          "vector_length_bp": {
+            "maximum": 1000000000.0,
+            "minimum": 1.0,
+            "title": "Vector Length Bp",
+            "type": "integer"
+          },
+          "vector_mass_ng": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Vector Mass Ng",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "vector_mass_ng",
+          "vector_length_bp",
+          "insert_length_bp",
+          "insert_to_vector_molar_ratio"
+        ],
+        "title": "DNARatioInput",
+        "type": "object"
+      },
       "DatasetCreate": {
         "additionalProperties": false,
         "properties": {
@@ -5727,6 +6115,59 @@
           "updated_at"
         ],
         "title": "DeliveryResponse",
+        "type": "object"
+      },
+      "DilutionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "concentration_unit": {
+            "enum": [
+              "M",
+              "mM",
+              "uM",
+              "nM",
+              "pM",
+              "g/L",
+              "mg/mL",
+              "mg/L",
+              "ug/mL",
+              "ng/uL"
+            ],
+            "title": "Concentration Unit",
+            "type": "string"
+          },
+          "final_volume_uL": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Final Volume Ul",
+            "type": "number"
+          },
+          "kind": {
+            "const": "dilution",
+            "title": "Kind",
+            "type": "string"
+          },
+          "stock_concentration": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Stock Concentration",
+            "type": "number"
+          },
+          "target_concentration": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Target Concentration",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "stock_concentration",
+          "target_concentration",
+          "concentration_unit",
+          "final_volume_uL"
+        ],
+        "title": "DilutionInput",
         "type": "object"
       },
       "DilutionResult": {
@@ -11218,6 +11659,117 @@
         "title": "ModelReview",
         "type": "object"
       },
+      "NucleicA260Input": {
+        "additionalProperties": false,
+        "properties": {
+          "absorbance_basis": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "normalized-1cm"
+            ],
+            "title": "Absorbance Basis",
+            "type": "string"
+          },
+          "blank_absorbance": {
+            "default": 0.0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Blank Absorbance",
+            "type": "number"
+          },
+          "dilution_factor": {
+            "default": 1.0,
+            "maximum": 1000000000000.0,
+            "minimum": 1.0,
+            "title": "Dilution Factor",
+            "type": "number"
+          },
+          "kind": {
+            "const": "nucleic-a260",
+            "title": "Kind",
+            "type": "string"
+          },
+          "material": {
+            "enum": [
+              "dsDNA",
+              "ssDNA",
+              "RNA"
+            ],
+            "title": "Material",
+            "type": "string"
+          },
+          "path_length_cm": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000.0,
+            "title": "Path Length Cm",
+            "type": "number"
+          },
+          "sample_absorbance": {
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Sample Absorbance",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sample_absorbance",
+          "kind",
+          "material"
+        ],
+        "title": "NucleicA260Input",
+        "type": "object"
+      },
+      "NucleicPropertiesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "nucleic-properties",
+            "title": "Kind",
+            "type": "string"
+          },
+          "molecule": {
+            "enum": [
+              "DNA",
+              "RNA"
+            ],
+            "title": "Molecule",
+            "type": "string"
+          },
+          "sequence": {
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Sequence",
+            "type": "string"
+          },
+          "strandedness": {
+            "enum": [
+              "ss",
+              "ds"
+            ],
+            "title": "Strandedness",
+            "type": "string"
+          },
+          "topology": {
+            "enum": [
+              "linear",
+              "circular"
+            ],
+            "title": "Topology",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sequence",
+          "molecule",
+          "strandedness",
+          "topology"
+        ],
+        "title": "NucleicPropertiesInput",
+        "type": "object"
+      },
       "OIDCAuthorizationResponse": {
         "properties": {
           "authorization_url": {
@@ -13285,6 +13837,72 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "ProteinA280Input": {
+        "additionalProperties": false,
+        "properties": {
+          "absorbance_basis": {
+            "default": "raw",
+            "enum": [
+              "raw",
+              "normalized-1cm"
+            ],
+            "title": "Absorbance Basis",
+            "type": "string"
+          },
+          "blank_absorbance": {
+            "default": 0.0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Blank Absorbance",
+            "type": "number"
+          },
+          "dilution_factor": {
+            "default": 1.0,
+            "maximum": 1000000000000.0,
+            "minimum": 1.0,
+            "title": "Dilution Factor",
+            "type": "number"
+          },
+          "epsilon_M_inv_cm_inv": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Epsilon M Inv Cm Inv",
+            "type": "number"
+          },
+          "kind": {
+            "const": "protein-a280",
+            "title": "Kind",
+            "type": "string"
+          },
+          "molecular_weight_g_mol": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Molecular Weight G Mol",
+            "type": "number"
+          },
+          "path_length_cm": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000.0,
+            "title": "Path Length Cm",
+            "type": "number"
+          },
+          "sample_absorbance": {
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Sample Absorbance",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sample_absorbance",
+          "kind",
+          "epsilon_M_inv_cm_inv",
+          "molecular_weight_g_mol"
+        ],
+        "title": "ProteinA280Input",
+        "type": "object"
+      },
       "ProteinCreate": {
         "properties": {
           "candidate_id": {
@@ -13355,6 +13973,28 @@
           "items"
         ],
         "title": "ProteinPage",
+        "type": "object"
+      },
+      "ProteinPropertiesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "protein-properties",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sequence": {
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Sequence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sequence"
+        ],
+        "title": "ProteinPropertiesInput",
         "type": "object"
       },
       "ProteinRead": {
@@ -16852,6 +17492,63 @@
         "title": "SelectionConstraints",
         "type": "object"
       },
+      "SerialDilutionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "dilution_factor": {
+            "exclusiveMinimum": 1.0,
+            "maximum": 1000000.0,
+            "title": "Dilution Factor",
+            "type": "number"
+          },
+          "extra_dead_vol_uL": {
+            "default": 0.0,
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Extra Dead Vol Ul",
+            "type": "number"
+          },
+          "kind": {
+            "const": "serial-dilution",
+            "title": "Kind",
+            "type": "string"
+          },
+          "n_steps": {
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "N Steps",
+            "type": "integer"
+          },
+          "start_conc_uM": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Start Conc Um",
+            "type": "number"
+          },
+          "stock_conc_uM": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Stock Conc Um",
+            "type": "number"
+          },
+          "vol_per_well_uL": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Vol Per Well Ul",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "stock_conc_uM",
+          "start_conc_uM",
+          "dilution_factor",
+          "n_steps",
+          "vol_per_well_uL"
+        ],
+        "title": "SerialDilutionInput",
+        "type": "object"
+      },
       "SiteHit": {
         "properties": {
           "end": {
@@ -16972,6 +17669,42 @@
           "description"
         ],
         "title": "SkillResponse",
+        "type": "object"
+      },
+      "SolutionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "concentration_mM": {
+            "maximum": 1000000000000000.0,
+            "minimum": 0.0,
+            "title": "Concentration Mm",
+            "type": "number"
+          },
+          "kind": {
+            "const": "solution",
+            "title": "Kind",
+            "type": "string"
+          },
+          "molecular_weight_g_mol": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Molecular Weight G Mol",
+            "type": "number"
+          },
+          "volume_mL": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000000000000000.0,
+            "title": "Volume Ml",
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "concentration_mM",
+          "volume_mL",
+          "molecular_weight_g_mol"
+        ],
+        "title": "SolutionInput",
         "type": "object"
       },
       "StructurePolicy": {
@@ -168911,6 +169644,551 @@
           "wetlab"
         ],
         "x-permission": "wetlab.preview"
+      }
+    },
+    "/api/v2/wetlab/calculations": {
+      "post": {
+        "description": "Authenticated pure calculation; POST keeps sequences out of URL histories.\n\nNo result, supplied sequence or project record is persisted. Viewer accounts\nmay use this endpoint; it does not authorize any mutation.",
+        "operationId": "post_bench_calculation_api_v2_wetlab_calculations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "centrifuge": "#/components/schemas/CentrifugeInput",
+                    "concentration": "#/components/schemas/ConcentrationInput",
+                    "copy-number": "#/components/schemas/CopyNumberInput",
+                    "dilution": "#/components/schemas/DilutionInput",
+                    "dna-ratio": "#/components/schemas/DNARatioInput",
+                    "nucleic-a260": "#/components/schemas/NucleicA260Input",
+                    "nucleic-properties": "#/components/schemas/NucleicPropertiesInput",
+                    "protein-a280": "#/components/schemas/ProteinA280Input",
+                    "protein-properties": "#/components/schemas/ProteinPropertiesInput",
+                    "serial-dilution": "#/components/schemas/SerialDilutionInput",
+                    "solution": "#/components/schemas/SolutionInput"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ProteinPropertiesInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NucleicPropertiesInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ProteinA280Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NucleicA260Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConcentrationInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SolutionInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DilutionInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DNARatioInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CopyNumberInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CentrifugeInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SerialDilutionInput"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchCalculationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Post Bench Calculation",
+        "tags": [
+          "wetlab"
+        ],
+        "x-permission": "wetlab.calculate",
+        "x-read-only": true
       }
     },
     "/api/v2/wetlab/concentration": {

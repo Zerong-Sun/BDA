@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { ChatCircleIcon } from '@phosphor-icons/react'
-import { CopilotWorkspace } from '../features/copilot/CopilotWorkspace'
 import { NextStep } from '../components/ui/NextStep'
 import { Button } from '../components/ui/Button'
+import { Disclosure } from '../components/ui/Disclosure'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs'
 import { Alert, AlertDescription } from '../components/reui/alert'
 import { Frame, FramePanel } from '../components/reui/frame'
@@ -16,13 +16,10 @@ import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { useI18n } from '../lib/i18n'
 import { useAppStore, type Language } from '../lib/store/appStore'
 import { isDemoProject } from '../features/tour'
-import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
-import { projectText } from '../lib/i18n/projectText'
 
 export function ResearchPage() {
   const { language, t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [researchAgentOpen, setResearchAgentOpen] = useState(false)
   const rawTab = searchParams.get('tab')
   const { projectId, activeProject } = useProjectContext()
   const isPd1Demo = Boolean(activeProject && isDemoProject(activeProject))
@@ -50,7 +47,7 @@ export function ResearchPage() {
   const selectTab = (nextTab: ResearchTab) => {
     const next = new URLSearchParams(searchParams)
     next.set('tab', nextTab)
-    setSearchParams(next, { replace: true })
+    setSearchParams(next)
   }
   const tabConfig: Record<ResearchTab, { label: string }> = {
     goals: { label: t.research.goals.title },
@@ -71,7 +68,7 @@ export function ResearchPage() {
         <header className="research-page-heading mb-5 border-b border-border-soft pb-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p>
-            <h1 className="mt-2 text-3xl font-medium text-text-primary">{activeProject ? projectText(activeProject, 'name', language) : t.research.page.title}</h1>
+            <h1 className="mt-2 text-3xl font-medium text-text-primary">{t.research.page.title}</h1>
           </div>
           {isPd1Demo ? (
             <Alert className="mt-3" variant="warning">
@@ -84,7 +81,6 @@ export function ResearchPage() {
           ) : null}
           {projectId ? (
             <div className="science-route-links">
-            <Button type="button" render={<Link to={`/bots?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
             <Button
               type="button"
               variant="outline"
@@ -119,11 +115,8 @@ export function ResearchPage() {
         </nav> : null}
         {projectId && (group === 'methods' || tab === 'evidence' || tab === 'references') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {group === 'methods' ? <Button type="button" render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
-          {group === 'evidence' ? <Button type="button" onClick={() => setResearchAgentOpen(!researchAgentOpen)} aria-expanded={researchAgentOpen}>{language === 'zh' ? 'AI 辅助文献调研' : 'Research with AI'}</Button> : null}
+          {group === 'evidence' ? <Button type="button" render={<Link to={literatureTaskLink(projectId, tab, language)} />}>{language === 'zh' ? '准备 AI 文献调研任务' : 'Prepare AI literature task'}</Button> : null}
         </div> : null}
-        {projectId && group === 'evidence' && researchAgentOpen ? <CopilotWorkspace key={projectId} initialService="literature" initialGoal={language === 'zh'
-          ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，调用文献检索并等待完成，读取可获取的正文或摘要，保存带引用的待审核研究笔记，列出信息缺口和实验方案建议。只保存草案，不审核结论、不提交计算任务。请使用中文汇报。'
-          : 'Research this project: read its brief, search literature, wait for retrieval, read available full text or abstracts, and save cited pending-review knowledge notes. Identify evidence gaps and propose experiments. Save drafts only; do not approve conclusions or submit compute jobs.'} /> : null}
         <TabsContent value={group}>
           {!projectId ? (
             <Frame>
@@ -136,21 +129,27 @@ export function ResearchPage() {
           ) : tab === 'goals' ? (
             <>
             <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />
-            {activeProject ? <ProjectBriefPanel project={activeProject} /> : null}
             <Frame>
               <FramePanel>
-                <div data-tour-id="research-goals"><ResearchGoalsPanel key={projectId} projectId={projectId} /></div>
+                <div data-tour-id="research-goals"><Disclosure key={projectId} title={language === 'zh' ? '管理问题与目标树' : 'Manage questions and goal tree'}><ResearchGoalsPanel key={projectId} projectId={projectId} /></Disclosure></div>
               </FramePanel>
             </Frame>
             </>
           ) : tab === 'timeline' ? (
-            <div data-tour-id="research-timeline"><ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} /></div>
+            <div data-tour-id="research-timeline"><div data-tour-id="timeline-page"><ProjectTimeline projectId={projectId} hasPrompt={Boolean(activeProject?.prompt)} /></div></div>
           ) : <div data-tour-id="research-workspace"><ResearchWorkspacePanel view={tab} /></div>}
         </TabsContent>
       </Tabs>
       {projectId ? <NextStep stage="research" /> : null}
     </div>
   )
+}
+
+function literatureTaskLink(projectId: string, tab: ResearchTab, language: Language) {
+  const draft = language === 'zh'
+    ? '请为当前项目检索文献。读取项目任务书，将主题转换为英文检索词，读取可获取的正文或摘要，整理带引用的待审核研究笔记，列出信息缺口和实验方案建议。只准备草案，不审核结论、不提交计算任务。请使用中文汇报。'
+    : 'Research this project: read its brief, search literature, read available full text or abstracts, and prepare cited pending-review knowledge notes. Identify evidence gaps and propose experiments. Prepare drafts only; do not approve conclusions or submit compute jobs.'
+  return `/bots?${new URLSearchParams({ project: projectId, view: 'tasks', service: 'literature', draft, draft_project: projectId, from: tab })}`
 }
 
 function languagePrompt(tab: ResearchTab, label: string, language: Language) {

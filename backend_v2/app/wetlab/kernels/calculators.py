@@ -139,6 +139,12 @@ def calc_dilution_series(stock_conc_uM: float, start_conc_uM: float,
     -------
     list of DilutionStep
     """
+    if not all(math.isfinite(value) for value in (
+        stock_conc_uM, start_conc_uM, dilution_factor, vol_per_well_uL, extra_dead_vol_uL,
+    )):
+        raise ValueError("Dilution inputs must be finite")
+    if extra_dead_vol_uL < 0:
+        raise ValueError("Dead volume cannot be negative")
     if stock_conc_uM <= 0:
         raise ValueError(f"母液浓度必须 > 0，当前值: {stock_conc_uM} μM")
     if start_conc_uM <= 0:
@@ -148,39 +154,50 @@ def calc_dilution_series(stock_conc_uM: float, start_conc_uM: float,
             f"起始浓度 ({start_conc_uM} μM) 不能超过母液浓度 ({stock_conc_uM} μM)")
     if dilution_factor <= 1:
         raise ValueError(f"稀释倍数必须 > 1，当前值: {dilution_factor}")
-    if n_steps < 1:
-        raise ValueError(f"梯度步数必须 ≥ 1，当前值: {n_steps}")
+    if isinstance(n_steps, bool) or not isinstance(n_steps, int) or not 1 <= n_steps <= 24:
+        raise ValueError("梯度步数必须为 1–24 的整数")
     if vol_per_well_uL <= 0:
         raise ValueError(f"每孔体积必须 > 0，当前值: {vol_per_well_uL} μL")
 
-    # 从后向前递推，计算第 0 步所需最大体积
-    total_last = vol_per_well_uL + extra_dead_vol_uL
-    total_cur = total_last
-    for _ in range(n_steps - 1):
-        total_cur = vol_per_well_uL + total_cur / dilution_factor + extra_dead_vol_uL
-    # 向上取整到 100 μL，所有步骤统一体积
-    uniform_total = math.ceil(total_cur / 100) * 100
+    # Work backwards using the ACTUAL next tube volume. A uniform volume based
+    # on a finite geometric sum can leave too little liquid after the transfer,
+    # especially for factors near one. Round only prepared totals upwards.
+    totals = [0.0] * n_steps
+    next_transfer = 0.0
+    for index in range(n_steps - 1, -1, -1):
+        required = vol_per_well_uL + extra_dead_vol_uL + next_transfer
+        if not math.isfinite(required) or required > 1e18:
+            raise ValueError("Requested dilution volume exceeds the supported range")
+        totals[index] = math.ceil(required / 5.0) * 5.0
+        next_transfer = totals[index] / dilution_factor
 
     steps = []
     for i in range(n_steps):
-        target_conc = start_conc_uM / (dilution_factor ** i)
-        total_needed = uniform_total
+        try:
+            target_conc = start_conc_uM / (dilution_factor ** i)
+        except OverflowError as exc:
+            raise ValueError("Dilution concentrations exceed the numerical range") from exc
+        if not math.isfinite(target_conc) or target_conc <= 0:
+            raise ValueError("Dilution concentrations exceed the numerical range")
+        total_needed = totals[i]
 
         if i == 0:
             # 第一步: 直接从母液配制
-            stock_vol = total_needed * target_conc / stock_conc_uM
+            stock_vol = total_needed * (target_conc / stock_conc_uM)
             buffer_vol = total_needed - stock_vol
         else:
             # 后续步骤: 从上一步的剩余液中取 total_needed / factor
             stock_vol = total_needed / dilution_factor
             buffer_vol = total_needed - stock_vol
 
+        if stock_vol <= 0 or not math.isfinite(stock_vol + buffer_vol):
+            raise ValueError("Dilution transfer exceeds the numerical range")
         steps.append(DilutionStep(
             step=i + 1,
-            conc_uM=round(target_conc, 4),
-            stock_vol_uL=round(stock_vol, 2),
-            buffer_vol_uL=round(buffer_vol, 2),
-            total_vol_uL=round(total_needed, 2),
+            conc_uM=target_conc,
+            stock_vol_uL=stock_vol,
+            buffer_vol_uL=buffer_vol,
+            total_vol_uL=total_needed,
         ))
     return steps
 

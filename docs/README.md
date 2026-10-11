@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-10-11（全平台能力升级与接入账本）
+最后核验：2026-10-11（全平台能力升级、接入账本与导航入口归整）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -19,6 +19,8 @@
 
 - [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
+- [全局导航与工作区入口契约](NAVIGATION_WORKSPACE_CONTRACT.md)
+- [实验工具使用与计算约定](LAB_TOOLS.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)
 - [公开 PD1 演示数据说明](../examples/migration-fixtures/pd1/DATA_CARD.md)

@@ -1120,6 +1120,118 @@ export type BatchResponse = {
 };
 
 /**
+ * BenchCalculationResult
+ */
+export type BenchCalculationResult = {
+    /**
+     * Assumptions
+     */
+    assumptions: Array<string>;
+    /**
+     * Assumptions Zh
+     */
+    assumptions_zh: Array<string>;
+    /**
+     * Calculation Version
+     */
+    calculation_version?: 'bench-v1';
+    /**
+     * Formula
+     */
+    formula: string;
+    /**
+     * Kind
+     */
+    kind: 'protein-properties' | 'nucleic-properties' | 'protein-a280' | 'nucleic-a260' | 'concentration' | 'solution' | 'dilution' | 'dna-ratio' | 'copy-number' | 'centrifuge' | 'serial-dilution';
+    /**
+     * References
+     */
+    references: Array<BenchReference>;
+    /**
+     * Steps
+     */
+    steps?: Array<BenchDilutionStep>;
+    /**
+     * Values
+     */
+    values: Array<BenchValue>;
+    /**
+     * Warnings
+     */
+    warnings?: Array<string>;
+    /**
+     * Warnings Zh
+     */
+    warnings_zh?: Array<string>;
+};
+
+/**
+ * BenchDilutionStep
+ */
+export type BenchDilutionStep = {
+    /**
+     * Buffer Vol Ul
+     */
+    buffer_vol_uL: number;
+    /**
+     * Conc Um
+     */
+    conc_uM: number;
+    /**
+     * Step
+     */
+    step: number;
+    /**
+     * Stock Vol Ul
+     */
+    stock_vol_uL: number;
+    /**
+     * Total Vol Ul
+     */
+    total_vol_uL: number;
+};
+
+/**
+ * BenchReference
+ */
+export type BenchReference = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * BenchValue
+ */
+export type BenchValue = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Label Zh
+     */
+    label_zh: string;
+    /**
+     * Unit
+     */
+    unit: string;
+    /**
+     * Value
+     */
+    value: number;
+};
+
+/**
  * BliAnalysisRequest
  */
 export type BliAnalysisRequest = {
@@ -1729,6 +1841,28 @@ export type CandidateUpdate = {
      * Structure Artifact Id
      */
     structure_artifact_id?: string | null;
+};
+
+/**
+ * CentrifugeInput
+ */
+export type CentrifugeInput = {
+    /**
+     * From Unit
+     */
+    from_unit: 'rpm' | 'rcf';
+    /**
+     * Kind
+     */
+    kind: 'centrifuge';
+    /**
+     * Radius Cm
+     */
+    radius_cm: number;
+    /**
+     * Value
+     */
+    value: number;
 };
 
 /**
@@ -2376,6 +2510,32 @@ export type ComputeNodeResponse = {
 };
 
 /**
+ * ConcentrationInput
+ */
+export type ConcentrationInput = {
+    /**
+     * From Unit
+     */
+    from_unit: 'M' | 'mM' | 'uM' | 'nM' | 'pM' | 'g/L' | 'mg/mL' | 'mg/L' | 'ug/mL' | 'ng/uL';
+    /**
+     * Kind
+     */
+    kind: 'concentration';
+    /**
+     * Molecular Weight G Mol
+     */
+    molecular_weight_g_mol?: number | null;
+    /**
+     * To Unit
+     */
+    to_unit: 'M' | 'mM' | 'uM' | 'nM' | 'pM' | 'g/L' | 'mg/mL' | 'mg/L' | 'ug/mL' | 'ng/uL';
+    /**
+     * Value
+     */
+    value: number;
+};
+
+/**
  * ConcentrationResult
  */
 export type ConcentrationResult = {
@@ -2875,6 +3035,58 @@ export type CopilotTurnContext = {
 };
 
 /**
+ * CopyNumberInput
+ */
+export type CopyNumberInput = {
+    /**
+     * Kind
+     */
+    kind: 'copy-number';
+    /**
+     * Length
+     */
+    length?: number | null;
+    /**
+     * Mass Ng
+     */
+    mass_ng: number;
+    /**
+     * Material
+     */
+    material?: 'dsDNA' | 'ssDNA' | 'RNA' | null;
+    /**
+     * Molecular Weight G Mol
+     */
+    molecular_weight_g_mol?: number | null;
+};
+
+/**
+ * DNARatioInput
+ */
+export type DnaRatioInput = {
+    /**
+     * Insert Length Bp
+     */
+    insert_length_bp: number;
+    /**
+     * Insert To Vector Molar Ratio
+     */
+    insert_to_vector_molar_ratio: number;
+    /**
+     * Kind
+     */
+    kind: 'dna-ratio';
+    /**
+     * Vector Length Bp
+     */
+    vector_length_bp: number;
+    /**
+     * Vector Mass Ng
+     */
+    vector_mass_ng: number;
+};
+
+/**
  * DatasetCreate
  */
 export type DatasetCreate = {
@@ -3367,6 +3579,32 @@ export type DeliveryResponse = {
      * Version
      */
     version: number;
+};
+
+/**
+ * DilutionInput
+ */
+export type DilutionInput = {
+    /**
+     * Concentration Unit
+     */
+    concentration_unit: 'M' | 'mM' | 'uM' | 'nM' | 'pM' | 'g/L' | 'mg/mL' | 'mg/L' | 'ug/mL' | 'ng/uL';
+    /**
+     * Final Volume Ul
+     */
+    final_volume_uL: number;
+    /**
+     * Kind
+     */
+    kind: 'dilution';
+    /**
+     * Stock Concentration
+     */
+    stock_concentration: number;
+    /**
+     * Target Concentration
+     */
+    target_concentration: number;
 };
 
 /**
@@ -6641,6 +6879,66 @@ export type ModelReview = {
 };
 
 /**
+ * NucleicA260Input
+ */
+export type NucleicA260Input = {
+    /**
+     * Absorbance Basis
+     */
+    absorbance_basis?: 'raw' | 'normalized-1cm';
+    /**
+     * Blank Absorbance
+     */
+    blank_absorbance?: number;
+    /**
+     * Dilution Factor
+     */
+    dilution_factor?: number;
+    /**
+     * Kind
+     */
+    kind: 'nucleic-a260';
+    /**
+     * Material
+     */
+    material: 'dsDNA' | 'ssDNA' | 'RNA';
+    /**
+     * Path Length Cm
+     */
+    path_length_cm?: number;
+    /**
+     * Sample Absorbance
+     */
+    sample_absorbance: number;
+};
+
+/**
+ * NucleicPropertiesInput
+ */
+export type NucleicPropertiesInput = {
+    /**
+     * Kind
+     */
+    kind: 'nucleic-properties';
+    /**
+     * Molecule
+     */
+    molecule: 'DNA' | 'RNA';
+    /**
+     * Sequence
+     */
+    sequence: string;
+    /**
+     * Strandedness
+     */
+    strandedness: 'ss' | 'ds';
+    /**
+     * Topology
+     */
+    topology: 'linear' | 'circular';
+};
+
+/**
  * OIDCAuthorizationResponse
  */
 export type OidcAuthorizationResponse = {
@@ -7860,6 +8158,44 @@ export type ProjectUpdate = {
 };
 
 /**
+ * ProteinA280Input
+ */
+export type ProteinA280Input = {
+    /**
+     * Absorbance Basis
+     */
+    absorbance_basis?: 'raw' | 'normalized-1cm';
+    /**
+     * Blank Absorbance
+     */
+    blank_absorbance?: number;
+    /**
+     * Dilution Factor
+     */
+    dilution_factor?: number;
+    /**
+     * Epsilon M Inv Cm Inv
+     */
+    epsilon_M_inv_cm_inv: number;
+    /**
+     * Kind
+     */
+    kind: 'protein-a280';
+    /**
+     * Molecular Weight G Mol
+     */
+    molecular_weight_g_mol: number;
+    /**
+     * Path Length Cm
+     */
+    path_length_cm?: number;
+    /**
+     * Sample Absorbance
+     */
+    sample_absorbance: number;
+};
+
+/**
  * ProteinCreate
  */
 export type ProteinCreate = {
@@ -7897,6 +8233,20 @@ export type ProteinPage = {
      * Next Cursor
      */
     next_cursor?: string | null;
+};
+
+/**
+ * ProteinPropertiesInput
+ */
+export type ProteinPropertiesInput = {
+    /**
+     * Kind
+     */
+    kind: 'protein-properties';
+    /**
+     * Sequence
+     */
+    sequence: string;
 };
 
 /**
@@ -10017,6 +10367,40 @@ export type SelectionConstraints = {
 };
 
 /**
+ * SerialDilutionInput
+ */
+export type SerialDilutionInput = {
+    /**
+     * Dilution Factor
+     */
+    dilution_factor: number;
+    /**
+     * Extra Dead Vol Ul
+     */
+    extra_dead_vol_uL?: number;
+    /**
+     * Kind
+     */
+    kind: 'serial-dilution';
+    /**
+     * N Steps
+     */
+    n_steps: number;
+    /**
+     * Start Conc Um
+     */
+    start_conc_uM: number;
+    /**
+     * Stock Conc Um
+     */
+    stock_conc_uM: number;
+    /**
+     * Vol Per Well Ul
+     */
+    vol_per_well_uL: number;
+};
+
+/**
  * SiteHit
  */
 export type SiteHit = {
@@ -10100,6 +10484,28 @@ export type SkillResponse = {
      * Title
      */
     title: string;
+};
+
+/**
+ * SolutionInput
+ */
+export type SolutionInput = {
+    /**
+     * Concentration Mm
+     */
+    concentration_mM: number;
+    /**
+     * Kind
+     */
+    kind: 'solution';
+    /**
+     * Molecular Weight G Mol
+     */
+    molecular_weight_g_mol: number;
+    /**
+     * Volume Ml
+     */
+    volume_mL: number;
 };
 
 /**
@@ -104696,6 +105102,339 @@ export type PreviewAnalysisApiV2WetlabAnalysisPreviewsPostResponses = {
 };
 
 export type PreviewAnalysisApiV2WetlabAnalysisPreviewsPostResponse = PreviewAnalysisApiV2WetlabAnalysisPreviewsPostResponses[keyof PreviewAnalysisApiV2WetlabAnalysisPreviewsPostResponses];
+
+export type PostBenchCalculationApiV2WetlabCalculationsPostData = {
+    /**
+     * Payload
+     */
+    body: ({
+        kind: 'protein-properties';
+    } & ProteinPropertiesInput) | ({
+        kind: 'nucleic-properties';
+    } & NucleicPropertiesInput) | ({
+        kind: 'protein-a280';
+    } & ProteinA280Input) | ({
+        kind: 'nucleic-a260';
+    } & NucleicA260Input) | ({
+        kind: 'concentration';
+    } & ConcentrationInput) | ({
+        kind: 'solution';
+    } & SolutionInput) | ({
+        kind: 'dilution';
+    } & DilutionInput) | ({
+        kind: 'dna-ratio';
+    } & DnaRatioInput) | ({
+        kind: 'copy-number';
+    } & CopyNumberInput) | ({
+        kind: 'centrifuge';
+    } & CentrifugeInput) | ({
+        kind: 'serial-dilution';
+    } & SerialDilutionInput);
+    path?: never;
+    query?: never;
+    url: '/api/v2/wetlab/calculations';
+};
+
+export type PostBenchCalculationApiV2WetlabCalculationsPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostBenchCalculationApiV2WetlabCalculationsPostError = PostBenchCalculationApiV2WetlabCalculationsPostErrors[keyof PostBenchCalculationApiV2WetlabCalculationsPostErrors];
+
+export type PostBenchCalculationApiV2WetlabCalculationsPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: BenchCalculationResult;
+};
+
+export type PostBenchCalculationApiV2WetlabCalculationsPostResponse = PostBenchCalculationApiV2WetlabCalculationsPostResponses[keyof PostBenchCalculationApiV2WetlabCalculationsPostResponses];
 
 export type StandaloneConcentrationApiV2WetlabConcentrationGetData = {
     body?: never;

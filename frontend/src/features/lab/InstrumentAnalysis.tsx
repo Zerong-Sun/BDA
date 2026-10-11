@@ -37,6 +37,9 @@ type Analysed =
   | { instrument: 'akta'; record: AnalysisRecord; summary: AktaSummary }
   | { instrument: 'enzyme'; record: AnalysisRecord; summary: EnzymeSummary }
 
+type InstrumentAnalysisProps = { projectId?: string; previewOnly?: boolean; instrument?: Instrument }
+type DisplayAnalysis = Analysed & { savedProjectId: string }
+
 //: What each kernel can read. The picker narrows the file dialog rather than
 //: relying on the 422 that a Unicorn zip handed to the BLI parser would produce.
 const ACCEPT: Record<Instrument, string> = {
@@ -74,28 +77,33 @@ function formatNumber(value: number | null | undefined, digits = 3): string {
  * such rather than hidden: a KD that four methods agree on means something quite
  * different from one that only a single method produced.
  */
-export function InstrumentAnalysis({ projectId, previewOnly = false }: { projectId: string; previewOnly?: boolean }) {
+export function InstrumentAnalysis({ projectId = '', previewOnly = false, instrument }: InstrumentAnalysisProps) {
+  return <InstrumentAnalysisPanel key={`${instrument ?? 'all'}:${previewOnly ? 'preview' : projectId}`} projectId={projectId} previewOnly={previewOnly} instrument={instrument} />
+}
+
+function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrument: fixedInstrument }: InstrumentAnalysisProps) {
   const { t, language } = useI18n()
   const copy = t.lab.instruments
 
-  const [instrument, setInstrument] = useState<Instrument>('bli')
+  const [instrument, setInstrument] = useState<Instrument>(fixedInstrument ?? 'bli')
   const [file, setFile] = useState<File | null>(null)
-  const [candidateId, setCandidateId] = useState('')
+  const [candidate, setCandidate] = useState({ projectId, value: '' })
+  const candidateId = candidate.projectId === projectId ? candidate.value : ''
   const [sampleId, setSampleId] = useState('')
   const [channel, setChannel] = useState('')
   const [tAssoc, setTAssoc] = useState('')
   const [tDissoc, setTDissoc] = useState('')
   const [subtractBackground, setSubtractBackground] = useState(true)
-  const [analysed, setAnalysed] = useState<Analysed | null>(null)
+  const [analysed, setAnalysed] = useState<DisplayAnalysis | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const run = useMutation({
-    mutationFn: async (save: boolean): Promise<Analysed> => {
+    mutationFn: async (save: boolean): Promise<DisplayAnalysis> => {
       if (!file) throw new Error(copy.file)
-      if (previewOnly && !save) return previewInstrumentAnalysis(file, {
+      if (previewOnly && !save) return { ...await previewInstrumentAnalysis(file, {
         instrument, sample_id: sampleId.trim() || null, channel: channel.trim() || null,
         t_assoc: optionalNumber(tAssoc), t_dissoc: optionalNumber(tDissoc), subtract_background: subtractBackground,
-      })
+      }), savedProjectId: '' }
       if (!projectId) throw new Error(language === 'zh' ? '请先选择保存到哪个项目' : 'Choose a project before saving')
       const artifact = await uploadArtifact(file, projectId)
       const candidate = candidateId.trim() || null
@@ -107,7 +115,7 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
           t_dissoc: optionalNumber(tDissoc),
           candidate_id: candidate,
         })
-        return { instrument: 'bli', record: result, summary: result.summary }
+        return { instrument: 'bli', record: result, summary: result.summary, savedProjectId: projectId }
       }
       if (instrument === 'akta') {
         const result = await analyseAkta(projectId, {
@@ -115,14 +123,14 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
           channel: channel.trim() || null,
           candidate_id: candidate,
         })
-        return { instrument: 'akta', record: result, summary: result.summary }
+        return { instrument: 'akta', record: result, summary: result.summary, savedProjectId: projectId }
       }
       const result = await analyseEnzyme(projectId, {
         artifact_id: artifact.id,
         subtract_background: subtractBackground,
         candidate_id: candidate,
       })
-      return { instrument: 'enzyme', record: result, summary: result.summary }
+      return { instrument: 'enzyme', record: result, summary: result.summary, savedProjectId: projectId }
     },
     onSuccess: (result) => setAnalysed(result),
   })
@@ -130,22 +138,22 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
   return (
     <Frame dense>
       <FrameHeader>
-        <FrameTitle>{copy.title}</FrameTitle>
+        <FrameTitle>{fixedInstrument ? copy[fixedInstrument] : copy.title}</FrameTitle>
       </FrameHeader>
 
       <div className="space-y-5 p-4">
-        <p className="max-w-3xl text-sm text-text-secondary">{copy.intro}</p>
+        <p className="max-w-3xl text-sm text-text-secondary">{previewOnly ? (language === 'zh' ? '先预览仪器导出文件与拟合结果。只有选择项目并点击保存后，才记录原始文件、分析结果及后续人工质控。' : 'Preview an instrument export and its fitted results. The source file and analysis are recorded only after you select a project and save; you can then record a human quality review.') : copy.intro}</p>
 
         <fieldset disabled={run.isPending}>
         <form
-          onChange={() => setAnalysed(null)}
+          onChange={() => { setAnalysed(null); run.reset() }}
           className="flex flex-wrap items-end gap-3"
           onSubmit={(event) => {
             event.preventDefault()
             run.mutate(false)
           }}
         >
-          <label className="flex flex-col gap-1 text-sm">
+          {!fixedInstrument ? <label className="flex flex-col gap-1 text-sm">
             <span>{copy.instrument}</span>
             <Select
               value={instrument}
@@ -168,7 +176,7 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
                 <SelectItem value="enzyme">{copy.enzyme}</SelectItem>
               </SelectContent>
             </Select>
-          </label>
+          </label> : null}
 
           {/* The picker is a hidden native input behind a registry Button, the
               same shape every other upload here uses: the browser's own file
@@ -253,15 +261,15 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
             </label>
           ) : null}
 
-          <label className="flex flex-col gap-1 text-sm">
+          {!previewOnly || projectId ? <label className="flex flex-col gap-1 text-sm">
             <span>{copy.candidate}</span>
             <Input
               className="w-72"
               placeholder={copy.candidateHint}
               value={candidateId}
-              onChange={(event) => setCandidateId(event.target.value)}
+              onChange={(event) => setCandidate({ projectId, value: event.target.value })}
             />
-          </label>
+          </label> : null}
 
           <Button type="submit" disabled={!file || run.isPending}>
             {run.isPending ? copy.analysing : previewOnly ? (language === 'zh' ? '预览分析（不保存）' : 'Preview without saving') : copy.analyse}
@@ -270,7 +278,7 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
         </fieldset>
         {previewOnly && analysed && !analysed.record.experiment_result_id ? <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-text-secondary">{language === 'zh' ? '预览未保存。选择项目后可保存原始文件和分析结果。' : 'Unsaved preview. Choose a project to save the source file and analysis.'}</p>
-          <Button type="button" disabled={!projectId || run.isPending} onClick={() => run.mutate(true)}>{language === 'zh' ? '保存到当前项目' : 'Save to current project'}</Button>
+          <Button type="button" disabled={!projectId || run.isPending} onClick={() => run.mutate(true)}>{language === 'zh' ? '保存到所选项目' : 'Save to selected project'}</Button>
         </div> : null}
 
         {run.error ? (
@@ -279,8 +287,8 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
           </p>
         ) : null}
 
-        {projectId && <SavedInstrumentReviews key={projectId} projectId={projectId} />}
-        {analysed ? <AnalysisResult analysed={analysed} projectId={projectId} onReviewed={(record) => setAnalysed((current) => current?.record.experiment_result_id === record.experiment_result_id ? { ...current, record } : current)} /> : null}
+        {projectId && !previewOnly ? <SavedInstrumentReviews key={projectId} projectId={projectId} /> : null}
+        {analysed ? <AnalysisResult analysed={analysed} projectId={analysed.savedProjectId} onReviewed={(record) => setAnalysed((current) => current?.record.experiment_result_id === record.experiment_result_id ? { ...current, record } : current)} /> : null}
       </div>
     </Frame>
   )

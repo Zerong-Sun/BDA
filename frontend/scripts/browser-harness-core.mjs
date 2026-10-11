@@ -26,6 +26,7 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   lab: { root: '[data-tour-id="lab-page"]', maxSteps: 128 },
   extensions: { root: '[data-testid="extension-center"]', maxSteps: 160 },
   'research-goals': { root: '[data-testid="research-decision-center"]', maxSteps: 160 },
+  tools: { root: '[data-testid="lab-tools-page"]', maxSteps: 128 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -259,6 +260,7 @@ export const ROUTES = Object.freeze([
   { id: 'research-goals', path: `/research?tab=goals&project=${PROJECT_ID}`, authenticated: true },
   { id: 'learning', path: `/learning?project=${PROJECT_ID}`, authenticated: true },
   { id: 'lab', path: `/lab?project=${PROJECT_ID}`, authenticated: true },
+  { id: 'tools', path: '/tools?tool=protein-properties', authenticated: true },
 ])
 
 export const VIEWPORTS = Object.freeze([
@@ -317,6 +319,7 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   extensions: [],
   'research-goals': [],
   lab: ['empty', 'loading', 'recoverable-error'],
+  tools: [],
 })
 
 export function buildBrowserMatrix() {
@@ -989,6 +992,13 @@ function createStrictRoutes({ scenario, routeId }) {
     a280: 1, path_length_cm: 1, epsilon: 10000, mw: 12000,
     molar_conc_uM: 100, molar_conc_nM: 100000, molar_conc_M: 0.0001,
     mass_conc_mg_mL: 1.2, mass_conc_ug_mL: 1200, mass_conc_ng_uL: 1200,
+  }))
+  add('POST', '/api/v2/wetlab/calculations', {}, () => ok({
+    kind: 'nucleic-a260', calculation_version: 'bench-v1',
+    values: [{ key: 'concentration_ng_uL', label: 'Original sample mass concentration', label_zh: '原样本质量浓度', value: 50, unit: 'ng/uL' }],
+    formula: 'c = (A260 - blank) × factor × dilution / path',
+    assumptions: ['1 cm normalized absorbance; no repeat path correction.'], assumptions_zh: ['读数已归一化为 1 cm，不重复校正光程。'], warnings: [], warnings_zh: [],
+    references: [{ title: 'NanoDrop guide', url: 'https://www.thermofisher.com/TFS-Assets/CAD/manuals/NanoDrop-2000-User-Manual-EN.pdf' }], steps: [],
   }))
   add('GET', '/api/v2/health/ready', {}, () => ok({
     status: 'ok',

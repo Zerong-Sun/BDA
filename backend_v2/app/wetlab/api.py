@@ -13,6 +13,8 @@ from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..projects.service import require_project, require_project_permission
 from .analysis import analyse_akta, analyse_bli, analyse_enzyme
+from .bench import calculate
+from .bench_schemas import BenchCalculationInput, BenchCalculationResult
 from .repository import ProteinRepository
 from .schemas import (
     AktaAnalysisRequest,
@@ -165,10 +167,23 @@ def patch_protein(
 
 
 # --- Bench calculators -------------------------------------------------------
-# GET, not POST: each is a pure function of its scalar inputs - same arguments,
-# same answer, nothing persisted. That makes them idempotent and cacheable, and
-# it keeps them out of the write-permission surface, which is the honest place
-# for a calculation a read-only account should be able to run.
+# Legacy scalar calculators use GET. The unified calculator below accepts POST
+# to keep sequence inputs out of URLs; all calculations are pure and read-only.
+
+
+@router.post(
+    "/wetlab/calculations", response_model=BenchCalculationResult,
+    openapi_extra={"x-permission": "wetlab.calculate", "x-read-only": True},
+)
+def post_bench_calculation(
+    payload: BenchCalculationInput, user: User = Depends(current_user),
+) -> BenchCalculationResult:
+    """Authenticated pure calculation; POST keeps sequences out of URL histories.
+
+    No result, supplied sequence or project record is persisted. Viewer accounts
+    may use this endpoint; it does not authorize any mutation.
+    """
+    return calculate(payload)
 
 
 @router.get("/projects/{project_id}/wetlab/concentration", response_model=ConcentrationResult)

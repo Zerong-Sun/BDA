@@ -17,6 +17,9 @@ vi.mock('../features/research/ResearchWorkspacePanel', () => ({
 vi.mock('../components/ui/NextStep', () => ({
   NextStep: () => <div data-testid="next-step" />,
 }))
+vi.mock('../features/research/ResearchDecisionCenter', () => ({
+  ResearchDecisionCenter: () => <div data-testid="decision-center" />,
+}))
 
 const project = {
   id: 'proj_research',
@@ -99,6 +102,43 @@ describe('ResearchPage', () => {
     await waitFor(() => expect(screen.getByTestId('research-timeline-view')).toHaveTextContent('true'))
   })
 
+  it('preserves the project and browser history when changing research tabs', async () => {
+    window.location.hash = '/research?project=proj_research&tab=methods'
+    renderWithProviders(<ResearchPage />)
+    await screen.findByTestId('research-workspace-view')
+    fireEvent.click(within(nav()).getByRole('tab', { name: 'Decision record' }))
+    expect(window.location.hash).toContain('project=proj_research')
+    expect(window.location.hash).toContain('tab=timeline')
+    window.history.back()
+    await waitFor(() => expect(window.location.hash).toContain('tab=methods'))
+    expect(within(nav()).getByRole('tab', { name: 'Experiment plan' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows one research title and keeps goal management explicitly expandable', async () => {
+    renderWithProviders(<ResearchPage />)
+    await screen.findByTestId('decision-center')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(en.research.page.title)
+    expect(screen.queryByText(project.name)).not.toBeInTheDocument()
+    expect(screen.queryByText(project.prompt)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Research team' })).not.toBeInTheDocument()
+    const manage = screen.getByRole('button', { name: 'Manage questions and goal tree' })
+    expect(manage).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('research-goals-view')).not.toBeInTheDocument()
+    fireEvent.click(manage)
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
+  })
+
+  it('opens literature research as a project-scoped draft in the unified task workspace', async () => {
+    window.location.hash = '/research?project=proj_research&tab=references'
+    renderWithProviders(<ResearchPage />)
+    const link = await screen.findByRole('link', { name: 'Prepare AI literature task' })
+    const url = new URL(link.getAttribute('href')!.slice(1), 'https://local.test')
+    expect(url.pathname).toBe('/bots')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ project: project.id, draft_project: project.id, service: 'literature', view: 'tasks', from: 'references' })
+    expect(url.searchParams.get('draft')).toContain('Prepare drafts only')
+    expect(screen.queryByRole('textbox', { name: 'Task goal' })).not.toBeInTheDocument()
+  })
+
   it.each([
     ['atlas', 'evidence'],
     ['review', 'evidence'],
@@ -159,5 +199,7 @@ describe('ResearchPage without a project', () => {
 
     expect(screen.getAllByText(en.research.projectNotice)).toHaveLength(1)
     expect(screen.queryByTestId('research-workspace-view')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Prepare AI literature task' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Manage questions and goal tree' })).not.toBeInTheDocument()
   })
 })

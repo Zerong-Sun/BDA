@@ -59,6 +59,7 @@ const ROUTE_SURFACES = Object.freeze({
   lab: '[data-tour-id="lab-page"]',
   extensions: '[data-testid="extension-center"]',
   'research-goals': '[data-testid="research-decision-center"]',
+  tools: '[data-testid="lab-tools-page"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -541,7 +542,8 @@ async function assertDocumentContract(page, testCase) {
       + `received theme=${actual.theme}, dark=${actual.dark}.`,
     )
   }
-  const expectedRoute = canonicalHashRoute(testCase.routePath)
+  const expectedRoute = canonicalHashRoute(testCase.routeId === 'timeline'
+    ? testCase.routePath.replace('/timeline?', '/research?tab=timeline&') : testCase.routePath)
   const actualRoute = canonicalHashRoute(actual.hash)
   const emptyProjectLibraryCanonicalRoute =
     testCase.routeId === 'experiments' && testCase.scenario === 'empty' && actualRoute === '/projects'
@@ -908,10 +910,11 @@ async function auditKeyboardFocus(page, testCase) {
   }
 }
 
-async function assertEscapeFocusReturn(page, trigger, layer, label, diagnostics) {
+async function assertEscapeFocusReturn(page, trigger, layer, label, diagnostics, afterTrigger) {
   await expectVisible(trigger, `${label} trigger`)
   await trigger.focus()
   await trigger.click()
+  if (afterTrigger) await afterTrigger()
   await expectVisible(layer, `${label} layer`)
   const motion = await assertReducedMotion(page, { requiredLayer: layer, label })
   diagnostics.overlayMotion ??= {}
@@ -1000,6 +1003,7 @@ async function exerciseGlobalLayers(page, testCase, diagnostics) {
     page.getByRole('dialog'),
     'Tour menu',
     diagnostics,
+    async () => page.getByRole('menuitem', { name: 'Interface tour', exact: true }).click(),
   )
 
   const projectTrigger = page.locator('[data-tour-id="project-selector"] button').first()
@@ -1195,26 +1199,17 @@ async function exerciseResearchGrids(page, diagnostics) {
   const methodsTab = page.getByRole('tab', { name: 'Experiment plan' })
   await methodsTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await methodsTab.click()
-  await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
-  await expectVisible(page.getByText('Advance the restrained backbone route'), 'decision tree node')
-  // The tree shows decisions. A `problem` entry like the interface-drift one is part of
-  // the same record but belongs to the timeline view, so asserting it here would be
-  // asserting that the decision tree is not a decision tree.
-  await expectVisible(
-    page.locator('[data-tour-id="dry-lab-decision-tree"]').getByText('Show reasoning').first(),
-    'decision tree node reasoning toggle',
-  )
-  // The research panel and the timeline page render the same DecisionTreeView, so the
-  // node is a tree card (<li>) with a "Show reasoning" toggle, not the phase-column
-  // <article> the panel used to draw for itself.
-  const decisionNode = page
-    .locator('[data-tour-id="dry-lab-decision-tree"] li')
-    .filter({ hasText: 'Advance the restrained backbone route' })
-    .first()
-  const decisionDocument = decisionNode.getByRole('button', { name: /Show reasoning/i })
-  await decisionDocument.click()
-  await expectVisible(page.getByText('Browser decision basis'), 'expanded decision document')
-  diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded reasoning'
+  const methodsEntry = page.locator('[data-tour-id="dry-lab-decision-tree"]')
+  await expectVisible(methodsEntry.getByText('Reasoning behind method choices'), 'methods decision context')
+  if (await methodsEntry.getByText('Show reasoning').count()) throw new Error('Methods duplicated the decision record')
+  await methodsEntry.getByRole('link', { name: 'Open decision record', exact: true }).click()
+  await page.getByRole('tab', { name: 'Decision tree', exact: true }).click()
+  const record = page.locator('[data-tour-id="timeline-page"]')
+  await expectVisible(record.getByText('Advance the restrained backbone route'), 'canonical decision tree node')
+  const decisionNode = record.locator('li').filter({ hasText: 'Advance the restrained backbone route' }).first()
+  await decisionNode.getByRole('button', { name: /Show reasoning/i }).click()
+  await expectVisible(record.getByText('Browser decision basis'), 'expanded canonical decision document')
+  diagnostics.interactions.researchDecisionTree = 'methods entry links to canonical decision record and expanded reasoning'
   diagnostics.interactions.researchDecisionTreeOverflow = await assertNoPageOverflow(page)
 }
 
@@ -1419,17 +1414,31 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
     await expectVisible(root.getByText('Saved. Continue when ready.', { exact: true }), 'learning observation receipt')
     diagnostics.interactions.learningObservation = 'Typed measurement with selected candidate, artifact and QC reaches the generated transport'
   } else if (testCase.routeId === 'lab') {
-    await page.getByRole('link', { name: 'Toolbox', exact: true }).click()
-    await expectVisible(page.getByRole('heading', { name: 'Lab toolbox' }), 'standalone toolbox')
-    await page.getByRole('button', { name: 'Choose a project for saving (optional)' }).click()
-    await page.getByRole('combobox', { name: /select research project/i }).click()
-    await page.getByRole('option', { name: 'No project', exact: true }).click()
-    const concentration = page.getByRole('region', { name: 'Concentration (A280)', exact: true })
-    await concentration.getByRole('button', { name: 'Compute', exact: true }).click()
-    await expectVisible(concentration.getByText('100 µM · 1.2 mg/mL', { exact: true }), 'projectless concentration result')
-    await expectVisible(page.getByRole('button', { name: 'Preview without saving' }), 'projectless analysis preview action')
-    diagnostics.interactions.standaloneToolbox = 'toolbox opens without project gating and calculates after deselecting project'
-    diagnostics.interactions.toolboxOverflow = await assertNoPageOverflow(page)
+    const root = page.locator('[data-tour-id="lab-page"]')
+    await expectVisible(root.getByRole('tab', { name: 'Proteins & constructs', exact: true }), 'project construct library')
+    if (await root.getByRole('form', { name: 'Protein A280 → concentration' }).count()) throw new Error('General calculators must not be duplicated inside the project lab.')
+    await root.getByRole('link', { name: 'Open standalone calculations and previews' }).click()
+    await expectVisible(page.getByTestId('lab-tools-page'), 'independent lab tools')
+    diagnostics.interactions.standaloneToolbox = 'project lab links to one canonical standalone calculator workspace'
+  } else if (testCase.routeId === 'tools') {
+    const root = page.getByTestId('lab-tools-page')
+    const nav = root.getByRole('navigation', { name: 'Lab tool categories' })
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    if (await nav.getByRole('button').count() !== 14) throw new Error('Lab tools must contain 14 categorized entries.')
+    await nav.getByRole('button', { name: 'Nucleic acid A260 → concentration', exact: true }).click()
+    const form = root.getByRole('form', { name: 'Nucleic acid A260 → concentration', exact: true })
+    await form.getByLabel('Sample A260 (AU)', { exact: true }).fill('1')
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/wetlab/calculations'))
+    await form.getByRole('button', { name: 'Calculate', exact: true }).click()
+    const body = (await request).postDataJSON()
+    if (body.kind !== 'nucleic-a260' || body.sample_absorbance !== 1 || body.path_length_cm !== 1 || body.absorbance_basis !== 'normalized-1cm' || body.project_id) throw new Error('Standalone absorbance payload lost its units or depends on a project.')
+    await expectVisible(root.getByRole('region', { name: 'Calculation result' }), 'absorbance result')
+    await form.getByLabel('Sample A260 (AU)', { exact: true }).fill('2')
+    await expectVisible(root.getByText('Inputs changed. These are the previous results; calculate again before using them.'), 'stale result marker')
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    await nav.getByRole('button', { name: 'BLI data preview', exact: true }).click()
+    await expectVisible(root.getByRole('button', { name: 'Preview without saving' }), 'explicit projectless preview')
+    diagnostics.interactions.labTools = 'categorized tool navigation, unit-preserving calculation, stale-result handling and standalone preview'
   } else if (testCase.routeId === 'autopilot') {
     await exerciseAutopilotPromptGuard(page, diagnostics)
   }
@@ -1464,6 +1473,7 @@ function assertControlAcceptance(testCase, diagnostics) {
     extensions: ['extensionSelection'],
     'research-goals': ['decisionDefinition'],
     lab: [],
+    tools: ['labTools'],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
     for (const layer of ['Settings', 'Copilot', 'Tour menu', 'Project selector']) {

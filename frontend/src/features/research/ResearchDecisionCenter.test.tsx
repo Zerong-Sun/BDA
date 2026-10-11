@@ -129,6 +129,16 @@ describe('research decision center', () => {
     expect(screen.queryByRole('button', { name: 'Edit decision definition' })).not.toBeInTheDocument()
   })
 
+  it('keeps recent history as a short index to the canonical decision record', async () => {
+    api.timeline.mockResolvedValue(Array.from({ length: 4 }, (_, index) => ({ id: `entry-${index}`, occurred_at: `2026-10-0${index + 1}T00:00:00Z`, entry_type: 'decision', decided_by: 'human', title: `Recorded decision ${index}`, summary: 'Full reasoning belongs in the decision record.', outcome: 'open', alternatives: [] })))
+    renderWithProviders(<ResearchDecisionCenter projectId="project-one" />)
+    const ledger = screen.getByRole('region', { name: 'Project learning ledger' })
+    expect(await within(ledger).findByRole('link', { name: 'Recorded decision 3' })).toHaveAttribute('href', '#/research?project=project-one&tab=timeline')
+    expect(within(ledger).queryByText('Recorded decision 0')).not.toBeInTheDocument()
+    expect(within(ledger).getAllByRole('article')).toHaveLength(3)
+    expect(within(ledger).queryByText('Full reasoning belongs in the decision record.')).not.toBeInTheDocument()
+  })
+
   it('marks linked records as not yet loaded when evidence pagination remains', async () => {
     api.evidence.mockResolvedValue({ items: [], next_cursor: 'more' })
     renderWithProviders(<ResearchDecisionCenter projectId="project-one" />)

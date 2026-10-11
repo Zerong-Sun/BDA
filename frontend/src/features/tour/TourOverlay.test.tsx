@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialTourState, useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { TourOverlay } from './TourOverlay'
+import { HelpMenu } from '../../components/ui/HelpMenu'
 import { TOUR_SECTIONS } from './tourData'
 
 const projectContext = vi.hoisted(() => ({
@@ -377,6 +378,17 @@ describe('TourOverlay', () => {
 
     expect(media.motionRemoveEventListener).toHaveBeenCalledWith('change', motionListener)
     expect(removeWindowListener).toHaveBeenCalledWith('keydown', keyboardListener)
+  })
+
+  it('returns to the stable Help trigger after opening a tour through its menu', async () => {
+    renderWithProviders(<><HelpMenu /><TourOverlay /></>)
+    const help = screen.getByRole('button', { name: 'Help' })
+    fireEvent.click(help)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Interface tour' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Interface tour' })
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(help).toHaveFocus())
   })
 
   it('restores the anchored target after Pause then tour-menu Close', async () => {

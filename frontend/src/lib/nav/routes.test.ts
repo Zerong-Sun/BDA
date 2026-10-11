@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchRoutes, type NavTranslationKey } from './routes'
+import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchGroups, workbenchRoutes, type NavTranslationKey } from './routes'
 
 /**
  * The registry exists to stop two copies of the route list drifting. These
@@ -32,6 +32,20 @@ describe('route registry', () => {
     const paths = APP_ROUTES.map((route) => route.to)
 
     expect(new Set(paths).size).toBe(paths.length)
+  })
+
+  it('gives lab tools one primary destination and keeps history and FAQ out of the main route registry', () => {
+    expect(PRIMARY_ROUTES).toContain('/tools')
+    expect(APP_ROUTES.map((route) => route.to)).not.toContain('/timeline')
+    expect(APP_ROUTES.map((route) => route.to)).not.toContain('/faq')
+    expect(workbenchGroups(false).map((group) => [group.label, group.routes.map((route) => route.to)])).toEqual([
+      ['Computational design', ['/workflow', '/candidates']],
+      ['Experimental learning', ['/lab', '/learning', '/results']],
+      ['Platform', ['/extensions']],
+    ])
+    expect(workbenchGroups(false).flatMap((group) => group.routes)).toEqual(workbenchRoutes())
+    expect(routeLabel('tools', true, () => '')).toBe('实验工具')
+    expect(routeLabel('tools', false, () => '')).toBe('Lab tools')
   })
 
   it('words the two routes whose navigation label differs from their page title', () => {

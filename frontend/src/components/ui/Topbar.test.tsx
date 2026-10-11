@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { server } from '../../test/mocks/handlers'
@@ -111,16 +111,37 @@ describe('Topbar logout', () => {
     expect(screen.getByRole('menuitem', { name: /log\s*out/i })).toBeInTheDocument()
   })
 
-  it.each([
-    ['Application settings', 'settingsOpen'],
-    ['Interface tour', 'tourMenuOpen'],
-  ] as const)('keeps %s reachable from the compact utility menu', (label, stateKey) => {
+  it('keeps settings reachable from the compact utility menu', () => {
     useAppStore.setState({ language: 'en' })
     renderWithProviders(<Topbar />)
 
     fireEvent.click(screen.getByRole('button', { name: 'More workspace actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: label }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Application settings' }))
 
-    expect(useAppStore.getState()[stateKey]).toBe(true)
+    expect(useAppStore.getState().settingsOpen).toBe(true)
+  })
+
+  it('has one lab-tools route, grouped workbenches and a single help entry for tours and FAQ', async () => {
+    useAppStore.setState({ language: 'en' })
+    renderWithProviders(<Topbar />)
+    await screen.findByRole('combobox', { name: 'Select project' })
+    const navigation = screen.getByRole('navigation', { name: 'Main navigation' })
+    expect(screen.getAllByRole('link', { name: 'Lab tools' })).toHaveLength(1)
+    expect(within(navigation).getByRole('link', { name: 'Lab tools' })).toHaveAttribute('href', '#/tools?project=proj_live')
+    expect(screen.queryByRole('link', { name: 'Toolbox' })).not.toBeInTheDocument()
+    expect(within(navigation).queryByRole('link', { name: /FAQ|Timeline/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Workbenches' }))
+    await waitFor(() => expect(screen.getByText('Computational design')).toBeVisible())
+    expect(screen.getByText('Experimental learning')).toBeVisible()
+    expect(screen.getByText('Platform')).toBeVisible()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Open interface tour' })).not.toBeInTheDocument()
+    const help = screen.getByRole('button', { name: 'Help' })
+    expect(help).toHaveAttribute('data-tour-id', 'tour-help')
+    fireEvent.click(help)
+    expect(screen.getByRole('menuitem', { name: 'FAQ' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Interface tour' }))
+    await waitFor(() => expect(useAppStore.getState().tourMenuOpen).toBe(true))
   })
 })
