@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0073_learning_lifecycle"
+    schema_revision: str = "0074_research_decision_contract"
     worker_queues: str = ""
     required_worker_queues: str = ""
     scheduler_dispatch_paused: bool = False

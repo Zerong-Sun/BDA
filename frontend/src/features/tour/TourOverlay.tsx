@@ -656,12 +656,17 @@ export function TourMenu({
   const { projects, setProjectId } = useProjectContext()
   const { tourState, startTour, resumeTour, restartTour, setTourMenuOpen, setAppMode } = useAppStore()
   const [demoUnavailable, setDemoUnavailable] = useState(false)
+  const activeElement = document.activeElement
+  const explicitHelpTrigger = activeElement instanceof HTMLElement
+    && activeElement.matches('[data-tour-id="tour-help"]')
+    ? activeElement
+    : null
   const returnFocusRef = useRef<HTMLElement | null>(
-    returnFocusTarget?.isConnected
+    explicitHelpTrigger ?? (returnFocusTarget?.isConnected
       ? returnFocusTarget
       : document.activeElement instanceof HTMLElement
         ? document.activeElement
-        : null,
+        : null),
   )
   const labels = t.tour
   const pausedSection = getTourSection(tourState.sectionId)

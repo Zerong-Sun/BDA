@@ -22,6 +22,8 @@ import {
   listDocumentsApiV2ProjectsProjectIdLiteratureDocumentsGet,
   listEntriesApiV2ProjectsProjectIdKnowledgeGet,
   listModelPluginsApiV2RegistryModelPluginsGet,
+  listProceduralSkillsApiV2CopilotProceduralSkillsGet,
+  getProceduralSkillApiV2CopilotProceduralSkillsSkillIdGet,
   listRelationsApiV2ProjectsProjectIdLiteratureRelationsGet,
   listSearchesApiV2ProjectsProjectIdLiteratureSearchesGet,
   listSubscriptionsApiV2ProjectsProjectIdLiteratureSubscriptionsGet,
@@ -44,6 +46,18 @@ import {
   testConfigApiV2CopilotProjectsProjectIdConfigTestsPost,
 } from './generated/sdk.gen'
 import { z } from 'zod'
+import type { KnowledgeResponse } from './generated/types.gen'
+export type { ProceduralSkillSummary, ProceduralSkillDetail } from './generated/types.gen'
+
+export async function listProceduralSkills() {
+  const { data } = await listProceduralSkillsApiV2CopilotProceduralSkillsGet<true>({ throwOnError: true })
+  return data
+}
+
+export async function getProceduralSkill(skillId: string) {
+  const { data } = await getProceduralSkillApiV2CopilotProceduralSkillsSkillIdGet<true>({ path: { skill_id: skillId }, throwOnError: true })
+  return data
+}
 
 export interface CopilotMessage {
   role: 'user' | 'assistant' | 'system'
@@ -124,6 +138,8 @@ export const CopilotKnowledgeEntrySchema = z.object({
   source_type: z.string(),
   citation: z.string().nullable().optional(),
   confidence: z.string(),
+  review_status: z.string().default('unknown'),
+  source: z.record(z.string(), z.unknown()).default({}),
   metadata_json: z.record(z.string(), z.unknown()).optional(),
   status: z.string(),
   version: z.number(),
@@ -145,6 +161,8 @@ export interface CopilotKnowledgeEntryUpsert {
   citation?: string
   confidence?: string
   metadata?: Record<string, unknown>
+  source?: Record<string, unknown>
+  review_status?: string
 }
 
 export interface CopilotConfigUpdate {
@@ -237,40 +255,54 @@ export function confirmClusterDraft(draftId: string) {
   }).then((response) => ClusterDraftSchema.parse(response.data))
 }
 
-export function searchCopilotKnowledge(projectId: string, query: string, category?: string) {
-  return listEntriesApiV2ProjectsProjectIdKnowledgeGet<true>({
-    path: { project_id: projectId }, query: { limit: 200 }, throwOnError: true,
-  }).then(({ data: page }) => {
-    const normalized = query.trim().toLowerCase()
-    const items = page.items.filter((item) => !normalized || `${item.title} ${item.content}`.toLowerCase().includes(normalized))
-      .filter((item) => !category || item.entry_type === category)
-      .map((item) => CopilotKnowledgeEntrySchema.parse({ knowledge_entry_id: item.id, title: item.title,
-        category: item.entry_type, summary: String(item.content).slice(0, 240), content: item.content,
-        tags_json: item.tags, source_type: 'project', citation: '', confidence: 'curated', status: 'active',
-        metadata_json: { version: item.version }, version: item.version }))
-    return { items, next_cursor: page.next_cursor, query }
+function knowledgeEntry(item: KnowledgeResponse): CopilotKnowledgeEntry {
+  const source = item.source ?? {}
+  const text = (key: string, fallback = '') => typeof source[key] === 'string' ? source[key] as string : fallback
+  return CopilotKnowledgeEntrySchema.parse({
+    knowledge_entry_id: item.id, title: item.title, category: item.entry_type,
+    summary: text('summary', item.content.slice(0, 240)), content: item.content,
+    subcategory: text('subcategory'), tags_json: item.tags,
+    source_type: text('type', 'unspecified'), citation: typeof source.citation === 'string' ? source.citation : null,
+    confidence: text('confidence', 'unassessed'), review_status: text('review_status', 'unknown'),
+    status: 'active', source, metadata_json: { version: item.version }, version: item.version,
   })
+}
+
+function knowledgeSource(payload: CopilotKnowledgeEntryUpsert) {
+  const previousEditor = payload.source?.editor_metadata
+  const editorMetadata = previousEditor && typeof previousEditor === 'object' && !Array.isArray(previousEditor)
+    ? previousEditor as Record<string, unknown> : {}
+  return {
+    ...payload.source,
+    ...(payload.source_type !== undefined ? { type: payload.source_type } : {}),
+    ...(payload.citation !== undefined ? { citation: payload.citation } : {}),
+    ...(payload.confidence !== undefined ? { confidence: payload.confidence } : {}),
+    ...(payload.review_status !== undefined ? { review_status: payload.review_status } : {}),
+    summary: payload.summary,
+    ...(payload.subcategory !== undefined ? { subcategory: payload.subcategory } : {}),
+    ...(payload.metadata ? { editor_metadata: { ...editorMetadata, ...payload.metadata } } : {}),
+  }
+}
+
+export function searchCopilotKnowledge(projectId: string, query: string, category?: string, cursor?: string) {
+  return listEntriesApiV2ProjectsProjectIdKnowledgeGet<true>({
+    path: { project_id: projectId }, query: { q: query.trim(), entry_type: category || undefined, cursor, limit: 50 }, throwOnError: true,
+  }).then(({ data: page }) => ({ items: page.items.map(knowledgeEntry), next_cursor: page.next_cursor, query }))
 }
 
 export function createCopilotKnowledgeEntry(projectId: string, payload: CopilotKnowledgeEntryUpsert) {
   return postEntryApiV2ProjectsProjectIdKnowledgePost<true>({ path: { project_id: projectId }, body: {
     title: payload.title, content: payload.content, entry_type: payload.category,
-    source: { type: payload.source_type, citation: payload.citation }, tags: payload.tags ?? [],
-  }, throwOnError: true }).then(({ data: item }) => CopilotKnowledgeEntrySchema.parse({ knowledge_entry_id: item.id, title: item.title,
-    category: item.entry_type, summary: payload.summary, content: item.content, tags_json: item.tags,
-    source_type: payload.source_type ?? 'project', citation: payload.citation, confidence: payload.confidence ?? 'curated',
-    status: 'active', metadata_json: { version: item.version }, version: item.version }))
+    source: knowledgeSource(payload), tags: payload.tags ?? [],
+  }, throwOnError: true }).then(({ data: item }) => knowledgeEntry(item))
 }
 
 export function updateCopilotKnowledgeEntry(entryId: string, payload: CopilotKnowledgeEntryUpsert, version: number) {
   return patchEntryApiV2KnowledgeEntryIdPatch<true>({ path: { entry_id: entryId },
     headers: { 'If-Match': `W/"${version}"` }, body: { title: payload.title, content: payload.content,
-      entry_type: payload.category, source: { type: payload.source_type, citation: payload.citation }, tags: payload.tags ?? [] },
+      entry_type: payload.category, source: knowledgeSource(payload), tags: payload.tags ?? [] },
     throwOnError: true,
-  }).then(({ data: item }) => CopilotKnowledgeEntrySchema.parse({ knowledge_entry_id: item.id, title: item.title,
-    category: item.entry_type, summary: payload.summary, content: item.content, tags_json: item.tags,
-    source_type: payload.source_type ?? 'project', citation: payload.citation, confidence: payload.confidence ?? 'curated',
-    status: 'active', metadata_json: { version: item.version }, version: item.version }))
+  }).then(({ data: item }) => knowledgeEntry(item))
 }
 
 export function archiveCopilotKnowledgeEntry(entryId: string, version: number) {

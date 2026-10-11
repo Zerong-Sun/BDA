@@ -22,6 +22,8 @@ Two rules carried over from the source workbench, both load-bearing:
 
 from __future__ import annotations
 
+import hashlib
+import math
 import uuid
 from typing import Any
 
@@ -32,6 +34,7 @@ from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
 from ..experiments.models import ExperimentResult
+from .diagnostics import check, finite_json, quality, trace_arrays
 from .kernels import akta, bli, calculators
 
 #: Instrument files are small - a ForteBio CSV or a Unicorn export is a few MB.
@@ -58,12 +61,10 @@ def _decimate(xs: Any, ys: Any, limit: int = TRACE_POINTS) -> list[list[float]]:
     NaNs are dropped rather than sent: JSON has no NaN, and a gap the client can
     see as a gap is more honest than a zero.
     """
-    import math
-
     pairs = [
         [float(x), float(y)]
         for x, y in zip(list(xs), list(ys), strict=False)
-        if not (math.isnan(float(x)) or math.isnan(float(y)))
+        if math.isfinite(float(x)) and math.isfinite(float(y))
     ]
     if len(pairs) <= limit:
         return pairs
@@ -76,7 +77,7 @@ def _decimate(xs: Any, ys: Any, limit: int = TRACE_POINTS) -> list[list[float]]:
 
 def _load_artifact(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> Artifact:
     artifact = session.scalar(select(Artifact).where(Artifact.id == artifact_id, Artifact.deleted_at.is_(None)))
-    if artifact is None or artifact.project_id != project_id:
+    if artifact is None or artifact.project_id != project_id or artifact.status != "available":
         raise DomainError(
             "artifact_not_found",
             "No such artifact in this project.",
@@ -87,7 +88,10 @@ def _load_artifact(session: Session, project_id: uuid.UUID, artifact_id: uuid.UU
 
 def _read(artifact: Artifact) -> bytes:
     try:
-        return ObjectStorage().read_bytes(artifact.object_key, max_bytes=MAX_INSTRUMENT_BYTES)
+        body = ObjectStorage().read_bytes(artifact.object_key, max_bytes=MAX_INSTRUMENT_BYTES)
+        if len(body) != artifact.size_bytes or hashlib.sha256(body).hexdigest() != artifact.checksum_sha256:
+            raise DomainError("instrument_source_integrity", "Raw instrument file does not match its completed artifact", status_code=409)
+        return body
     except ValueError as error:
         raise DomainError(
             "instrument_file_too_large",
@@ -110,6 +114,12 @@ def _record(
     unit: str | None,
     candidate_id: uuid.UUID | None,
 ) -> ExperimentResult:
+    if candidate_id is not None:
+        from ..candidates.models import Candidate
+
+        candidate = session.get(Candidate, candidate_id)
+        if candidate is None or candidate.project_id != project_id:
+            raise DomainError("candidate_not_found", "Project candidate was not found", status_code=404)
     row = ExperimentResult(
         project_id=project_id,
         candidate_id=candidate_id,
@@ -125,12 +135,12 @@ def _record(
             "results": results,
             "analysis_version": analysis_version,
             "source_filename": artifact.filename,
+            "instrument_qc_review": {"status": "pending"},
         },
         created_by=user_id,
     )
     session.add(row)
     session.flush()
-    record_measured_metric(session, row)
     return row
 
 
@@ -201,6 +211,7 @@ def analyse_bli_bytes(
         "kd_nM": kd,
         "methods": {name: fit.get(name) for name in ("standard", "split", "joint", "steady", "mixed")},
         "phase": fit.get("phase"),
+        "quality_control": fit.get("quality_control"),
         # The sensorgrams themselves, so the browser can draw what was fitted
         # rather than only the numbers that came out of it. A KD with no curve
         # behind it cannot be judged.
@@ -255,11 +266,32 @@ def analyse_akta_bytes(data: bytes, *, channel: str | None = None) -> tuple[dict
     uv = akta.find_uv_channels(channels)
     chosen = channel or (uv[0] if uv else sorted(channels)[0])
 
-    peaks = akta.detect_peaks(channels[chosen])
+    trace = channels[chosen]
+    volumes, amplitudes, trace_metric = trace_arrays(trace.vols, trace.amps)
+    checks = []
+    if trace_metric["excluded_nonfinite_points"]:
+        checks.append(check("missing_points", "Non-finite chromatogram points were excluded; inspect gaps before accepting peak areas.", count=trace_metric["excluded_nonfinite_points"]))
+    valid_trace = len(volumes) >= 5 and trace_metric["strictly_increasing"]
+    if not valid_trace:
+        checks.append(check("invalid_volume_axis", "Peak integration requires at least five finite, strictly increasing volume points."))
+    clean_trace = akta.Channel(trace.name, trace.data_type, trace.unit, volumes, amplitudes)
+    peaks = akta.detect_peaks(clean_trace) if valid_trace else []
     rows = akta.peaks_to_rows(peaks)
     fractions = akta.fraction_ranges(akta.find_fraction_events(parsed["events"]))
 
-    largest = max((peak.area for peak in peaks), default=None)
+    if chosen not in uv:
+        checks.append(check("non_uv_channel", "Selected channel is not identified as UV; its area is not recorded as a protein UV peak-area measurement."))
+    if not trace.unit:
+        checks.append(check("unknown_amplitude_unit", "Amplitude units are unavailable; quantitative peak-area units cannot be established."))
+    for index, peak in enumerate(peaks):
+        if peak.start_vol <= volumes[0] or peak.end_vol >= volumes[-1]:
+            checks.append(check("boundary_truncated_peak", "Integration reaches a trace boundary; the complete peak area may not have been observed.", peak=index))
+        if any(peak.start_vol < other.end_vol and other.start_vol < peak.end_vol for other in peaks[index + 1:]):
+            checks.append(check("overlapping_peak_windows", "Detected peak integration windows overlap; their areas must not be summed as independent components.", peak=index))
+    checks.append(check("peak_identity_unverified", "A UV peak and baseline-corrected area do not establish protein identity, purity or yield. Baseline is the 5th percentile after smoothing.", warning=False))
+    qc = quality(checks, trace=trace_metric, detected_peaks=len(peaks), min_height=5.0, smoothing_window=11,
+                 area_definition="smoothed amplitude minus 5th-percentile baseline integrated over volume")
+    largest = max((peak.area for peak in peaks), default=None) if chosen in uv and trace.unit else None
     measurement = dict(
         experiment_type="akta_purification",
         params={"channel": chosen, "channels_available": sorted(channels)},
@@ -267,15 +299,17 @@ def analyse_akta_bytes(data: bytes, *, channel: str | None = None) -> tuple[dict
             "peaks": rows,
             "fractions": [{"start": start, "end": end, "label": label} for start, end, label in fractions],
             "meta": parsed.get("meta", {}),
+            "quality_control": qc,
         },
-        analysis_version=akta.AKTA_ANALYSIS_VERSION,
+        analysis_version=f"{akta.AKTA_ANALYSIS_VERSION}-qc1",
         value=float(largest) if largest is not None else None,
-        unit="mAU*mL" if largest is not None else None,
+        unit=f"{trace.unit}*mL" if largest is not None else None,
     )
     return measurement, {
         "channel": chosen,
         "channels_available": sorted(channels),
         "peak_count": len(rows),
+        "quality_control": qc,
         "peaks": rows,
         "unit": channels[chosen].unit,
         "trace": _decimate(channels[chosen].vols, channels[chosen].amps),
@@ -312,11 +346,26 @@ def analyse_enzyme_bytes(data: bytes, *, subtract_background: bool = True) -> tu
         raise DomainError("enzyme_no_wells", "That workbook contained no readable wells.", status_code=422)
 
     corrected, background = calculators.sub_blank(wells, enabled=subtract_background)
-    fits = {
+    fits = finite_json({
         name: calculators.fit_kinetics(data.get("times") or [], data.get("od") or [])
         for name, data in corrected.items()
-    }
+    })
     slopes = [fit["slope"] for fit in fits.values() if fit.get("slope") is not None]
+    checks = [check("initial_rate_window_unverified", "Fits use the entire observed time window. A linear trend is not automatically an initial enzymatic rate.", warning=False),
+              check("well_mapping_unverified", "The summary takes the maximum well slope. Confirm sample/control roles and the candidate-to-well mapping before accepting it.")]
+    if subtract_background and background is None:
+        checks.append(check("background_unavailable", "Background subtraction was requested but no annotated negative or blank control was available."))
+    for name, fit in fits.items():
+        diagnostics = fit["diagnostics"]
+        if diagnostics["status"] != "fitted":
+            checks.append(check("well_not_fitted", "Well lacks enough ordered finite time points; no numeric rate was assigned.", well=name))
+        if diagnostics["residual_degrees_of_freedom"] <= 0:
+            checks.append(check("insufficient_residual_dof", "A line through two points cannot estimate residual variance or a slope confidence interval.", well=name))
+        if diagnostics["excluded_nonfinite_points"]:
+            checks.append(check("missing_points", "Non-finite well observations were excluded; review measurement gaps.", well=name, count=diagnostics["excluded_nonfinite_points"]))
+        if diagnostics["response_range"] == 0:
+            checks.append(check("constant_response", "No response variation was observed. This does not distinguish inactivity, detection limits or instrument failure.", well=name))
+    qc = quality(checks, fitted_wells=len(slopes), total_wells=len(wells), summary_rule="maximum_finite_well_slope")
 
     measurement = dict(
         experiment_type="enzyme_activity",
@@ -328,6 +377,7 @@ def analyse_enzyme_bytes(data: bytes, *, subtract_background: bool = True) -> tu
         results={
             "fits": fits,
             "background_subtracted": background is not None,
+            "quality_control": qc,
         },
         # Enzyme fitting lives in calculators, which has no version constant of
         # its own; the kernels were ported together, so BLI's stands for the set.
@@ -339,6 +389,7 @@ def analyse_enzyme_bytes(data: bytes, *, subtract_background: bool = True) -> tu
         "well_count": len(wells),
         "fits": fits,
         "background_subtracted": background is not None,
+        "quality_control": qc,
         # Background-corrected, because that is what was fitted; plotting the
         # raw wells beside a corrected slope would invite reading one off the
         # other.
@@ -374,9 +425,20 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
     Returns None when there is nothing to record: no candidate to attach to, no
     value fitted, or an experiment type with no agreed metric key.
     """
-    from ..candidates.models import CandidateMetric
+    from ..candidates.models import Candidate, CandidateMetric
 
-    if result.candidate_id is None or result.value is None:
+    if result.candidate_id is not None:
+        candidate = session.scalar(select(Candidate).where(Candidate.id == result.candidate_id,
+                                   Candidate.project_id == result.project_id).with_for_update())
+        if candidate is None:
+            raise DomainError("candidate_not_found", "Project candidate was not found", status_code=404)
+    review = result.result_metadata.get("instrument_qc_review", {})
+    if review.get("status") != "accepted":
+        # Projection is disposable; preserve the original result and audit history.
+        session.query(CandidateMetric).filter(CandidateMetric.source_experiment_result_id == result.id).delete(synchronize_session="fetch")
+        session.flush()
+        return None
+    if result.candidate_id is None or result.value is None or not math.isfinite(result.value):
         return None
     mapping = MEASURED_METRICS.get(result.experiment_type)
     if mapping is None:
@@ -400,6 +462,7 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
         existing.value = float(result.value)
         existing.unit = result.unit or unit
         existing.source_experiment_result_id = result.id
+        existing.context = {**existing.context, "qc_review": review, "analysis_version": result.result_metadata.get("analysis_version", "")}
         existing.version += 1
         session.flush()
         return existing
@@ -417,7 +480,7 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
         assessor="instrument",
         condition="",
         unit=result.unit or unit,
-        context={"analysis_version": result.result_metadata.get("analysis_version", "")},
+        context={"analysis_version": result.result_metadata.get("analysis_version", ""), "qc_review": review},
         source_experiment_result_id=result.id,
     )
     session.add(metric)

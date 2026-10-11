@@ -1,30 +1,44 @@
 /* Bigo V2 application tokens. Scientific structure colors retain their source palettes. */
 :root, [data-theme="light"] {
-  --bg-app: #f3f0e8;
-  --bg-canvas: #e8eadf;
-  --bg-surface-1: #faf9f4;
-  --bg-surface-2: #eeeee5;
-  --bg-surface-3: #fffef9;
-  --border-soft: #d3d3c7;
-  --border-default: #c7c9bb;
-  --border-strong: #929987;
-  --text-primary: #171a16;
-  --text-secondary: #50564a;
-  --text-muted: #686b61;
-  --text-inverse: #f3f0e8;
-  --bda-primary: #d3ed70;
-  --bda-primary-foreground: #171a16;
-  --accent: #4e651e;
-  --accent-foreground: #f3f0e8;
-  --accent-hover: #bfd854;
-  --accent-pressed: #abc341;
-  --accent-muted: #526728;
-  --accent-bg: #e8edcf;
-  --accent-border: #a9bb6e;
-  --accent-2: #ad482b;
-  --accent-2-hover: #923b24;
-  --accent-2-bg: #f4e1d7;
-  --accent-2-border: #daae97;
+  color-scheme: light;
+  --bg-app: #f5f7fa;
+  --bg-canvas: #edf1f6;
+  --bg-surface-1: #ffffff;
+  --bg-surface-2: #f0f3f7;
+  --bg-surface-3: #ffffff;
+  --border-soft: #dfe5ed;
+  --border-default: #c6cfdb;
+  --border-strong: #8793a5;
+  --text-primary: #1c2433;
+  --text-secondary: #4e5b6e;
+  --text-muted: #626f80;
+  --text-inverse: #ffffff;
+  --bda-primary: #861b35;
+  --bda-primary-foreground: #ffffff;
+  --accent: #861b35;
+  --accent-foreground: #ffffff;
+  --accent-hover: #6f142b;
+  --accent-pressed: #591023;
+  --accent-muted: #903e54;
+  --accent-bg: #f8edf1;
+  --accent-border: #dcb5c0;
+  --accent-2: #126b79;
+  --accent-2-hover: #0c5562;
+  --accent-2-bg: #e8f3f5;
+  --accent-2-border: #afcfd5;
+  --bda-success: #16715a;
+  --success: var(--bda-success);
+  --success-bg: #e8f5ef;
+  --bda-warning: #915b0c;
+  --warning: var(--bda-warning);
+  --warning-bg: #fff5e4;
+  --bda-destructive: #b32636;
+  --destructive: var(--bda-destructive);
+  --danger: var(--bda-destructive);
+  --danger-bg: #fceef0;
+  --bda-info: #285f9e;
+  --info: var(--bda-info);
+  --info-bg: #edf3fc;
   --background: var(--bg-app);
   --foreground: var(--text-primary);
   --card: var(--bg-surface-1);
@@ -38,15 +52,30 @@
   --muted: var(--bg-surface-2);
   --muted-foreground: var(--text-muted);
   --border: var(--border-soft);
-  --input: var(--border-default);
-  --ring: #637a2b;
-  --success-foreground: #2d6541;
-  --info-foreground: #335770;
-  --warning-foreground: #7c4d14;
-  --destructive-foreground: #9d382f;
-  --radius: .35rem;
-  --shadow-soft: 0 1px 2px rgb(23 26 22 / 3%);
-  --shadow-medium: 0 8px 24px rgb(23 26 22 / 8%);
+  --input: var(--border-strong);
+  --ring: var(--bda-primary);
+  --success-foreground: #14624f;
+  --info-foreground: #24558d;
+  --warning-foreground: #80500b;
+  --destructive-foreground: #a22131;
+  --invert: var(--text-primary);
+  --invert-foreground: var(--text-inverse);
+  --sidebar: var(--bg-surface-1);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--bda-primary);
+  --sidebar-primary-foreground: var(--bda-primary-foreground);
+  --sidebar-accent: var(--accent-bg);
+  --sidebar-accent-foreground: var(--accent);
+  --sidebar-border: var(--border-soft);
+  --sidebar-ring: var(--ring);
+  --chart-1: #126b79;
+  --chart-2: #416cab;
+  --chart-3: #861b35;
+  --chart-4: #8f6b3a;
+  --chart-5: #7b63a1;
+  --radius: .625rem;
+  --shadow-soft: 0 1px 2px rgb(28 36 51 / 3%), 0 4px 16px rgb(28 36 51 / 3%);
+  --shadow-medium: 0 8px 32px rgb(28 36 51 / 10%), 0 2px 6px rgb(28 36 51 / 4%);
 }
 
 /* One dark palette for application, registry controls and charts.
@@ -498,4 +527,64 @@ body { line-height: 1.6; }
   .research-page--structures .research-page-heading > * { grid-column: 1; }
   .research-page--structures .research-page-heading > .science-route-links { grid-column: 1; grid-row: auto; }
   .structure-toolbar-actions { margin-left: 0; width: 100%; }
+}
+
+/* Light workspace: white reading surfaces, cool neutral chrome, BigoBio wine
+   for actions. Scope visual refinements so the black workspace stays intact. */
+[data-theme="light"] ::selection { background: #edd4dd; color: #591023; }
+[data-theme="light"] .science-topbar { box-shadow: 0 1px 0 rgb(28 36 51 / 3%); }
+[data-theme="light"] .science-navigation { background: var(--bg-surface-1); }
+[data-theme="light"] .science-navigation a[aria-current="page"] { color: var(--accent); }
+[data-theme="light"] .science-navigation a:hover { color: var(--accent); background: var(--accent-bg); }
+[data-theme="light"] .science-topbar [data-tour-id="project-selector"] {
+  border-left: 1px solid var(--border-soft);
+  padding-left: 1rem;
+}
+[data-theme="light"] [data-slot="button"] { border-radius: 8px; }
+[data-theme="light"] [data-slot="button"].text-primary-foreground { color: var(--primary-foreground); }
+[data-theme="light"] [data-slot="button"].bg-primary:not(:disabled):hover { background: var(--accent-hover); }
+[data-theme="light"] [data-slot="button"].bg-primary:not(:disabled):active { background: var(--accent-pressed); }
+[data-theme="light"] [data-slot="button"].border-border { background: var(--bg-surface-1); border-color: var(--border-default); }
+[data-theme="light"] [data-slot="button"].border-border:hover { background: var(--bg-surface-2); border-color: var(--border-strong); }
+[data-theme="light"] [data-slot="badge"] { border-radius: 5px; }
+[data-theme="light"] [data-slot="tabs-list"][data-variant="default"] { border-radius: 9px; padding: 4px; }
+[data-theme="light"] [data-slot="tabs-list"][data-variant="default"] [role="tab"] { border-radius: 6px; }
+[data-theme="light"] [data-slot="tabs-list"][data-variant="line"] [role="tab"][aria-selected="true"] { color: var(--accent); }
+[data-theme="light"] [data-slot="tabs-list"][data-variant="line"] [role="tab"][aria-selected="true"]::after { background: var(--accent); }
+[data-theme="light"] :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) { background: var(--bg-surface-1); border-radius: 8px; }
+[data-theme="light"] .science-eyebrow { color: var(--accent-muted); }
+[data-theme="light"] .science-team-preview {
+  background: var(--bg-surface-1);
+  color: var(--text-primary);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-soft);
+}
+[data-theme="light"] .science-team-preview .science-eyebrow { color: var(--accent); }
+[data-theme="light"] .science-preview-footer { border-color: var(--border-soft); color: var(--text-secondary); }
+[data-theme="light"] .science-preview-footer > span:first-child { color: var(--text-muted); }
+[data-theme="light"] .bot-avatar { background: #f2dce3; color: #761b34; }
+[data-theme="light"] .bot-avatar--produce { background: #dceef1; color: #125d6a; }
+[data-theme="light"] .bot-avatar--review { background: #f6e8d2; color: #785414; }
+[data-theme="light"] .project-row { box-shadow: var(--shadow-soft); border-radius: 12px; }
+[data-theme="light"] .project-row:hover { border-color: var(--accent-border); box-shadow: var(--shadow-medium); }
+[data-theme="light"] .project-row[data-active="true"] { border-color: var(--accent-border); box-shadow: inset 3px 0 var(--accent), var(--shadow-soft); }
+[data-theme="light"] .project-index { background: var(--accent-bg); color: var(--accent); }
+[data-theme="light"] .bot-surface-tabs { background: var(--bg-surface-1); }
+[data-theme="light"] .room-scroll { background: var(--bg-app); border-color: var(--border-soft); }
+[data-theme="light"] .room-entry-body { background: var(--bg-surface-1); box-shadow: 0 1px 2px rgb(28 36 51 / 3%); }
+[data-theme="light"] .room-entry--mine .room-entry-body { background: var(--accent-bg); border-color: var(--accent-border); }
+[data-theme="light"] .bot-context nav a { color: var(--text-secondary); }
+[data-theme="light"] .bot-context nav a:hover { color: var(--accent); }
+[data-theme="light"] .learning-overview dd,
+[data-theme="light"] .learning-metrics dd { color: var(--accent-2); }
+[data-theme="light"] .learning-record { background: #f8fafc; }
+[data-theme="light"] .learning-field :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]),
+[data-theme="light"] .learning-scroll input[type="number"] { background: var(--bg-surface-1); border-color: var(--input); }
+[data-theme="light"] .learning-steps li > button { border-radius: 0; }
+[data-theme="light"] #lab-tool-catalog [aria-current="page"] { background: var(--accent-bg); color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
+[data-theme="light"] :is(.lab-tool-workbench, .research-decision-center, .evidence-note-card, .evidence-note-editor) { background: var(--bg-surface-1); border-radius: 12px; box-shadow: var(--shadow-soft); }
+[data-theme="light"] .lab-tool-workbench dl > div { border-radius: 8px; background: var(--bg-surface-2); }
+[data-theme="light"] .lab-tool-workbench dd { color: var(--accent-2); }
+@media (max-width: 640px) {
+  [data-theme="light"] .science-topbar [data-tour-id="project-selector"] { border-left: 0; padding-left: 0; }
 }

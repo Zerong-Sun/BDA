@@ -22,6 +22,7 @@ import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { childTasksByParent, copilotRoomQueryKey, inReadingOrder, topLevelEntries, useCopilotRoom } from './roomFeed'
 import { roomTaskLabel } from './taskPresentation'
 import { useCopilotChat } from './useCopilotChat'
+import { ChatModeSwitch } from './ChatModeSwitch'
 
 /**
  * The project's research room.
@@ -66,7 +67,7 @@ export function Room({
   const bots = useCopilotBots()
   const roster = bots.data ?? []
   const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, pendingMessages } = useCopilotChat(
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode } = useCopilotChat(
     projectId,
     pageContext,
     language,
@@ -114,7 +115,7 @@ export function Room({
 
   // Who this message is addressed to, recomputed as it is typed so the room can
   // show the addressee before it is sent rather than after.
-  const mention = parseMention(input, roster)
+  const mention = mode === 'bench' ? null : parseMention(input, roster)
   const addressee = mention?.bot
   const unknownHandle = mention && !mention.bot ? mention.handle : null
   const assignable = addressee ? ownedService(addressee) : undefined
@@ -131,6 +132,7 @@ export function Room({
 
   return (
     <div className="room" data-tour-id="research-room">
+      <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
       <ApiState
         isLoading={feed.isLoading}
         isError={feed.isError}

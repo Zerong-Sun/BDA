@@ -344,6 +344,11 @@ class AgentRunCreate(BaseModel):
     skills: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
         default_factory=list, max_length=20
     )
+    #: Procedural SKILL.md packages, never authorization capabilities. None
+    #: chooses service defaults; [] explicitly opts out. Frozen on the run.
+    procedural_skills: list[Annotated[str, Field(min_length=1, max_length=64)]] | None = Field(
+        default=None, max_length=3
+    )
     #: A roster bot id. Mutually exclusive with `skills`, and narrowing only:
     #: the run gets `bot.capabilities & project.enabled_skills`.
     bot: str | None = Field(default=None, min_length=1, max_length=80)

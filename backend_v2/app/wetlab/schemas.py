@@ -201,6 +201,20 @@ class AnalysisResponse(BaseModel):
     unit: str | None
     source_artifact_id: uuid.UUID
     summary: dict
+    version: int
+    qc_review: dict | None = None
+
+
+class AnalysisReviewRequest(BaseModel):
+    accept: bool
+    rationale: str = Field(min_length=1, max_length=2000)
+
+
+class AnalysisReviewResponse(BaseModel):
+    experiment_result_id: uuid.UUID
+    version: int
+    review: dict
+    candidate_metric_recorded: bool
 
 
 class AnalysisPreviewRequest(BaseModel):

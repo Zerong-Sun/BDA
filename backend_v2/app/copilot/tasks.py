@@ -157,6 +157,7 @@ def copilot_respond(message_id: str) -> dict:
                 *(citation for item in history if item.role == "assistant" for citation in item.citations or []),
             ])
             reasoning_content = None
+            delivery_context: dict = {}
             try:
                 if provider and provider.enabled:
                     configured_prompt = (
@@ -164,9 +165,9 @@ def copilot_respond(message_id: str) -> dict:
                     )
                     skills = ", ".join(sorted(enabled_capabilities))
                     active_skills = ", ".join(sorted(turn_capabilities)) or "none"
-                    from .policy import SCIENTIFIC_POLICY
+                    from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
 
-                    system_prompt = SCIENTIFIC_POLICY
+                    system_prompt = SCIENTIFIC_POLICY + "\n" + RESPONSE_STYLE
                     messages = [{"role": "system", "content": system_prompt}]
                     if configured_prompt:
                         messages.append(
@@ -235,13 +236,20 @@ def copilot_respond(message_id: str) -> dict:
                         max_tool_calls=max_tool_calls,
                         bot=active_bot.id if active_bot else None,
                         enabled_capabilities=enabled_capabilities,
+                        bench_response_language=turn_context.get("language", "en")
+                        if turn_capabilities == {"wetlab-read"} else None,
                     )
                     answer = agent_result.content
+                    if agent_result.calculator_delivery:
+                        delivery_context = {"calculator_delivery": True,
+                                            "delivery_status": "partial" if agent_result.delivery_incomplete else "complete"}
                     reasoning_content = agent_result.reasoning_content
                     citations = agent_result.citations
                     tool_calls = agent_result.tool_calls
                     grounded_citations = _traceable_literature_citations(citations)
-                    if len(answer) >= 1500 and grounded_citations:
+                    # Server-rendered arithmetic already carries its validated assumptions.
+                    # A prose reviewer must not rewrite the calculator's facts.
+                    if not agent_result.calculator_delivery and len(answer) >= 1500 and grounded_citations:
                         evidence_packet = research_context.grounding_packet(citations)
                         reviewed = review_grounded_scientific_answer_result(
                             provider,
@@ -283,7 +291,7 @@ def copilot_respond(message_id: str) -> dict:
                                     + "、".join(remaining_issues)
                                     + "。不得将本回答作为已验证科学结论。"
                                 )
-                    elif _needs_scientific_review(available_kinds, answer):
+                    elif not agent_result.calculator_delivery and _needs_scientific_review(available_kinds, answer):
                         reviewed = review_scientific_answer_result(provider, source.content, answer)
                         answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                 elif settings.is_production:
@@ -314,6 +322,7 @@ def copilot_respond(message_id: str) -> dict:
                             "policy_version": "BDA_COPILOT_POLICY_V6",
                             "capabilities": sorted(enabled_capabilities),
                             "active_capabilities": sorted(turn_capabilities),
+                            **delivery_context,
                         },
                     )
                 )

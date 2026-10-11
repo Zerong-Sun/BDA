@@ -15,6 +15,7 @@ import { useAppStore, type CopilotTaskDraft } from '../../lib/store/appStore'
 import { assessTaskReadiness, getTaskReadiness, isLive, listAgentRuns, listTaskServices, startAgentRun } from '../../lib/api/agentRuns'
 import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
+import { ProceduralSkillSelector } from './ProceduralSkills'
 import { BotAvatar } from './BotAvatar'
 import { reviewersOf, useCopilotBots, type CopilotBot } from './bots/registry'
 import { botHref } from './bots/workbenches'
@@ -60,6 +61,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const runId = onRunChange ? openRunId : localRunId
   const setRunId = onRunChange ?? setLocalRunId
   const [question, setQuestion] = useState<string | null>(null)
+  const [proceduralSkills, setProceduralSkills] = useState<string[] | null>(null)
   const [chat, setChat] = useState(Boolean(draft))
   const services = useQuery({ queryKey: ['copilot-task-services'], queryFn: listTaskServices, enabled: Boolean(projectId) })
   const readiness = useQuery({ queryKey: ['copilot-task-readiness', projectId], queryFn: () => getTaskReadiness(projectId), enabled: Boolean(projectId) })
@@ -86,6 +88,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     void queryClient.invalidateQueries({ queryKey: ['copilot-config', projectId] })
   } })
   const start = useMutation({ mutationFn: () => { requireCopilotWrite(); if (!assignee || !kind) throw new Error(zh ? '请先选择任务负责人。' : 'Choose who owns this task first.'); return startAgentRun({ project_id: projectId, goal: goal.trim(), bot: assignee.bot.id, service_kind: kind,
+    procedural_skills: proceduralSkills,
     authorized_writes: writes, max_turns: maxTurns, max_cost_usd_cents: maxCost.trim() === '' ? null : Number(maxCost) }) },
     onSuccess: ({ run }) => {
       // A durable task may start after the user has moved to another project
@@ -127,6 +130,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       </div></div>
       <p className="text-sm">{zh ? service.deliverable_zh : service.deliverable}</p>
       <ol className="list-decimal space-y-1 pl-5 text-sm">{service.steps.map((s, i) => <li key={i}>{String(zh ? s.title_zh : s.title)}</li>)}</ol>
+      <ProceduralSkillSelector serviceKind={kind ?? 'custom'} value={proceduralSkills} onChange={setProceduralSkills} disabled={readOnly || start.isPending} />
       {ownerWrites.map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
         {tool === 'start_literature_search' ? (zh ? '允许发起外部文献检索并摄取结果' : 'Allow external literature search and ingestion') : (zh ? '允许保存待审核研究笔记' : 'Allow saving research notes for review')}</label>)}
       <p className="text-xs text-text-secondary">{writes.length ? (zh ? '将在本项目内执行以上勾选操作。' : 'Checked actions will run in this project.') : (zh ? '当前只读取已有资料并生成答复。' : 'Reads existing data and prepares an answer.')} {zh ? '工作流运行仍需检查并确认提交。' : 'Workflow execution still requires review and confirmation.'}</p>

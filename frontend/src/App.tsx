@@ -45,16 +45,17 @@ const WorkflowPage = lazy(() => import('./app/Workflow').then((module) => ({ def
 const CandidatesPage = lazy(() => import('./app/Candidates').then((module) => ({ default: module.CandidatesPage })))
 const LearningPage = lazy(() => import('./app/Learning').then((module) => ({ default: module.LearningPage })))
 const LabPage = lazy(() => import('./app/Lab').then((module) => ({ default: module.LabPage })))
+const ToolsPage = lazy(() => import('./app/Tools').then((module) => ({ default: module.ToolsPage })))
 const ResultsPage = lazy(() => import('./app/Results').then((module) => ({ default: module.ResultsPage })))
 const LoginPage = lazy(() => import('./app/Login').then((module) => ({ default: module.LoginPage })))
 const ResearchPage = lazy(() => import('./app/Research').then((module) => ({ default: module.ResearchPage })))
-const TimelinePage = lazy(() => import('./app/Timeline'))
 const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: module.FAQPage })))
 const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
 const AutopilotPage = lazy(() => import('./app/Autopilot').then((module) => ({ default: module.AutopilotPage })))
 const BotsPage = lazy(() => import('./app/Bots').then((module) => ({ default: module.BotsPage })))
 const BotDetailPage = lazy(() => import('./app/BotDetail').then((module) => ({ default: module.BotDetailPage })))
 const InboxPage = lazy(() => import('./app/Inbox').then((module) => ({ default: module.InboxPage })))
+const ExtensionCenter = lazy(() => import('./features/registry/ExtensionCenter').then((module) => ({ default: module.ExtensionCenter })))
 
 function RouteFallback() {
   const { t } = useI18n()
@@ -78,6 +79,14 @@ function RequireAuth() {
     return <Navigate to="/login" replace />
   }
   return <Outlet />
+}
+
+/** Old bookmarks share the one research decision-record page. */
+function TimelineRedirect() {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  params.set('tab', 'timeline')
+  return <Navigate replace to={`/research?${params.toString()}`} />
 }
 
 function LanguageSync() {
@@ -190,6 +199,7 @@ export default function App() {
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
                 <Route path="/inbox" element={<InboxPage />} />
+                <Route path="/extensions" element={<ExtensionCenter />} />
                 <Route path="/bots" element={<BotsPage />} />
                 <Route path="/bots/:botId" element={<BotDetailPage />} />
                 {/* The page was always labelled "Projects"; only the URL said
@@ -198,12 +208,12 @@ export default function App() {
                 <Route path="/experiments" element={<Navigate to="/projects" replace />} />
                 <Route path="/workflow" element={<ProjectRequired><WorkflowPage /></ProjectRequired>} />
                 <Route path="/candidates" element={<ProjectRequired><CandidatesPage /></ProjectRequired>} />
-                <Route path="/tools" element={<LabPage toolbox />} />
+                <Route path="/tools" element={<ToolsPage />} />
                 <Route path="/lab" element={<ProjectRequired><LabPage /></ProjectRequired>} />
                 <Route path="/learning" element={<ProjectRequired><LearningPage /></ProjectRequired>} />
                 <Route path="/results" element={<ProjectRequired><ResultsPage /></ProjectRequired>} />
                 <Route path="/research" element={<ResearchPage />} />
-                <Route path="/timeline" element={<ProjectRequired><TimelinePage /></ProjectRequired>} />
+                <Route path="/timeline" element={<TimelineRedirect />} />
                 <Route path="/autopilot" element={<ProjectRequired><AutopilotPage /></ProjectRequired>} />
                 <Route path="/faq" element={<FAQPage />} />
               </Route>

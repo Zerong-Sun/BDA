@@ -11,6 +11,7 @@ from ..identity.models import User
 from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
+from .bundle import snapshot_selection
 from .models import DeliveryPackage
 from .schemas import DeliveryCreate, ResultSummary
 
@@ -32,9 +33,12 @@ def _kd_value_in_molar(value: float | None, unit: str | None) -> float | None:
 def create_delivery(
     session: Session, project: Project, payload: DeliveryCreate, user: User
 ) -> tuple[DeliveryPackage, Operation]:
-    package = DeliveryPackage(
-        project_id=project.id, created_by=user.id, name=payload.name, selection=payload.model_dump(mode="json")
-    )
+    selection = payload.model_dump(mode="json")
+    snapshot = snapshot_selection(session, project.id, selection)
+    selection.update({"_snapshot": snapshot, "format": "ro-crate-1.1", "frozen_at": snapshot["frozen_at"],
+                      "consistency": snapshot.get("consistency", "caller-transaction"),
+                      "record_counts": {key: len(snapshot[key]) for key in ("candidates", "metrics", "experiment_results", "artifacts")}})
+    package = DeliveryPackage(project_id=project.id, created_by=user.id, name=payload.name, selection=selection)
     session.add(package)
     session.flush()
     operation = enqueue_operation(

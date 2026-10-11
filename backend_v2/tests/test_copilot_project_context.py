@@ -19,6 +19,9 @@ class FakeSession:
     def scalars(self, statement):
         return iter(next(self.outputs))
 
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
 
 def test_project_context_reads_each_operational_data_family() -> None:
     project_id = uuid.uuid4()

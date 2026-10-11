@@ -19,6 +19,14 @@ import { z } from 'zod'
 /** A decimated trace, as [x, y] pairs. The server thins it; the browser draws it. */
 export const SeriesSchema = z.array(z.tuple([z.number(), z.number()]))
 
+export const InstrumentQCSchema = z.object({
+  version: z.string(),
+  review_required: z.boolean(),
+  checks: z.array(z.object({ code: z.string(), status: z.enum(['review', 'information']), message: z.string(), details: z.record(z.string(), z.unknown()).default({}) })),
+  metrics: z.record(z.string(), z.unknown()).default({}),
+  interpretation: z.string(),
+})
+
 const FitSchema = z
   .object({
     kd: z.number().nullable().optional(),
@@ -31,6 +39,7 @@ const FitSchema = z
   .nullable()
 
 export const BliSummarySchema = z.object({
+  quality_control: InstrumentQCSchema.nullable().default(null),
   sample_id: z.string(),
   samples_available: z.array(z.string()).default([]),
   kd_nM: z.number().nullable().default(null),
@@ -51,6 +60,7 @@ export const BliSummarySchema = z.object({
 })
 
 export const AktaSummarySchema = z.object({
+  quality_control: InstrumentQCSchema.nullable().default(null),
   channel: z.string(),
   channels_available: z.array(z.string()).default([]),
   peak_count: z.number(),
@@ -75,6 +85,7 @@ export const AktaSummarySchema = z.object({
 })
 
 export const EnzymeSummarySchema = z.object({
+  quality_control: InstrumentQCSchema.nullable().default(null),
   well_count: z.number(),
   background_subtracted: z.boolean().default(false),
   fits: z.record(
@@ -84,6 +95,7 @@ export const EnzymeSummarySchema = z.object({
       intercept: z.number().nullable(),
       r2: z.number().nullable(),
       n: z.number(),
+      diagnostics: z.record(z.string(), z.unknown()).optional(),
     }),
   ),
   wells: z.array(z.object({ well: z.string(), points: SeriesSchema })).default([]),

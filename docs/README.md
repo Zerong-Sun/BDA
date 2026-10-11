@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-30（归档已交付方案，更新能力与剩余工作入口）
+最后核验：2026-10-11（RC2 发布、全平台能力升级与导航入口归整）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -12,18 +12,26 @@
 
 ## 开始使用
 
-- [Iteravia 2.6 RC1 安装、升级和发布说明](RELEASE_2_6_RC1.md)
+- [全平台能力升级与接入账本](PLATFORM_CAPABILITY_UPGRADE.md)
+
+- [Iteravia 2.6 RC2 安装、升级和发布说明](RELEASE_2_6_RC2.md)
+- [历史 RC1 发布说明与安装初始化步骤](RELEASE_2_6_RC1.md)
 - [Iteravia / BDA 2.6 项目学习](LEARNING_V26.md)
 
 - [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
+- [全局导航与工作区入口契约](NAVIGATION_WORKSPACE_CONTRACT.md)
+- [实验工具使用与计算约定](LAB_TOOLS.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
+- [DeepSeek Flash 输出验收与优化](DEEPSEEK_OUTPUT_REVIEW.md)
+- [六维审查、修复清单与实际运行验证](DEEPSEEK_OUTPUT_AUDIT.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)
 - [公开 PD1 演示数据说明](../examples/migration-fixtures/pd1/DATA_CARD.md)
 - [工作区结构说明](WORKSPACE_MAP.md)
 
 ## Copilot、bots 与工作流
 
+- [版本化科研 Skill 方法包](SCIENTIFIC_METHOD_PACKAGES.md)
 - [Bot 名册](COPILOT_BOT_ROSTER.md)
 - [Bot 职责与委派规则](COPILOT_BOT_GOVERNANCE.md)
 - [MCP 能力与调用契约](MCP_CAPABILITY_SURFACE.md)
@@ -34,7 +42,12 @@
 
 ## 研究记录与审核
 
+- [研究决策中心](RESEARCH_DECISION_CENTER.md)
+- [仪器分析与质控审核](WETLAB_QUALITY_CONTROL.md)
+- [可核验的研究交付包](RESEARCH_DELIVERY_BUNDLES.md)
+- [文献整理开源方法调研与论据工作台](LITERATURE_EVIDENCE_WORKBENCH.md)
 - [研究工具能力、输入与来源限制](RESEARCH_TOOL_CAPABILITIES.md)
+- [知识库检索与来源保留](KNOWLEDGE_SEARCH.md)
 - [研究记录结构](RESEARCH_RECORD_STRUCTURE.md)
 - [文献综述写作与审核标准](RESEARCH_REVIEW_WRITING_STANDARD.md)
 - [数据目录与公开/私有数据边界](DATA_CATALOG.md)
@@ -45,6 +58,7 @@
 - [前端架构与 API 契约](FRONTEND_V2.md)
 - [后端架构与服务边界](BACKEND_V2.md)
 - [计算后端与目标配置](COMPUTE_TARGETS.md)
+- [扩展中心与模型使用资格](EXTENSION_QUALIFICATION.md)
 - [插件接口](PLUGIN_INTERFACE.md)
 - [插件参数手册](plugins/INDEX.md)
 - [Rosetta 参数](rosetta/PARAMETERS.md)与[科学模式](rosetta/SCIENTIFIC_MODES.md)

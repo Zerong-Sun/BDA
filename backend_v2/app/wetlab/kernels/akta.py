@@ -136,7 +136,7 @@ def parse_akta_zip(source: str | bytes) -> dict:
             name = name_el.text if name_el is not None else None
             if not name:
                 continue
-            d_type = c.attrib.get("CurveDataType", "Other")
+            d_type = c.attrib.get("CurveDataType") or c.findtext("CurveDataType") or "Other"
             unit_el = c.find("AmplitudeUnit")
             unit = unit_el.text if unit_el is not None and unit_el.text else ""
             try:

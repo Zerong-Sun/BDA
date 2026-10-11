@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useI18n } from '../../lib/i18n'
 import { citationText, citationValueLabel, safeCitationUrl, type CitationRecord } from './citationMarkers'
 import { citationLabel } from './citationLabel'
+import { relationLabel } from './evidenceNotes'
 
 const CONTENT_KINDS: Record<string, [string, string]> = {
   metadata_only: ['仅书目信息', 'Bibliographic metadata only'],
@@ -11,6 +12,7 @@ const CONTENT_KINDS: Record<string, [string, string]> = {
   open_access_abstract: ['开放文献 XML 中的摘要', 'Abstract from open-access XML'],
   open_access_full_text: ['开放获取全文片段', 'Excerpt from open-access full text'],
   uploaded_text: ['上传的文本', 'Uploaded text'],
+  user_supplied_excerpt: ['手工摘录（未匹配原文）', 'Manual excerpt (not source-matched)'],
 }
 
 export function CitationDetails({ citations, prefix, projectId }: { citations: readonly CitationRecord[]; prefix: string; projectId?: string }) {
@@ -51,8 +53,11 @@ export function CitationDetails({ citations, prefix, projectId }: { citations: r
       return <div key={index} id={`${prefix}-source-${index + 1}`} className="mt-2 rounded border border-border-soft p-2"><Disclosure title={`[${index + 1}] ${label}`}>
         {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">{zh ? '打开原始来源' : 'Open original source'} · {label}</a> : null}
         {projectHref ? <Link to={projectHref} className="mt-2 block">{zh ? '查看项目资料' : 'View project material'}</Link> : null}
-        <dl className="mt-2 grid gap-1 sm:grid-cols-[auto_1fr]">{fields.map(([name, value]) => <div key={String(name)} className="contents"><dt className="text-text-muted">{String(name)}</dt><dd className="break-all">{String(value)}</dd></div>)}</dl>
+        {citationText(citation.project_argument) ? <p className="mt-3"><strong>{zh ? '项目论点：' : 'Project argument: '}</strong>{citationText(citation.project_argument)}</p> : null}
+        {citationText(citation.evidence_relation) ? <p className="mt-2 font-medium">{relationLabel(citationText(citation.evidence_relation), zh)}</p> : null}
         {citationText(citation.excerpt) ? <><p className="mt-2 font-medium">{zh ? '保存的原文片段' : 'Saved source excerpt'}{citation.excerpt_truncated ? (zh ? '（预览已截短）' : ' (preview truncated)') : ''}</p><blockquote className="mt-1 whitespace-pre-wrap border-l-2 pl-2">{citationText(citation.excerpt)}</blockquote></> : <p className="mt-2 text-text-muted">{zh ? '未附原文片段，需查阅来源内容核实。' : 'No excerpt attached. Check the source content to verify the claim.'}</p>}
+        {[[zh ? '论文观点' : 'Paper claim', citation.paper_claim], [zh ? '论据解释' : 'Interpretation', citation.interpretation], [zh ? '适用边界' : 'Limits', citation.limitations], [zh ? '原文位置' : 'Location', citation.locator]].filter(([, value]) => citationText(value)).map(([name, value]) => <p className="mt-2" key={citationText(name)}><strong>{citationText(name)}: </strong>{citationText(value)}</p>)}
+        <dl className="mt-3 grid gap-1 border-t pt-2 sm:grid-cols-[auto_1fr]">{fields.map(([name, value]) => <div key={String(name)} className="contents"><dt className="text-text-muted">{String(name)}</dt><dd className="break-all">{String(value)}</dd></div>)}</dl>
       </Disclosure></div>
     })}
   </div>

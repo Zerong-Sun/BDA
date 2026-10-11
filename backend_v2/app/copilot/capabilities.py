@@ -195,7 +195,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series"],
+        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series", "calculate_bench"],
     },
     {
         "id": "wetlab-authoring",

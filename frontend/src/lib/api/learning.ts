@@ -20,7 +20,7 @@ import {
   exportLearningDeliveryApiV2ProjectsProjectIdLearningStudiesRecordIdDeliveryGet as deliverySdk,
   getLearningRecordApiV2ProjectsProjectIdLearningKindRecordIdGet as recordSdk,
 } from './generated/sdk.gen'
-import type { AssayCreate, AssayResponse, StudyCreate, StudyResponse, DatasetResponse, ModelResponse,
+import type { AssayCreate, AssayResponse, StudyCreate, StudyResponse, DatasetCreate, DatasetResponse, ModelResponse,
   LearningDecisionCreate, LearningDecisionResponse, ObservationCreate, ModelCreate, ModelReview,
   BackendV2AppLearningSchemasEvidenceResponse as EvidenceResponse, EvidenceCreate, BatchResponse, BatchComplete, ObservationImport, ExperimentResultResponse } from './generated/types.gen'
 
@@ -62,8 +62,8 @@ export async function createStudy(projectId: string, body: StudyCreate) {
 export async function createObservation(projectId: string, body: ObservationCreate) {
   return (await observationSdk<true>({ path: { project_id: projectId }, body, throwOnError: true })).data
 }
-export async function freezeDataset(projectId: string, studyId: string, resultIds: string[]) {
-  return (await datasetSdk<true>({ path: { project_id: projectId }, body: { study_id: studyId, result_ids: resultIds }, throwOnError: true })).data
+export async function freezeDataset(projectId: string, studyId: string, resultIds: string[], featureVersion?: DatasetCreate['feature_version']) {
+  return (await datasetSdk<true>({ path: { project_id: projectId }, body: { study_id: studyId, result_ids: resultIds, ...(featureVersion ? { feature_version: featureVersion } : {}) }, throwOnError: true })).data
 }
 export async function trainLearningModel(projectId: string, datasetId: string, options: Omit<ModelCreate, 'dataset_id'> = {}) {
   return (await modelSdk<true>({ path: { project_id: projectId }, body: { dataset_id: datasetId, ...options }, throwOnError: true })).data

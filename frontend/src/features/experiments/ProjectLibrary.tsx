@@ -263,7 +263,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
                     <StatusPills status={project.status} />
                     {brief.source === 'public-package' ? <span className="project-source">{language === 'zh' ? '公开演示' : 'Public demo'}</span> : null}
                   </div>
-                  <h3><Link to={`/research${query}&tab=goals`}>{localizedProjectText(project, 'name')}</Link></h3>
+                  <h3><Link to={`/research${query}&tab=goals&brief=1`}>{localizedProjectText(project, 'name')}</Link></h3>
                   <p className="project-row-objective">{brief.objective || (language === 'zh' ? '尚未定义目标，打开项目补充。' : 'Define the objective in the project brief.')}</p>
                   <div className="project-facts">
                     {summary ? <>
@@ -275,7 +275,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
                   </div>
                 </div>
                 <div className="project-row-actions">
-                  <Button type="button" render={<Link to={`/research${query}&tab=goals`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
+                  <Button type="button" render={<Link to={`/research${query}&tab=goals&brief=1`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
                   <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
                   <Disclosure className="project-row-menu" title={language === 'zh' ? '更多操作' : 'More actions'}><div>
                     <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>{t.projectLibrary.manage}</Button>

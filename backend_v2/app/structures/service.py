@@ -113,6 +113,7 @@ def superpose(
     *,
     reference_chain: str,
     mobile_chain: str,
+    pairing: str = "author_number",
 ) -> dict[str, Any]:
     """Fit one structure onto another and report how far off it lands.
 
@@ -129,6 +130,7 @@ def superpose(
             _text(mobile),
             reference_chain=reference_chain,
             mobile_chain=mobile_chain,
+            pairing=pairing,
         )
     except kernels.StructureFormatError as error:
         raise DomainError("structure_unreadable", str(error), status_code=422) from error

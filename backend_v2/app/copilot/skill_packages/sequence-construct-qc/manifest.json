@@ -1,0 +1,101 @@
+{
+  "id": "sequence-construct-qc",
+  "version": "1.0.0",
+  "title": "Sequence and construct QC",
+  "title_zh": "序列与构建体质检",
+  "description": "Check identity, numbering, composition and construct boundaries with recorded provenance.",
+  "description_zh": "核对序列身份、编号、组成及构建体边界。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "78a8fe0eb9772d1ae755e5ca6987aba685c1fb2a7f65330579c7a83839e6d7e8",
+  "default_for": [],
+  "tool_requests": [
+    "list_project_targets",
+    "list_project_candidates",
+    "analyse_sequence",
+    "list_proteins"
+  ],
+  "optional_write_tools": [],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "identity_and_boundaries",
+      "sequence_checks",
+      "construct_risks",
+      "required_validation",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "identity_and_boundaries": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "sequence_checks": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "construct_risks": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "required_validation": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

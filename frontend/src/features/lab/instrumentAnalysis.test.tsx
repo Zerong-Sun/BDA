@@ -54,11 +54,11 @@ describe('instrument analysis panel', () => {
     render(<QueryClientProvider client={client}><InstrumentAnalysis projectId="" previewOnly /></QueryClientProvider>)
     choose(new File(['export'], 'preview.csv'))
     fireEvent.click(screen.getByRole('button', { name: 'Preview without saving' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save to current project' })).toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save to selected project' })).toBeDisabled())
     expect(uploadArtifact).not.toHaveBeenCalled()
     expect(analyseBli).not.toHaveBeenCalled()
     choose(new File(['another export'], 'replacement.csv'))
-    expect(screen.queryByRole('button', { name: 'Save to current project' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save to selected project' })).not.toBeInTheDocument()
   })
 
   it('uploads the file first and posts only its artifact id', async () => {

@@ -76,6 +76,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   // phase of work is several messages long, so component state quietly sent the
   // operator back to Auto whenever the user looked at a page.
   const bot = session?.bot ?? null
+  const mode = session?.mode ?? 'general'
+  const setSessionMode = useAppStore((state) => state.setCopilotSessionMode)
+  const setMode = (next: 'general' | 'bench') => {
+    if (projectId) setSessionMode(projectId, next)
+  }
   const setSessionBot = useAppStore((state) => state.setCopilotSessionBot)
   const setBot = (next: string | null) => {
     if (projectId) setSessionBot(projectId, next)
@@ -117,8 +122,9 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     // An address for this turn, then the operator the room is scoped to, then
     // the served roster's own triggers. Each is a narrowing hint the server
     // intersects with the project's capabilities; none of them can widen a turn.
-    const activeBot = options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
-    const reviewIntent = detectReviewIntent(trimmed)
+    const skill = mode === 'bench' ? 'wetlab-read' : undefined
+    const activeBot = skill ? undefined : options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
+    const reviewIntent = !skill && detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
       {
@@ -136,10 +142,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const payload = {
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
-      // `skill` stays on the request contract - an agent run, an MCP grant or
-      // another client may still narrow to one capability - and this UI simply
-      // no longer guesses one. Sending neither means the project's configured
-      // set, which is the documented undifferentiated case.
+      // Explicit calculation mode narrows the turn; never send both hints.
+      skill,
       bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,
@@ -225,6 +229,6 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   return {
     messages: usableMessages, pendingMessages: loading ? messages.slice(-2) : [],
     loading, loadingStage, loadingDetail, error, send, resetMessages,
-    lastMode, bots: bots ?? [], bot, setBot,
+    lastMode, bots: bots ?? [], bot, setBot, mode, setMode,
   }
 }

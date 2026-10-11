@@ -11,14 +11,18 @@ from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
 from .analysis import analyse_akta, analyse_bli, analyse_enzyme
+from .bench import calculate
+from .bench_schemas import BenchCalculationInput, BenchCalculationResult
 from .repository import ProteinRepository
 from .schemas import (
     AktaAnalysisRequest,
     AnalysisPreviewRequest,
     AnalysisPreviewResponse,
     AnalysisResponse,
+    AnalysisReviewRequest,
+    AnalysisReviewResponse,
     BliAnalysisRequest,
     ConcentrationRequest,
     ConcentrationResult,
@@ -41,6 +45,7 @@ from .service import (
     dilution_series,
     import_fasta,
     promote_candidate,
+    review_analysis,
     to_read,
     update_protein,
 )
@@ -162,10 +167,23 @@ def patch_protein(
 
 
 # --- Bench calculators -------------------------------------------------------
-# GET, not POST: each is a pure function of its scalar inputs - same arguments,
-# same answer, nothing persisted. That makes them idempotent and cacheable, and
-# it keeps them out of the write-permission surface, which is the honest place
-# for a calculation a read-only account should be able to run.
+# Legacy scalar calculators use GET. The unified calculator below accepts POST
+# to keep sequence inputs out of URLs; all calculations are pure and read-only.
+
+
+@router.post(
+    "/wetlab/calculations", response_model=BenchCalculationResult,
+    openapi_extra={"x-permission": "wetlab.calculate", "x-read-only": True},
+)
+def post_bench_calculation(
+    payload: BenchCalculationInput, user: User = Depends(current_user),
+) -> BenchCalculationResult:
+    """Authenticated pure calculation; POST keeps sequences out of URL histories.
+
+    No result, supplied sequence or project record is persisted. Viewer accounts
+    may use this endpoint; it does not authorize any mutation.
+    """
+    return calculate(payload)
 
 
 @router.get("/projects/{project_id}/wetlab/concentration", response_model=ConcentrationResult)
@@ -245,7 +263,26 @@ def _analysis_response(row, summary: dict) -> AnalysisResponse:
         unit=row.unit,
         source_artifact_id=row.source_artifact_id,
         summary=summary,
+        version=row.version,
+        qc_review=row.result_metadata.get("instrument_qc_review"),
     )
+
+
+@router.post(
+    "/projects/{project_id}/wetlab/results/{result_id}/review",
+    response_model=AnalysisReviewResponse,
+    openapi_extra={"x-permission": "experiment.record"},
+)
+def post_instrument_review(
+    project_id: uuid.UUID, result_id: uuid.UUID, payload: AnalysisReviewRequest,
+    if_match: str | None = Header(default=None), session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> AnalysisReviewResponse:
+    project = require_project_permission(session, project_id, user, "experiment")
+    row, recorded = review_analysis(session, project, result_id, user, expected=parse_if_match(if_match),
+                                    accept=payload.accept, rationale=payload.rationale)
+    return AnalysisReviewResponse(experiment_result_id=row.id, version=row.version,
+        review=row.result_metadata["instrument_qc_review"], candidate_metric_recorded=recorded)
 
 
 @router.post(

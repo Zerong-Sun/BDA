@@ -1,6 +1,6 @@
 # BDA Workbench
 
-**2.6 release candidate:** [Install and upgrade Iteravia RC1](docs/RELEASE_2_6_RC1.md). [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Workflow outcomes now settle Autopilot compute stages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
+**2.6 release candidate:** [Install and upgrade Iteravia RC2](docs/RELEASE_2_6_RC2.md). RC2 adds traceable literature evidence, explicit research decision criteria, scientific method packages, independent lab tools, reliable calculation delivery and a refreshed light workspace. [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
 
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.
 
@@ -11,6 +11,8 @@ BDA Workbench 面向计算蛋白设计中“证据、设计、计算、实验和
 BDA 将项目作为权限与追溯边界，把研究证据、版本化工作流、异步计算、制品谱系、候选和实验记录放入同一模块化单体。平台使用 PostgreSQL 保存业务事实，使用 MinIO 保存计算制品，使用 Redis/Celery 传递异步工作；Copilot 与 Autopilot 只能通过受限、可审计的服务接口参与这一过程。
 
 当前公开 alpha 已通过后端、前端、浏览器、迁移和公开数据检查，并提供可重复导入的 PD1 演示包。该验证证明的是软件基线可测试、演示数据可追溯和关键状态约束可执行，不证明真实模型性能、实验有效性或生产基础设施已经验收。
+
+本轮跨模块升级与明确尚未接入的方案见[全平台能力升级账本](docs/PLATFORM_CAPABILITY_UPGRADE.md)。
 
 ## 1. 系统边界
 
@@ -120,7 +122,7 @@ FastAPI 模块化单体 ─────► PostgreSQL
 
 要求：Docker Engine、Docker Compose v2，以及可用于本地开发的空闲端口。
 
-按 [RC1 安装说明](docs/RELEASE_2_6_RC1.md#新的本地安装) 生成配置、迁移数据库并配置独立 scheduler 身份，再启动全部服务。
+按 [RC2 安装说明](docs/RELEASE_2_6_RC2.md#新安装) 生成配置、迁移数据库并配置独立 scheduler 身份，再启动全部服务。
 
 启动后可访问：
 

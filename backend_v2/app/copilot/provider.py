@@ -91,11 +91,34 @@ def completion_message(
         raise last_error
     payload = response.json()
     try:
-        message = payload["choices"][0]["message"]
+        choice = payload["choices"][0]
+        message = choice["message"]
     except (KeyError, IndexError, TypeError) as exc:
         raise ValueError("llm_response_schema_invalid") from exc
     if not isinstance(message, dict):
         raise ValueError("llm_response_schema_invalid")
+    if choice.get("finish_reason") == "length":
+        raise DomainError(
+            "llm_output_truncated",
+            "The model reached its output limit. Shorten the request or increase the provider output token limit and retry.",
+            status_code=502,
+        )
+    if choice.get("finish_reason") == "content_filter":
+        raise DomainError("llm_output_filtered", "The provider filtered this response; partial output was not accepted.", status_code=502)
+    calls = message.get("tool_calls")
+    if calls is not None:
+        if not isinstance(calls, list):
+            raise ValueError("llm_response_schema_invalid")
+        ids: set[str] = set()
+        for call in calls:
+            if not isinstance(call, dict) or not isinstance(call.get("id"), str) or not call["id"] or call["id"] in ids:
+                raise ValueError("llm_response_schema_invalid")
+            function = call.get("function")
+            if (call.get("type") != "function" or not isinstance(function, dict)
+                    or not isinstance(function.get("name"), str) or not function["name"]
+                    or not isinstance(function.get("arguments"), str)):
+                raise ValueError("llm_response_schema_invalid")
+            ids.add(call["id"])
     return message
 
 

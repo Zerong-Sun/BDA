@@ -62,6 +62,23 @@ describe('CopilotChat', () => {
     vi.clearAllMocks()
   })
 
+  it('offers persistent calculation mode without sending conflicting bot hints or creating a research task', async () => {
+    const taskRequested = vi.fn()
+    const view = renderWithProviders(<CopilotChat externalRoster onTaskRequested={taskRequested} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Lab calculations' }))
+    expect(screen.getByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), { target: { value: 'Plan a dilution of 1 µM to 10 nM, 1000 µL final volume.' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0]).toMatchObject({ skill: 'wetlab-read', bot: undefined, intent: 'chat' })
+    expect(taskRequested).not.toHaveBeenCalled()
+    view.unmount()
+    renderWithProviders(<CopilotChat externalRoster />)
+    expect(await screen.findByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Research chat' }))
+    expect(useAppStore.getState().copilotSessions.proj_test.mode).toBe('general')
+  })
+
   it('preserves the accepted conversation and unlocks input when waiting times out', async () => {
     vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, _chunk, _status, _message, accepted) => {
       accepted?.({ conversationId: 'accepted-conversation', messageId: 'accepted-message' })

@@ -1,10 +1,10 @@
 import { ModelResultGuideLibrary } from '../features/results/ModelResultGuide'
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
 import { PackageIcon } from '@phosphor-icons/react'
 import { listExperimentResults } from '../lib/api/experiments'
-import { getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
+import { createDeliveryPackage, getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
 import { interpretResults, type InterpretationReasoning } from '../lib/api/copilot'
 import { InterpretationCard } from '../components/ui/InterpretationCard'
 import { downloadArtifact, getArtifact } from '../lib/api/artifacts'
@@ -28,6 +28,8 @@ import { AppFrame } from '../components/ui/AppFrame'
 import { Disclosure } from '../components/ui/Disclosure'
 import { Alert, AlertDescription } from '@/components/reui/alert'
 import { isDemoProject } from '../features/tour'
+import { useProjectAccess } from '../lib/hooks/useProjectAccess'
+import { useAppStore } from '../lib/store/appStore'
 
 function ResultsMetricsSkeleton() {
   return (
@@ -47,12 +49,19 @@ export function ResultsPage() {
   const { t, language } = useI18n()
   const zh = language === 'zh'
   const { projectId, activeProject } = useProjectContext()
+  const access = useProjectAccess(projectId)
+  const demoMode = useAppStore((state) => state.appMode === 'demo')
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const showToast = useToastStore((s) => s.show)
   const [interpretation, setInterpretation] = useState<InterpretationReasoning | null>(null)
   const candidateParam = searchParams.get('candidate')?.trim() || null
   const isDemoReferenceProject = Boolean(activeProject && isDemoProject(activeProject))
+  const createPackage = useMutation({
+    mutationFn: () => createDeliveryPackage(projectId, `${activeProject?.name || 'Research'} · ${new Date().toISOString().slice(0, 10)}`),
+    onSuccess: (data) => { queryClient.setQueryData(['delivery-package', data.project_id], data) },
+    onError: (error) => showToast(error instanceof Error ? error.message : (zh ? '创建失败' : 'Could not create delivery'), 'error'),
+  })
 
   const {
     data: results = [],
@@ -88,6 +97,7 @@ export function ResultsPage() {
     queryKey: ['delivery-package', projectId],
     queryFn: () => getDeliveryPackageOrNull(projectId),
     enabled: Boolean(projectId),
+    refetchInterval: (query) => query.state.data?.status === 'pending' ? 2000 : false,
   })
 
   const {
@@ -314,6 +324,9 @@ export function ResultsPage() {
           >
           <DeliveryPackage
             packageData={deliveryPackage ?? null}
+            onCreate={() => createPackage.mutate()}
+            creating={createPackage.isPending}
+            writable={!demoMode && access.data?.permissions.write === true}
             loading={packageLoading}
           />
           </ApiState>
