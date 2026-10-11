@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-10-11（决策、科研方法、学习、实验质控和扩展中心）
+最后核验：2026-10-11（决策、科研方法、学习、实验质控、扩展中心和浅色主题）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -95,3 +95,9 @@ npm run test:browser
 测试层包括单元/Zod、MSW contract、页面 vertical slice 与浏览器 smoke。关键场景覆盖 local/OIDC 登录、refresh rotation、两阶段上传、多 target、工作流 ETag/提交、job SSE、候选/实验/交付包、Campaign、Literature、Intelligence、Registry、Copilot 与 legacy URL 转换。
 
 正式构建固定 `/api/v2`。Nginx、Compose 与 Helm 不再发布旧 API 路由。
+
+## 10. 浅色主题
+
+应用配色统一由 `frontend/src/styles/science-workspace.css` 管理，`index.css` 不再重复声明浅色调色板。浅色主题使用冷灰画布 `#f5f7fa`、白色阅读与操作面板、BigoBio 酒红主色 `#861b35` 和蓝绿色数据色 `#126b79`；状态色独立表达成功、警告、错误与信息。导航选中项、项目卡片、科研决策、文献论据、Bot 对话、学习记录及实验计算使用同一组语义变量。
+
+主按钮白字与酒红底对比度为 9.45:1；辅助文字与主要背景、状态文字与浅底均超过 4.5:1，输入边界与白色背景为 3.11:1。这些是选定配色组合的检查，不代表完整无障碍审计。链接式主按钮显式继承 `--primary-foreground`，避免全局链接规则覆盖其文字颜色。主题细节仅在 `[data-theme="light"]` 下生效；深色变量和结构视图的科学配色不变。

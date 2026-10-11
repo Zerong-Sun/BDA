@@ -57,7 +57,7 @@ export function ToolsPage() {
         })}</nav>
         {!matches.length ? <div className="space-y-2 text-sm text-muted-foreground"><p>{zh ? '没有匹配的工具。' : 'No matching tools.'}</p><Button type="button" variant="outline" size="sm" onClick={() => setSearch('')}>{zh ? '清除搜索' : 'Clear search'}</Button></div> : null}
       </aside>
-      <section className="min-w-0 space-y-5 border bg-background p-5 sm:p-6" aria-label={selected.title[language]}>
+      <section className="lab-tool-workbench min-w-0 space-y-5 border bg-background p-5 sm:p-6" aria-label={selected.title[language]}>
         {rawTool && !BENCH_TOOLS.some((tool) => tool.id === rawTool) ? <p role="status" className="text-sm text-muted-foreground">{zh ? '链接中的工具不存在，下面显示蛋白分子量工具。' : 'The linked tool is unavailable. Protein molecular mass is shown below.'}</p> : null}
         <div className="space-y-2 border-b pb-4"><h2 className="text-xl font-semibold">{selected.title[language]}</h2><p className="text-sm leading-6 text-muted-foreground">{selected.description[language]}</p></div>
         {currentPrefill ? <p role="status" className="text-sm text-muted-foreground">{zh ? '已带入上一个工具的结果，请补齐其余输入并确认适用条件。' : 'Values from the previous tool are filled in. Complete the remaining inputs and check assumptions.'}</p> : null}

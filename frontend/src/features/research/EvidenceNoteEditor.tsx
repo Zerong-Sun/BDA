@@ -50,7 +50,7 @@ export function EvidenceNoteEditor({ projectId, reference, note, onClose, argume
     prefix.setEnd(range.startContainer, range.startOffset)
     setSelection({ quote: range.toString(), start: Array.from(prefix.toString()).length })
   }
-  return <form className="grid gap-5 border border-primary/40 bg-background p-5" onSubmit={(event) => { event.preventDefault(); save.mutate() }}>
+  return <form className="evidence-note-editor grid gap-5 border border-primary/40 bg-background p-5" onSubmit={(event) => { event.preventDefault(); save.mutate() }}>
     <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">{note ? (zh ? '编辑论据卡' : 'Edit evidence card') : (zh ? '新建论据卡' : 'New evidence card')}</h3>
       <Button type="button" variant="ghost" size="sm" disabled={save.isPending} onClick={onClose}>{zh ? '取消' : 'Cancel'}</Button></div>
     <fieldset className="grid min-w-0 gap-5" disabled={save.isPending}>

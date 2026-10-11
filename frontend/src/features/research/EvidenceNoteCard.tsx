@@ -26,7 +26,7 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
   const suffix = typeof quoteSelector?.suffix === 'string' ? quoteSelector.suffix : ''
   const contentKind = typeof note.source_ref.content_kind === 'string' ? note.source_ref.content_kind : ''
   const location = [note.locator, note.structured_locator?.section, note.structured_locator?.figure, note.structured_locator?.page ? `${zh ? '第' : 'p. '}${note.structured_locator.page}${zh ? '页' : ''}` : ''].filter(Boolean).join(' · ')
-  return <article className="grid min-w-0 gap-4 border border-border bg-background p-5" data-testid="evidence-note-card">
+  return <article className="evidence-note-card grid min-w-0 gap-4 border border-border bg-background p-5" data-testid="evidence-note-card">
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant={note.relation === 'contradicts' ? 'destructive' : 'outline'}>{relationLabel(note.relation, zh)}</Badge>
       <Badge variant="secondary">{citationValueLabel(note.review_status, language)}</Badge>
