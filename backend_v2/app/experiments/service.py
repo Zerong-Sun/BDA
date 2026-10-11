@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -34,6 +35,10 @@ def create_results(
     user: User,
 ) -> list[ExperimentResult]:
     for item in payload.results:
+        if {"instrument_qc_review", "instrument_qc_history"}.intersection(item.result_metadata) or (
+            isinstance(item.result_metadata.get("results"), dict) and "quality_control" in item.result_metadata["results"]
+        ):
+            raise DomainError("instrument_review_required", "Instrument QC reviews require the versioned review endpoint", status_code=422)
         if reserved_learning_field(item.model_dump()):
             raise DomainError(
                 "learning_ingestion_required",
@@ -41,6 +46,36 @@ def create_results(
                 status_code=422,
             )
     return _create_results(session, project, payload, user)
+
+
+def review_instrument_result(
+    session: Session, project: Project, row: ExperimentResult, user: User, *, expected: int, accept: bool, rationale: str
+) -> ExperimentResult:
+    """Review a derived instrument fit without changing its assay pass/fail label."""
+    if row.project_id != project.id or row.experiment_type not in {"bli_affinity", "akta_purification", "enzyme_activity"}:
+        raise DomainError("instrument_result_not_found", "Instrument result was not found", status_code=404)
+    qc = row.result_metadata.get("results", {}).get("quality_control")
+    if not isinstance(qc, dict) or qc.get("version") != "instrument-qc-v1":
+        raise DomainError("instrument_reanalysis_required", "Re-analyse this historical result to obtain versioned QC diagnostics", status_code=409)
+    if row.version != expected:
+        raise DomainError("version_conflict", "Instrument result changed; reload before review", status_code=412)
+    if not rationale.strip():
+        raise DomainError("instrument_review_rationale", "Record the scientific basis for accepting or rejecting this fit", status_code=422)
+    artifact = session.get(Artifact, row.source_artifact_id) if row.source_artifact_id else None
+    if accept and (artifact is None or artifact.project_id != project.id or artifact.status != "available" or artifact.deleted_at is not None):
+        raise DomainError("instrument_source_unavailable", "Acceptance requires an available project source artifact", status_code=409)
+    if accept and (row.value is None or not math.isfinite(row.value)):
+        raise DomainError("instrument_no_finite_value", "An unavailable fit cannot be accepted as a quantitative measurement", status_code=422)
+    review = {"status": "accepted" if accept else "rejected", "rationale": rationale.strip(),
+              "by": str(user.id), "at": datetime.now(UTC).isoformat(), "qc_version": qc["version"]}
+    row.result_metadata = {**row.result_metadata, "instrument_qc_review": review,
+                           "instrument_qc_history": [*row.result_metadata.get("instrument_qc_history", []), review]}
+    row.version += 1
+    session.flush()
+    record_audit(session, action="instrument.qc.review", entity_type="experiment_result", entity_id=row.id,
+                 project_id=project.id, organization_id=project.organization_id, actor_id=user.id,
+                 payload={"status": review["status"], "qc_version": qc["version"]})
+    return row
 
 
 def _create_results(

@@ -27,6 +27,7 @@ from .capabilities import (
     normalize_capabilities,
 )
 from .models import CopilotAgentRun, CopilotConfig, CopilotMcpSession
+from .procedural_skills import ProceduralSkillDetail, ProceduralSkillSummary, catalog, require_skill
 from .provider import complete as complete_with_provider
 from .provider import credential_available
 from .provider_selection import select_provider
@@ -145,6 +146,17 @@ def _config_response(session: Session, row: CopilotConfig) -> CopilotConfigRespo
 @router.get("/skills", response_model=list[SkillResponse])
 def list_skills(user: User = Depends(current_user)) -> list[SkillResponse]:
     return SKILLS
+
+
+@router.get("/procedural-skills", response_model=list[ProceduralSkillSummary])
+def list_procedural_skills(user: User = Depends(current_user)) -> list[ProceduralSkillSummary]:
+    """Bundled scientific methods. These do not grant project capabilities."""
+    return [ProceduralSkillSummary.model_validate(item.model_dump(exclude={"instructions"})) for item in catalog()]
+
+
+@router.get("/procedural-skills/{skill_id}", response_model=ProceduralSkillDetail)
+def get_procedural_skill(skill_id: str, user: User = Depends(current_user)) -> ProceduralSkillDetail:
+    return require_skill(skill_id)
 
 
 @router.get("/bots", response_model=list[BotResponse])

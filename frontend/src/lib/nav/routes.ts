@@ -15,7 +15,7 @@
 
 export interface AppRoute {
   to: string
-  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'learning' | 'results' | 'timeline' | 'faq'
+  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'learning' | 'results' | 'timeline' | 'faq' | 'extensions'
 }
 
 /**
@@ -26,7 +26,7 @@ export interface AppRoute {
  * Encoding that here means a caller cannot pass a translator that would be
  * asked for a key it does not have.
  */
-export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots' | 'learning'>
+export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots' | 'learning' | 'extensions'>
 
 /** Every route reachable from navigation, in the order a person meets them. */
 export const APP_ROUTES: readonly AppRoute[] = [
@@ -40,6 +40,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
   { to: '/learning', key: 'learning' },
   { to: '/results', key: 'results' },
   { to: '/timeline', key: 'timeline' },
+  { to: '/extensions', key: 'extensions' },
   { to: '/faq', key: 'faq' },
 ]
 
@@ -72,5 +73,6 @@ export function routeLabel(
   if (key === 'inbox') return zh ? '待我决定' : 'Decisions'
   if (key === 'learning') return zh ? '项目学习' : 'Project learning'
   if (key === 'bots') return zh ? '研究团队' : 'Research team'
+  if (key === 'extensions') return zh ? '能力与扩展' : 'Capabilities & extensions'
   return translate(key)
 }

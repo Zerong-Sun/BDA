@@ -1,7 +1,7 @@
 FROM python:3.14-slim
 
 ARG BDA_BUILD_REVISION=development
-ARG BDA_SCHEMA_REVISION=0073_learning_lifecycle
+ARG BDA_SCHEMA_REVISION=0074_research_decision_contract
 
 WORKDIR /app
 # Pick up patched Debian packages (util-linux, libblkid, libmount, libuuid, etc.)

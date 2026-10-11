@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '../components/reui/alert'
 import { Frame, FramePanel } from '../components/reui/frame'
 import { ResearchWorkspacePanel } from '../features/research/ResearchWorkspacePanel'
 import { ResearchGoalsPanel } from '../features/research/ResearchGoalsPanel'
+import { ResearchDecisionCenter } from '../features/research/ResearchDecisionCenter'
 import { ProjectTimeline } from '../features/timeline/ProjectTimeline'
 import { normalizeResearchTab, RESEARCH_TABS, type ResearchTab } from '../features/research/researchUi'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
@@ -134,6 +135,7 @@ export function ResearchPage() {
             </Frame>
           ) : tab === 'goals' ? (
             <>
+            <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />
             {activeProject ? <ProjectBriefPanel project={activeProject} /> : null}
             <Frame>
               <FramePanel>

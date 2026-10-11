@@ -109,9 +109,39 @@ describe('literature evidence workbench', () => {
     expect(await screen.findByRole('button', { name: 'Accept evidence' })).toBeDisabled()
     expect(screen.getByText(/Source changed/)).toBeVisible()
   })
+
+  it('filters conflicts and review gaps without labeling filtered papers as unannotated', async () => {
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={references} />)
+    await screen.findByTestId('evidence-note-card')
+    fireEvent.click(screen.getByRole('button', { name: 'Contradictions / limits only' }))
+    expect(screen.getByText('No evidence matches this filter')).toBeVisible()
+    expect(screen.queryByText('This paper has no project evidence card yet')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'By argument' }))
+    expect(screen.getAllByTestId('evidence-note-card')).toHaveLength(1)
+    expect(screen.getByText(second.quote)).toBeVisible()
+  })
+
+  it('groups by persistent argument identity rather than collapsing distinct assertions with identical labels', async () => {
+    api.list.mockResolvedValue({ items: [{ ...first, argument_id: 'argument-a' }, { ...second, argument_id: 'argument-b' }], next_cursor: null })
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={references} />)
+    await screen.findByTestId('evidence-note-card')
+    fireEvent.click(screen.getByRole('button', { name: 'By argument' }))
+    expect(screen.getAllByRole('heading', { name: /A shared project argument/ })).toHaveLength(2)
+  })
 })
 
 describe('evidence editing and export', () => {
+  it('shows an existing argument label in the closed selector before any option is mounted', () => {
+    const existing = { ...first, argument_id: 'stable-assertion' }
+    renderWithProviders(<EvidenceNoteEditor projectId="project-one" reference={references[0]} note={existing}
+      argumentChoices={[{ id: existing.argument_id, argument: existing.argument }]} onClose={vi.fn()} />)
+    const selector = screen.getByRole('combobox', { name: 'Reuse an existing argument' })
+    expect(selector).toHaveAttribute('aria-expanded', 'false')
+    expect(selector).toHaveTextContent(existing.argument)
+    expect(selector).not.toHaveTextContent(existing.argument_id)
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
   it('reuses the exact existing argument so different papers can be compared together', async () => {
     renderWithProviders(<EvidenceNoteEditor projectId="project-one" reference={references[0]} note={first} argumentChoices={['Another shared argument']} onClose={vi.fn()} />)
     fireEvent.click(screen.getByRole('combobox', { name: 'Reuse an existing argument' }))
@@ -135,6 +165,15 @@ describe('evidence editing and export', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save for review' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('reload before editing')
     expect(screen.getByRole('textbox', { name: 'Original quote (source language)' })).toHaveValue(first.quote)
+  })
+
+  it('makes assertion changes an explicit new group while preserving structured coordinates', async () => {
+    const existing = { ...first, argument_id: 'stable-assertion', structured_locator: { page: 5, section: 'Results', figure: 'Fig. 2' } }
+    renderWithProviders(<EvidenceNoteEditor projectId="project-one" reference={references[0]} note={existing} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByRole('textbox', { name: '1 · Our project argument' }), { target: { value: 'A distinct assertion' } })
+    expect(screen.getByText(/Changing the assertion moves this card/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Save for review' }))
+    await waitFor(() => expect(api.save).toHaveBeenCalledWith('doc-one', expect.objectContaining({ argument_id: null, structured_locator: { page: 5, section: 'Results', figure: 'Fig. 2' } }), existing))
   })
 
   it('exports provenance, limitations and pending status with each original quote', () => {

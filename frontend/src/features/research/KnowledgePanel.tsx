@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArchiveIcon,
   BookOpenTextIcon,
@@ -18,6 +18,7 @@ import {
   FrameTitle,
 } from '../../components/reui/frame'
 import { Button } from '../../components/ui/Button'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { Input } from '../../components/ui/Input'
 import { Label } from '../../components/ui/label'
 import { ScrollArea } from '../../components/ui/scroll-area'
@@ -30,23 +31,28 @@ import {
   type CopilotKnowledgeEntry,
 } from '../../lib/api/copilot'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
 import { useI18n } from '../../lib/i18n'
-import { commaList, currentRole } from './jsonHelpers'
-import { projectKnowledgeQuery } from './projectSearch'
+import { useAppStore } from '../../lib/store/appStore'
+import { commaList } from './jsonHelpers'
 
-const DEFAULT_TAGS = 'manual, curated'
+const DEFAULT_TAGS = 'manual'
 
 export function KnowledgePanel() {
+  const context = useProjectContext()
+  return <KnowledgePanelContent key={context.projectId} context={context} />
+}
+
+function KnowledgePanelContent({ context }: { context: ReturnType<typeof useProjectContext> }) {
   const { t, language } = useI18n()
   const k = t.research.knowledge
   const client = useQueryClient()
-  const { activeProject, projectId } = useProjectContext()
-  const isAdmin = currentRole() === 'admin'
-  const canEdit = isAdmin || currentRole() === 'researcher'
-  const defaultQuery = useMemo(() => projectKnowledgeQuery(activeProject), [activeProject])
+  const { activeProject, projectId } = context
+  const access = useProjectAccess(projectId)
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const canEdit = !demo && access.data?.permissions.write === true
   const [query, setQuery] = useState('')
-  const autoQueryRef = useRef('')
-  const projectIdRef = useRef('')
+  const [entryTypeFilter, setEntryTypeFilter] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [entryId, setEntryId] = useState('')
   const [entryVersion, setEntryVersion] = useState<number | null>(null)
@@ -57,20 +63,17 @@ export function KnowledgePanel() {
   const [content, setContent] = useState('')
   // Tags stay in English: they are search identifiers shared with seeded entries.
   const [tags, setTags] = useState(DEFAULT_TAGS)
-  const [citation, setCitation] = useState(k.defaultCitation)
-  const knowledge = useQuery({
-    queryKey: ['copilot-knowledge', projectId, query],
-    queryFn: () => searchCopilotKnowledge(projectId, query),
-    enabled: Boolean(projectId && query.trim()),
+  const [citation, setCitation] = useState('')
+  const [originalCitation, setOriginalCitation] = useState('')
+  const [entrySource, setEntrySource] = useState<Record<string, unknown>>({})
+  const [reviewStatus, setReviewStatus] = useState('unknown')
+  const knowledge = useInfiniteQuery({
+    queryKey: ['copilot-knowledge', projectId, query, entryTypeFilter], initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => searchCopilotKnowledge(projectId, query, entryTypeFilter || undefined, pageParam),
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: Boolean(projectId),
   })
-  useEffect(() => {
-    const projectChanged = projectIdRef.current !== projectId
-    if (projectChanged || !query.trim() || query === autoQueryRef.current) {
-      setQuery(defaultQuery)
-      autoQueryRef.current = defaultQuery
-    }
-    projectIdRef.current = projectId
-  }, [defaultQuery, projectId, query])
+  const items = knowledge.data?.pages.flatMap((page) => page.items) ?? []
   const resetForm = () => {
     setSelectedId('')
     setEntryId('')
@@ -81,7 +84,10 @@ export function KnowledgePanel() {
     setSummary('')
     setContent('')
     setTags(DEFAULT_TAGS)
-    setCitation(k.defaultCitation)
+    setCitation('')
+    setOriginalCitation('')
+    setEntrySource({})
+    setReviewStatus('unknown')
   }
   const loadEntry = (item: CopilotKnowledgeEntry) => {
     setSelectedId(item.knowledge_entry_id)
@@ -94,6 +100,9 @@ export function KnowledgePanel() {
     setContent(item.content)
     setTags((item.tags_json ?? []).join(', '))
     setCitation(item.citation ?? '')
+    setOriginalCitation(item.citation ?? '')
+    setEntrySource(item.source ?? {})
+    setReviewStatus(item.review_status ?? 'unknown')
   }
   const payload = () => ({
     knowledge_entry_id: entryId.trim() || undefined,
@@ -103,9 +112,11 @@ export function KnowledgePanel() {
     summary: summary.trim(),
     content: content.trim(),
     tags: commaList(tags),
-    source_type: 'curated',
-    citation: citation.trim() || undefined,
-    confidence: 'curated',
+    source: entrySource,
+    source_type: selectedId ? undefined : 'manual',
+    citation: selectedId && citation === originalCitation ? undefined : citation.trim(),
+    confidence: 'unassessed',
+    review_status: 'pending_review',
     metadata: { entry_mode: 'manual', source_language: language },
   })
   const save = useMutation({
@@ -136,14 +147,16 @@ export function KnowledgePanel() {
             <FrameDescription>{activeProject ? k.searchPlaceholderActive : k.searchPlaceholderInactive}</FrameDescription>
           </FrameHeader>
           <div className="mt-3 flex gap-2">
-            <Input className="min-w-0 flex-1" placeholder={activeProject ? k.searchPlaceholderActive : k.searchPlaceholderInactive} value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input className="min-w-0 flex-1" maxLength={500} aria-label={language === 'zh' ? '检索项目知识' : 'Search project knowledge'} placeholder={activeProject ? k.searchPlaceholderActive : k.searchPlaceholderInactive} value={query} onChange={(event) => setQuery(event.target.value)} />
             <Button type="button" variant="outline" size="icon-sm" aria-label={k.searchAction} onClick={() => knowledge.refetch()}>
               <MagnifyingGlassIcon aria-hidden="true" />
             </Button>
           </div>
+          <Input className="mt-2" maxLength={80} value={entryTypeFilter} onChange={(event) => setEntryTypeFilter(event.target.value)} aria-label={language === 'zh' ? '按知识类型筛选' : 'Filter entry type'} placeholder={language === 'zh' ? '类型筛选，例如 copilot_draft（留空为全部）' : 'Entry type, e.g. copilot_draft (blank for all)'} />
+          <p className="mt-2 text-xs text-muted-foreground">{language === 'zh' ? '在整个项目的标题、正文和标签中按字面检索；留空浏览全部。' : 'Literal search across this project’s titles, content and tags. Leave blank to browse all.'}</p>
           <ScrollArea className="mt-3 min-h-0 flex-1">
             <div className="grid gap-2 pr-2">
-              {knowledge.data?.items.map((item) => (
+              {items.map((item) => (
                 <Button
                   key={item.knowledge_entry_id}
                   type="button"
@@ -155,11 +168,13 @@ export function KnowledgePanel() {
                     <strong className="block truncate">{item.title}</strong>
                     <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{item.summary}</span>
                     <Badge className="mt-2" variant="info-light" size="xs">{item.category}</Badge>
+                    <span className="ml-2 text-xs text-muted-foreground">{item.review_status ?? 'unknown'}</span>
                   </span>
                 </Button>
               ))}
-              {knowledge.isPending ? <p role="status" className="text-xs text-muted-foreground">{k.loading}</p> : null}
-              {knowledge.isSuccess && !knowledge.data.items.length ? <p className="text-xs text-muted-foreground">{k.noResults}</p> : null}
+              {knowledge.isPending && projectId ? <p role="status" className="text-xs text-muted-foreground">{k.loading}</p> : null}
+              {knowledge.isSuccess && !items.length ? <p className="text-xs text-muted-foreground">{k.noResults}</p> : null}
+              {knowledge.hasNextPage ? <Button type="button" variant="outline" disabled={knowledge.isFetchingNextPage} onClick={() => knowledge.fetchNextPage()}>{language === 'zh' ? '加载更多知识条目' : 'Load more knowledge'}</Button> : null}
               {knowledge.isError ? <Alert variant="destructive"><AlertDescription>{k.searchFailed}</AlertDescription></Alert> : null}
             </div>
           </ScrollArea>
@@ -172,6 +187,7 @@ export function KnowledgePanel() {
             <Button type="button" variant="outline" size="sm" onClick={resetForm}>{k.newEntry}</Button>
           </FrameHeader>
           <ScrollArea className="mt-3 min-h-0 flex-1">
+            {selectedId ? <div className="mb-3 grid gap-2"><p className="text-xs text-muted-foreground">{language === 'zh' ? '已记录的复核状态' : 'Recorded review status'} · {reviewStatus}</p><Disclosure title={language === 'zh' ? '原始来源与引用记录' : 'Original source and citation record'}><pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(entrySource, null, 2)}</pre></Disclosure></div> : null}
             <div className="grid gap-3 pr-2 md:grid-cols-2">
               <div className="grid gap-1"><Label htmlFor="knowledge-entry-id">{k.entryIdLabel}</Label><Input id="knowledge-entry-id" value={entryId} disabled={Boolean(selectedId)} onChange={(event) => setEntryId(event.target.value)} placeholder={k.entryIdPlaceholder} /></div>
               <div className="grid gap-1"><Label htmlFor="knowledge-category">{k.categoryLabel}</Label><Input id="knowledge-category" value={category} onChange={(event) => setCategory(event.target.value)} /></div>
@@ -185,7 +201,8 @@ export function KnowledgePanel() {
           </ScrollArea>
           {!canEdit ? <Alert className="mt-3"><AlertDescription>{k.permissionHint}</AlertDescription></Alert> : null}
           {save.isSuccess ? <Alert className="mt-2" variant="success" role="status"><AlertDescription>{k.savedSuccess}</AlertDescription></Alert> : null}
-          {save.isError || archive.isError ? <Alert className="mt-2" variant="destructive" role="alert"><AlertDescription>{k.actionFailed}</AlertDescription></Alert> : null}
+          {save.isError || archive.isError ? <Alert className="mt-2" variant="destructive" role="alert"><AlertDescription>{(save.error ?? archive.error) instanceof Error ? (save.error ?? archive.error)?.message : k.actionFailed}</AlertDescription></Alert> : null}
+          <p className="mt-2 text-xs text-muted-foreground">{language === 'zh' ? '保存后的新增或修改内容进入待复核，不会自动标为已认可；原始来源字段会保留。' : 'New or edited content is saved for review, never automatically marked curated. Original source fields are retained.'}</p>
           <FrameFooter className="mt-4 flex-row flex-wrap">
             <Button type="button" disabled={!canEdit || save.isPending || archive.isPending || !title.trim() || !summary.trim() || !content.trim()} onClick={() => save.mutate()}>
               {save.isPending ? <SpinnerGapIcon className="animate-spin" aria-hidden="true" /> : <FloppyDiskIcon aria-hidden="true" />}{k.save}

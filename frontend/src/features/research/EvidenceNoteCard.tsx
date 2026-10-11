@@ -25,6 +25,7 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
   const prefix = typeof quoteSelector?.prefix === 'string' ? quoteSelector.prefix : ''
   const suffix = typeof quoteSelector?.suffix === 'string' ? quoteSelector.suffix : ''
   const contentKind = typeof note.source_ref.content_kind === 'string' ? note.source_ref.content_kind : ''
+  const location = [note.locator, note.structured_locator?.section, note.structured_locator?.figure, note.structured_locator?.page ? `${zh ? '第' : 'p. '}${note.structured_locator.page}${zh ? '页' : ''}` : ''].filter(Boolean).join(' · ')
   return <article className="grid min-w-0 gap-4 border border-border bg-background p-5" data-testid="evidence-note-card">
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant={note.relation === 'contradicts' ? 'destructive' : 'outline'}>{relationLabel(note.relation, zh)}</Badge>
@@ -35,7 +36,8 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
     <div className="border-l-2 border-primary bg-muted/20 px-4 py-3">
       <p className="mb-2 text-xs font-medium text-muted-foreground">{zh ? '论文原文 · 原语言' : 'Original passage · source language'}</p>
       <blockquote className="whitespace-pre-wrap break-words text-sm leading-7">{note.quote}</blockquote>
-      <p className="mt-3 text-xs text-muted-foreground">{note.locator || (zh ? '页码 / 章节未记录' : 'Page / section not recorded')}{typeof note.source_ref.chunk_position === 'number' ? ` · ${zh ? '片段' : 'Passage'} ${note.source_ref.chunk_position + 1}` : ''}{contentKind.includes('abstract') ? (zh ? ' · 仅摘要' : ' · Abstract only') : ''}</p>
+      <p className="mt-3 text-xs text-muted-foreground">{location || (zh ? '页码 / 章节未记录' : 'Page / section not recorded')}{typeof note.source_ref.chunk_position === 'number' ? ` · ${zh ? '片段' : 'Passage'} ${note.source_ref.chunk_position + 1}` : ''}{contentKind.includes('abstract') ? (zh ? ' · 仅摘要' : ' · Abstract only') : ''}</p>
+      {note.structured_locator ? <p className="mt-1 text-xs text-muted-foreground">{zh ? '出版物位置由整理者填写，尚未做 PDF 坐标核验' : 'Publication location is human-entered; PDF coordinates have not been verified'}</p> : null}
     </div>
     <a className="inline-flex min-w-0 items-start gap-2 break-words text-sm text-primary underline-offset-4 hover:underline" href={url} target="_blank" rel="noopener noreferrer"><ArrowSquareOutIcon className="mt-0.5 shrink-0" />{note.document_title}</a>
     <dl className="grid gap-4 text-sm md:grid-cols-2">
@@ -46,13 +48,13 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
     <Disclosure title={zh ? '核对上下文与来源记录' : 'Check context and provenance'}>
       {prefix || suffix ? <p className="mb-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{prefix}<mark className="bg-primary/20 text-foreground">{note.quote}</mark>{suffix}</p> : null}
       <p className="mb-2 text-xs text-muted-foreground">{zh ? '匹配仅针对本系统保存的文字；人工复核不表示本项目已获得实验验证。' : 'Matching checks the text saved here. Human review does not mean this project has been experimentally validated.'}</p>
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{JSON.stringify({ note_id: note.id, version: note.version, reviewed_by: note.reviewed_by, reviewed_at: note.reviewed_at, ...note.source_ref }, null, 2)}</pre>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] text-muted-foreground">{JSON.stringify({ note_id: note.id, argument_id: note.argument_id, version: note.version, reviewed_by: note.reviewed_by, reviewed_at: note.reviewed_at, ...note.source_ref }, null, 2)}</pre>
     </Disclosure>
     {canWrite ? <div className="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" onClick={onEdit} disabled={review.isPending}>{zh ? '编辑论据' : 'Edit evidence'}</Button>
-      <Button variant="outline" size="sm" disabled={review.isPending || note.anchor_status === 'changed' || note.review_status === 'accepted'} onClick={() => review.mutate('accepted')}>{zh ? '认可这条论据' : 'Accept evidence'}</Button>
-      <Button variant="ghost" size="sm" disabled={review.isPending || note.review_status === 'rejected'} onClick={() => review.mutate('rejected')}>{zh ? '排除' : 'Exclude'}</Button>
-      {note.review_status !== 'pending' ? <Button variant="ghost" size="sm" disabled={review.isPending} onClick={() => review.mutate('pending')}>{zh ? '重新复核' : 'Reopen review'}</Button> : null}
+      <Button type="button" variant="outline" size="sm" onClick={onEdit} disabled={review.isPending}>{zh ? '编辑论据' : 'Edit evidence'}</Button>
+      <Button type="button" variant="outline" size="sm" disabled={review.isPending || note.anchor_status === 'changed' || note.review_status === 'accepted'} onClick={() => review.mutate('accepted')}>{zh ? '认可这条论据' : 'Accept evidence'}</Button>
+      <Button type="button" variant="ghost" size="sm" disabled={review.isPending || note.review_status === 'rejected'} onClick={() => review.mutate('rejected')}>{zh ? '排除' : 'Exclude'}</Button>
+      {note.review_status !== 'pending' ? <Button type="button" variant="ghost" size="sm" disabled={review.isPending} onClick={() => review.mutate('pending')}>{zh ? '重新复核' : 'Reopen review'}</Button> : null}
     </div> : null}
     {review.isError ? <p role="alert" className="text-sm text-destructive">{review.error instanceof Error ? review.error.message : (zh ? '复核失败' : 'Review failed')}</p> : null}
   </article>

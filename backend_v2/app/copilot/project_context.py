@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from ..candidates.models import Candidate
 from ..compute.models import ComputeDraft, Job
 from ..experiments.models import ExperimentResult
-from ..knowledge.models import KnowledgeEntry
 from ..projects.models import Project
 from ..targets.models import Target
 from ..workflows.models import WorkflowNode, WorkflowRun
@@ -331,21 +330,9 @@ class ProjectContextService:
         *,
         limit: int = 12,
     ) -> list[dict[str, Any]]:
-        normalized = query.strip().lower()
-        rows = list(
-            self.session.scalars(
-                select(KnowledgeEntry)
-                .where(KnowledgeEntry.project_id == self.project_id)
-                .order_by(KnowledgeEntry.updated_at.desc())
-                .limit(500)
-            )
-        )
-        matches = [
-            row
-            for row in rows
-            if not normalized
-            or normalized in f"{row.title}\n{row.content}\n{' '.join(row.tags or [])}".lower()
-        ][: max(1, min(limit, 50))]
+        from ..knowledge.repository import KnowledgeRepository
+
+        matches = KnowledgeRepository(self.session).search(self.project_id, query, limit=limit)
         return [
             self._item(
                 "knowledge_entry",

@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-07（Asia/Shanghai；更新页面、提交、预览及 Copilot 交接说明）
+最后核验：2026-10-11（决策、科研方法、学习、实验质控和扩展中心）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -14,7 +14,7 @@
 
 交付目标为桌面网页版，同时覆盖新手引导与专业操作。页面布局、工作流画布、Copilot 和验收均以桌面浏览器为重点；手机端不在当前开发与交付范围内。浏览器验收默认只运行桌面用例。
 
-前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
+前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline、Learning、Extensions 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 项目上下文使用 UUID；一个项目可包含多个 target，并以 primary target 兼容旧的单目标视图。Candidates 在没有项目时禁止发起查询，避免空项目串数据。
 
@@ -53,6 +53,8 @@ target structure、candidate structure、script asset、实验导入和 dossier 
 配体 UI 必须在项目上下文中调用显式 ligand import；`GET /ligands` 仅查询目录，无写入副作用。
 
 ## 6. 科研与 Copilot
+
+本轮 [能力升级](PLATFORM_CAPABILITY_UPGRADE.md) 增加目标页决策条件、原文反证、Bot 方法包、学习评测、仪器结果审核与 `/extensions` 能力准备检查。扩展页面明确区分声明、运行证据与科研有效性，不把未来适配呈现为已可执行。
 
 文献页使用[论据工作台](LITERATURE_EVIDENCE_WORKBENCH.md)：书目目录与原文论据并列，支持按论点跨文献对照、精确摘录、解释与边界编辑、人工复核和 Markdown 导出。自动拆句仍位于旧的检索操作区；不会冒充整理完成的论据。
 

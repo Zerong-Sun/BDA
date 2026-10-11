@@ -1278,6 +1278,7 @@ def _compare_structures(ctx: ToolContext, args: dict[str, Any]) -> Any:
         uuid.UUID(_arg_str(args, "mobile_artifact_id")),
         reference_chain=_arg_str(args, "reference_chain"),
         mobile_chain=_arg_str(args, "mobile_chain"),
+        pairing=str(args.get("pairing", "author_number")),
     )
 
 
@@ -1289,8 +1290,9 @@ _register(
             "RMSD over C-alpha atoms before and after the fit, the residues "
             "that moved most, and a TM-score when the chain is long enough for "
             "its formula. Residues are paired by author numbering, so the two "
-            "files must use the same numbering; a file missing a loop still "
-            "compares correctly. Use it for a design against its prediction, or "
+            "files must use the same numbering by default. Set pairing=sequence_alignment "
+            "explicitly for renumbered constructs; ambiguous sequence alignments are rejected. "
+            "Inspect coverage, correspondence and sequence identity. Use it for a design against its prediction, or "
             "a prediction against a solved structure. The TM-score is evaluated "
             "on this superposition and is not a TM-align result."
         ),
@@ -1301,6 +1303,7 @@ _register(
                 "mobile_artifact_id": {"type": "string"},
                 "reference_chain": {"type": "string"},
                 "mobile_chain": {"type": "string"},
+                "pairing": {"type": "string", "enum": ["author_number", "sequence_alignment"], "default": "author_number"},
             },
             "required": [
                 "reference_artifact_id",

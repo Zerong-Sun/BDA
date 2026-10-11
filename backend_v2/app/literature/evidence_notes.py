@@ -30,7 +30,18 @@ def is_note(claim: LiteratureClaim) -> bool:
     return (claim.attributes or {}).get("curation_kind") == NOTE_KIND
 
 
-def reading_context(claim: LiteratureClaim, evidence: LiteratureEvidence, chunk: LiteratureChunk | None) -> dict:
+def argument_identity(claim: LiteratureClaim, document: LiteratureDocument) -> uuid.UUID:
+    """Legacy records get the same project-scoped ID without changing them on read.
+
+    An assertion's wording is immutable within a group. Editing its wording makes
+    a new assertion rather than silently moving other papers' evidence to it.
+    """
+    stored = (claim.attributes or {}).get("argument_id")
+    return uuid.UUID(stored) if stored else uuid.uuid5(document.project_id, "literature-argument:" + claim.claim.strip())
+
+
+def reading_context(claim: LiteratureClaim, evidence: LiteratureEvidence, chunk: LiteratureChunk | None,
+                    document: LiteratureDocument | None = None) -> dict:
     """Never let a project interpretation travel downstream as a paper's assertion."""
     if not is_note(claim):
         return {}
@@ -38,7 +49,8 @@ def reading_context(claim: LiteratureClaim, evidence: LiteratureEvidence, chunk:
     return {
         "curation_kind": NOTE_KIND, "claim": details["paper_claim"], "project_argument": claim.claim,
         "evidence_relation": details["relation"], "interpretation": details["interpretation"],
-        "limitations": details["limitations"], "anchor_status": anchor_status(evidence, chunk),
+        "limitations": details["limitations"], "anchor_status": anchor_status(evidence, chunk, document),
+        "argument_id": str(argument_identity(claim, document)) if document else (claim.attributes or {}).get("argument_id"),
         "locator": evidence.source_ref.get("locator"), "review_status": claim.review_status,
         "review_scope": "Interpretation review only; not experimental validation of the project argument",
     }
@@ -76,6 +88,8 @@ def source_anchor(session: Session, document: LiteratureDocument, payload: Evide
         "document_id": str(document.id),
         "url": str(payload.source_url),
         "locator": payload.locator,
+        "structured_locator": payload.structured_locator.model_dump(mode="json") if payload.structured_locator else None,
+        "location_verification": "user_supplied",
         "excerpt_checksum_sha256": digest(payload.quote),
         "content_kind": "user_supplied_excerpt",
         "content_checksum_sha256": None,
@@ -111,15 +125,24 @@ def source_anchor(session: Session, document: LiteratureDocument, payload: Evide
     return ref
 
 
-def anchor_status(evidence: LiteratureEvidence, chunk: LiteratureChunk | None) -> Literal["matched", "changed", "unverified"]:
+def anchor_status(evidence: LiteratureEvidence, chunk: LiteratureChunk | None,
+                  document: LiteratureDocument | None = None) -> Literal["matched", "changed", "unverified"]:
     ref = evidence.source_ref
     if ref.get("anchor_scope") != "saved_chunk":
         return "unverified"
+    quote: dict = next((value for value in ref.get("selector", []) if value.get("type") == "TextQuoteSelector"), {})
+    if quote.get("exact") != evidence.content or ref.get("excerpt_checksum_sha256") != digest(evidence.content):
+        return "changed"
     if chunk is None or ref.get("chunk_version") != chunk.version or ref.get("chunk_checksum_sha256") != digest(chunk.content):
         return "changed"
+    if document is not None and ref.get("content_checksum_sha256"):
+        current = ((document.metadata_json or {}).get("content_provenance") or {}).get("content_checksum_sha256")
+        if current != ref["content_checksum_sha256"]:
+            return "changed"
     position: dict = next((value for value in ref.get("selector", []) if value.get("type") == "TextPositionSelector"), {})
     start, end = position.get("start"), position.get("end")
-    if not isinstance(start, int) or not isinstance(end, int) or chunk.content[start:end] != evidence.content:
+    if (type(start) is not int or type(end) is not int or not 0 <= start < end <= len(chunk.content)
+            or chunk.content[start:end] != evidence.content):
         return "changed"
     return "matched"
 
@@ -129,10 +152,12 @@ def response(claim: LiteratureClaim, evidence: LiteratureEvidence, document: Lit
     details = claim.attributes["evidence_note"]
     return EvidenceNoteResponse(
         id=claim.id, document_id=document.id, document_title=document.title,
-        argument=claim.claim, paper_claim=details["paper_claim"], interpretation=details["interpretation"],
+        argument=claim.claim, argument_id=argument_identity(claim, document),
+        paper_claim=details["paper_claim"], interpretation=details["interpretation"],
         limitations=details["limitations"], relation=details["relation"], quote=evidence.content,
         locator=evidence.source_ref.get("locator", ""), source_url=evidence.source_ref["url"],
-        source_ref=evidence.source_ref, anchor_status=anchor_status(evidence, chunk),
+        structured_locator=evidence.source_ref.get("structured_locator"),
+        source_ref=evidence.source_ref, anchor_status=anchor_status(evidence, chunk, document),
         review_status=claim.review_status, reviewed_by=claim.reviewed_by, reviewed_at=claim.reviewed_at,
         version=claim.version, created_at=claim.created_at, updated_at=claim.updated_at,
     )
@@ -155,13 +180,26 @@ def save_note(session: Session, document: LiteratureDocument, payload: EvidenceN
         before = response(claim, evidence, document, session.get(LiteratureChunk, claim.chunk_id) if claim.chunk_id else None).model_dump(mode="json")
     # Validate before adding or mutating either resource.
     ref = source_anchor(session, document, payload)
+    argument_id = (argument_identity(claim, document) if claim is not None and claim.claim == payload.argument
+                   else uuid.uuid5(document.project_id, "literature-argument:" + payload.argument))
+    if payload.argument_id is not None:
+        # Restrict the lookup to this project even when a caller knows a foreign
+        # UUID. Only matching assertions can share an identity.
+        candidates = session.execute(select(LiteratureClaim, LiteratureDocument).join(
+            LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id,
+        ).where(LiteratureDocument.project_id == document.project_id,
+                LiteratureClaim.attributes["curation_kind"].as_string() == NOTE_KIND,
+                LiteratureClaim.claim == payload.argument)).all()
+        if not any(argument_identity(existing, doc) == payload.argument_id for existing, doc in candidates):
+            raise DomainError("evidence_argument_conflict", "This argument identity does not match a saved assertion in this project; select an existing assertion or create a new one", status_code=409)
+        argument_id = payload.argument_id
     creating = claim is None
     if claim is None:
         claim = LiteratureClaim(document_id=document.id, confidence="unassessed", version=1)
         session.add(claim)
     claim.claim = payload.argument
     claim.chunk_id = payload.chunk_id
-    claim.attributes = {"curation_kind": NOTE_KIND, "evidence_note": payload.model_dump(
+    claim.attributes = {**(claim.attributes or {}), "curation_kind": NOTE_KIND, "argument_id": str(argument_id), "evidence_note": payload.model_dump(
         mode="json", include={"paper_claim", "interpretation", "limitations", "relation"},
     )}
     claim.review_status, claim.reviewed_by, claim.reviewed_at = "pending", None, None
@@ -187,7 +225,7 @@ def review_note(session: Session, claim: LiteratureClaim, document: LiteratureDo
     chunk = session.get(LiteratureChunk, claim.chunk_id) if claim.chunk_id else None
     if claim.version != expected_version:
         raise DomainError("version_conflict", "Evidence note changed; reload before reviewing", status_code=412)
-    if payload.review_status == "accepted" and anchor_status(evidence, chunk) == "changed":
+    if payload.review_status == "accepted" and anchor_status(evidence, chunk, document) == "changed":
         raise DomainError("evidence_source_changed", "The saved source changed; re-anchor the quote before accepting", status_code=409)
     before = response(claim, evidence, document, chunk).model_dump(mode="json")
     claim.review_status, claim.reviewed_by, claim.reviewed_at = payload.review_status, user.id, datetime.now(UTC)

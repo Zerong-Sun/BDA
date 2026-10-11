@@ -460,7 +460,7 @@ class ResearchContextService:
                         "source_ref": source_ref,
                         "content_provenance": metadata.get("content_provenance") or {},
                         "verification_status": metadata.get("verification_status"),
-                        **reading_context(claim, evidence, chunk),
+                        **reading_context(claim, evidence, chunk, document),
                     },
                 }
             )

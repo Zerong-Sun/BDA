@@ -13,8 +13,11 @@ import math
 from collections import defaultdict
 from statistics import fmean
 
+from .features import COMPOSITION_VERSION, extract
+from .predictors import KNearestPredictor, distance  # noqa: F401
+from .recommenders import RECOMMENDERS
+
 ALGORITHM = "composition-knn-v1"
-AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 
 def digest(value: object) -> str:
@@ -23,25 +26,12 @@ def digest(value: object) -> str:
     ).hexdigest()
 
 
-def features(sequence: str) -> dict:
-    sequence = "".join(sequence.split()).upper()
-    if not sequence or len(sequence) > 10_000 or set(sequence) - set(AMINO_ACIDS):
-        raise ValueError("A canonical protein sequence of 1–10000 residues is required")
-    return {
-        "sequence_sha256": hashlib.sha256(sequence.encode()).hexdigest(),
-        "feature_version": "aa-composition-length-v1",
-        "features": [sequence.count(aa) / len(sequence) for aa in AMINO_ACIDS] + [math.log1p(len(sequence)) / 10],
-    }
-
-
-def distance(a: list[float], b: list[float]) -> float:
-    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b, strict=True)))
+def features(sequence: str, version: str = COMPOSITION_VERSION) -> dict:
+    return extract(sequence, version)
 
 
 def estimate(points: list[dict], vector: list[float]) -> tuple[float, float]:
-    neighbors = sorted((distance(row["features"], vector), row["value"]) for row in points)[:3]
-    weights = [1 / (d + 0.01) for d, _ in neighbors]
-    return sum(w * pair[1] for w, pair in zip(weights, neighbors, strict=True)) / sum(weights), neighbors[0][0]
+    return KNearestPredictor().predict({"points": points}, vector)
 
 
 def train(rows: list[dict]) -> tuple[dict, dict]:
@@ -109,9 +99,14 @@ def propose(
     secondary_direction: str = "maximize",
     stop_reason: str | None = None,
     allow_out_of_domain: bool = True,
+    selection_policy: str = "cost-diversity-v2",
 ) -> dict:
     from .validation import predict
 
+    if selection_policy not in RECOMMENDERS:
+        raise ValueError("Unsupported recommendation policy")
+    if any(row["cost_cents"] <= 0 for row in pool):
+        raise ValueError("Candidate costs must be positive")
     retests = set(retest_candidates or [])
     measured = set(parameters.get("observed_sequences", [p["sequence_sha256"] for p in parameters["points"]]))
     scored, excluded = [], []
@@ -122,6 +117,8 @@ def propose(
             excluded.append({"candidate_id": row["candidate_id"], "reason": "measured_or_duplicate_sequence"})
             continue
         seen.add(key)
+        if row.get("feature_version", COMPOSITION_VERSION) != parameters.get("feature_version", COMPOSITION_VERSION):
+            raise ValueError("Candidate feature version does not match the model")
         value, nearest = predict(parameters, row["features"])
         if not allow_out_of_domain and nearest > parameters["domain_radius"]:
             excluded.append({"candidate_id": row["candidate_id"], "reason": "outside_permitted_model_domain"})
@@ -145,7 +142,7 @@ def propose(
             )
             scored[-1]["nominal_coverage"] = parameters["nominal_coverage"]
         if secondary_parameters is not None:
-            secondary_value, secondary_distance = predict(secondary_parameters, row["features"])
+            secondary_value, secondary_distance = predict(secondary_parameters, row.get("secondary_features", row["features"]))
             if not allow_out_of_domain and secondary_distance > secondary_parameters["domain_radius"]:
                 scored.pop()
                 excluded.append({"candidate_id": row["candidate_id"], "reason": "outside_permitted_secondary_domain"})
@@ -171,34 +168,13 @@ def propose(
                 )
                 for other in scored
             )
-    sign = -1 if direction == "maximize" else 1
-    exploitation = sorted(
-        scored,
-        key=lambda x: (
-            x["out_of_domain"] or x.get("secondary_out_of_domain", False),
-            not x.get("pareto_front", True),
-            sign * x["prediction"],
-            x["candidate_id"],
-        ),
+    reference = (max if direction == "maximize" else min)(p["value"] for p in parameters["points"])
+    selected = [] if stop_reason else RECOMMENDERS[selection_policy].select(
+        scored, budget=budget, batch_size=batch_size, exploration_fraction=exploration_fraction,
+        direction=direction, domain_radius=parameters["domain_radius"], error_scale=parameters["error_scale"],
+        observed_reference=reference,
     )
-    exploration = sorted(scored, key=lambda x: (-x["distance"], x["candidate_id"]))
-    explore_slots = math.floor(batch_size * exploration_fraction)
-    selected: list[dict] = []
-    remaining_budget = budget
-    for strategy, ranked, quota in (
-        ("retest", [r for r in scored if r["retest"]], batch_size),
-        ("exploration", exploration, explore_slots),
-        ("exploitation", exploitation, batch_size),
-    ):
-        used = 0
-        for row in ranked:
-            if stop_reason or len(selected) >= batch_size or used >= quota:
-                break
-            if any(r["candidate_id"] == row["candidate_id"] for r in selected) or row["cost_cents"] > remaining_budget:
-                continue
-            selected.append({**row, "selection_reason": strategy})
-            remaining_budget -= row["cost_cents"]
-            used += 1
+    remaining_budget = budget - sum(r["cost_cents"] for r in selected)
     chosen = {r["candidate_id"] for r in selected}
     excluded.extend(
         {"candidate_id": r["candidate_id"], "reason": "budget_or_batch_priority"}
@@ -211,7 +187,19 @@ def propose(
         "considered": scored,
         "estimated_cost_cents": budget - remaining_budget,
         "remaining_batch_budget_cents": remaining_budget,
-        "policy": "bounded-explore-exploit-v1",
+        "policy": selection_policy,
+        "feature_version": parameters.get("feature_version", COMPOSITION_VERSION),
+        "prediction_evidence": "model_prediction_not_experimental_observation",
+        "observed_training_reference": reference,
+        "selection_summary": {
+            "selected_count": len(selected),
+            "exploration_count": sum(r["selection_reason"] == "exploration" for r in selected),
+            "out_of_domain_count": sum(r["out_of_domain"] for r in selected),
+            "minimum_pairwise_feature_distance": min(
+                (distance(a["features"], b["features"]) for i, a in enumerate(selected) for b in selected[i + 1:]),
+                default=None,
+            ),
+        },
         "exploration_fraction": exploration_fraction,
         "action": stop_reason or ("review_batch" if selected else "stop_no_feasible_candidate"),
         "execution_authorized": False,
@@ -219,5 +207,7 @@ def propose(
         "limitations": [
             "Greedy batch heuristic; not a globally optimal budget allocation",
             "Predicted Pareto dominance does not establish measured multi-property success",
+            "Feature novelty and batch diversity are proxies, not expected information gain or biological diversity",
+            "Acquisition scores are unitless heuristics, not success probabilities or measured benefit per cost",
         ],
     }

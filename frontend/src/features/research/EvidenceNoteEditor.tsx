@@ -7,15 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { listSavedLiteratureChunks } from '../../lib/api/literatureSources'
 import { saveEvidenceNote } from '../../lib/api/evidenceNotes'
 import { useI18n } from '../../lib/i18n'
-import { evidenceRelations, noteDraft, referenceUrl, relationLabel, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
+import { evidenceRelations, noteDraft, referenceUrl, relationLabel, type ArgumentChoice, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
 
 export function EvidenceNoteEditor({ projectId, reference, note, onClose, argumentChoices = [] }: {
-  projectId: string; reference: LiteratureReference; note?: EvidenceNote; onClose: () => void; argumentChoices?: string[]
+  projectId: string; reference: LiteratureReference; note?: EvidenceNote; onClose: () => void; argumentChoices?: Array<string | ArgumentChoice>
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const client = useQueryClient()
   const [draft, setDraft] = useState(() => noteDraft(note, referenceUrl(reference)))
+  const choices = argumentChoices.map((choice) => typeof choice === 'string' ? { argument: choice, id: null } : choice)
+  const selectedArgument = choices.find((choice) => choice.argument === draft.argument && (!draft.argument_id || choice.id === draft.argument_id))
   const sourceElement = useRef<HTMLParagraphElement>(null)
   const [selection, setSelection] = useState<{ quote: string; start: number } | null>(null)
   const chunks = useInfiniteQuery({
@@ -37,7 +39,7 @@ export function EvidenceNoteEditor({ projectId, reference, note, onClose, argume
   })
   const field = (key: 'argument' | 'paper_claim' | 'interpretation' | 'limitations', label: string, hint: string) => <label className="grid gap-1.5 text-sm font-medium">
     {label}<Textarea required autoFocus={key === 'argument'} value={draft[key]} maxLength={key === 'argument' ? 2000 : 4000} placeholder={hint}
-      onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+      onChange={(event) => setDraft({ ...draft, [key]: event.target.value, ...(key === 'argument' ? { argument_id: null } : {}) })} />
   </label>
   const captureSelection = () => {
     const range = window.getSelection()?.rangeCount ? window.getSelection()?.getRangeAt(0) : undefined
@@ -53,10 +55,14 @@ export function EvidenceNoteEditor({ projectId, reference, note, onClose, argume
       <Button type="button" variant="ghost" size="sm" disabled={save.isPending} onClick={onClose}>{zh ? '取消' : 'Cancel'}</Button></div>
     <fieldset className="grid min-w-0 gap-5" disabled={save.isPending}>
       {field('argument', zh ? '1 · 我们需要的论点' : '1 · Our project argument', zh ? '写一个可被支持或反驳的具体判断' : 'One specific, testable project assertion')}
-      {argumentChoices.length ? <Select value={argumentChoices.includes(draft.argument) ? draft.argument : null} onValueChange={(value) => value && setDraft({ ...draft, argument: value })}>
+      {choices.length ? <Select items={choices.map((choice) => ({ value: choice.id ?? choice.argument, label: choice.argument }))} value={selectedArgument ? selectedArgument.id ?? selectedArgument.argument : null} onValueChange={(value) => {
+        const choice = choices.find((item) => (item.id ?? item.argument) === value)
+        if (choice) setDraft({ ...draft, argument: choice.argument, argument_id: choice.id ?? null })
+      }}>
         <SelectTrigger aria-label={zh ? '复用已有论点' : 'Reuse an existing argument'} className="w-full min-w-0"><SelectValue placeholder={zh ? '或选择已有论点，将多篇文献放在一起对照' : 'Or reuse an existing argument to compare papers'} /></SelectTrigger>
-        <SelectContent>{argumentChoices.map((argument) => <SelectItem className="max-w-[36rem] whitespace-normal" key={argument} value={argument}>{argument}</SelectItem>)}</SelectContent>
+        <SelectContent>{choices.map((choice) => <SelectItem className="max-w-[36rem] whitespace-normal" key={choice.id ?? choice.argument} value={choice.id ?? choice.argument}>{choice.argument}</SelectItem>)}</SelectContent>
       </Select> : null}
+      {note && draft.argument !== note.argument ? <p className="text-xs text-muted-foreground">{zh ? '论点文字改变后，这条论据会归入新的论点；其他论文的论据不会被自动改写。' : 'Changing the assertion moves this card to a new argument. Evidence from other papers is not silently reinterpreted.'}</p> : null}
       <div className="grid min-w-0 gap-2">
         <label className="text-sm font-medium" htmlFor="evidence-source-chunk">{zh ? '2 · 选择原文片段' : '2 · Select a source passage'}</label>
         <Select value={draft.chunk_id ?? 'manual'} onValueChange={(value) => { setDraft({ ...draft, chunk_id: value === 'manual' ? null : value, quote: '', quote_start: null }); setSelection(null) }}>
@@ -76,6 +82,12 @@ export function EvidenceNoteEditor({ projectId, reference, note, onClose, argume
         <label className="grid gap-1.5 text-sm font-medium">{zh ? '原文摘录（保留原语言）' : 'Original quote (source language)'}
           <Textarea required maxLength={12000} value={draft.quote} onChange={(event) => setDraft({ ...draft, quote: event.target.value, quote_start: null })} className="min-h-28 leading-6" /></label>
       </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="grid gap-1.5 text-sm font-medium">{zh ? '出版物页码（从 1 开始）' : 'Publication page (1-based)'}<Input type="number" min={1} max={100000} step={1} value={draft.structured_locator?.page ?? ''} onChange={(event) => setDraft({ ...draft, structured_locator: { ...draft.structured_locator, page: event.target.value ? Number(event.target.value) : null } })} /></label>
+        <label className="grid gap-1.5 text-sm font-medium">{zh ? '章节' : 'Section'}<Input maxLength={500} value={draft.structured_locator?.section ?? ''} onChange={(event) => setDraft({ ...draft, structured_locator: { ...draft.structured_locator, section: event.target.value } })} /></label>
+        <label className="grid gap-1.5 text-sm font-medium">{zh ? '图表标识' : 'Figure / table'}<Input maxLength={200} value={draft.structured_locator?.figure ?? ''} onChange={(event) => setDraft({ ...draft, structured_locator: { ...draft.structured_locator, figure: event.target.value } })} /></label>
+      </div>
+      <p className="text-xs text-muted-foreground">{zh ? '页码、章节、图表是人工定位信息；文字匹配和文档指纹单独核验。' : 'Page, section and figure are human-entered locations. Text matching and document fingerprints are checked separately.'}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1.5 text-sm font-medium">{zh ? '论文链接' : 'Paper URL'}<Input required type="url" value={draft.source_url} onChange={(event) => setDraft({ ...draft, source_url: event.target.value })} /></label>
         <label className="grid gap-1.5 text-sm font-medium">{zh ? '原文位置（章节 / 页码 / 图表）' : 'Location (section / page / figure)'}<Input maxLength={500} value={draft.locator ?? ''} onChange={(event) => setDraft({ ...draft, locator: event.target.value })} placeholder={zh ? '例如 Results · Figure 2 · p. 5' : 'e.g. Results · Figure 2 · p. 5'} /></label>

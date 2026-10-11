@@ -12,6 +12,7 @@ import { CopilotWorkspace } from '../features/copilot/CopilotWorkspace'
 import { Room } from '../features/copilot/Room'
 import { CopilotChain } from '../features/copilot/CopilotChain'
 import { CopilotSettings } from '../features/copilot/CopilotSettings'
+import { ProceduralSkillCatalog } from '../features/copilot/ProceduralSkills'
 import { useCopilotBots } from '../features/copilot/bots/registry'
 import { botDisplayText } from '../features/copilot/bots/displayText'
 import { botHref } from '../features/copilot/bots/workbenches'
@@ -46,7 +47,7 @@ function BotProjectWorkspace() {
   // link resolves to the room rather than landing silently on the default,
   // because the room contains what that tab used to show.
   const requested = search.get('view') === 'chat' ? 'room' : search.get('view') ?? ''
-  const view = ['room', 'tasks', 'handoffs'].includes(requested) ? requested : 'room'
+  const view = ['room', 'tasks', 'handoffs', 'skills'].includes(requested) ? requested : 'room'
   const selectView = (value: string) => { const next = new URLSearchParams(search); next.set('view', value); setSearch(next) }
   const selectRun = (id: string | null) => {
     const next = new URLSearchParams(search)
@@ -94,6 +95,7 @@ function BotProjectWorkspace() {
                 <TabsTrigger value="room">{zh ? '研究室' : 'Research room'}</TabsTrigger>
                 <TabsTrigger value="tasks">{zh ? '任务与交付' : 'Tasks & deliverables'}</TabsTrigger>
                 <TabsTrigger value="handoffs">{zh ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
+                <TabsTrigger value="skills">{zh ? '科学方法' : 'Scientific methods'}</TabsTrigger>
               </TabsList>
               <TabsContent value="tasks"><CopilotWorkspace pageContext={context} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} /></TabsContent>
               <TabsContent value="room">
@@ -108,6 +110,7 @@ function BotProjectWorkspace() {
                 />
               </TabsContent>
               <TabsContent value="handoffs"><CopilotChain onSelectOperator={(id) => navigate(botHref(id, projectId))} /></TabsContent>
+              <TabsContent value="skills"><ProceduralSkillCatalog /></TabsContent>
             </Tabs>
           </div>
           <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />

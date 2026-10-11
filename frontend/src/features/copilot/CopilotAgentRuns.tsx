@@ -14,6 +14,7 @@ import {
   type AgentTurn,
 } from '../../lib/api/agentRuns'
 import { TaskDelivery } from './TaskDelivery'
+import { AppliedProceduralSkills } from './ProceduralSkills'
 import { BotAvatar } from './BotAvatar'
 import { useCopilotBots } from './bots/registry'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -348,6 +349,7 @@ export function AgentRunDetail({
 
       {readOnly ? <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
       {run.data ? <TaskDelivery run={run.data} /> : null}
+      {run.data ? <AppliedProceduralSkills contract={run.data.task_contract ?? {}} outcome={run.data.outcome ?? {}} /> : null}
       {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
       {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
       {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>

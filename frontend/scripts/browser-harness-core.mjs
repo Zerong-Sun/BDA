@@ -1,3 +1,6 @@
+import { PROCEDURAL_SKILLS } from './fixtures/procedural-skills.mjs'
+import { EXTENSION_CATALOG } from './fixtures/extension-catalog.mjs'
+
 const PROJECT_ID = 'proj_browser'
 const NOW = '2026-07-29T08:00:00Z'
 
@@ -21,6 +24,8 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   autopilot: { root: '[data-tour-id="autopilot-page"]', maxSteps: 96 },
   learning: { root: '[data-tour-id="learning-page"]', maxSteps: 128 },
   lab: { root: '[data-tour-id="lab-page"]', maxSteps: 128 },
+  extensions: { root: '[data-testid="extension-center"]', maxSteps: 160 },
+  'research-goals': { root: '[data-testid="research-decision-center"]', maxSteps: 160 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -152,9 +157,9 @@ export const SCENARIO_CONTRACTS = Object.freeze({
   },
   'results:pending': {
     root: 'section',
-    evidence: [exactText('[data-tour-id="results-delivery"]', 'building')],
+    evidence: [exactText('[data-tour-id="results-delivery"]', 'pending')],
     controls: [
-      disabledControl('button', 'Prepare delivery package', 'A building delivery package is not downloadable yet.'),
+      disabledControl('button', 'Prepare delivery package', 'A pending delivery package is not downloadable yet.'),
     ],
   },
   'research:empty': {
@@ -250,6 +255,8 @@ export const ROUTES = Object.freeze([
   { id: 'autopilot', path: `/autopilot?project=${PROJECT_ID}`, authenticated: true },
   // The last route the matrix did not reach. Its three panels are the ones the React
   // Compiler skips (TanStack Table), so nothing else was watching them either.
+  { id: 'extensions', path: '/extensions', authenticated: true },
+  { id: 'research-goals', path: `/research?tab=goals&project=${PROJECT_ID}`, authenticated: true },
   { id: 'learning', path: `/learning?project=${PROJECT_ID}`, authenticated: true },
   { id: 'lab', path: `/lab?project=${PROJECT_ID}`, authenticated: true },
 ])
@@ -307,6 +314,8 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   // case here would be asserting on a fixture rather than on the page.
   autopilot: [],
   learning: [],
+  extensions: [],
+  'research-goals': [],
   lab: ['empty', 'loading', 'recoverable-error'],
 })
 
@@ -961,6 +970,8 @@ function createStrictRoutes({ scenario, routeId }) {
   }
   const ok = (body, options) => routeResponse(200, body, options)
 
+  add('GET', '/api/v2/registry/extensions', {}, () => ok(EXTENSION_CATALOG))
+
   const learningBase = { project_id: PROJECT_ID, version: 1, created_at: NOW, updated_at: NOW, created_by: 'user_browser' }
   const learningAssay = { ...learningBase, id: 'assay_browser', name: 'Synthetic affinity assay', method: 'BLI fixture', unit: 'nM', conditions: { pH: '7' } }
   const learningStudy = { ...learningBase, id: 'study_browser', name: 'Synthetic learning round', assay_id: learningAssay.id, research_goal_id: 'goal_browser_1', goal_snapshot: { version: 1 }, direction: 'minimize', threshold: 10, currency: 'USD', batch_budget_cents: 10000, max_batch_size: 2, max_rounds: 12, stop_on_threshold: false, supersedes_id: null }
@@ -1299,14 +1310,14 @@ function createStrictRoutes({ scenario, routeId }) {
     best_result_value: empty ? null : 18,
     best_result_unit: empty ? null : 'nM',
   }))
-  add('GET', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, { limit: '1' }, () => ok({
+  add('GET', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, { limit: '1', order: 'newest' }, () => ok({
     items: empty
       ? []
       : [{
           id: 'delivery_browser',
           project_id: PROJECT_ID,
           name: 'Browser delivery package',
-          status: scenario === 'pending' ? 'building' : 'ready',
+          status: scenario === 'pending' ? 'pending' : 'available',
           selection: { candidate_ids: ['candidate_browser_1'], include_experiment_results: true },
           artifact_id: null,
           error: null,
@@ -1336,6 +1347,8 @@ function createStrictRoutes({ scenario, routeId }) {
     items: [],
     next_cursor: null,
   }))
+  add('GET', '/api/v2/copilot/procedural-skills', {}, () => ok(PROCEDURAL_SKILLS.map(({ instructions: _instructions, ...summary }) => summary)))
+  for (const skill of PROCEDURAL_SKILLS) add('GET', `/api/v2/copilot/procedural-skills/${skill.id}`, {}, () => ok(skill))
   add('GET', '/api/v2/copilot/task-services', {}, () => ok([{
     id: 'literature', title: 'Research the evidence', title_zh: '调研与比较证据',
     deliverable: 'Traced excerpts and evidence gaps', deliverable_zh: '可追溯的证据与缺口',
@@ -1461,6 +1474,11 @@ function createStrictRoutes({ scenario, routeId }) {
       : [],
     next_cursor: null,
   }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/knowledge`, { limit: '50', q: '' }, () => ok({
+    items: empty ? [] : [{id: 'knowledge_browser', project_id: PROJECT_ID, entry_type: 'evidence',
+      title: 'Browser knowledge', content: 'Deterministic knowledge fixture.', source: {}, tags: ['fixture'],
+      version: 1, created_at: NOW, updated_at: NOW}], next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/knowledge`, { limit: '100' }, () => ok({
     items: empty
       ? []
@@ -1536,16 +1554,19 @@ function createStrictRoutes({ scenario, routeId }) {
     { expectedHttpFailure: true },
   ))
   add('POST', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, {}, () => ok({
+    operation_id: 'operation_delivery_browser',
+    delivery_package: {
     id: 'delivery_browser_pending',
     project_id: PROJECT_ID,
     name: 'Browser candidate structures',
-    status: 'building',
+    status: 'pending',
     artifact_id: null,
-    candidate_ids: ['candidate_browser_1'],
-    include_experiment_results: true,
+    selection: { candidate_ids: [], include_experiment_results: true, format: 'ro-crate-1.1', frozen_at: NOW },
+    error: null,
     version: 1,
     created_at: NOW,
     updated_at: NOW,
+    },
   }, { delayMs: scenario === 'pending' ? 1_000 : 0 }))
   add('POST', `/api/v2/workflow-runs/${workflowRun.id}/submissions`, {}, () => ok({
     id: 'submission_browser',

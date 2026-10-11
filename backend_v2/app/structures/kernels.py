@@ -28,6 +28,7 @@ import warnings
 from typing import Any
 
 import numpy as np
+from Bio.Align import PairwiseAligner
 from Bio.PDB import MMCIFParser, NeighborSearch, PDBParser, Superimposer
 from Bio.PDB.Polypeptide import protein_letters_3to1
 from Bio.PDB.SASA import ShrakeRupley
@@ -746,6 +747,7 @@ def superpose(
     *,
     reference_chain: str,
     mobile_chain: str,
+    pairing: str = "author_number",
 ) -> dict[str, Any]:
     """Least-squares fit of one chain onto another, and how far off it lands.
 
@@ -757,7 +759,8 @@ def superpose(
 
     Two decisions, both about honesty rather than accuracy:
 
-    **Residues are paired by author numbering, never by order.** Files of the
+    **Residues default to author-number correspondence.** Explicit sequence
+    alignment is also available for different constructs. Files of the
     same construct agree on numbering; they disagree on how many residues they
     contain, because one is missing a disordered loop. Pairing by order would
     compare different residues and report a small, confident, wrong number.
@@ -775,7 +778,14 @@ def superpose(
 
     left = _ca_by_number(reference_model, reference_chain)
     right = _ca_by_number(mobile_model, mobile_chain)
-    shared = sorted(set(left) & set(right))
+    alignment_details: dict[str, Any] = {}
+    if pairing == "author_number":
+        pairs = [(key, key) for key in sorted(set(left) & set(right))]
+    elif pairing == "sequence_alignment":
+        pairs, alignment_details = _align_ca_sequences(left, right)
+    else:
+        raise StructureFormatError("Pairing must be author_number or sequence_alignment.")
+    shared = [pair[0] for pair in pairs]
     if len(shared) < MIN_SUPERPOSITION_PAIRS:
         raise StructureFormatError(
             f"Only {len(shared)} residue numbers are present in both chains; "
@@ -783,8 +793,8 @@ def superpose(
             "Check that the two files use the same numbering."
         )
 
-    fixed = [left[key] for key in shared]
-    moving = [right[key] for key in shared]
+    fixed = [left[key] for key, _ in pairs]
+    moving = [right[key] for _, key in pairs]
     before = float(
         np.sqrt(np.mean([np.sum((a.coord - b.coord) ** 2) for a, b in zip(fixed, moving, strict=True)]))
     )
@@ -810,13 +820,20 @@ def superpose(
             tm_score = round(sum(1 / (1 + (d / d0) ** 2) for d in deviations) / length, 4)
 
     ranked: list[dict[str, Any]] = [
-        {"seq": key[0], "insertion_code": key[1] or None, "deviation_angstrom": round(value, 2)}
-        for key, value in zip(shared, deviations, strict=True)
+        {"seq": key[0], "insertion_code": key[1] or None, "mobile_seq": mobile[0],
+         "mobile_insertion_code": mobile[1] or None, "deviation_angstrom": round(value, 2)}
+        for (key, mobile), value in zip(pairs, deviations, strict=True)
     ]
     ranked.sort(key=lambda item: float(item["deviation_angstrom"]), reverse=True)
     return {
         "reference_chain": reference_chain,
         "mobile_chain": mobile_chain,
+        "pairing": pairing,
+        "alignment": alignment_details or None,
+        "reference_coverage": round(length / len(left), 4),
+        "mobile_coverage": round(length / len(right), 4),
+        "residue_correspondence": [{"reference_seq": a[0], "reference_insertion_code": a[1] or None,
+                                    "mobile_seq": b[0], "mobile_insertion_code": b[1] or None} for a, b in pairs],
         "paired_residue_count": length,
         "reference_residue_count": len(left),
         "mobile_residue_count": len(right),
@@ -825,9 +842,46 @@ def superpose(
         "tm_score_on_paired_residues": tm_score,
         "tm_score_note": (
             "TM-score formula evaluated on the RMSD-minimising superposition of "
-            "residues paired by number. Not TM-align: no alignment search is "
+            f"residues paired by {pairing}. Not TM-align: no alignment search over spatial coordinates is "
             "performed, so this is not comparable with a published TM-align score."
         ),
         "paired_residue_numbers": [key[0] for key in shared],
         "largest_deviations": ranked[:20],
+    }
+
+
+def _align_ca_sequences(left: dict, right: dict) -> tuple[list, dict]:
+    """Explicit sequence correspondence; never infer correspondence from geometry.
+
+    Only the first two optima are inspected. If an alternative optimum exists,
+    refuse to invent which repeated segment the user intended to compare.
+    """
+    def recognized(atoms: dict) -> tuple[list, str]:
+        entries = [(key, protein_letters_3to1.get(atom.parent.get_resname().strip().upper()))
+                   for key, atom in atoms.items()]
+        return [key for key, residue in entries if residue], "".join(residue for _, residue in entries if residue)
+
+    left_keys, left_sequence = recognized(left)
+    right_keys, right_sequence = recognized(right)
+    if not left_sequence or not right_sequence:
+        raise StructureFormatError("Sequence alignment requires recognized amino acids with CA atoms in both chains.")
+    if len(left_sequence) * len(right_sequence) > 4_000_000:
+        raise StructureFormatError("Sequence alignment exceeds the local 4-million-cell limit; use a registered alignment workflow.")
+    aligner = PairwiseAligner(mode="global", match_score=2, mismatch_score=-1, open_gap_score=-10, extend_gap_score=-0.5)
+    alignments = iter(aligner.align(left_sequence, right_sequence))
+    aligned = next(alignments)
+    if next(alignments, None) is not None:
+        raise StructureFormatError("Sequence alignment is ambiguous: multiple equally scoring correspondences exist. Review the construct or use a dedicated alignment workflow.")
+    index_pairs = [(i, j) for a, b in zip(*aligned.aligned, strict=True)
+                   for i, j in zip(range(int(a[0]), int(a[1])), range(int(b[0]), int(b[1])), strict=True)]
+    if len(index_pairs) < MIN_SUPERPOSITION_PAIRS:
+        raise StructureFormatError("Too few aligned amino acids with CA coordinates to superpose.")
+    identity = sum(left_sequence[i] == right_sequence[j] for i, j in index_pairs) / len(index_pairs)
+    return [(left_keys[i], right_keys[j]) for i, j in index_pairs], {
+        "method": "biopython-global-affine-v1", "algorithm": aligner.algorithm,
+        "scoring": {"match": 2, "mismatch": -1, "open_gap": -10, "extend_gap": -0.5},
+        "score": float(aligned.score), "paired_sequence_identity": round(identity, 4),
+        "reference_unrecognized_ca_count": len(left) - len(left_keys),
+        "mobile_unrecognized_ca_count": len(right) - len(right_keys),
+        "limitations": "Global alignment of observed residues only. Missing coordinates, tags and low similarity require review; this is not structural alignment or proof of homology.",
     }

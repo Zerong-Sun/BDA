@@ -1,5 +1,7 @@
 import './generatedTransport'
 import {
+  postInstrumentReviewApiV2ProjectsProjectIdWetlabResultsResultIdReviewPost,
+  listResultsApiV2ProjectsProjectIdExperimentResultsGet,
   getConcentrationApiV2ProjectsProjectIdWetlabConcentrationGet,
   standaloneConcentrationApiV2WetlabConcentrationGet,
   previewAnalysisApiV2WetlabAnalysisPreviewsPost,
@@ -15,6 +17,7 @@ import {
   postPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPost,
 } from './generated/sdk.gen'
 import {
+  InstrumentQCSchema,
   AktaSummarySchema,
   BliSummarySchema,
   EnzymeSummarySchema,
@@ -175,6 +178,8 @@ export async function planDilutionSeries(query: {
 // a measurement to fail.
 
 export interface AnalysisRecord {
+  version?: number
+  qc_review?: Record<string, unknown> | null
   experiment_result_id: string
   experiment_type: string
   analysis_version: string
@@ -184,6 +189,8 @@ export interface AnalysisRecord {
 }
 
 function record(data: {
+  version?: number
+  qc_review?: Record<string, unknown> | null
   experiment_result_id: string
   experiment_type: string
   analysis_version: string
@@ -192,6 +199,7 @@ function record(data: {
   source_artifact_id: string
 }): AnalysisRecord {
   return {
+    version: data.version, qc_review: data.qc_review,
     experiment_result_id: data.experiment_result_id,
     experiment_type: data.experiment_type,
     analysis_version: data.analysis_version,
@@ -257,4 +265,29 @@ export async function previewInstrumentAnalysis(file: File, options: {
   if (options.instrument === 'bli') return { instrument: 'bli' as const, record, summary: BliSummarySchema.parse(data.summary) }
   if (options.instrument === 'akta') return { instrument: 'akta' as const, record, summary: AktaSummarySchema.parse(data.summary) }
   return { instrument: 'enzyme' as const, record, summary: EnzymeSummarySchema.parse(data.summary) }
+}
+
+export async function reviewInstrumentAnalysis(projectId: string, result: AnalysisRecord, accept: boolean, rationale: string) {
+  if (result.version == null) throw new Error('Reload the result to obtain its review version')
+  return (await postInstrumentReviewApiV2ProjectsProjectIdWetlabResultsResultIdReviewPost<true>({
+    path: { project_id: projectId, result_id: result.experiment_result_id },
+    headers: { 'If-Match': `W/"${result.version}"` }, body: { accept, rationale }, throwOnError: true,
+  })).data
+}
+
+export async function listSavedInstrumentAnalyses(projectId: string, cursor?: string) {
+  const { data } = await listResultsApiV2ProjectsProjectIdExperimentResultsGet<true>({
+    path: { project_id: projectId }, query: { limit: 100, cursor }, throwOnError: true,
+  })
+  return { next_cursor: data.next_cursor, items: data.items.filter((row) => ['bli_affinity', 'akta_purification', 'enzyme_activity'].includes(row.experiment_type)).map((row) => {
+    const meta = row.result_metadata
+    const result = meta.results && typeof meta.results === 'object' ? meta.results as Record<string, unknown> : {}
+    return {
+      record: { experiment_result_id: row.id, experiment_type: row.experiment_type, value: row.value, unit: row.unit,
+        source_artifact_id: row.source_artifact_id ?? '', analysis_version: String(meta.analysis_version ?? ''), version: row.version,
+        qc_review: meta.instrument_qc_review && typeof meta.instrument_qc_review === 'object' ? meta.instrument_qc_review as Record<string, unknown> : null } satisfies AnalysisRecord,
+      quality: result.quality_control == null ? null : InstrumentQCSchema.parse(result.quality_control),
+      label: String(meta.source_filename ?? row.id),
+    }
+  }) }
 }

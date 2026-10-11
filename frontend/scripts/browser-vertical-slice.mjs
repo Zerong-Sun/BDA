@@ -57,6 +57,8 @@ const ROUTE_SURFACES = Object.freeze({
   autopilot: '[data-tour-id="autopilot-page"]',
   learning: '[data-tour-id="learning-page"]',
   lab: '[data-tour-id="lab-page"]',
+  extensions: '[data-testid="extension-center"]',
+  'research-goals': '[data-testid="research-decision-center"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -1377,6 +1379,28 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'extensions') {
+    const root = page.getByTestId('extension-center')
+    await root.getByRole('textbox', { name: 'Search integrations' }).fill('Nextflow')
+    const choices = root.getByRole('navigation', { name: 'Integration options' })
+    if (await choices.getByRole('button').count() !== 1) throw new Error('Extension filter did not restrict the catalog.')
+    await choices.getByRole('button', { name: /Nextflow/ }).click()
+    await expectVisible(root.getByText('Preparation or an execution adapter is still needed', { exact: true }), 'planned extension state')
+    await expectVisible(root.getByText('No execution adapter is shipped for this extension. Requirements can be reviewed, but this assessment cannot install or run it.', { exact: true }).first(), 'explicit future-adapter boundary')
+    diagnostics.interactions.extensionSelection = 'Filtering and selecting a future integration shows its actual missing adapter'
+  } else if (testCase.routeId === 'research-goals') {
+    const root = page.getByTestId('research-decision-center')
+    const currentQuestion = root.getByRole('combobox', { name: 'Current question', exact: true })
+    if ((await currentQuestion.locator('[data-slot="select-value"]').textContent())?.trim() !== 'Does the designed binder hold at bench concentrations?') {
+      throw new Error('The closed question selector must show the question title rather than its internal ID.')
+    }
+    await root.getByRole('button', { name: 'Edit decision definition', exact: true }).click()
+    const form = root.getByRole('form', { name: 'Edit decision definition' })
+    await form.getByLabel('Testable hypothesis', { exact: true }).fill('A reversible browser draft')
+    await expectVisible(form.getByRole('button', { name: 'Save decision definition', exact: true }), 'explicit decision save')
+    await form.getByRole('button', { name: 'Cancel', exact: true }).click()
+    if (await root.getByRole('form', { name: 'Edit decision definition' }).count()) throw new Error('Cancelling did not close the decision draft.')
+    diagnostics.interactions.decisionDefinition = 'A typed decision draft can be opened and cancelled without writing a result'
   } else if (testCase.routeId === 'learning') {
     const root = page.locator('[data-tour-id="learning-page"]')
     await root.getByRole('button', { name: 'Record an observation', exact: true }).click()
@@ -1437,6 +1461,8 @@ function assertControlAcceptance(testCase, diagnostics) {
     timeline: ['timelineViews'],
     autopilot: ['autopilotPromptGuard'],
     learning: ['learningObservation'],
+    extensions: ['extensionSelection'],
+    'research-goals': ['decisionDefinition'],
     lab: [],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {

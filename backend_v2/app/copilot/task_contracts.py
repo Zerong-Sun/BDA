@@ -292,7 +292,12 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
         status = "review_required"  # Open-ended goals have no machine-verifiable delivery contract.
     if invalid or invalid_sections:
         status = "review_required"
-    return {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks)),
+    from .procedural_skills import evaluate_outputs
+    skill_outputs, skill_checks = evaluate_outputs(run.task_contract or {}, data, successful)
+    if skill_checks:
+        status = "review_required" if any("invalid" in check or "unverified" in check or "unexpected" in check for check in skill_checks) else ("partial" if status == "completed" else status)
+    return {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks + skill_checks)),
+            **({"skill_outputs": skill_outputs} if (run.task_contract or {}).get("procedural_skills") else {}),
             "next_action": data["next_action"], "evidence_call_ids": [ref for ref in refs if ref in successful], "steps": steps}
 
 

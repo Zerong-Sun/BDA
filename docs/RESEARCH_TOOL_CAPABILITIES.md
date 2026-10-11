@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-30（仓库实现核对；未重新验证外部账号或集群）
+最后核验：2026-10-11（仓库实现核对；未重新验证外部账号或集群）
 
 权威范围：蛋白质、专利与成药性工具的现有能力、输入和限制。
 
@@ -16,11 +16,13 @@
 | --- | --- | --- |
 | 序列分析 | `analyse_sequence`；项目内 candidate、target 或 protein ID | 返回位点和理化测量，不回传序列明文。 |
 | 界面测量 | `measure_structure_interface`；结构 artifact ID | 返回 SASA/BSA、氢键、盐桥等测量；不据此宣告设计成功。 |
-| 结构叠合 | `compare_structures`；结构 artifact ID | 按作者编号匹配 CA，报告拟合前后 RMSD。 |
+| 结构叠合 | `compare_structures`；结构 artifact ID | 默认作者编号配对；可选 `pairing=sequence_alignment`，报告拟合前后 RMSD、对应关系和双侧覆盖。 |
 | AlphaFold 3 结果 | 作业结果采集 | 按 seed 解析指标；解析器可用不证明某次集群作业已成功。 |
 | 候选分诊 | `triage_candidates`；候选与路线阈值 | 按阈值区分通过、不通过和缺数据。 |
 | 密码子优化 | HTTP 入口 `/projects/{id}/codon-optimisations`；蛋白记录与宿主 | 返回 DNA，验证可翻译回原蛋白；不作为会记录输出的 Copilot 工具。 |
 | 保守性分析 | `analyse_conservation`；比对 artifact 或可唯一匹配的 target | 支持上传 FASTA/A3M/Stockholm，以及 AF3 采集的真实比对；返回位点统计，不补造 MSA。 |
+
+序列配对使用现有 Biopython 全局仿射缺口对齐，只使用结构中实际存在的标准氨基酸 CA，忽略的非标准残基单列。至少需要 3 对，多于一个最优对应时要求人工消歧；对齐规模上限为 400 万矩阵单元。按选定对应计算 RMSD 和 paired-residue TM-like score，不实施空间对应搜索，不等同 TM-align/US-align，也不证明功能相同。
 
 AF3 从已采集的 `*_data.json` 提取内嵌 `unpairedMsa`/`pairedMsa`，生成逐链 A3M。源文件须通过 SHA-256 校验，查询行须匹配链序列；派生制品保留源制品、哈希、job、attempt、链和比对类型。没有比对时保留原始输出并标记不可用；多份匹配时要求指定 artifact。`protein_msa` 端口只影响新快照，旧作业快照不被重写。
 

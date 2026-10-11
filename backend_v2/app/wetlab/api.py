@@ -11,7 +11,7 @@ from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
 from .analysis import analyse_akta, analyse_bli, analyse_enzyme
 from .repository import ProteinRepository
 from .schemas import (
@@ -19,6 +19,8 @@ from .schemas import (
     AnalysisPreviewRequest,
     AnalysisPreviewResponse,
     AnalysisResponse,
+    AnalysisReviewRequest,
+    AnalysisReviewResponse,
     BliAnalysisRequest,
     ConcentrationRequest,
     ConcentrationResult,
@@ -41,6 +43,7 @@ from .service import (
     dilution_series,
     import_fasta,
     promote_candidate,
+    review_analysis,
     to_read,
     update_protein,
 )
@@ -245,7 +248,26 @@ def _analysis_response(row, summary: dict) -> AnalysisResponse:
         unit=row.unit,
         source_artifact_id=row.source_artifact_id,
         summary=summary,
+        version=row.version,
+        qc_review=row.result_metadata.get("instrument_qc_review"),
     )
+
+
+@router.post(
+    "/projects/{project_id}/wetlab/results/{result_id}/review",
+    response_model=AnalysisReviewResponse,
+    openapi_extra={"x-permission": "experiment.record"},
+)
+def post_instrument_review(
+    project_id: uuid.UUID, result_id: uuid.UUID, payload: AnalysisReviewRequest,
+    if_match: str | None = Header(default=None), session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> AnalysisReviewResponse:
+    project = require_project_permission(session, project_id, user, "experiment")
+    row, recorded = review_analysis(session, project, result_id, user, expected=parse_if_match(if_match),
+                                    accept=payload.accept, rationale=payload.rationale)
+    return AnalysisReviewResponse(experiment_result_id=row.id, version=row.version,
+        review=row.result_metadata["instrument_qc_review"], candidate_metric_recorded=recorded)
 
 
 @router.post(

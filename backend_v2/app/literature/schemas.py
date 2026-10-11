@@ -116,11 +116,26 @@ class ReviewUpdate(BaseModel):
     review_status: str = Field(pattern="^(accepted|rejected|pending)$")
 
 
+class EvidenceLocator(BaseModel):
+    """User-entered publication coordinates, not an automatically verified PDF location."""
+
+    model_config = ConfigDict(extra="forbid")
+    page: int | None = Field(default=None, ge=1, le=100000, strict=True)
+    section: str = Field(default="", max_length=500)
+    figure: str = Field(default="", max_length=200)
+
+    @field_validator("section", "figure", mode="before")
+    @classmethod
+    def trim_location(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
 class EvidenceNoteWrite(BaseModel):
     """One source passage applied to one project argument; interpretation is never a quote."""
 
     model_config = ConfigDict(extra="forbid")
     argument: str = Field(min_length=1, max_length=2000)
+    argument_id: uuid.UUID | None = None
     paper_claim: str = Field(min_length=1, max_length=4000)
     interpretation: str = Field(min_length=1, max_length=4000)
     limitations: str = Field(min_length=1, max_length=4000)
@@ -130,6 +145,7 @@ class EvidenceNoteWrite(BaseModel):
     chunk_id: uuid.UUID | None = None
     quote_start: int | None = Field(default=None, ge=0)
     locator: str = Field(default="", max_length=500)
+    structured_locator: EvidenceLocator | None = None
     source_url: HttpUrl
 
     @field_validator("argument", "paper_claim", "interpretation", "limitations", "locator", mode="before")
@@ -153,12 +169,14 @@ class EvidenceNoteResponse(BaseModel):
     document_id: uuid.UUID
     document_title: str
     argument: str
+    argument_id: uuid.UUID | None = None
     paper_claim: str
     interpretation: str
     limitations: str
     relation: Literal["supports", "contradicts", "context"]
     quote: str
     locator: str
+    structured_locator: EvidenceLocator | None = None
     source_url: str
     source_ref: dict
     anchor_status: Literal["matched", "changed", "unverified"]

@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from '../../components/ui/select'
 import { LineChart, type Trace } from './LineChart'
+import { InstrumentQuality } from './InstrumentQuality'
+import { SavedInstrumentReviews } from './SavedInstrumentReviews'
 
 type Instrument = 'bli' | 'akta' | 'enzyme'
 
@@ -277,7 +279,8 @@ export function InstrumentAnalysis({ projectId, previewOnly = false }: { project
           </p>
         ) : null}
 
-        {analysed ? <AnalysisResult analysed={analysed} /> : null}
+        {projectId && <SavedInstrumentReviews key={projectId} projectId={projectId} />}
+        {analysed ? <AnalysisResult analysed={analysed} projectId={projectId} onReviewed={(record) => setAnalysed((current) => current?.record.experiment_result_id === record.experiment_result_id ? { ...current, record } : current)} /> : null}
       </div>
     </Frame>
   )
@@ -342,7 +345,7 @@ function numberColumn<Row extends object>(
   }
 }
 
-function AnalysisResult({ analysed }: { analysed: Analysed }) {
+function AnalysisResult({ analysed, projectId, onReviewed }: { analysed: Analysed; projectId: string; onReviewed: (record: AnalysisRecord) => void }) {
   const { t, language } = useI18n()
   const copy = t.lab.instruments
 
@@ -358,6 +361,7 @@ function AnalysisResult({ analysed }: { analysed: Analysed }) {
           <dd className="font-mono text-xs">{analysed.record.analysis_version}</dd>
         </div>
       </dl>
+      <InstrumentQuality key={analysed.record.experiment_result_id || 'preview'} quality={analysed.summary.quality_control} record={analysed.record} projectId={projectId} onReviewed={onReviewed} />
       {analysed.instrument === 'bli' ? <BliResult summary={analysed.summary} /> : null}
       {analysed.instrument === 'akta' ? <AktaResult summary={analysed.summary} /> : null}
       {analysed.instrument === 'enzyme' ? <EnzymeResult summary={analysed.summary} /> : null}
@@ -396,6 +400,7 @@ function BliResult({ summary }: { summary: BliSummary }) {
       label,
       kd: fit ? formatNumber(fit.kd) : copy.notConverged,
       r2: fit ? formatNumber(fit.r2, 4) : '—',
+      diagnostics: fit?.diagnostics && typeof fit.diagnostics === 'object' ? fit.diagnostics as Record<string, unknown> : {},
     }
   })
   const methodColumns: ColumnDef<(typeof methodRows)[number]>[] = [
@@ -407,6 +412,8 @@ function BliResult({ summary }: { summary: BliSummary }) {
     },
     numberColumn('kd', `${copy.kd} (nM)`, (row) => row.kd),
     numberColumn('r2', copy.r2, (row) => row.r2, 100),
+    numberColumn('residual', 'Residual RMSE', (row) => typeof row.diagnostics.residual_rmse === 'number' ? formatNumber(row.diagnostics.residual_rmse, 5) : '—'),
+    numberColumn('bounds', 'Active bounds', (row) => Array.isArray(row.diagnostics.active_bounds) ? row.diagnostics.active_bounds.join(', ') || '—' : '—'),
   ]
 
   return (
@@ -507,6 +514,7 @@ function EnzymeResult({ summary }: { summary: EnzymeSummary }) {
     well,
     rate: formatNumber(fit.slope, 5),
     r2: formatNumber(fit.r2, 4),
+    interval: Array.isArray(fit.diagnostics?.slope_interval_95_dOD_min) ? fit.diagnostics.slope_interval_95_dOD_min.map((v) => typeof v === 'number' ? formatNumber(v, 5) : '—').join(' – ') : '—',
   }))
   const wellColumns: ColumnDef<(typeof wellRows)[number]>[] = [
     {
@@ -517,6 +525,7 @@ function EnzymeResult({ summary }: { summary: EnzymeSummary }) {
     },
     numberColumn('rate', copy.rate, (row) => row.rate),
     numberColumn('r2', copy.r2, (row) => row.r2, 100),
+    numberColumn('interval', 'Conditional 95% slope interval (dOD/min)', (row) => row.interval, 220),
   ]
 
   return (

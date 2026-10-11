@@ -11,9 +11,10 @@ from collections import defaultdict
 from datetime import datetime
 from statistics import fmean
 
-import numpy as np
-
 from . import engine
+from .calibration import GroupSplitConformal
+from .features import COMPOSITION_VERSION, validate_rows
+from .predictors import predictor
 
 
 def aggregate(rows: list[dict]) -> list[dict]:
@@ -35,34 +36,12 @@ def aggregate(rows: list[dict]) -> list[dict]:
     return points
 
 
-@np.errstate(over="raise", invalid="raise", divide="raise")
 def _fit(points: list[dict], algorithm: str) -> dict:
-    if algorithm == "knn":
-        return {"points": points, "predictor": "knn"}
-    x = np.asarray([p["features"] for p in points], dtype=float)
-    y = np.asarray([p["value"] for p in points], dtype=float)
-    center, scale = x.mean(axis=0), x.std(axis=0)
-    scale[scale < 1e-12] = 1
-    z = (x - center) / scale
-    # Fixed alpha, no tuning against held-out observations. Intercept unpenalized.
-    weights = np.linalg.solve(z.T @ z + np.eye(x.shape[1]), z.T @ (y - y.mean()))
-    return {
-        "points": points,
-        "predictor": "ridge",
-        "center": center.tolist(),
-        "scale": scale.tolist(),
-        "weights": weights.tolist(),
-        "intercept": float(y.mean()),
-        "alpha": 1.0,
-    }
+    return predictor(algorithm).fit(points)
 
 
 def predict(parameters: dict, vector: list[float]) -> tuple[float, float]:
-    baseline, nearest = engine.estimate(parameters["points"], vector)
-    if parameters.get("predictor") != "ridge":
-        return baseline, nearest
-    z = [(v - c) / s for v, c, s in zip(vector, parameters["center"], parameters["scale"], strict=True)]
-    return parameters["intercept"] + sum(w * v for w, v in zip(parameters["weights"], z, strict=True)), nearest
+    return predictor(parameters.get("predictor", "knn")).predict(parameters, vector)
 
 
 def _folds(rows: list[dict], strategy: str) -> list[tuple[str, list[dict], list[dict]]]:
@@ -71,7 +50,10 @@ def _folds(rows: list[dict], strategy: str) -> list[tuple[str, list[dict], list[
         # training. A sequence tested later is purged, including earlier repeats.
         if any(not r.get("observed_at") for r in rows):
             raise ValueError("Time validation requires a timezone-aware observed_at for every included result")
-        times = sorted({datetime.fromisoformat(r["observed_at"]) for r in rows})
+        times = [datetime.fromisoformat(r["observed_at"]) for r in rows]
+        if any(time.utcoffset() is None for time in times):
+            raise ValueError("Time validation requires timezone-aware observation times")
+        times = sorted(set(times))
         if len(times) < 5:
             raise ValueError("Time validation requires at least five distinct observation times")
         cutoff = times[max(1, math.floor(len(times) * 0.8))]
@@ -104,6 +86,11 @@ def _folds(rows: list[dict], strategy: str) -> list[tuple[str, list[dict], list[
 
 
 def train(rows: list[dict], algorithm: str, strategy: str, calibrate: bool = False) -> tuple[dict, dict]:
+    feature_version = validate_rows(rows)
+    predictor(algorithm)
+    if strategy not in {"sequence", "family", "batch", "time"}:
+        raise ValueError("Unsupported validation strategy")
+    original_rows = list(rows)
     observed_sequences = sorted({r["sequence_sha256"] for r in rows})
     calibration_rows: list[dict] = []
     calibration_groups: list[str] = []
@@ -144,6 +131,10 @@ def train(rows: list[dict], algorithm: str, strategy: str, calibrate: bool = Fal
                 "held_out_group": group,
                 "train_sequences": [r["sequence_sha256"] for r in train_points],
                 "test_predictions": predictions,
+                "sequence_overlap": 0,
+                "family_overlap": sorted({r["family_key"] for r in training if r.get("family_key")} &
+                                         {r["family_key"] for r in held_out if r.get("family_key")}),
+                "batch_overlap": sorted({r["batch_key"] for r in training} & {r["batch_key"] for r in held_out}),
                 "train_rows": len(training),
                 "test_rows": len(held_out),
             }
@@ -156,12 +147,26 @@ def train(rows: list[dict], algorithm: str, strategy: str, calibrate: bool = Fal
         **_fit(aggregate(rows), algorithm),
         "domain_radius": max(distances),
         "error_scale": rmse,
-        "feature_version": "aa-composition-length-v1",
+        "feature_version": feature_version,
         "observed_sequences": observed_sequences,
     }
     evaluation: dict = {
         "split": f"purged-{strategy}-v2",
         "algorithm_declared_before_validation": algorithm,
+        "feature_version": feature_version,
+        "feature_dimensions": len(rows[0]["features"]),
+        "predictor_version": parameters["predictor_version"],
+        "data_quality": {
+            "total_included_rows": len(original_rows),
+            "technical_repeat_rows": len(original_rows) - len({
+                (r["sequence_sha256"], r["batch_key"], r["replicate_key"]) for r in original_rows
+            }),
+            "family_labels_complete": all(r.get("family_key") for r in original_rows),
+            "family_overlap_fold_count": sum(bool(f["family_overlap"]) for f in folds),
+            "batch_overlap_fold_count": sum(bool(f["batch_overlap"]) for f in folds),
+            "identical_sequence_leakage": False,
+            "homology_exclusion_verified": False,
+        },
         "groups": len(parameters["points"]),
         "rows": len(rows),
         "folds": folds,
@@ -171,9 +176,11 @@ def train(rows: list[dict], algorithm: str, strategy: str, calibrate: bool = Fal
         "eligible_for_promotion": baseline_rmse > 0 and rmse < baseline_rmse,
         "evidence_level": "retrospective_baseline_only",
         "limitations": [
-            "Composition features ignore residue order and structure",
+            ("Composition features ignore residue order and structure" if feature_version == COMPOSITION_VERSION else
+             "Local pair and terminal features do not model long-range interactions, homology or structure"),
             "Uncertainty is a distance/error heuristic, not a calibrated interval",
             "Family labels and timestamps are supplied by the experiment owner",
+            "Identical-sequence purging does not establish homology-independent validation",
             "Repeated model selection on these folds needs a separate external test set",
             "No prospective experimental benefit has been established",
         ],
@@ -186,19 +193,13 @@ def train(rows: list[dict], algorithm: str, strategy: str, calibrate: bool = Fal
         for group in calibration_groups:
             points = aggregate([r for r in calibration_rows if r[column] == group])
             scores.append(max(abs(predict(parameters, p["features"])[0] - p["value"]) for p in points))
-        nominal_coverage = 0.9
-        rank = math.ceil((len(scores) + 1) * nominal_coverage)
-        half_width = sorted(scores)[rank - 1]
-        parameters["interval_half_width"] = half_width
-        parameters["nominal_coverage"] = nominal_coverage
+        calibration = GroupSplitConformal().fit(scores)
+        parameters["interval_half_width"] = calibration["half_width"]
+        parameters["nominal_coverage"] = calibration["nominal_coverage"]
         evaluation["calibration"] = {
-            "method": "split-conformal-group-max-v1",
-            "nominal_coverage": nominal_coverage,
+            **calibration,
             "calibration_groups": calibration_groups,
             "calibration_sequences": sorted({r["sequence_sha256"] for r in calibration_rows}),
-            "group_absolute_errors": scores,
-            "quantile_rank": rank,
-            "half_width": half_width,
             "assumptions": "Coverage requires exchangeable independent groups and a fixed predictor; distribution shift and adaptive selection can invalidate it",
         }
         evaluation["limitations"] = [item for item in evaluation["limitations"] if "heuristic" not in item]

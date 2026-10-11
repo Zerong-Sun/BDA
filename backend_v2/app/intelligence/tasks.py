@@ -73,7 +73,8 @@ def intelligence_run(run_id: str) -> dict:
                 if curated:
                     note = note_evidence(session, claim_item)
                     chunk = session.get(LiteratureChunk, claim_item.chunk_id) if claim_item.chunk_id else None
-                    content = json.dumps({**reading_context(claim_item, note, chunk), "excerpt": note.content}, ensure_ascii=False)
+                    document = session.get(LiteratureDocument, claim_item.document_id)
+                    content = json.dumps({**reading_context(claim_item, note, chunk, document), "excerpt": note.content}, ensure_ascii=False)
                     citation = {**citation, **note.source_ref}
                 evidence_items.append(
                     IntelligenceEvidence(

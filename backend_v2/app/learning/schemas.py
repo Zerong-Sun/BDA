@@ -89,6 +89,7 @@ class ObservationCreate(Input):
 
 
 class DatasetCreate(Input):
+    feature_version: Literal["aa-composition-length-v1", "sequence-order-v1"] = "sequence-order-v1"
     study_id: uuid.UUID
     result_ids: list[uuid.UUID] = Field(min_length=1, max_length=256)
 
@@ -121,6 +122,7 @@ class LearningDecisionCreate(Input):
     model_id: uuid.UUID
     candidates: list[CandidateCost] = Field(min_length=1, max_length=256)
     exploration_fraction: float = Field(ge=0, le=1, default=0.25)
+    selection_policy: Literal["cost-diversity-v2", "bounded-explore-exploit-v1"] = "cost-diversity-v2"
     retest_candidates: list[uuid.UUID] = Field(default_factory=list, max_length=96)
     secondary_model_id: uuid.UUID | None = None
 

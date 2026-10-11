@@ -192,11 +192,35 @@ def validate_observation(
         or artifact.deleted_at is not None
     ):
         raise DomainError("learning_source_unavailable", "Project source artifact is not available", status_code=404)
+    instrument = _instrument_source(session, project, payload)
+    if payload.qc_accepted and instrument is not None and instrument.result_metadata.get("instrument_qc_review", {}).get("status") != "accepted":
+        raise DomainError("learning_instrument_review_required", "Review and accept the matching instrument analysis before marking this source QC accepted; failed or unaccepted observations can still be recorded", status_code=422)
     return assay, candidate, key, values
+
+
+def _instrument_source(session: Session, project: Project, payload: ObservationCreate) -> ExperimentResult | None:
+    return session.scalar(select(ExperimentResult).where(
+        ExperimentResult.project_id == project.id,
+        ExperimentResult.source_artifact_id == payload.source_artifact_id,
+        ExperimentResult.experiment_type.in_(["bli_affinity", "akta_purification", "enzyme_activity"]),
+        (ExperimentResult.candidate_id == payload.candidate_id) | ExperimentResult.candidate_id.is_(None),
+    ).order_by(ExperimentResult.created_at.desc(), ExperimentResult.id.desc()).limit(1).with_for_update())
+
+
+def _instrument_source_current(session: Session, project: Project, result: ExperimentResult) -> bool:
+    source = result.result_metadata.get("instrument_source")
+    observation = result.result_metadata.get("learning", {})
+    if not source or not observation.get("qc_accepted") or observation.get("status") != "measured":
+        return True
+    row = session.get(ExperimentResult, uuid.UUID(source["id"]))
+    return bool(row is not None and row.project_id == project.id and row.version == source["version"]
+                and row.result_metadata.get("instrument_qc_review", {}).get("status") == "accepted")
 
 
 def create_observation(session: Session, project: Project, user: User, payload: ObservationCreate) -> ExperimentResult:
     assay, candidate, key, values = validate_observation(session, project, payload)
+    instrument = _instrument_source(session, project, payload)
+    provenance = {"instrument_source": {"id": str(instrument.id), "version": instrument.version}} if instrument else {}
     return create_idempotent_result(
         session,
         project,
@@ -210,7 +234,7 @@ def create_observation(session: Session, project: Project, user: User, payload: 
             pass_status="unknown",
             conclusion=payload.note,
             failure_reason=payload.note if payload.status in {"failed", "missing"} else None,
-            result_metadata={"learning": values, "assay_version": assay.version},
+            result_metadata={"learning": values, "assay_version": assay.version, **provenance},
         ),
         user,
         request_key=key,
@@ -227,11 +251,11 @@ def _candidate(session: Session, project: Project, candidate_id: uuid.UUID, *, l
     return row
 
 
-def _features(candidate: Candidate) -> dict:
+def _features(candidate: Candidate, version: str = "aa-composition-length-v1") -> dict:
     sequence = candidate.properties.get("sequence")
     if not isinstance(sequence, str):
         raise ValueError("Candidate has no canonical sequence")
-    return engine.features(sequence)
+    return engine.features(sequence, version)
 
 
 def freeze_dataset(session: Session, project: Project, user: User, payload: DatasetCreate) -> LearningDataset:
@@ -280,6 +304,8 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
             reason = "assay_control"
         elif context.get("status") != "measured" or result.value is None:
             reason = "failed_missing_or_censored"
+        elif not _instrument_source_current(session, project, result):
+            reason = "instrument_source_review_changed"
         artifact = session.get(Artifact, result.source_artifact_id) if result.source_artifact_id else None
         if (
             artifact is None
@@ -295,7 +321,7 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
         if reason is None and result.candidate_id:
             candidate = _candidate(session, project, result.candidate_id)
             try:
-                vector = _features(candidate)
+                vector = _features(candidate, payload.feature_version)
             except ValueError:
                 reason = "candidate_sequence_unavailable"
         if reason is not None:
@@ -319,7 +345,8 @@ def freeze_dataset(session: Session, project: Project, user: User, payload: Data
             }
         )
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "feature_version": payload.feature_version,
         "study_id": str(study.id),
         "study_version": study.version,
         "goal": study.goal_snapshot,
@@ -367,7 +394,9 @@ def train_model(
     dataset = require_record(session, LearningDataset, project, dataset_id, lock=True)
     if engine.digest(dataset.manifest) != dataset.digest:
         raise DomainError("learning_dataset_integrity", "Frozen dataset digest does not match", status_code=409)
-    algorithm_name = f"composition-{algorithm}-{strategy}-v2" + ("-conformal" if calibrate else "")
+    feature_version = dataset.manifest.get("feature_version", "aa-composition-length-v1")
+    prefix, version = ("composition", "v2") if feature_version == "aa-composition-length-v1" else ("sequence-order", "v3")
+    algorithm_name = f"{prefix}-{algorithm}-{strategy}-{version}" + ("-conformal" if calibrate else "")
     key = f"learning-model:{dataset.id}:{algorithm_name}"
     existing = session.scalar(select(LearningModel).where(LearningModel.legacy_id == key))
     if existing is not None:
@@ -488,7 +517,11 @@ def create_decision(
     for item in payload.candidates:
         candidate = _candidate(session, project, item.candidate_id)
         try:
-            vector = _features(candidate)
+            vector = _features(candidate, model.parameters.get("feature_version", "aa-composition-length-v1"))
+            if secondary:
+                vector["secondary_features"] = _features(
+                    candidate, secondary.parameters.get("feature_version", "aa-composition-length-v1")
+                )["features"]
         except ValueError as exc:
             raise DomainError("learning_candidate_sequence", str(exc), status_code=422) from exc
         sequence = "".join(candidate.properties["sequence"].split()).upper()
@@ -520,6 +553,7 @@ def create_decision(
         secondary_direction=secondary_study.direction if secondary_study else "maximize",
         stop_reason=stop_reason,
         allow_out_of_domain=constraints.get("allow_out_of_domain", True),
+        selection_policy=payload.selection_policy,
     )
     proposal["excluded"].extend(constrained_out)
     proposal["selection_constraints"] = constraints
@@ -589,6 +623,7 @@ def _check_model_sources(session: Session, project: Project, model: LearningMode
             or result.unit != source["unit"]
             or result.result_metadata != source["metadata"]
             or str(result.source_artifact_id) != source["source_artifact_id"]
+            or not _instrument_source_current(session, project, result)
         ):
             raise DomainError(
                 "learning_source_changed",

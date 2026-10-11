@@ -243,22 +243,41 @@ def parse_tecan_xlsx(source: str | bytes) -> dict:
 
 
 def fit_kinetics(times: list, od: list) -> dict:
-    """线性拟合 → ΔOD/min、R²"""
-    t = np.asarray(times, float)
-    od_arr = np.asarray(od, float)
+    """All-window OLS with conditional slope uncertainty and explicit input QC."""
+    from scipy.stats import t as student_t  # type: ignore[import-untyped]
+
+    from ..diagnostics import trace_arrays
+
+    t, observed, diagnostics = trace_arrays(times, od)
     n = len(t)
-    if n < 2:
-        return {"slope": None, "intercept": None, "r2": None, "n": n}
-    k, b = np.polyfit(t, od_arr, 1)
-    dod_min = round(float(k * 60), 6)
-    if n > 2:
-        pred = k * t + b
-        ss_res = float(np.sum((od_arr - pred) ** 2))
-        ss_tot = float(np.sum((od_arr - od_arr.mean()) ** 2))
-        r2 = round(float(1 - ss_res / ss_tot), 4) if ss_tot > 0 else None
-    else:
-        r2 = None
-    return {"slope": dod_min, "intercept": round(float(b), 6), "r2": r2, "n": n}
+    diagnostics["residual_degrees_of_freedom"] = n - 2
+    diagnostics["fit_window_seconds"] = [float(t[0]), float(t[-1])] if n else None
+    empty = {"slope": None, "intercept": None, "r2": None, "n": n, "diagnostics": diagnostics}
+    if n < 2 or not diagnostics["strictly_increasing"]:
+        diagnostics["status"] = "insufficient_or_nonincreasing_time_points"
+        return empty
+    centered = t - t.mean()
+    sxx = float(centered @ centered)
+    slope = float(centered @ (observed - observed.mean()) / sxx)
+    intercept = float(observed.mean() - slope * t.mean())
+    residual = observed - (slope * t + intercept)
+    ss_res = float(residual @ residual)
+    ss_total = float(np.sum((observed - observed.mean()) ** 2))
+    stderr = float(np.sqrt((ss_res / (n - 2)) / sxx) * 60) if n > 2 else None
+    critical = float(student_t.ppf(0.975, n - 2)) if n > 2 else None
+    # A whole-window trend is not automatically an initial reaction rate.
+    diagnostics.update({
+        "status": "fitted", "residual_rmse": float(np.sqrt(ss_res / n)),
+        "slope_standard_error_dOD_min": stderr,
+        "slope_interval_95_dOD_min": [slope * 60 - critical * stderr, slope * 60 + critical * stderr]
+            if critical is not None and stderr is not None else None,
+        "durbin_watson": float(np.sum(np.diff(residual) ** 2) / ss_res) if ss_res > np.finfo(float).eps else None,
+        "interval_assumptions": "Conditional OLS t interval assumes a linear mean, independent normal residuals and constant variance; technical time points are not biological replicates.",
+        "initial_rate_window_verified": False,
+    })
+    return {"slope": round(slope * 60, 6), "intercept": round(intercept, 6),
+            "r2": round(1 - ss_res / ss_total, 4) if ss_total > 0 and n > 2 else None,
+            "n": n, "diagnostics": diagnostics}
 
 
 def _bg_priority(refs_present):
