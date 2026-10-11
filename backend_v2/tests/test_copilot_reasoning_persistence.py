@@ -65,6 +65,32 @@ def _conversation(factory):
         return conversation.id, source.id
 
 
+@pytest.mark.parametrize("grounded", [False, True])
+def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monkeypatch, grounded):
+    factory, _ = wired
+    conversation_id, source_id = _conversation(factory)
+    citations = ([{"source_type": "scientific_literature", "chunk_id": "synthetic-chunk",
+                   "content_checksum_sha256": "synthetic-checksum", "retrieval_trace_id": "synthetic-trace"}]
+                 if grounded else [])
+    monkeypatch.setattr(provider_selection, "select_provider", lambda *_, **__: SimpleNamespace(enabled=True))
+    monkeypatch.setattr(ResearchContextService, "build_context", lambda *_, **__: SimpleNamespace(
+        citations=citations, context="synthetic evidence", tool_calls=[]))
+    monkeypatch.setattr(ResearchContextService, "research_overview", lambda *_: {"available_kinds": ["project"]})
+    monkeypatch.setattr(ProjectContextService, "overview_packet", lambda *_: "synthetic overview")
+    canonical = "Synthetic server calculator result and assumptions. " * 40
+    monkeypatch.setattr(research_agent, "complete_research_turn", lambda *_, **__: research_agent.ResearchAgentResult(
+        canonical, citations, [], calculator_delivery=True))
+    def no_rewrite(*args, **kwargs):
+        pytest.fail("A prose reviewer must not rewrite canonical calculator output")
+    monkeypatch.setattr(research_agent, "review_scientific_answer_result", no_rewrite)
+    monkeypatch.setattr(research_agent, "review_grounded_scientific_answer_result", no_rewrite)
+    assert tasks.copilot_respond.run(str(source_id))["status"] == "completed"
+    with factory() as session:
+        answer = session.scalars(select(CopilotMessage).where(
+            CopilotMessage.conversation_id == conversation_id, CopilotMessage.role == "assistant")).one()
+        assert answer.content == canonical
+
+
 @pytest.mark.parametrize("mode", ["plain", "null", "empty", "review", "grounded", "repair"])
 def test_chat_replays_final_response_reasoning_after_new_worker_session(wired, monkeypatch, mode):
     factory, _ = wired

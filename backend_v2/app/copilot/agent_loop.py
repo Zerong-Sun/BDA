@@ -44,7 +44,7 @@ from .agent_review import (
     reviewable_delivery,
 )
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
-from .policy import SCIENTIFIC_POLICY
+from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
 from .procedural_skills import prompt_for
 from .provider import completion_message
 from .registry import REGISTRY, ToolContext
@@ -91,7 +91,7 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     This is the whole of "restoring" a run. There is no in-memory object graph to
     reconstruct, which is exactly why a worker can die mid-run without losing it.
     """
-    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + AGENT_SYSTEM_PROMPT + "\n" + EVIDENCE_CALIBRATION + "\n" + FINAL_INSTRUCTION}]
+    conversation: list[dict[str, Any]] = [{"role": "system", "content": SCIENTIFIC_POLICY + "\n" + RESPONSE_STYLE + "\n" + AGENT_SYSTEM_PROMPT + "\n" + EVIDENCE_CALIBRATION + "\n" + FINAL_INSTRUCTION}]
     method_prompt = prompt_for(run.task_contract or {}, list(run.allowed_tools or []))
     if method_prompt:
         conversation.append({"role": "system", "content": method_prompt})

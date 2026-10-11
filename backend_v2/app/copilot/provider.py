@@ -91,11 +91,18 @@ def completion_message(
         raise last_error
     payload = response.json()
     try:
-        message = payload["choices"][0]["message"]
+        choice = payload["choices"][0]
+        message = choice["message"]
     except (KeyError, IndexError, TypeError) as exc:
         raise ValueError("llm_response_schema_invalid") from exc
     if not isinstance(message, dict):
         raise ValueError("llm_response_schema_invalid")
+    if choice.get("finish_reason") == "length":
+        raise DomainError(
+            "llm_output_truncated",
+            "The model reached its output limit. Shorten the request or increase the provider output token limit and retry.",
+            status_code=502,
+        )
     return message
 
 

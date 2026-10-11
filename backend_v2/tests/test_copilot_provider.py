@@ -68,6 +68,19 @@ def test_openai_compatible_completion(monkeypatch) -> None:
     assert captured["timeout"].read == 180.0
 
 
+@pytest.mark.parametrize("message", [{"content": "partial result"}, {"content": None, "tool_calls": []}])
+def test_truncated_output_is_not_accepted_as_a_complete_answer(monkeypatch, message) -> None:
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    monkeypatch.setattr(provider.httpx, "post", lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": message, "finish_reason": "length"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "question"}])
+    assert error.value.error_code == "llm_output_truncated"
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

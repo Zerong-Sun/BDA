@@ -20,6 +20,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+from . import bench_tools
 from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
@@ -690,6 +691,19 @@ _register(
 # The agent can work the bench rather than only read about it. Sequences are not
 # reachable from here: `list_proteins` returns the same redacted projection the
 # API does, so no tool result can carry plaintext into a model prompt.
+
+_register(ToolSpec(
+    id="calculate_bench",
+    description=(
+        "Run the same validated scalar calculators as Lab tools: A260/A280 concentrations, mass/molar conversion, "
+        "solution mass, single/serial dilution, insert/vector ratio, copy number and RPM/RCF. "
+        "Pure calculation, no project writes or sequence access. Results include units, formula, assumptions and sources. "
+        "Use only supplied inputs; ask for missing sample type, blank, dilution and absorbance basis first. "
+        "For instrument-normalized 1 cm absorbance set path_length_cm=1; never apply its physical path again."
+    ),
+    parameters=bench_tools.parameters(), capability="wetlab-read", execution_mode="read",
+    requires="session", handler=bench_tools.run,
+))
 
 
 def _list_proteins(ctx: ToolContext, args: dict[str, Any]) -> Any:
