@@ -11,6 +11,125 @@ from backend_v2.app.core.problem import DomainError
 from jsonschema import Draft202012Validator
 
 
+@pytest.mark.parametrize("missing", ["blank_absorbance", "absorbance_basis", "path_length_cm", "dilution_factor"])
+def test_chat_calculator_requires_explicit_absorbance_conditions(missing):
+    payload = {"kind": "nucleic-a260", "material": "dsDNA", "sample_absorbance": 1,
+               "blank_absorbance": 0, "absorbance_basis": "normalized-1cm", "path_length_cm": 1, "dilution_factor": 1}
+    payload.pop(missing)
+    with pytest.raises(DomainError):
+        REGISTRY.execute("calculate_bench", ToolContext(session=object()), {"calculation": payload}, granted={"wetlab-read"})
+
+
+@pytest.mark.parametrize(("stock_unit", "stock", "target_unit", "target", "expected"), [
+    ("uM", 1, "nM", 10, 10), ("nM", 1000, "uM", .01, 10), ("mg/mL", 1, "ug/mL", 10, 10),
+])
+def test_dilution_converts_stock_and_target_units_before_feasibility(stock_unit, stock, target_unit, target, expected):
+    result = REGISTRY.execute("calculate_bench", ToolContext(session=object()), {"calculation": {
+        "kind": "dilution", "stock_concentration": stock, "target_concentration": target,
+        "concentration_unit": stock_unit, "target_concentration_unit": target_unit, "final_volume_uL": 1000,
+    }}, granted={"wetlab-read"})
+    assert next(row["value"] for row in result["values"] if row["key"] == "stock_volume_uL") == pytest.approx(expected)
+    assert "换算" in result["assumptions_zh"][-1]
+
+
+def test_dilution_still_rejects_infeasible_target_after_unit_conversion():
+    with pytest.raises(DomainError):
+        REGISTRY.execute("calculate_bench", ToolContext(session=object()), {"calculation": {
+            "kind": "dilution", "stock_concentration": 1, "target_concentration": 10000,
+            "concentration_unit": "uM", "target_concentration_unit": "nM", "final_volume_uL": 1000,
+        }}, granted={"wetlab-read"})
+
+
+def _calculation_request(call_id="calc"):
+    return {"id": call_id, "type": "function", "function": {"name": "calculate_bench", "arguments": json.dumps({"calculation": {
+        "kind": "nucleic-a260", "material": "dsDNA", "sample_absorbance": 1,
+        "blank_absorbance": 0, "absorbance_basis": "normalized-1cm", "path_length_cm": 1, "dilution_factor": 1,
+    }})}}
+
+
+def _turn(monkeypatch, replies, **kwargs):
+    from backend_v2.app.copilot import research_agent
+    responses = iter(replies)
+    def model(*args, **kwargs):
+        response = next(responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+    monkeypatch.setattr(research_agent, "completion_message", model)
+    return research_agent.complete_research_turn(
+        object(), [], SimpleNamespace(session=object()), initial_citations=[], initial_tool_calls=[],
+        allowed_tools={"calculate_bench", "list_proteins", "compute_concentration", "plan_dilution_series"},
+        bench_response_language="zh", **kwargs,
+    )
+
+
+def test_skipped_batch_cannot_be_reported_as_fully_completed(monkeypatch):
+    result = _turn(monkeypatch, [
+        {"tool_calls": [_calculation_request("first"), _calculation_request("skipped")]},
+        {"content": '{"complete":true,"remaining_questions":[]}'},
+    ], max_tool_calls=1)
+    assert result.limit_reached
+    assert "尚未完成全部请求" in result.content
+    assert any(row.get("status") == "skipped" for row in result.tool_calls)
+
+
+@pytest.mark.parametrize("failure", [DomainError("llm_output_truncated", "Output limit", status_code=502), ValueError("llm_response_empty")])
+def test_final_model_failure_preserves_completed_calculations(monkeypatch, failure):
+    result = _turn(monkeypatch, [{"tool_calls": [_calculation_request()]}, failure])
+    assert result.calculator_delivery
+    assert result.delivery_incomplete
+    assert "50 ng/uL" in result.content and "尚未完成全部请求" in result.content
+
+
+def test_library_results_are_not_lost_when_mixed_with_calculations(monkeypatch):
+    from backend_v2.app.copilot import research_agent
+    execute = research_agent._execute
+    def mixed(context, name, *args, **kwargs):
+        if name == "list_proteins":
+            return [{"id": "synthetic-protein", "name": "Library control", "length": 100, "molecular_weight": 12000}], []
+        return execute(context, name, *args, **kwargs)
+    monkeypatch.setattr(research_agent, "_execute", mixed)
+    result = _turn(monkeypatch, [
+        {"tool_calls": [{"id": "library", "function": {"name": "list_proteins", "arguments": "{}"}}, _calculation_request()]},
+        {"content": '{"complete":true,"remaining_questions":[]}'},
+    ])
+    assert "Library control" in result.content and "50 ng/uL" in result.content
+
+
+def test_failed_tool_is_not_hidden_by_a_later_completion_claim(monkeypatch):
+    invalid = _calculation_request("invalid")
+    invalid["function"]["arguments"] = '{"calculation":{"kind":"nucleic-a260","material":"dsDNA","sample_absorbance":1}}'
+    result = _turn(monkeypatch, [{"tool_calls": [invalid, _calculation_request("good")]},
+                                 {"content": '{"complete":true,"remaining_questions":[]}'}])
+    assert "50 ng/uL" in result.content and "尚未完成全部请求" in result.content
+    assert result.delivery_incomplete
+
+
+def test_dedicated_mode_advertises_one_calculator_contract(monkeypatch):
+    from backend_v2.app.copilot import research_agent
+    seen = []
+    def model(*args, **kwargs):
+        seen.extend(tool['function']['name'] for tool in kwargs['tools'])
+        return {"content": "请补充样本类型。"}
+    monkeypatch.setattr(research_agent, "completion_message", model)
+    research_agent.complete_research_turn(object(), [], SimpleNamespace(session=object()), initial_citations=[], initial_tool_calls=[],
+                                         allowed_tools={"calculate_bench", "list_proteins", "compute_concentration", "plan_dilution_series"},
+                                         bench_response_language="zh")
+    assert set(seen) == {"calculate_bench", "list_proteins"}
+
+
+def test_empty_final_content_does_not_lose_calculations(monkeypatch):
+    result = _turn(monkeypatch, [{"tool_calls": [_calculation_request()]}, {"content": None}])
+    assert result.delivery_incomplete and "50 ng/uL" in result.content
+
+
+def test_single_fenced_json_envelope_is_accepted_but_mixed_prose_is_not():
+    from backend_v2.app.copilot.bench_tools import completion_status
+    envelope = '```json\n{"complete":true,"remaining_questions":[]}\n```'
+    assert completion_status(envelope) == (True, [])
+    assert completion_status('Unverified explanation\n' + envelope) == (False, [])
+
+
 def call(**overrides):
     payload = {"kind": "nucleic-a260", "material": "dsDNA", "sample_absorbance": 1,
                "blank_absorbance": 0, "absorbance_basis": "normalized-1cm", "path_length_cm": 1, "dilution_factor": 1}

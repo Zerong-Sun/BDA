@@ -157,6 +157,7 @@ def copilot_respond(message_id: str) -> dict:
                 *(citation for item in history if item.role == "assistant" for citation in item.citations or []),
             ])
             reasoning_content = None
+            delivery_context: dict = {}
             try:
                 if provider and provider.enabled:
                     configured_prompt = (
@@ -239,6 +240,9 @@ def copilot_respond(message_id: str) -> dict:
                         if turn_capabilities == {"wetlab-read"} else None,
                     )
                     answer = agent_result.content
+                    if agent_result.calculator_delivery:
+                        delivery_context = {"calculator_delivery": True,
+                                            "delivery_status": "partial" if agent_result.delivery_incomplete else "complete"}
                     reasoning_content = agent_result.reasoning_content
                     citations = agent_result.citations
                     tool_calls = agent_result.tool_calls
@@ -318,6 +322,7 @@ def copilot_respond(message_id: str) -> dict:
                             "policy_version": "BDA_COPILOT_POLICY_V6",
                             "capabilities": sorted(enabled_capabilities),
                             "active_capabilities": sorted(turn_capabilities),
+                            **delivery_context,
                         },
                     )
                 )

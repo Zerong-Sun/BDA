@@ -10,6 +10,7 @@ import { Frame, FramePanel } from '../components/reui/frame'
 import { ResearchWorkspacePanel } from '../features/research/ResearchWorkspacePanel'
 import { ResearchGoalsPanel } from '../features/research/ResearchGoalsPanel'
 import { ResearchDecisionCenter } from '../features/research/ResearchDecisionCenter'
+import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
 import { ProjectTimeline } from '../features/timeline/ProjectTimeline'
 import { normalizeResearchTab, RESEARCH_TABS, type ResearchTab } from '../features/research/researchUi'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
@@ -128,6 +129,9 @@ export function ResearchPage() {
             </Frame>
           ) : tab === 'goals' ? (
             <>
+            {activeProject ? <Disclosure key={`brief-${projectId}-${searchParams.get('brief')}`} title={language === 'zh' ? '研究背景与任务书' : 'Research context'} defaultOpen={searchParams.get('brief') === '1'}>
+              <ProjectBriefPanel project={activeProject} />
+            </Disclosure> : null}
             <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />
             <Frame>
               <FramePanel>

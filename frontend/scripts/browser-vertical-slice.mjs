@@ -1536,6 +1536,12 @@ async function findContractControl(root, descriptor) {
 }
 
 async function assertScenarioState(page, testCase, diagnostics) {
+  if (testCase.routeId === 'research' && testCase.scenario === 'populated') {
+    // The tab shell mounts before its data. Auditing focus stops while the
+    // loading panel is replaced races the arrival of the real controls.
+    await expectVisible(page.getByRole('region', { name: /^(Research reading guide|研究阅读导览)$/ }),
+      'populated research content before focus audit')
+  }
   if (['populated', 'auth-retry', 'loading'].includes(testCase.scenario)) return
   const contract = SCENARIO_CONTRACTS[`${testCase.routeId}:${testCase.scenario}`]
   if (!contract) {

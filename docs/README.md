@@ -23,6 +23,7 @@
 - [实验工具使用与计算约定](LAB_TOOLS.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [DeepSeek Flash 输出验收与优化](DEEPSEEK_OUTPUT_REVIEW.md)
+- [六维审查、修复清单与实际运行验证](DEEPSEEK_OUTPUT_AUDIT.md)
 - [研究包导入与结构数据](RESEARCH_PACKAGES.md)
 - [公开 PD1 演示数据说明](../examples/migration-fixtures/pd1/DATA_CARD.md)
 - [工作区结构说明](WORKSPACE_MAP.md)

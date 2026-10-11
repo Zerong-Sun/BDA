@@ -12,6 +12,7 @@ import {
 } from '@phosphor-icons/react'
 import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
+import { ChatModeSwitch } from './ChatModeSwitch'
 import { useCopilotChat } from './useCopilotChat'
 import { byStance, reviewersOf, successorsOf } from './bots/registry'
 import { getCopilotConfig } from '../../lib/api/copilot'
@@ -60,6 +61,8 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     bots,
     bot,
     setBot,
+    mode,
+    setMode,
   } = useCopilotChat(projectId, pageContext, language)
   const readOnly = useCopilotReadOnly()
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
@@ -111,7 +114,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     const trimmed = input.trim()
     if (!trimmed || loading || readOnly) return
     setInput('')
-    if (onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
+    if (mode !== 'bench' && onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
     await send(trimmed)
   }
 
@@ -161,7 +164,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
-        {bots.length > 0 && !externalRoster ? (
+        {bots.length > 0 && !externalRoster && mode !== 'bench' ? (
           <Select
             value={bot ?? AUTO_BOT}
             onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
@@ -207,6 +210,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           <ArrowCounterClockwiseIcon aria-hidden="true" />
         </Button>
       </div>
+      <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
       {/* What the selected operator refuses, who checks it, and where it hands
           on. All of it was in the roster response already and none of it reached
           the screen, which made selecting one a gesture rather than a decision.

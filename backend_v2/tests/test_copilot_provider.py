@@ -81,6 +81,31 @@ def test_truncated_output_is_not_accepted_as_a_complete_answer(monkeypatch, mess
     assert error.value.error_code == "llm_output_truncated"
 
 
+def test_filtered_output_is_not_accepted_as_a_complete_answer(monkeypatch) -> None:
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    monkeypatch.setattr(provider.httpx, "post", lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": {"content": "partial"}, "finish_reason": "content_filter"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "question"}])
+    assert error.value.error_code == "llm_output_filtered"
+
+
+@pytest.mark.parametrize("calls", ["not-an-array", [None], [{"id": "a", "function": None}],
+                                   [{"id": "a", "type": "function", "function": {"name": "tool", "arguments": {}}}]])
+def test_malformed_tool_calls_are_rejected_at_provider_boundary(monkeypatch, calls):
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    monkeypatch.setattr(provider.httpx, "post", lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": {"content": None, "tool_calls": calls}, "finish_reason": "tool_calls"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(ValueError, match="llm_response_schema_invalid"):
+        provider.completion_message(configured, [])
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

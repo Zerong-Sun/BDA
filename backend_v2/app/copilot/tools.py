@@ -700,6 +700,8 @@ _register(ToolSpec(
         "Pure calculation, no project writes or sequence access. Results include units, formula, assumptions and sources. "
         "Use only supplied inputs; ask for missing sample type, blank, dilution and absorbance basis first. "
         "For instrument-normalized 1 cm absorbance set path_length_cm=1; never apply its physical path again."
+        " For dilution, concentration_unit is the stock unit; set target_concentration_unit to the target's own unit. "
+        "The server converts these units before checking feasibility; 1 uM to 10 nM is a valid dilution."
     ),
     parameters=bench_tools.parameters(), capability="wetlab-read", execution_mode="read",
     requires="session", handler=bench_tools.run,

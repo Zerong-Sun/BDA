@@ -5,8 +5,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
+from . import bench_tools
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .actions import CopilotActionService
 from .citations import citations_for, inline_citation_instructions
@@ -205,6 +208,7 @@ class ResearchAgentResult:
     limit_reached: bool = False
     reasoning_content: str | None = field(default=None, repr=False)
     calculator_delivery: bool = False
+    delivery_incomplete: bool = False
 
 
 @dataclass(frozen=True)
@@ -246,14 +250,26 @@ def complete_research_turn(
     call_log = list(initial_tool_calls)
     conversation = list(messages)
     bench_results: list[dict] = []
+    bench_libraries: list[list[dict]] = []
+    skipped_calls = False
+    failed_calls = False
     bench_delivery = (bench_response_language is not None and allowed_tools is not None
                       and allowed_tools <= {"list_proteins", "compute_concentration", "plan_dilution_series", "calculate_bench"})
     bench_delivery_instructed = False
-    for _ in range(max_tool_calls + 1):
-        if bench_results and not bench_delivery_instructed:
-            from .bench_tools import DELIVERY_INSTRUCTION
+    if bench_delivery:
+        allowed_tools = set(allowed_tools or ()) & bench_tools.DELIVERY_TOOLS
 
-            conversation.append({"role": "system", "content": DELIVERY_INSTRUCTION})
+    def bench_answer(content: str, *, reasoning: str | None = None, interrupted: bool = False) -> ResearchAgentResult:
+        incomplete = skipped_calls or failed_calls or interrupted or not bench_tools.completion_status(content)[0]
+        answer = bench_tools.render_delivery(bench_results, content, language=bench_response_language or "en",
+                                             libraries=bench_libraries, exhausted=skipped_calls,
+                                             interrupted=failed_calls or interrupted)
+        return ResearchAgentResult(answer, dedupe_citations(citations), call_log, limit_reached=skipped_calls,
+                                   reasoning_content=reasoning, calculator_delivery=True, delivery_incomplete=incomplete)
+
+    for _ in range(max_tool_calls + 1):
+        if (bench_results or bench_libraries) and not bench_delivery_instructed:
+            conversation.append({"role": "system", "content": bench_tools.DELIVERY_INSTRUCTION})
             bench_delivery_instructed = True
         tools = chat_schemas(
             has_research=context is not None,
@@ -264,30 +280,40 @@ def complete_research_turn(
             has_operator=bot is not None,
         )
         offered = {tool["function"]["name"] for tool in tools}
-        message = completion_message(
-            provider,
-            [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
-            tools=tools if max_tool_calls > 0 and tools else None,
-        )
+        try:
+            message = completion_message(
+                provider,
+                [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
+                tools=tools if max_tool_calls > 0 and tools else None,
+            )
+        except (DomainError, ValueError, httpx.HTTPError):
+            if bench_results or bench_libraries:
+                call_log.append({"name": "calculator_delivery", "status": "failed", "error": "llm_delivery_unavailable"})
+                return bench_answer("", interrupted=True)
+            raise
         requested = message.get("tool_calls")
         if not isinstance(requested, list) or not requested:
             content = message.get("content")
+            if bench_results or bench_libraries:
+                return bench_answer(content if isinstance(content, str) else "", reasoning=_response_reasoning(message))
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("llm_response_empty")
-            if bench_results:
-                from .bench_tools import render_delivery
-
-                content = render_delivery(bench_results, content, language=bench_response_language or "en")
             return ResearchAgentResult(
                 content.strip(), dedupe_citations(citations), call_log,
+                limit_reached=skipped_calls,
                 reasoning_content=_response_reasoning(message),
-                calculator_delivery=bool(bench_results),
             )
         if len(call_log) - len(initial_tool_calls) >= max_tool_calls:
+            skipped_calls = True
+            if bench_results or bench_libraries:
+                for request in requested:
+                    call_log.append({"name": str((request.get("function") or {}).get("name") or ""),
+                                     "status": "skipped", "error": "tool_call_budget_exhausted"})
+                return bench_answer("")
             conversation.append(
                 {
                     "role": "system",
-                    "content": "The 12-call Research tool limit was reached. Answer now and state the uncovered scope.",
+                    "content": f"The {max_tool_calls}-call Research tool limit was reached. Answer now and state the uncovered scope.",
                 }
             )
             final = completion_message(
@@ -299,12 +325,8 @@ def complete_research_turn(
             if not isinstance(content, str) or not content.strip():
                 content = "Research tool-call limit reached; the remaining workspace scope was not covered."
                 reasoning = None
-            if bench_results:
-                from .bench_tools import render_delivery
-
-                content = render_delivery(bench_results, content, language=bench_response_language or "en", exhausted=True)
             return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True, reasoning,
-                                       calculator_delivery=bool(bench_results))
+                                       calculator_delivery=False)
         assistant_turn: dict[str, Any] = {
             "role": "assistant",
             "content": message.get("content"),
@@ -350,13 +372,16 @@ def complete_research_turn(
                     "status": "completed",
                     "result_count": len(result) if isinstance(result, list) else (1 if result else 0),
                 }
-                if (name in WRITE_TOOL_NAMES or name == "calculate_bench") and isinstance(result, dict):
+                if (name in WRITE_TOOL_NAMES or name == "calculate_bench" or bench_delivery and name == "list_proteins"):
                     logged_call["result"] = result
                 call_log.append(logged_call)
                 if bench_delivery and name == "calculate_bench":
                     # Preserve results while allowing dependent calculations to continue.
                     bench_results.append(result)
+                elif bench_delivery and name == "list_proteins":
+                    bench_libraries.append(result)
             except (DomainError, TypeError, ValueError, RuntimeError) as exc:
+                failed_calls = True
                 error = exc.error_code if isinstance(exc, DomainError) else str(exc)
                 result = {"error": error}
                 call_log.append({"name": name, "status": "failed", "error": error[:300]})
@@ -379,6 +404,9 @@ def complete_research_turn(
             call_id = str(request.get("id") or "")
             if not call_id or call_id in answered:
                 continue
+            skipped_calls = True
+            call_log.append({"name": str((request.get("function") or {}).get("name") or ""),
+                             "status": "skipped", "error": "tool_call_budget_exhausted"})
             conversation.append(
                 {
                     "role": "tool",

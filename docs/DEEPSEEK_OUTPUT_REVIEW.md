@@ -1,6 +1,6 @@
 # DeepSeek Flash 输出验收与优化
 
-状态：活跃
+状态：历史验收基线（提交 `6053b6ee`）；最新实现与回归见 [六维审查及修复清单](DEEPSEEK_OUTPUT_AUDIT.md)
 
 最后核验：2026-10-11
 
@@ -8,7 +8,7 @@
 
 数据来源：真实 DeepSeek API 调用；6 个固定中文合成验收问题的对照输出；平台工具循环与本地异步聊天验收；`copilot/policy.py`、`bench_tools.py`、`provider.py` 及相关测试。密钥和含认证信息的运行文件保存在公共仓库之外。
 
-替代关系：补充 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)、[实验工具](LAB_TOOLS.md)；不替代原任务授权、模型资格或证据审核契约。
+替代关系：保留初轮六题对照和真实调用记录；当前入口、完成状态、异常恢复及最终测试结果由 [六维审查](DEEPSEEK_OUTPUT_AUDIT.md) 补充更新。不替代原任务授权、模型资格或证据审核契约。
 
 ## 结论与实际配置
 

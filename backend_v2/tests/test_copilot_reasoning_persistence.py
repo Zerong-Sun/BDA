@@ -66,7 +66,8 @@ def _conversation(factory):
 
 
 @pytest.mark.parametrize("grounded", [False, True])
-def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monkeypatch, grounded):
+@pytest.mark.parametrize("partial", [False, True])
+def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monkeypatch, grounded, partial):
     factory, _ = wired
     conversation_id, source_id = _conversation(factory)
     citations = ([{"source_type": "scientific_literature", "chunk_id": "synthetic-chunk",
@@ -79,7 +80,7 @@ def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monk
     monkeypatch.setattr(ProjectContextService, "overview_packet", lambda *_: "synthetic overview")
     canonical = "Synthetic server calculator result and assumptions. " * 40
     monkeypatch.setattr(research_agent, "complete_research_turn", lambda *_, **__: research_agent.ResearchAgentResult(
-        canonical, citations, [], calculator_delivery=True))
+        canonical, citations, [], calculator_delivery=True, delivery_incomplete=partial))
     def no_rewrite(*args, **kwargs):
         pytest.fail("A prose reviewer must not rewrite canonical calculator output")
     monkeypatch.setattr(research_agent, "review_scientific_answer_result", no_rewrite)
@@ -89,6 +90,7 @@ def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monk
         answer = session.scalars(select(CopilotMessage).where(
             CopilotMessage.conversation_id == conversation_id, CopilotMessage.role == "assistant")).one()
         assert answer.content == canonical
+        assert answer.context["delivery_status"] == ("partial" if partial else "complete")
 
 
 @pytest.mark.parametrize("mode", ["plain", "null", "empty", "review", "grounded", "repair"])

@@ -69,6 +69,14 @@ describe('ResearchPage', () => {
     useAppStore.setState({ language: 'en' })
   })
 
+  it('renders the project brief at the destination used by research team links', async () => {
+    window.location.hash = '/research?project=proj_research&tab=goals&brief=1'
+    renderWithProviders(<ResearchPage />)
+    const brief = await screen.findByRole('region', { name: 'Project brief' })
+    expect(within(brief).getByText('A confirmed research brief.')).toBeInTheDocument()
+    expect(screen.getAllByRole('region', { name: 'Project brief' })).toHaveLength(1)
+  })
+
   it('defaults to goals and presents four stages with accessible controls', () => {
     renderWithProviders(<ResearchPage />)
     expect(within(nav()).getAllByRole('tab')).toHaveLength(4)

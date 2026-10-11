@@ -33,6 +33,6 @@ export function ProjectBriefPanel({ project, compact = false }: { project: Proje
       </div>
       {brief.deliverables.length ? <div><h3>{zh ? '预期交付' : 'Expected deliverables'}</h3><ul>{brief.deliverables.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
     </div> : null}
-    {compact ? <Button type="button" variant="outline" render={<Link to={`/research?project=${encodeURIComponent(project.id)}&tab=goals`} />}>{zh ? '查看项目简报' : 'Read project brief'}</Button> : null}
+    {compact ? <Button type="button" variant="outline" render={<Link to={`/research?project=${encodeURIComponent(project.id)}&tab=goals&brief=1`} />}>{zh ? '查看项目简报' : 'Read project brief'}</Button> : null}
   </section>
 }
