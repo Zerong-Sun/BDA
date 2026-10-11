@@ -1,6 +1,6 @@
 # BDA Workbench
 
-**2.6 release candidate:** [Install and upgrade Iteravia RC1](docs/RELEASE_2_6_RC1.md). [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Workflow outcomes now settle Autopilot compute stages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
+**2.6 release candidate:** [Install and upgrade Iteravia RC2](docs/RELEASE_2_6_RC2.md). RC2 adds traceable literature evidence, explicit research decision criteria, scientific method packages, independent lab tools, reliable calculation delivery and a refreshed light workspace. [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
 
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.
 
@@ -122,7 +122,7 @@ FastAPI 模块化单体 ─────► PostgreSQL
 
 要求：Docker Engine、Docker Compose v2，以及可用于本地开发的空闲端口。
 
-按 [RC1 安装说明](docs/RELEASE_2_6_RC1.md#新的本地安装) 生成配置、迁移数据库并配置独立 scheduler 身份，再启动全部服务。
+按 [RC2 安装说明](docs/RELEASE_2_6_RC2.md#新安装) 生成配置、迁移数据库并配置独立 scheduler 身份，再启动全部服务。
 
 启动后可访问：
 

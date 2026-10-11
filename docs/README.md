@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-10-11（全平台能力升级、接入账本与导航入口归整）
+最后核验：2026-10-11（RC2 发布、全平台能力升级与导航入口归整）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -14,7 +14,8 @@
 
 - [全平台能力升级与接入账本](PLATFORM_CAPABILITY_UPGRADE.md)
 
-- [Iteravia 2.6 RC1 安装、升级和发布说明](RELEASE_2_6_RC1.md)
+- [Iteravia 2.6 RC2 安装、升级和发布说明](RELEASE_2_6_RC2.md)
+- [历史 RC1 发布说明与安装初始化步骤](RELEASE_2_6_RC1.md)
 - [Iteravia / BDA 2.6 项目学习](LEARNING_V26.md)
 
 - [Bot 工作区、项目简报与前端改版验收](BOT_FIRST_WORKSPACE.md)
