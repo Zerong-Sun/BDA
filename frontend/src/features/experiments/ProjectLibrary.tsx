@@ -166,7 +166,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
           <p className="mt-1 text-sm text-text-secondary">{t.projectLibrary.subtitle}</p>
         </div>
         <div className="project-library-actions"><Button type="button" variant="ghost" onClick={onToggleIntro} aria-expanded={introOpen}>{t.experimentsExt.gettingStarted}</Button>
-        <Button type="button" className="science-primary" onClick={onCreate}>
+        <Button type="button" className="science-primary" disabled={role === 'viewer'} onClick={onCreate}>
           <Plus aria-hidden="true" />{t.common.newExperiment}
         </Button></div>
       </div>
@@ -236,7 +236,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
           <AppFrame className="border-dashed" panelClassName="p-6 text-sm text-text-secondary">
             <h3 className="text-lg font-semibold text-text-primary">{t.projectLibrary.empty}</h3>
             <p className="mt-2 max-w-2xl">{t.projectLibrary.emptyBody}</p>
-            <Button type="button" className="mt-4" onClick={onCreate}>
+            <Button type="button" className="mt-4" disabled={role === 'viewer'} onClick={onCreate}>
               {t.projectLibrary.createFirst}
             </Button>
           </AppFrame>

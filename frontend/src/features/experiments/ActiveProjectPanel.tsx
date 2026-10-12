@@ -83,7 +83,7 @@ export function ActiveProjectPanel({
         description={t.projects.activeProjectPanel.noProjectBody}
         panelClassName="p-5"
       >
-        <Button type="button" className="mt-4" onClick={onCreate}>
+        <Button type="button" className="mt-4" disabled={readOnly} onClick={onCreate}>
           <FolderPlus className="h-4 w-4" />
           {t.projects.activeProjectPanel.newProject}
         </Button>
