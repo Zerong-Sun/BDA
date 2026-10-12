@@ -53,7 +53,7 @@ async def production_write_gate(request, call_next):
         # headers nor a general wetlab prefix can bypass the write fence.
         read_only_calculation = (request.method, request.url.path) == ("POST", "/api/v2/wetlab/calculations")
         if (not settings.writes_enabled
-                and request.url.path not in {"/api/v2/auth/token", "/api/v2/auth/refresh"}
+                and request.url.path not in {"/api/v2/auth/token", "/api/v2/auth/refresh", "/api/v2/auth/logout"}
                 and not read_only_calculation):
             return await domain_error_handler(
                 request,

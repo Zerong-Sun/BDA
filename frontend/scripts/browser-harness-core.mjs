@@ -9,7 +9,7 @@ export const CANDIDATE_SEARCH_FILTER_PATTERN = /candidate or family/i
 export const COPILOT_LAYER_SELECTOR = '[role="dialog"][data-tour-id="copilot-drawer"]'
 export const COPILOT_TRIGGER_PATTERN = /^Open Copilot$/
 export const LOGIN_INVALID_CREDENTIALS_PATTERN =
-  /invalid (?:browser acceptance credentials|credentials|username or password)/i
+  /(?:invalid|incorrect) (?:browser acceptance credentials|credentials|username or password)/i
 
 export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   login: { root: 'form', maxSteps: 24 },
@@ -1541,6 +1541,8 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
 
+  add('GET', '/api/v2/auth/config', {}, () => ok({ deployment_kind: 'public', registration_mode: 'open', realm: 'browser-public', public_portal_url: '', private_portal_url: '' }))
+  add('POST', '/api/v2/auth/logout', {}, () => routeResponse(204, null))
   add('POST', '/api/v2/auth/token', {}, ({ count }) => {
     if (scenario === 'auth-retry' && count === 1) {
       return routeResponse(

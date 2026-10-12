@@ -1297,7 +1297,7 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
 
   if (testCase.routeId === 'login' && testCase.scenario === 'auth-retry') {
     await page.getByLabel(/username/i).fill('browser.qa')
-    await page.getByLabel(/password/i).fill('wrong-then-correct')
+    await page.getByLabel('Password', { exact: true }).fill('wrong-then-correct')
     await page.getByRole('button', { name: /sign in/i }).click()
     await expectVisible(page.getByText(LOGIN_INVALID_CREDENTIALS_PATTERN), 'login 401 alert')
     await page.getByRole('button', { name: /sign in/i }).click()

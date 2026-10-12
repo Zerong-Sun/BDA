@@ -110,6 +110,9 @@ export function AppSettingsDrawer() {
       }
     >
       <div data-tour-id="settings-drawer">
+      <section className="border-b border-border-soft p-4">
+        <Link to="/account" onClick={() => setSettingsOpen(false)} className="text-sm font-medium text-primary underline underline-offset-4">{language === 'zh' ? '账号与访问：密码、邀请和工作区入口' : 'Account & access: password, invitations and workspaces'}</Link>
+      </section>
       <section className="space-y-3 border-b border-border-soft p-4">
         <div className="flex items-center gap-2 text-sm font-medium">
           <GearIcon className="h-4 w-4 text-accent" />

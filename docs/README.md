@@ -12,6 +12,8 @@
 
 ## 开始使用
 
+- [Public / Private 登录、注册与账号管理](ACCOUNT_ACCESS.md)
+
 - [全平台能力升级与接入账本](PLATFORM_CAPABILITY_UPGRADE.md)
 
 - [Iteravia 2.6 RC2 安装、升级和发布说明](RELEASE_2_6_RC2.md)

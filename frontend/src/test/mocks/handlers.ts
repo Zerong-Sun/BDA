@@ -19,6 +19,8 @@ const emptyPageRoutes = [
 ]
 
 export const handlers = [
+  http.get('/api/v2/auth/config', () => HttpResponse.json({ deployment_kind: 'public', registration_mode: 'open', realm: 'test-public', public_portal_url: '', private_portal_url: '' })),
+  http.post('/api/v2/auth/logout', () => new HttpResponse(null, { status: 204 })),
   ...emptyPageRoutes.map((route) => http.get(route, () => HttpResponse.json({ items: [], next_cursor: null }))),
   http.get('/api/v2/research-packages', () => HttpResponse.json([])),
   http.get('/api/v2/health/ready', () => HttpResponse.json({ status: 'ok', checks: {} })),

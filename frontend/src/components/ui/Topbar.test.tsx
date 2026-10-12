@@ -58,7 +58,7 @@ describe('Topbar logout', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: '选择项目' })).toHaveTextContent('Live Project'))
   })
 
-  it('clears authentication and project-scoped browser state while preserving preferences', () => {
+  it('clears authentication and project-scoped browser state while preserving preferences', async () => {
     sessionStorage.setItem('bda_token', 'token')
     sessionStorage.setItem(
       'bda_user',
@@ -70,7 +70,7 @@ describe('Topbar logout', () => {
     fireEvent.click(screen.getByText('Test User'))
     fireEvent.click(screen.getByRole('menuitem', { name: '退出登录' }))
 
-    expect(sessionStorage.getItem('bda_token')).toBeNull()
+    await waitFor(() => expect(sessionStorage.getItem('bda_token')).toBeNull())
     expect(sessionStorage.getItem('bda_user')).toBeNull()
     expect(useAppStore.getState().activeProjectId).toBe('')
     expect(useAppStore.getState().language).toBe('zh')

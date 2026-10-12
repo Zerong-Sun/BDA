@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
+  invalidateAuthRequests,
   apiAuthorizationHeaders,
   notifyUnauthorized,
   refreshAccessToken,
@@ -57,5 +58,26 @@ describe('generated transport authentication helpers', () => {
     setUnauthorizedHandler(handler)
     notifyUnauthorized()
     expect(handler).toHaveBeenCalledOnce()
+  })
+})
+
+
+describe('session isolation', () => {
+  it('does not resurrect browser credentials when an in-flight refresh finishes after logout', async () => {
+    let finish!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve })))
+    const pending = refreshAccessToken()
+    const rejected = expect(pending).rejects.toThrow('Session ended')
+    invalidateAuthRequests()
+    finish(new Response(JSON.stringify({ access_token: 'stale', user: { id: 'old' } })))
+    await rejected
+    expect(sessionStorage.getItem('bda_token')).toBeNull()
+  })
+  it('does not silently switch to the account whose cookie was set in another tab', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ id: 'first' }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ access_token: 'other', user: { id: 'second' } }))))
+    await expect(refreshAccessToken()).rejects.toThrow('Account changed')
+    expect(sessionStorage.getItem('bda_token')).toBeNull()
+    expect(JSON.parse(sessionStorage.getItem('bda_user')!).id).toBe('first')
   })
 })

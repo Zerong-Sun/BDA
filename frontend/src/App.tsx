@@ -48,6 +48,9 @@ const LabPage = lazy(() => import('./app/Lab').then((module) => ({ default: modu
 const ToolsPage = lazy(() => import('./app/Tools').then((module) => ({ default: module.ToolsPage })))
 const ResultsPage = lazy(() => import('./app/Results').then((module) => ({ default: module.ResultsPage })))
 const LoginPage = lazy(() => import('./app/Login').then((module) => ({ default: module.LoginPage })))
+const RegisterPage = lazy(() => import('./app/Login').then((module) => ({ default: module.RegisterPage })))
+const ResetPasswordPage = lazy(() => import('./app/Login').then((module) => ({ default: module.ResetPasswordPage })))
+const AccountPage = lazy(() => import('./app/Account').then((module) => ({ default: module.AccountPage })))
 const ResearchPage = lazy(() => import('./app/Research').then((module) => ({ default: module.ResearchPage })))
 const FAQPage = lazy(() => import('./app/FAQ').then((module) => ({ default: module.FAQPage })))
 const GuidePage = lazy(() => import('./app/Guide').then((module) => ({ default: module.GuidePage })))
@@ -74,9 +77,10 @@ function AuthHandler() {
 }
 
 function RequireAuth() {
+  const location = useLocation()
   const token = sessionStorage.getItem('bda_token')
   if (!token) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />
   }
   return <Outlet />
 }
@@ -193,11 +197,14 @@ export default function App() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/guide" element={<GuidePage />} />
             <Route element={<RequireAuth />}>
               <Route element={<AppShell />}>
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
+                <Route path="/account" element={<AccountPage />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/extensions" element={<ExtensionCenter />} />
                 <Route path="/bots" element={<BotsPage />} />

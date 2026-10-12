@@ -29,6 +29,8 @@ def _resolve_user(
     user = IdentityRepository(session).user_by_id(user_id)
     if user is None or not user.enabled:
         raise DomainError("invalid_token", "Access token user is unavailable", status_code=401)
+    if payload.get("ver", 1) != user.version:
+        raise DomainError("invalid_token", "Account credentials changed; sign in again", status_code=401)
     set_request_rls_context(session, user_id=user.id, is_global_admin=user.role == "admin")
     return user
 

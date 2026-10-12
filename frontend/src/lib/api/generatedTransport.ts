@@ -6,6 +6,7 @@ import {
   refreshAccessToken,
   setUnauthorizedHandler,
   type ProblemDetails,
+  currentAuthGeneration,
 } from './client'
 import { client } from './generated/client.gen'
 
@@ -16,6 +17,7 @@ function generatedBaseUrl(): string {
 }
 
 async function generatedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const generation = currentAuthGeneration()
   // The generated SDK uses a relative base URL in browsers. Resolve it here as
   // well so the same transport works under jsdom/Node contract tests, where the
   // native Request constructor rejects relative URLs.
@@ -31,15 +33,16 @@ async function generatedFetch(input: RequestInfo | URL, init?: RequestInit): Pro
   let request = new Request(original.clone(), { headers })
   let response = await fetch(request.clone())
   const pathname = new URL(request.url).pathname.replace(/\/$/, '')
-  const isCredentialRequest = pathname.endsWith('/auth/refresh') || pathname.endsWith('/auth/token')
-  if (response.status === 401 && !isCredentialRequest) {
+  const isCredentialRequest = ['/auth/refresh', '/auth/token', '/auth/register', '/auth/logout', '/auth/password', '/auth/password/reset'].some(path => pathname.endsWith(path))
+  if (response.status === 401 && !isCredentialRequest && generation === currentAuthGeneration()) {
     let nextToken: string
     try {
       nextToken = await refreshAccessToken()
     } catch {
-      notifyUnauthorized()
+      if (generation === currentAuthGeneration()) notifyUnauthorized()
       return response
     }
+    if (generation !== currentAuthGeneration()) return response
     headers.set('Authorization', `Bearer ${nextToken}`)
     request = new Request(original, { headers })
     response = await fetch(request)
