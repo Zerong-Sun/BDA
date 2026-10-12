@@ -199,7 +199,7 @@ function CandidatesWorkspace() {
   if (!projectId) return <ProjectChooser compact />
 
   return (
-    <section>
+    <section data-tour-id="candidates-workspace">
       <PageHead
         eyebrow={t.candidates.eyebrow}
         title={t.candidates.title}

@@ -90,7 +90,8 @@ export const SCENARIO_CONTRACTS = Object.freeze({
     root: '[data-tour-id="workflow-page"]',
     evidence: [exactText('[data-slot="alert"]', 'Target preparation is incomplete')],
     controls: [
-      disabledControl('button', 'Add workflow node', 'Target readiness blocks graph mutations.'),
+      { selector: 'button', name: 'Add workflow node', disabled: false,
+        reason: 'Incomplete targets still allow draft editing; execution remains gated.' },
       disabledControl('button', 'Submit workflow', 'Target readiness blocks workflow submission.'),
     ],
   },
@@ -109,9 +110,11 @@ export const SCENARIO_CONTRACTS = Object.freeze({
     }],
   },
   'candidates:empty': {
-    root: 'section',
-    evidence: [exactText('td', 'No candidates match the current filters.')],
+    root: '[data-tour-id="candidates-workspace"]',
+    evidence: [exactText('[role="status"]', 'No candidate updates yet. Add a proposal manually, or review candidates produced by a completed workflow.')],
     controls: [
+      { selector: 'button', name: 'Add candidate manually', disabled: false,
+        reason: 'An empty project can record a candidate proposal before computation.' },
       disabledControl('button', 'Download selected', 'No candidate selection exists in the empty grid.'),
     ],
   },
@@ -1642,6 +1645,7 @@ export function createFixtureRouter({ scenario = 'populated', routeId = '', stal
       if (
         scenario === 'recoverable-error'
         && recoverablePath === url.pathname
+        && !url.searchParams.has('cursor')
         && count <= 4
       ) {
         return routeResponse(

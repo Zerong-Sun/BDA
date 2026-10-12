@@ -179,6 +179,20 @@ test('strict preview port validation rejects non-numeric and reserved values', (
   assert.throws(() => validatePort('abc'), /integer/)
 })
 
+test('candidate recovery fails the first page only, then allows cursor pagination', async () => {
+  const router = createFixtureRouter({ scenario: 'recoverable-error', routeId: 'candidates' })
+  const firstUrl = 'http://app.test/api/v2/projects/proj_browser/candidates?limit=100'
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    assert.equal((await router.resolve('GET', firstUrl)).status, 503)
+  }
+  const first = await router.resolve('GET', firstUrl)
+  assert.equal(first.status, 200)
+  assert.equal(first.body.next_cursor, 'candidate-page-2')
+  const second = await router.resolve('GET', `${firstUrl}&cursor=candidate-page-2`)
+  assert.equal(second.status, 200)
+  assert.equal(second.body.next_cursor, null)
+})
+
 test('excludes Base UI hidden form proxies without excluding real controls', () => {
   assert.equal(isHiddenControlProxy({ tag: 'input', ariaHidden: 'true', tabIndex: -1 }), true)
   assert.equal(isHiddenControlProxy({ tag: 'button', ariaHidden: null, tabIndex: -1 }), false)

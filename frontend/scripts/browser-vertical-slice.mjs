@@ -49,7 +49,7 @@ const ROUTE_SURFACES = Object.freeze({
   guide: '.guide-page main',
   experiments: '[data-slot="app-shell"]',
   workflow: '[data-tour-id="workflow-page"]',
-  candidates: '[data-tour-id="candidate-filters"]',
+  candidates: '[data-tour-id="candidates-workspace"]',
   results: '[data-tour-id="results-validation"]',
   research: '[data-tour-id="research-tabs"]',
   faq: '[data-tour-id="faq-content"]',
@@ -1277,6 +1277,23 @@ async function exerciseDisclosure(page, containerSelector, label) {
 
 async function exerciseRouteInteractions(page, testCase, diagnostics) {
   if (testCase.appearanceId !== 'en-light') return
+
+  if (testCase.routeId === 'candidates' && testCase.scenario === 'empty') {
+    await assertEscapeFocusReturn(page, page.getByRole('button', { name: 'Add candidate manually', exact: true }),
+      page.getByRole('dialog', { name: 'Add a candidate proposal' }), 'Empty candidate proposal', diagnostics)
+    diagnostics.interactions.emptyCandidate = 'manual proposal opens without prior computation'
+    return
+  }
+
+  if (testCase.routeId === 'workflow' && testCase.scenario === 'blocked') {
+    await assertEscapeFocusReturn(page, page.getByRole('button', { name: 'Add workflow node', exact: true }),
+      page.getByRole('dialog'), 'Draft editing before target readiness', diagnostics)
+    if (!(await page.getByRole('button', { name: 'Submit workflow', exact: true }).isDisabled())) {
+      throw new Error('Draft editing must not authorize compute before target readiness.')
+    }
+    diagnostics.interactions.blockedWorkflow = 'draft editor opens; compute remains disabled'
+    return
+  }
 
   if (testCase.routeId === 'login' && testCase.scenario === 'auth-retry') {
     await page.getByLabel(/username/i).fill('browser.qa')
