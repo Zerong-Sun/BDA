@@ -4,12 +4,13 @@ import { CreateCandidate } from './CreateCandidate'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { useAppStore } from '../../lib/store/appStore'
 import type { Candidate } from '../../lib/schemas/candidate'
+import { ApiError } from '../../lib/api/client'
 
-const api = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), writable: true }))
-vi.mock('../../lib/api/candidates', () => ({ createCandidate: api.create, updateCandidate: api.update }))
+const api = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), get: vi.fn(), writable: true }))
+vi.mock('../../lib/api/candidates', () => ({ createCandidate: api.create, updateCandidate: api.update, getCandidate: api.get }))
 vi.mock('../../lib/hooks/useProjectAccess', () => ({ useProjectAccess: () => ({ data: { permissions: { write: api.writable } } }) }))
 const proposal = { id: 'candidate-a', project_id: 'project-a', name: 'Proposal', properties: {}, version: 1 } as Candidate
-beforeEach(() => { vi.clearAllMocks(); api.writable = true; useAppStore.setState({ language: 'en', appMode: 'application' }); api.create.mockResolvedValue(proposal) })
+beforeEach(() => { vi.resetAllMocks(); api.writable = true; useAppStore.setState({ language: 'en', appMode: 'application' }); api.create.mockResolvedValue(proposal) })
 afterEach(cleanup)
 
 function fill() {
@@ -19,6 +20,52 @@ function fill() {
 }
 
 describe('manual candidate proposals', () => {
+  it('keeps the same create key when retrying a lost response', async () => {
+    api.create.mockRejectedValueOnce(new Error('Response lost')).mockResolvedValueOnce(proposal)
+    const done = vi.fn()
+    renderWithProviders(<CreateCandidate projectId="project-a" onCreated={done} />)
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Save candidate proposal' }))
+    await screen.findByText('Response lost')
+    fireEvent.click(screen.getByRole('button', { name: 'Save candidate proposal' }))
+    await waitFor(() => expect(done).toHaveBeenCalledWith(proposal))
+    expect(api.create.mock.calls[0]).toEqual(api.create.mock.calls[1])
+  })
+  it('reloads an already-saved proposal after a duplicate-key conflict without creating another record', async () => {
+    api.create.mockRejectedValue(new ApiError('Already saved with different content', 409, {
+      error_code: 'candidate_key_conflict', errors: [{ candidate_id: proposal.id }],
+    }))
+    api.get.mockResolvedValue(proposal)
+    const done = vi.fn()
+    renderWithProviders(<CreateCandidate projectId="project-a" onCreated={done} />)
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Save candidate proposal' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard edits and load saved candidate' }))
+    await waitFor(() => expect(done).toHaveBeenCalledWith(proposal))
+    expect(api.get).toHaveBeenCalledWith(proposal.id)
+    expect(api.create).toHaveBeenCalledTimes(1)
+  })
+  it('keeps unsaved text and version across background updates, then reloads explicitly after a 412', async () => {
+    const old = { ...proposal, version: 7, properties: { design_rationale: 'Original' } }
+    const latest = { ...old, version: 8, properties: { design_rationale: 'Concurrent edit' } }
+    api.update.mockRejectedValue(new ApiError('Version conflict', 412))
+    api.get.mockResolvedValue(latest)
+    const view = renderWithProviders(<CreateCandidate projectId="project-a" candidate={old} onCreated={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit candidate rationale' }))
+    fireEvent.change(screen.getByLabelText('Design rationale and open questions'), { target: { value: 'Unsaved local edit' } })
+    view.rerender(<CreateCandidate projectId="project-a" candidate={latest} onCreated={vi.fn()} />)
+    expect(screen.getByLabelText('Design rationale and open questions')).toHaveValue('Unsaved local edit')
+    fireEvent.click(screen.getByRole('button', { name: 'Save candidate rationale' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard edits and load saved candidate' }))
+    expect(api.update.mock.calls[0][1]).toBe(7)
+    await waitFor(() => expect(screen.getByLabelText('Design rationale and open questions')).toHaveValue('Concurrent edit'))
+    fireEvent.change(screen.getByLabelText('Design rationale and open questions'), { target: { value: 'Revised against latest' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save candidate rationale' }))
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(2))
+    expect(api.update.mock.calls[1][1]).toBe(8)
+  })
+  it('refuses editing a candidate from another project', () => {
+    renderWithProviders(<CreateCandidate projectId="project-b" candidate={proposal} onCreated={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Edit candidate rationale' })).toBeDisabled()
+  })
   it('creates a proposal without fabricated sequence, score or experimental success', async () => {
     const done = vi.fn()
     renderWithProviders(<CreateCandidate projectId="project-a" onCreated={done} />)

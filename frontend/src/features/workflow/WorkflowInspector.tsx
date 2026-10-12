@@ -33,6 +33,7 @@ import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Frame, FrameHeader, FramePanel, FrameTitle } from '../../components/reui/frame'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { ManualReviewInspector } from './ManualReviewInspector'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import {
   Select,
@@ -63,6 +64,7 @@ interface WorkflowInspectorProps {
 export function WorkflowInspector(props: WorkflowInspectorProps) {
   const selectionKey =
     props.selectedNode?.id ?? props.selectedArtifact?.id ?? 'empty'
+  if (props.selectedNode?.execution_mode === 'manual') return <ManualReviewInspector key={selectionKey} node={props.selectedNode} workflowVersion={props.workflowVersion} readOnly={Boolean(props.readOnly)} onDirtyChange={props.onDirtyChange} />
   return <WorkflowInspectorContent key={selectionKey} {...props} />
 }
 

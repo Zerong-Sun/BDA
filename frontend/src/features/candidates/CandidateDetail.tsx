@@ -22,6 +22,7 @@ import { CandidateStructureOverlay } from './CandidateStructureOverlay'
 import { CandidateConditionMetrics } from './CandidateConditionMetrics'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
 import { CreateCandidate } from './CreateCandidate'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
 
 interface CandidateDetailProps {
   candidate: Candidate | null
@@ -36,10 +37,17 @@ const metricGuideKeys = [
 ] as const
 
 export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) {
+  return <CandidateDetailContent key={`${projectId}:${candidate?.id ?? 'empty'}`} candidate={candidate} projectId={projectId} />
+}
+
+function CandidateDetailContent({ candidate, projectId }: CandidateDetailProps) {
   const { t, format, language } = useI18n()
   const showToast = useToastStore((s) => s.show)
   const uiDensity = useAppStore((s) => s.uiDensity)
   const advanced = uiDensity === 'advanced'
+  const access = useProjectAccess(projectId)
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const writable = !demo && !access.isError && access.data?.permissions.write === true && candidate?.project_id === projectId
   const [structureMode, setStructureMode] = useState<'monomer' | 'complex'>('monomer')
   const [explanation, setExplanation] = useState<InterpretationReasoning | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -90,7 +98,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const hasSequence = typeof sequence === 'string' && sequence.trim().length > 0
 
   const promoteToBench = async () => {
-    if (!candidate) return
+    if (!candidate || !writable) return
     setIsPromoting(true)
     try {
       const construct = await promoteCandidateToBench(candidate.project_id, candidate.id)
@@ -170,7 +178,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
         <p className="whitespace-pre-wrap text-text-secondary">{candidateText(candidate, 'design_rationale') || (language === 'zh' ? '尚未补充设计依据。可记录论点、文献支持和待验证问题。' : 'No design rationale has been added. Record the claim, literature support and open questions.')}</p>
         {Array.isArray(candidate.properties.evidence_links) ? candidate.properties.evidence_links.filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url)).map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-primary underline">{url}</a>) : null}
         {candidate.properties.experimental_status === 'not_tested' ? <p>{language === 'zh' ? '尚未进行实验验证。' : 'Not experimentally validated.'}</p> : null}
-        <CreateCandidate key={`${candidate.id}:${candidate.version}`} projectId={projectId} candidate={candidate} onCreated={() => {}} />
+        <CreateCandidate key={candidate.id} projectId={projectId} candidate={candidate} onCreated={() => {}} />
         <Link to={`/research?project=${encodeURIComponent(projectId)}&tab=references`} className="ml-3 text-primary underline">{language === 'zh' ? '查看项目文献证据' : 'Open project literature evidence'}</Link>
       </div>
       <p className="mb-4 text-sm text-text-secondary">
@@ -290,8 +298,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           type="button"
           variant="outline"
           size="sm"
-          disabled={!hasSequence || isPromoting}
-          title={hasSequence ? undefined : t.candidatesExt.detail.promoteNeedsSequence}
+          disabled={!writable || !hasSequence || isPromoting}
+          title={!writable ? (language === 'zh' ? '需要项目编辑权限；演示模式只读。' : 'Project edit access is required; demo mode is read-only.') : hasSequence ? undefined : t.candidatesExt.detail.promoteNeedsSequence}
           onClick={() => void promoteToBench()}
         >
           <FlaskIcon aria-hidden="true" />

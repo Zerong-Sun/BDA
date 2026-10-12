@@ -1,7 +1,7 @@
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 import { FOLD_CONFIDENCE_FLOOR, canonicalFoldConfidence, screenByFoldConfidence } from '../features/candidates/foldConfidence'
 import { candidatesCsv } from '../features/candidates/candidatesCsv'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
 import { DownloadSimpleIcon } from '@phosphor-icons/react'
@@ -38,6 +38,11 @@ function CandidateGridSkeleton({ label }: { label: string }) {
 }
 
 export function CandidatesPage() {
+  const { projectId } = useProjectContext()
+  return <CandidatesWorkspace key={projectId} />
+}
+
+function CandidatesWorkspace() {
   const { t, format, language } = useI18n()
   const zh = language === 'zh'
   const { projectId } = useProjectContext()
@@ -71,6 +76,7 @@ export function CandidatesPage() {
   })
 
   const allCandidates = useMemo(() => data?.items ?? [], [data])
+  const candidateStatuses = useMemo(() => [...new Set(allCandidates.map((candidate) => candidate.status))], [allCandidates])
   const sources = [...new Set(allCandidates.map((c) => String(c.properties.source_dataset ?? '')).filter(Boolean))].sort()
   const linkedSource = linkedCandidateId ? String(allCandidates.find((c) => c.id === linkedCandidateId)?.properties.source_dataset ?? 'all') : null
   const requestedSource = searchParams.get('dataset') ?? linkedSource ?? 'all'
@@ -102,14 +108,6 @@ export function CandidatesPage() {
     ? matching.filter(candidate => !confidenceScreen.screenedOut.includes(candidate) || candidate.id === linkedCandidateId)
     : matching
   const hiddenCount = matching.length - candidates.length
-
-  useEffect(() => {
-    const resetSelection = window.setTimeout(() => {
-      setSelected(null)
-      setSelectedIds(new Set())
-    }, 0)
-    return () => window.clearTimeout(resetSelection)
-  }, [projectId])
 
   // A construct on the bench links back here by candidate id. Derive the selection from
   // it rather than writing it into state on load: an explicit pick still wins, and the
@@ -276,6 +274,7 @@ export function CandidatesPage() {
       </label> : null}
       {allCandidates.length > 0 ? <div data-tour-id="candidate-filters">
       <CandidateFilters
+        statuses={candidateStatuses}
         search={search}
         status={status}
         priorityOnly={priorityOnly}

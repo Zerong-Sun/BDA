@@ -22,6 +22,7 @@
 - [项目引导、Research 四分区、独立工具与可靠执行](GUIDED_PLATFORM_WORKFLOW.md)
 - [全局导航与工作区入口契约](NAVIGATION_WORKSPACE_CONTRACT.md)
 - [项目空状态、手动候选、人工流程步骤与历史兼容](PROJECT_WORKSPACES.md)
+- [项目工作区六维审查与修复清单（2026-10-12）](PROJECT_WORKSPACES_REVIEW_2026-10-12.md)
 - [实验工具使用与计算约定](LAB_TOOLS.md)
 - [Copilot 服务、任务授权与模型配置](COPILOT_SERVICE_GUIDE.md)
 - [DeepSeek Flash 输出验收与优化](DEEPSEEK_OUTPUT_REVIEW.md)

@@ -12,6 +12,7 @@ interface CandidateFiltersProps {
   search: string
   status: string
   priorityOnly: boolean
+  statuses?: string[]
   onSearchChange: (value: string) => void
   onStatusChange: (value: string) => void
   onPriorityOnlyChange: (value: boolean) => void
@@ -20,7 +21,7 @@ interface CandidateFiltersProps {
 type CandidateFilterValue = string | boolean
 type CandidateFilter = Filter<CandidateFilterValue>
 
-const candidateStatuses = new Set(['Validated', 'QC risk', 'Retest', 'Reserve'])
+const defaultStatuses = ['Validated', 'QC risk', 'Retest', 'Reserve']
 
 function createCandidateFilter(
   field: 'search' | 'status' | 'priority',
@@ -72,11 +73,13 @@ export function CandidateFilters({
   search,
   status,
   priorityOnly,
+  statuses = defaultStatuses,
   onSearchChange,
   onStatusChange,
   onPriorityOnlyChange,
 }: CandidateFiltersProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const candidateStatuses = useMemo(() => new Set(statuses.filter(Boolean)), [statuses])
   const [filterIds] = useState(() => ({
     search: createFilter('search').id,
     status: createFilter('status').id,
@@ -97,12 +100,11 @@ export function CandidateFilters({
       type: 'select',
       defaultOperator: 'is',
       operators: [{ value: 'is', label: t.candidatesExt.filters.operatorIs }],
-      options: [
-        { value: 'Validated', label: t.candidatesExt.filters.validated },
-        { value: 'QC risk', label: t.candidatesExt.filters.qcRisk },
-        { value: 'Retest', label: t.candidatesExt.filters.retest },
-        { value: 'Reserve', label: t.candidatesExt.filters.reserve },
-      ],
+      options: [...candidateStatuses].sort().map((value) => ({ value, label: ({
+        validated: t.candidatesExt.filters.validated, 'qc risk': t.candidatesExt.filters.qcRisk,
+        retest: t.candidatesExt.filters.retest, reserve: t.candidatesExt.filters.reserve,
+        ...t.candidatesExt.funnel, proposed: language === 'zh' ? '提案' : 'Proposed',
+      } as Record<string, string>)[value.toLocaleLowerCase()] ?? value })),
     },
     {
       key: 'priority',
@@ -112,7 +114,7 @@ export function CandidateFilters({
       operators: [{ value: 'is', label: t.candidatesExt.filters.operatorIs }],
       options: [{ value: true, label: t.candidatesExt.filters.priorityOnly }],
     },
-  ], [t])
+  ], [candidateStatuses, language, t])
   const [filterState, setFilterState] = useState(() => ({
     filters: filtersFromQuery(search, status, priorityOnly, filterIds),
     external: { search, status, priorityOnly },
@@ -169,7 +171,7 @@ export function CandidateFilters({
         allowMultiple={false}
         i18n={{
           addFilter: t.candidatesExt.filters.addFilter,
-          searchFields: t.candidatesExt.filters.searchPlaceholder,
+          searchFields: language === 'zh' ? '查找筛选字段…' : 'Find a filter field…',
         }}
       />
       {filters.length > 0 ? (

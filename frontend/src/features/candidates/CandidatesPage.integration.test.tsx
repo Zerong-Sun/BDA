@@ -5,6 +5,7 @@ import { CandidatesPage } from '../../app/Candidates'
 import { useAppStore } from '../../lib/store/appStore'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { useProjectContext } from '../../lib/hooks/useProjectContext'
 
 vi.mock('./CandidateFilters', () => ({
   CandidateFilters: ({
@@ -80,6 +81,11 @@ function candidate(
   }
 }
 
+function ProjectSwitcher() {
+  const { setProjectId } = useProjectContext()
+  return <button type="button" onClick={() => setProjectId('project-next')}>Switch project</button>
+}
+
 describe('CandidatesPage complete cursor collection', () => {
   beforeEach(() => {
     window.location.hash = '/candidates?project=proj_candidates_integration'
@@ -92,6 +98,32 @@ describe('CandidatesPage complete cursor collection', () => {
   afterEach(() => {
     cleanup()
     window.location.hash = ''
+  })
+
+  it('clears search, status, priority and selection when switching project', async () => {
+    const projects = ['proj_candidates_integration', 'project-next'].map((id) => ({
+      id, organization_id: 'org_test', name: id, project_type: 'protein_design', status: 'active',
+      owner_id: 'user_test', summary: '', primary_target_id: null, version: 1,
+      created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',
+    }))
+    server.use(
+      http.get('/api/v2/projects', () => HttpResponse.json({ items: projects, next_cursor: null })),
+      http.get('/api/v2/projects/:id/candidate-funnel', () => HttpResponse.json({ generated: 1, designed: 0, folded: 0, scored: 0, ordered: 0 })),
+      http.get('/api/v2/projects/:id/candidates', ({ params }) => HttpResponse.json({ items: params.id === 'project-next'
+        ? [{ ...candidate('new-project-candidate'), project_id: 'project-next' }]
+        : [candidate('old-project-candidate', { name: 'Kinase', status: 'Validated', decision: 'Anchor' })], next_cursor: null })),
+    )
+    renderWithProviders(<><ProjectSwitcher /><CandidatesPage /></>)
+    await screen.findByRole('button', { name: 'View details for candidate old-project-candidate' })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter later-page search' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter later-page status' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter later-page priority' }))
+    fireEvent.click(screen.getAllByRole('checkbox')[1])
+    expect(screen.getByRole('button', { name: /Download selected/ })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Switch project' }))
+    expect(await screen.findByRole('button', { name: 'View details for candidate new-project-candidate' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View details for candidate old-project-candidate' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Download selected/ })).toBeDisabled()
   })
 
   it('filters search, status, and priority matches fetched only from later cursor pages', async () => {

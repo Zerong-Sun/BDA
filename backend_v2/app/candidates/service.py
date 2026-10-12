@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
@@ -25,10 +26,35 @@ def _verify_artifacts(session: Session, project: Project, ids: list) -> None:
 
 
 def create_candidate(session: Session, project: Project, payload: CandidateCreate, user: User) -> Candidate:
+    # A client may retry after the commit succeeded but its response was lost.
+    # Replay identical creates only; a reused key must never overwrite a design.
+    repository = CandidateRepository(session)
+    values = payload.model_dump()
+
+    def replay(existing: Candidate) -> Candidate:
+        if any(getattr(existing, field) != value for field, value in values.items()):
+            raise DomainError(
+                "candidate_key_conflict", "Candidate key already exists with different content", status_code=409,
+                errors=[{"candidate_id": str(existing.id)}],
+            )
+        return existing
+
+    existing = repository.get_by_key(project.id, payload.candidate_key)
+    if existing is not None:
+        return replay(existing)
     _verify_artifacts(session, project, [payload.structure_artifact_id, payload.complex_artifact_id])
-    candidate = Candidate(project_id=project.id, **payload.model_dump())
-    session.add(candidate)
-    session.flush()
+    candidate = Candidate(project_id=project.id, **values)
+    try:
+        with session.begin_nested():
+            session.add(candidate)
+            session.flush()
+    except IntegrityError:
+        # The unique constraint also arbitrates simultaneous retries. A savepoint
+        # keeps the surrounding transaction usable when that insert loses.
+        existing = repository.get_by_key(project.id, payload.candidate_key)
+        if existing is None:
+            raise
+        return replay(existing)
     record_audit(
         session,
         action="candidate.create",
@@ -49,6 +75,12 @@ def update_candidate(
     user: User,
     expected_version: int,
 ) -> Candidate:
+    # Lock and refresh before checking the client version. Two simultaneous edits
+    # must report a 412, rather than racing into a StaleDataError at commit.
+    current = CandidateRepository(session).get(candidate.id, for_update=True)
+    if current is None or current.project_id != project.id:
+        raise DomainError("candidate_not_found", "Candidate was not found in this project", status_code=404)
+    candidate = current
     if candidate.version != expected_version:
         raise DomainError("version_conflict", "Candidate was modified by another request", status_code=412)
     values = payload.model_dump(exclude_unset=True)
