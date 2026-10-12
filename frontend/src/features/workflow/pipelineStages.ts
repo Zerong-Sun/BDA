@@ -1,7 +1,7 @@
 import type { ProjectOverview } from '../../lib/api/projects'
 
-/** Navigation reflects available project records. Execution readiness is enforced
- * by workflow preflight and submission, not by hiding imported evidence. */
+/** Progress describes existing records, never whether a workspace may be opened.
+ * Empty workspaces accept manual input; execution has its own preflight gates. */
 export type StageKey = 'research' | 'workflow' | 'candidates' | 'lab' | 'results'
 export type StageState = 'done' | 'current' | 'locked' | 'not_started'
 
@@ -45,10 +45,9 @@ export function pipelineStageState(
   const hasWorkflow = Boolean(overview?.latest_workflow_id)
   const targetReady = overview?.target_readiness?.ready_for_workflow === true
   const done = [targetReady, hasWorkflow && hasCandidates, hasCandidates && (hasOrders || hasResults), hasResults, hasResults]
-  const available = [true, targetReady || hasWorkflow, hasCandidates, hasCandidates || hasResults, hasCandidates || hasResults]
   if (index === currentIndex) return 'current'
   if (done[index] && index < currentIndex) return 'done'
-  return available[index] ? 'not_started' : 'locked'
+  return 'not_started'
 
 }
 

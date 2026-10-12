@@ -132,6 +132,6 @@ describe('WorkflowProgress', () => {
       '#/results?project=proj_test',
     )
     expect(screen.getByRole('tab', { name: /Research/i })).toBeEnabled()
-    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeEnabled()
   })
 })

@@ -199,8 +199,8 @@ describe('CandidatesPage complete cursor collection', () => {
     ).not.toBeInTheDocument()
   })
   it('shows all candidates by default and only reversibly filters confirmed low confidence', async () => {
-    const low = { ...candidate('low'), scores: { plddt: 35 }, properties: { folded_by: 'alphafold2_superfold' } }
-    const high = { ...candidate('high'), scores: { plddt: 95 }, properties: { predicted_by: 'alphafold3' } }
+    const low = { ...candidate('low'), scores: { plddt: 35 }, properties: { folded_by: 'alphafold2_superfold', source_dataset: 'dataset-a' } }
+    const high = { ...candidate('high'), scores: { plddt: 95 }, properties: { predicted_by: 'alphafold3', source_dataset: 'dataset-b' } }
     const uncertain = { ...candidate('uncertain'), scores: { plddt: 0.94 } }
     server.use(
       http.get('/api/v2/projects/proj_candidates_integration/candidate-funnel', () => HttpResponse.json({ generated: 3, designed: 3, folded: 3, scored: 3, ordered: 0 })),
@@ -213,6 +213,9 @@ describe('CandidatesPage complete cursor collection', () => {
     }], next_cursor: null })))
     renderWithProviders(<CandidatesPage />)
     expect(await screen.findByRole('button', { name: 'View details for candidate low' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View details for candidate high' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View details for candidate uncertain' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Candidate dataset' })).toHaveTextContent('All project records')
     expect(screen.getByText(/1 candidates have an unknown or conflicting pLDDT scale/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Hide low-confidence candidates' }))
     expect(screen.queryByRole('button', { name: 'View details for candidate low' })).not.toBeInTheDocument()

@@ -24,6 +24,7 @@ interface WorkflowResourceSidebarProps {
   onArtifactSelected: (artifact: Artifact) => void
   onPluginAdd?: (plugin: ModelPlugin) => void
   readOnly?: boolean
+  artifactReadOnly?: boolean
 }
 
 export function WorkflowResourceSidebar({
@@ -35,6 +36,7 @@ export function WorkflowResourceSidebar({
   onArtifactSelected,
   onPluginAdd,
   readOnly = false,
+  artifactReadOnly = readOnly,
 }: WorkflowResourceSidebarProps) {
   const { t, format } = useI18n()
   const [tab, setTab] = useState('artifacts')
@@ -70,7 +72,7 @@ export function WorkflowResourceSidebar({
             ) : null}
             <ArtifactUploadDropzone
               projectId={projectId}
-              readOnly={readOnly}
+              readOnly={artifactReadOnly}
               onUploaded={onArtifactUploaded}
             />
             <div className="mt-3">

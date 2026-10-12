@@ -4,7 +4,7 @@ import { WorkflowPage } from '../../app/Workflow'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { initialTourState, useAppStore } from '../../lib/store/appStore'
 
-const state = vi.hoisted(() => ({ projectId: 'project-a' }))
+const state = vi.hoisted(() => ({ projectId: 'project-a', ready: true, readinessError: false }))
 const api = vi.hoisted(() => ({
   current: vi.fn(), runs: vi.fn(), graph: vi.fn(), preflight: vi.fn(), create: vi.fn(),
   plan: vi.fn(), apply: vi.fn(), preview: vi.fn(), submit: vi.fn(), artifacts: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../lib/hooks/useProjectContext', () => ({ useProjectContext: () => (
   projectId: state.projectId, activeProject: { id: state.projectId, name: state.projectId, summary: 'Design a binder' },
 }) }))
 vi.mock('../../lib/hooks/useProjectTargetStructure', () => ({ useTargetReadiness: () => ({
-  data: { ready_for_workflow: true, blockers: [] }, isSuccess: true, isError: false, refetch: vi.fn(),
+  data: state.readinessError ? undefined : { ready_for_workflow: state.ready, blockers: [] }, isSuccess: !state.readinessError, isError: state.readinessError, refetch: vi.fn(),
 }) }))
 vi.mock('../../lib/api/projects', () => ({ getCurrentWorkflowRunOrNull: api.current, listProjectWorkflowRuns: api.runs, getProjectAccess: api.access }))
 vi.mock('../../lib/api/workflow', () => ({ createWorkflowRun: api.create, getWorkflowGraph: api.graph,
@@ -26,7 +26,7 @@ vi.mock('../../lib/api/copilot', () => ({ planRoute: api.plan, applyRoutePlan: a
 vi.mock('../../lib/api/artifacts', () => ({ listProjectArtifacts: api.artifacts }))
 vi.mock('../../lib/api/registry', () => ({ listModelPlugins: async () => [], validateModelPlugin: vi.fn() }))
 vi.mock('./WorkflowContextBar', () => ({ WorkflowContextBar: () => null }))
-vi.mock('./WorkflowResourceSidebar', () => ({ WorkflowResourceSidebar: ({ artifacts }: { artifacts: Array<{ id: string }> }) => <div>{artifacts.map((artifact) => <span key={artifact.id}>{artifact.id}</span>)}</div> }))
+vi.mock('./WorkflowResourceSidebar', () => ({ WorkflowResourceSidebar: ({ artifacts, artifactReadOnly }: { artifacts: Array<{ id: string }>; artifactReadOnly: boolean }) => <div><button type="button" disabled={artifactReadOnly}>Upload project artifact</button>{artifacts.map((artifact) => <span key={artifact.id}>{artifact.id}</span>)}</div> }))
 vi.mock('./WorkflowCanvas', () => ({ WorkflowCanvas: ({ onNodeSelected }: { onNodeSelected: (id: string) => void }) => <><button onClick={() => onNodeSelected('node-1')}>Select node</button><button onClick={() => onNodeSelected('node-2')}>Select another node</button><button onClick={() => onNodeSelected('target')}>Select demo target</button></> }))
 vi.mock('./WorkflowInspector', () => ({ WorkflowInspector: ({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) => <div><button onClick={() => onDirtyChange(true)}>Edit parameter</button><button onClick={() => onDirtyChange(false)}>Save parameter</button></div> }))
 vi.mock('./NodeBuilder', () => ({ NodeBuilder: ({ open }: { open: boolean }) => open ? <div>Manual node builder</div> : null }))
@@ -47,6 +47,8 @@ function plan(objective = 'Design a binder') {
 beforeEach(() => {
   vi.clearAllMocks()
   state.projectId = 'project-a'
+  state.ready = true
+  state.readinessError = false
   window.location.hash = '/workflow?project=project-a'
   useAppStore.setState({ language: 'en', appMode: 'application', uiDensity: 'guided', workflowSeed: null })
   api.current.mockResolvedValue(run)
@@ -63,6 +65,31 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('workflow journey', () => {
+  it('reopens an empty saved draft for editing without forcing another creation', async () => {
+    state.ready = false
+    api.graph.mockResolvedValue({ workflow: run, nodes: [], edges: [], layout: {} })
+    renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByRole('button', { name: 'Add workflow node' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Create a blank workflow manually' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submit workflow' })).toBeDisabled()
+    expect(api.create).not.toHaveBeenCalled()
+  })
+  it.each([false, true])('keeps manual drafts editable with incomplete or unavailable readiness (%s)', async (readinessError) => {
+    state.ready = false
+    state.readinessError = readinessError
+    api.current.mockResolvedValue(null)
+    api.runs.mockResolvedValue([])
+    renderWithProviders(<WorkflowPage />)
+    const create = await screen.findByRole('button', { name: 'Create a blank workflow manually' })
+    await waitFor(() => expect(create).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Upload project artifact' })).toBeEnabled()
+    fireEvent.click(create)
+    await waitFor(() => expect(api.create).toHaveBeenCalledWith('project-a'))
+    expect(await screen.findByText('Manual node builder')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add workflow node' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Submit workflow' })).toBeDisabled()
+    expect(api.submit).not.toHaveBeenCalled()
+  })
   it.each(['en', 'zh'] as const)('restores the selected example after reloading an active workflow tour (%s)', async (language) => {
     window.location.hash = '/workflow?project=project-a&node=target'
     useAppStore.setState({ appMode: 'application', tourState: initialTourState })

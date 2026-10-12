@@ -118,7 +118,7 @@ export function WorkflowContextBar({
         <Button
           variant="link"
           size="sm"
-          render={<Link to="/experiments" />}
+          render={<Link to={`/projects?project=${encodeURIComponent(activeProject.id)}`} />}
         >
           {t.workflowExt.contextBar.manage}
         </Button>

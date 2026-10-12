@@ -176,7 +176,11 @@ interface NodeBuilderProps {
 }
 
 export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
+  const zh = language === 'zh'
+  const [manual, setManual] = useState(false)
+  const [reviewName, setReviewName] = useState('')
+  const [reviewCriteria, setReviewCriteria] = useState('')
   const [selected, setSelected] = useState('rf')
   const [methods, setMethods] = useState<string[]>(['Affinity score', 'Diversity cap', 'Auto report'])
   const [nodeName, setNodeName] = useState('')
@@ -317,6 +321,19 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
   }
 
   const handleAdd = async () => {
+    if (manual) {
+      if (!reviewName.trim() || !reviewCriteria.trim()) return
+      setAdding(true)
+      setAddError('')
+      try {
+        await onAdd({ id: 'manual-review', icon: 'clipboard-check', title: reviewName.trim(), body: reviewCriteria.trim(), resource: 'manual', nodeType: 'manual_review' }, reviewName.trim(), [], {
+          description: reviewCriteria.trim(), acceptance_criteria: reviewCriteria.trim(), review_status: 'pending_review',
+        })
+        setReviewName(''); setReviewCriteria('')
+      } catch (error) { setAddError(error instanceof Error ? error.message : String(error)) }
+      finally { setAdding(false) }
+      return
+    }
     const trimmedName = nodeName.trim()
     if (!trimmedName) {
       setNameError(t.nodeBuilder.nameRequired)
@@ -374,11 +391,21 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
       >
       <SheetHeader className="border-b border-border-soft">
           <p className="text-xs uppercase tracking-wide text-accent">{t.nodeBuilder.cardEyebrow}</p>
-          <SheetTitle className="text-base">{t.nodeBuilder.cardTitle}</SheetTitle>
-          <SheetDescription>{t.nodeBuilder.subtitle}</SheetDescription>
+          <SheetTitle className="text-base">{manual ? (zh ? '添加人工审阅步骤' : 'Add a manual review step') : t.nodeBuilder.cardTitle}</SheetTitle>
+          <SheetDescription>{manual ? (zh ? '填写需要核对的内容和放行条件' : 'Define the review and its acceptance criteria') : t.nodeBuilder.subtitle}</SheetDescription>
       </SheetHeader>
 
+      <div className="flex gap-2 px-4 pt-3" role="group" aria-label={zh ? '步骤类型' : 'Step type'}>
+        <Button type="button" variant={manual ? 'outline' : 'secondary'} aria-pressed={!manual} disabled={adding} onClick={() => { setManual(false); setAddError('') }}>{zh ? '模型计算' : 'Model computation'}</Button>
+        <Button type="button" variant={manual ? 'secondary' : 'outline'} aria-pressed={manual} disabled={adding} onClick={() => { setManual(true); setAddError('') }}>{zh ? '人工审阅步骤' : 'Manual review step'}</Button>
+      </div>
+
       <ScrollArea className="min-h-0 flex-1">
+      {manual ? <div className="space-y-4 p-4">
+        <p className="text-sm text-text-secondary">{zh ? '记录目标确认、文献核对或实验验收。保存为待审阅步骤，不会启动计算或标记任务完成。' : 'Record target confirmation, evidence checks or experimental acceptance. Saved pending review; no computation is started or completion recorded.'}</p>
+        <label className="block space-y-1 text-sm"><span>{zh ? '步骤名称' : 'Review step name'}</span><Input value={reviewName} onChange={(event) => setReviewName(event.target.value)} maxLength={120} disabled={adding} /></label>
+        <label className="block space-y-1 text-sm"><span>{zh ? '输入、文献来源与验收条件' : 'Inputs, sources and acceptance criteria'}</span><Textarea value={reviewCriteria} onChange={(event) => setReviewCriteria(event.target.value)} maxLength={10000} rows={8} disabled={adding} /></label>
+      </div> :
       <div className="grid gap-5 p-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.15fr)]">
         {/* Model cards */}
         <section aria-labelledby="node-builder-models">
@@ -643,7 +670,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
           </FramePanel>
         </Frame>
         </section>
-      </div>
+      </div>}
       </ScrollArea>
       {addError ? <Alert variant="destructive" role="alert"><AlertDescription>{addError}</AlertDescription></Alert> : null}
       <SheetFooter className="flex-row justify-end border-t border-border-soft">
@@ -653,7 +680,7 @@ export function NodeBuilder({ open, onClose, onAdd }: NodeBuilderProps) {
         <Button type="button"
           className="flex-1 sm:flex-none sm:min-w-44"
           onClick={() => void handleAdd()}
-          disabled={adding || pluginsLoading || Boolean(pluginsError) || templates.length === 0 || selectedMethodOptions.length === 0}
+          disabled={adding || (manual ? !reviewName.trim() || !reviewCriteria.trim() : pluginsLoading || Boolean(pluginsError) || templates.length === 0 || selectedMethodOptions.length === 0)}
         >
           {adding ? (
             <>

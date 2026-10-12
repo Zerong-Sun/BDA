@@ -132,7 +132,7 @@ export const en: TranslationDict = {
     eyebrow: 'Design loop',
     stepOf: 'Step {index} of {total}',
     currentBadge: 'You are here',
-    lockedHint: 'Finish the current step to unlock this stage.',
+    lockedHint: 'Select a project to open this workspace.',
     nextStep: 'Next step',
     continueTo: 'Continue to {stage}',
     openStage: 'Open {stage}',

@@ -278,6 +278,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
 
           const created = await addWorkflowNode(workflowRunId, {
             node_type: template.nodeType,
+            ...(template.resource === 'manual' ? { execution_mode: 'manual' as const } : {}),
             key: nodeName,
             model_plugin: template.modelName,
             model_plugin_id: template.pluginId,

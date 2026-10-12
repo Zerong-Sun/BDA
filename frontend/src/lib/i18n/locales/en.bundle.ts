@@ -819,7 +819,7 @@ export const bundleEn = {
         'Create a project-specific protein-design workflow and nominate candidates for validation.',
       objectiveForProject: 'Create a {type} workflow for {projectName}.',
       targetIdentityFix: {
-        intro: 'Identify the target here to unlock the workflow. A de novo protein is identified by its sequence, and a small-molecule target by a chemical identifier - neither needs an accession.',
+        intro: 'Confirm the target identity before computation; draft editing is already available. A de novo protein is identified by its sequence, and a small-molecule target by a chemical identifier - neither needs an accession.',
         nameLabel: 'Target name',
         namePlaceholder: 'e.g. Delta-9-THC',
         kindLabel: 'Target kind',
@@ -838,17 +838,17 @@ export const bundleEn = {
         smallMoleculeNote: 'A small-molecule target needs no uploaded structure: the model resolves its coordinates from its own component library when the job runs.',
         submit: 'Confirm identity',
         submitting: 'Confirming...',
-        successReady: 'Target confirmed. The workflow is now editable.',
+        successReady: 'Target confirmed. The target is ready for execution checks.',
         successNotReady: 'Identity confirmed, but the target is still not ready - see the remaining blockers.',
         failed: 'Could not confirm the target identity.',
       },
       targetBlockedTitle: 'Target preparation is incomplete',
       targetBlockedBody:
-        'Confirm the target identity, prepare the structure, and approve the prepared revision before building a workflow.',
+        'Confirm the target identity, prepare the structure, and approve the prepared revision before submitting computation.',
       resolveTarget: 'Resolve target readiness',
       readinessUnavailableTitle: 'Target readiness could not be verified',
       readinessUnavailableBody:
-        'Workflow changes are locked until the target readiness service is available.',
+        'Drafts remain editable. Computation cannot be submitted until target readiness can be verified.',
       preflightReadyTitle: 'Execution preflight passed',
       preflightBlockedTitle: 'Execution preflight is blocked',
       preflightCounts: '{blockers} blocking · {warnings} advisory',
@@ -2101,7 +2101,7 @@ export const bundleEn = {
           },
           lockedStep: {
             question: "Why is a workflow locked?",
-            answer: "Check whether inputs are missing, upstream work is unfinished, a manual gate is waiting, or the run was submitted. Submitted snapshots cannot be edited; use a new workflow for a new plan.",
+            answer: "Empty workspaces and drafts remain open for manual input. Missing inputs, unfinished upstream work or pending manual gates block execution. Submitted snapshots cannot be edited; create a new workflow for a new plan.",
           },
           deleteConfirmation: {
             question: "Why is confirmation required?",

@@ -186,7 +186,7 @@ export function CandidateTable({
         ),
         enableSorting: false,
       }),
-      columnHelper.accessor((c) => candidateText(c, 'native_id') || c.candidate_key || c.name, {
+      columnHelper.accessor((c) => c.properties.source === 'manual' ? c.name : candidateText(c, 'native_id') || c.candidate_key || c.name, {
         id: 'id',
         header: ({ column }) => <DataGridColumnHeader column={column} title={t.candidatesExt.table.candidate} />,
         cell: (info) => (

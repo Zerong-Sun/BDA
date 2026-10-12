@@ -38,7 +38,7 @@ describe('PipelineRail route selection', () => {
     await waitFor(() => expect(results).toBeEnabled())
     expect(screen.getByRole('tab', { name: /Lab/i })).toBeEnabled()
     expect(screen.getByRole('tab', { name: /Research/i })).not.toHaveTextContent(/done/i)
-    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeEnabled()
     fireEvent.click(results)
     await waitFor(() => expect(window.location.hash).toContain('/results?project=proj_ready'))
   })

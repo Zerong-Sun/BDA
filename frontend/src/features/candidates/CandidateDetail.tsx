@@ -21,6 +21,7 @@ import { GlossaryTooltip } from '../../components/ui/GlossaryTooltip'
 import { CandidateStructureOverlay } from './CandidateStructureOverlay'
 import { CandidateConditionMetrics } from './CandidateConditionMetrics'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
+import { CreateCandidate } from './CreateCandidate'
 
 interface CandidateDetailProps {
   candidate: Candidate | null
@@ -158,12 +159,20 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
         </div>
       )}
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{candidate.candidate_key || candidate.id}</h2>
+        <h2 className="text-lg font-semibold">{candidate.properties.source === 'manual' ? candidate.name : candidate.candidate_key || candidate.id}</h2>
         <StatusPill label={decision ?? '—'} tone={statusTone(decision ?? '')} />
       </div>
-      {candidate.name && candidate.name !== (candidate.candidate_key || candidate.id) ? (
+      {candidate.properties.source !== 'manual' && candidate.name && candidate.name !== (candidate.candidate_key || candidate.id) ? (
         <p className="mb-2 font-medium">{candidate.name}</p>
       ) : null}
+      <div className="mb-4 space-y-2 rounded-md border border-border-soft p-3 text-sm">
+        <h3 className="font-medium">{language === 'zh' ? '设计依据与来源' : 'Design rationale & sources'}</h3>
+        <p className="whitespace-pre-wrap text-text-secondary">{candidateText(candidate, 'design_rationale') || (language === 'zh' ? '尚未补充设计依据。可记录论点、文献支持和待验证问题。' : 'No design rationale has been added. Record the claim, literature support and open questions.')}</p>
+        {Array.isArray(candidate.properties.evidence_links) ? candidate.properties.evidence_links.filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url)).map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-primary underline">{url}</a>) : null}
+        {candidate.properties.experimental_status === 'not_tested' ? <p>{language === 'zh' ? '尚未进行实验验证。' : 'Not experimentally validated.'}</p> : null}
+        <CreateCandidate key={`${candidate.id}:${candidate.version}`} projectId={projectId} candidate={candidate} onCreated={() => {}} />
+        <Link to={`/research?project=${encodeURIComponent(projectId)}&tab=references`} className="ml-3 text-primary underline">{language === 'zh' ? '查看项目文献证据' : 'Open project literature evidence'}</Link>
+      </div>
       <p className="mb-4 text-sm text-text-secondary">
         {format(t.candidatesExt.detail.familyLine, {
           family: candidateText(candidate, 'family') ?? '—',

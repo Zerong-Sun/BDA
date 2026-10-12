@@ -523,9 +523,9 @@ function WorkflowWorkspace() {
 
   const workflowRun = workflowGraph?.workflow ?? currentWorkflowRun
   const targetReady = targetReadiness.data?.ready_for_workflow === true
-  const readOnly = !canEdit || !targetReady || Boolean(workflowRun && workflowRun.status !== 'draft')
-  const showRoutePlanner = !isDemoMode && targetReady &&
-    (planningMode ?? (!workflowRunId || (workflowRun?.status === 'draft' && workflowNodes.length === 0)))
+  const readOnly = !canEdit || Boolean(workflowRun && workflowRun.status !== 'draft')
+  const showRoutePlanner = !isDemoMode &&
+    (planningMode ?? !workflowRunId)
   const routePlan = plannedRoute?.objective === routeObjective ? plannedRoute.plan : null
   const routeTargetLabel = routeTarget(activeProject, routeObjective)
 
@@ -555,6 +555,7 @@ function WorkflowWorkspace() {
       queryClient.invalidateQueries({ queryKey: ['workflow-graph', run.id] })
       queryClient.invalidateQueries({ queryKey: ['workflow-preflight', run.id] })
       queryClient.invalidateQueries({ queryKey: ['workflow-run', 'current', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-overview', projectId] })
       showToast(t.workflowExt.toasts.runCreated, 'success')
     },
     onError: () => showToast(t.workflowExt.toasts.runCreateFailed, 'error'),
@@ -630,6 +631,7 @@ function WorkflowWorkspace() {
   const startWorkflow = useMutation({
     mutationFn: () => {
       if (!canCompute) throw new Error(language === 'zh' ? '当前项目无计算提交权限。' : 'You do not have compute access to this project.')
+      if (!targetReady || workflowPreflight.data?.allowed !== true || workflowPreflight.isFetching || workflowPreflight.isError) throw new Error(language === 'zh' ? '请先完成目标准备和执行预检。' : 'Complete target preparation and execution preflight first.')
       if (!workflowRunId) {
         throw new Error(t.workflowExt.toasts.noWorkflowRun)
       }
@@ -708,6 +710,11 @@ function WorkflowWorkspace() {
         }}
       />
 
+      {!isDemoMode && projectId ? <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+        <Link className="text-primary underline" to={`/research?project=${encodeURIComponent(projectId)}&tab=methods`}>{language === 'zh' ? '查看研究路线、文献依据与放行条件' : 'Review the research plan, evidence and acceptance criteria'}</Link>
+        {!workflowRunId && workflowRunsQuery.isSuccess && projectWorkflowRuns.length === 0 ? <span className="text-text-secondary">{language === 'zh' ? '尚未有工作流更新，可手工创建草稿。' : 'No workflow updates yet. Create a draft manually.'}</span> : null}
+      </div> : null}
+
       {!isDemoMode && projectAccess.isError ? <Alert variant="destructive" className="mb-3"><AlertDescription>{language === 'zh' ? '项目权限读取失败，编辑暂不可用。' : 'Project permissions could not be loaded. Editing is unavailable.'}</AlertDescription><Button type="button" variant="outline" onClick={() => void projectAccess.refetch()}>{language === 'zh' ? '重试权限检查' : 'Retry permission check'}</Button></Alert>
         : !isDemoMode && projectAccess.isSuccess && !canEdit ? <p role="status" className="mb-3 text-sm">{accessMessage}</p> : null}
 
@@ -730,6 +737,7 @@ function WorkflowWorkspace() {
             {t.workflowExt.routePlanner.targetBlockedTitle}
           </AlertTitle>
           <AlertDescription>
+          <p>{language === 'zh' ? '可以先创建和编辑工作流草稿。目标准备和执行预检通过后才能提交计算。' : 'You can create and edit a workflow draft now. Prepare the target and pass execution preflight before submitting compute.'}</p>
           <p>
             {projectActionText(targetReadiness.data.next_action, t) || t.workflowExt.routePlanner.targetBlockedBody}
           </p>
@@ -795,9 +803,9 @@ function WorkflowWorkspace() {
         readOnly={readOnly || unsavedNodeChanges}
         workflowRunId={workflowRunId}
         createPending={createWorkflow.isPending}
-        creationDisabled={!canEdit || !targetReady || !projectId || unsavedNodeChanges}
+        creationDisabled={!canEdit || !projectId || unsavedNodeChanges}
         startPending={startWorkflow.isPending}
-        submitDisabled={!canCompute || readOnly || unsavedNodeChanges || workflowNodes.length === 0 || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true}
+        submitDisabled={!canCompute || !targetReady || readOnly || unsavedNodeChanges || workflowNodes.length === 0 || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true}
         onCreateRun={() => createWorkflow.mutate()}
         onNewRoute={openRoutePlanner}
         onAddNode={() => setBuilderOpen((v) => !v)}
@@ -814,7 +822,7 @@ function WorkflowWorkspace() {
           {submissionPreview.isPending ? <p role="status">{language === 'zh' ? '正在准备提交预览…' : 'Preparing submission preview…'}</p> : null}
           {submissionPreview.isError ? <div role="alert"><p>{submissionPreview.error.message}</p><Button type="button" variant="outline" onClick={() => void submissionPreview.refetch()}>{language === 'zh' ? '重新生成预览' : 'Retry preview'}</Button></div> : null}
           {submissionPreview.data?.map((preview) => <Disclosure key={preview.workflow_node_id} className="rounded border p-3" title={preview.name}><pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs">{preview.script}</pre></Disclosure>)}
-          <Button type="button" disabled={!canCompute || startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || unsavedNodeChanges || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
+          <Button type="button" disabled={!canCompute || !targetReady || startWorkflow.isPending || submissionPreview.isFetching || !submissionPreview.isSuccess || readOnly || unsavedNodeChanges || workflowPreflight.isFetching || workflowPreflight.isError || workflowPreflight.data?.allowed !== true} onClick={() => startWorkflow.mutate()}>{language === 'zh' ? '确认并提交作业' : 'Confirm and submit jobs'}</Button>
         </DialogContent>
       </Dialog>
 
@@ -1100,6 +1108,7 @@ function WorkflowWorkspace() {
               }}
               onPluginAdd={(plugin) => void addPluginNode(plugin)}
               readOnly={readOnly || !workflowRunId}
+              artifactReadOnly={isDemoMode || !canEdit}
             />
           </div>
 

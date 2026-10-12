@@ -13,9 +13,9 @@ describe('record-aware navigation', () => {
     expect(pipeline.stages.find((stage) => stage.key === current)?.state).toBe('current')
   })
 
-  it('keeps new computation behind target readiness when no prior records exist', () => {
+  it('opens every empty workspace without claiming completed progress', () => {
     const pipeline = derivePipeline(true, { candidate_count: 0, experiment_result_count: 0, latest_workflow_id: null, target_readiness: { ready_for_workflow: false }, funnel: { generated: 0, ordered: 0 } } as never)
     expect(pipeline.currentIndex).toBe(0)
-    expect(pipeline.stages[1].state).toBe('locked')
+    expect(pipeline.stages.map((stage) => stage.state)).toEqual(['current', 'not_started', 'not_started', 'not_started', 'not_started'])
   })
 })

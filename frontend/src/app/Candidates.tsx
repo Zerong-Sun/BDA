@@ -18,7 +18,8 @@ import { AppFrame } from '../components/ui/AppFrame'
 import { CandidateFilters } from '../features/candidates/CandidateFilters'
 import { CandidateTable } from '../features/candidates/CandidateTable'
 import { CandidateDetail } from '../features/candidates/CandidateDetail'
-import { ComputeStatusStrip } from '../features/workflow/ComputeStatusStrip'
+import { CreateCandidate } from '../features/candidates/CreateCandidate'
+import { ProjectChooser } from '../features/projects/ProjectChooser'
 import { candidateScore, candidateText, resolveActiveCandidate, type Candidate } from '../lib/schemas/candidate'
 import { NextStep } from '../components/ui/NextStep'
 import { GlossaryTooltip } from '../components/ui/GlossaryTooltip'
@@ -72,7 +73,7 @@ export function CandidatesPage() {
   const allCandidates = useMemo(() => data?.items ?? [], [data])
   const sources = [...new Set(allCandidates.map((c) => String(c.properties.source_dataset ?? '')).filter(Boolean))].sort()
   const linkedSource = linkedCandidateId ? String(allCandidates.find((c) => c.id === linkedCandidateId)?.properties.source_dataset ?? 'all') : null
-  const requestedSource = searchParams.get('dataset') ?? linkedSource ?? sources[0] ?? 'all'
+  const requestedSource = searchParams.get('dataset') ?? linkedSource ?? 'all'
   const activeSource = sources.includes(requestedSource) ? requestedSource : 'all'
   const normalizedSearch = search.trim().toLocaleLowerCase()
   const normalizedStatus = status.toLocaleLowerCase()
@@ -197,6 +198,8 @@ export function CandidatesPage() {
     }
   }
 
+  if (!projectId) return <ProjectChooser compact />
+
   return (
     <section>
       <PageHead
@@ -204,9 +207,14 @@ export function CandidatesPage() {
         title={t.candidates.title}
         actions={
           <div className="flex flex-wrap gap-2">
+            <CreateCandidate key={projectId} projectId={projectId} onCreated={(candidate) => {
+              setSearch(''); setStatus('All'); setPriorityOnly(false); setSelected(candidate); setSelectedIds(new Set())
+              const next = new URLSearchParams(searchParams); next.set('dataset', 'all'); next.set('candidate', candidate.id); setSearchParams(next)
+            }} />
             <Button
               type="button"
               variant="outline"
+              disabled={!candidates.length}
               onClick={exportCsv}
             >
               <DownloadSimpleIcon aria-hidden="true" />
@@ -225,7 +233,6 @@ export function CandidatesPage() {
           </div>
         }
       />
-      <ComputeStatusStrip />
 
       {activeSource !== 'all' ? <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-tour-id="candidate-funnel">
         {[
@@ -267,7 +274,7 @@ export function CandidatesPage() {
         </Select>
         <span className="text-text-secondary">{zh ? '按来源数据集查看候选、结构与预测指标。' : 'Filters the candidate table; workflow counts above cover the whole project.'}</span>
       </label> : null}
-      <div data-tour-id="candidate-filters">
+      {allCandidates.length > 0 ? <div data-tour-id="candidate-filters">
       <CandidateFilters
         search={search}
         status={status}
@@ -276,7 +283,7 @@ export function CandidatesPage() {
         onStatusChange={setStatus}
         onPriorityOnlyChange={setPriorityOnly}
       />
-      </div>
+      </div> : null}
 
       {(confidenceScreen.screenedOut.length > 0 || confidenceScreen.uncertain.length > 0) ? (
         <AppFrame className="mb-4" panelClassName="flex flex-wrap items-center justify-between gap-3 p-3">
@@ -302,7 +309,8 @@ export function CandidatesPage() {
         onRetry={() => void refetch()}
         loadingSkeleton={<CandidateGridSkeleton label={t.candidatesExt.table.loadingAriaLabel} />}
       >
-        <div className="grid min-h-0 gap-4 xl:h-[calc(100vh-22rem)] xl:min-h-[34rem] xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.9fr)]" data-tour-id="candidate-table">
+        {!allCandidates.length ? <p role="status" className="mb-4 rounded-lg border border-border-soft p-4 text-sm text-text-secondary">{zh ? '尚未有候选更新。可以手动添加候选草稿，或在工作流完成后查看计算产物。' : 'No candidate updates yet. Add a proposal manually, or review candidates produced by a completed workflow.'}</p> : null}
+        {allCandidates.length > 0 ? <div className="grid min-h-0 gap-4 xl:h-[calc(100vh-22rem)] xl:min-h-[34rem] xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.9fr)]" data-tour-id="candidate-table">
           <div className="flex min-h-[34rem] flex-col overflow-hidden xl:min-h-0">
             <AppFrame className="min-h-0 flex-1" panelClassName="min-h-0 overflow-hidden">
               <CandidateTable
@@ -322,7 +330,7 @@ export function CandidatesPage() {
             </AppFrame>
           </div>
           <CandidateDetail candidate={activeCandidate} projectId={projectId} />
-        </div>
+        </div> : null}
       </ApiState>
 
       <NextStep stage="candidates" />
