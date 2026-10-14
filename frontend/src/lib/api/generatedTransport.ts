@@ -46,7 +46,7 @@ async function generatedFetch(input: RequestInfo | URL, init?: RequestInit): Pro
     headers.set('Authorization', `Bearer ${nextToken}`)
     request = new Request(original, { headers })
     response = await fetch(request)
-    if (response.status === 401) notifyUnauthorized()
+    if (response.status === 401 && generation === currentAuthGeneration()) notifyUnauthorized()
   }
   return response
 }

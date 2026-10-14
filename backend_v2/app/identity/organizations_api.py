@@ -114,6 +114,12 @@ def add_organization_member(
     member_user = session.get(User, payload.user_id)
     if organization is None or member_user is None:
         raise DomainError("membership_resource_not_found", "Organization or user was not found", status_code=404)
+    if member_user.role == "viewer" and payload.role != "viewer":
+        raise DomainError(
+            "account_read_only",
+            "This account is globally read-only; organization membership cannot grant write access",
+            status_code=409,
+        )
     membership = session.get(OrganizationMember, (organization.id, member_user.id))
     if membership is None:
         session.add(OrganizationMember(organization_id=organization.id, user_id=member_user.id, role=payload.role))

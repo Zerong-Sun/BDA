@@ -5,6 +5,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,43 @@ from .service import authenticate, hash_password
 
 def _digest(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _record_account_audit(
+    session: Session,
+    user: User,
+    action: str,
+    *,
+    organization_id: uuid.UUID | None = None,
+    payload: dict | None = None,
+) -> None:
+    """Scope the verified account identity to its audit INSERT, never project access.
+
+    Call only after registration or credential checks succeed. Anonymous recovery
+    must not acquire the recovered user's request identity or administrator flag.
+    Flush before restoring the transaction-local setting so deferred ORM writes
+    cannot run after the narrow account policy context has disappeared.
+    """
+    postgres = session.get_bind().dialect.name == "postgresql"
+    previous = ""
+    if postgres:
+        previous = session.scalar(text("SELECT current_setting('bda.account_audit_user_id', true)")) or ""
+        session.execute(
+            text("SELECT set_config('bda.account_audit_user_id', :user_id, true)"), {"user_id": str(user.id)}
+        )
+    try:
+        record_audit(
+            session, action=action, entity_type="user", entity_id=user.id, actor_id=user.id,
+            organization_id=organization_id, payload=payload,
+        )
+        session.flush()
+    finally:
+        # Failed flushes require rollback; issuing SQL then would mask that error.
+        # The transaction/savepoint rollback also discards the local setting.
+        if postgres and session.is_active:
+            session.execute(
+                text("SELECT set_config('bda.account_audit_user_id', :user_id, true)"), {"user_id": previous}
+            )
 
 
 def _active_grant(session: Session, raw: str, purpose: str) -> AccountGrant:
@@ -87,16 +125,15 @@ def register_account(session: Session, payload: RegisterRequest) -> User:
                 organization_id = organization.id
                 membership_role = "owner"
             session.add(OrganizationMember(organization_id=organization_id, user_id=user.id, role=membership_role))
-            record_audit(
+            # Flush membership before the audit INSERT policy checks its scope.
+            session.flush()
+            _record_account_audit(
                 session,
-                action="account.register",
-                entity_type="user",
-                entity_id=user.id,
-                actor_id=user.id,
+                user,
+                "account.register",
                 organization_id=organization_id,
                 payload={"mode": "invitation" if grant else "self_service"},
             )
-            session.flush()
     except IntegrityError as exc:
         raise DomainError("username_unavailable", "This username is unavailable", status_code=409) from exc
     return user
@@ -188,7 +225,7 @@ def change_password(session: Session, user: User, current: str, new: str, versio
         raise DomainError("version_conflict", "Account changed; reload before changing your password", status_code=412)
     authenticate(session, locked.username, current)
     _replace_password(session, locked, hash_password(new))
-    record_audit(session, action="account.password.change", entity_type="user", entity_id=locked.id, actor_id=locked.id)
+    _record_account_audit(session, locked, "account.password.change")
 
 
 def reset_password(session: Session, raw: str, password: str) -> None:
@@ -200,7 +237,7 @@ def reset_password(session: Session, raw: str, password: str) -> None:
     _replace_password(session, user, encoded)
     grant.used_at = datetime.now(UTC)
     grant.version += 1
-    record_audit(session, action="account.password.reset", entity_type="user", entity_id=user.id, actor_id=user.id)
+    _record_account_audit(session, user, "account.password.reset")
 
 
 def logout(session: Session, raw: str) -> None:

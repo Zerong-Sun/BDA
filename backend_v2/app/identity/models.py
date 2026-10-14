@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.models import Base, UUIDVersionMixin, utcnow
@@ -28,7 +28,7 @@ class RefreshSession(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    family_id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, index=True)
+    family_id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, server_default=text("gen_random_uuid()"), index=True)
     realm: Mapped[str] = mapped_column(String(32), default="bda", server_default="bda")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

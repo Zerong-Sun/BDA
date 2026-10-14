@@ -9,6 +9,7 @@ import {
 } from './client'
 
 afterEach(() => {
+  invalidateAuthRequests()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   sessionStorage.clear()
@@ -63,6 +64,30 @@ describe('generated transport authentication helpers', () => {
 
 
 describe('session isolation', () => {
+  it('starts a new refresh after an account switch and keeps its single flight when the old request settles', async () => {
+    let finishOld!: (response: Response) => void
+    let finishNew!: (response: Response) => void
+    const fetch = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishOld = resolve }))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finishNew = resolve }))
+    vi.stubGlobal('fetch', fetch)
+    sessionStorage.setItem('bda_user', JSON.stringify({ id: 'old' }))
+    const oldRequest = refreshAccessToken()
+    const rejected = expect(oldRequest).rejects.toThrow('Session ended')
+    invalidateAuthRequests()
+    sessionStorage.setItem('bda_user', JSON.stringify({ id: 'new' }))
+    sessionStorage.setItem('bda_token', 'new-login')
+    const newRequest = refreshAccessToken()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect((fetch.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(true)
+    finishOld(new Response(JSON.stringify({ access_token: 'stale', user: { id: 'old' } })))
+    await rejected
+    expect(sessionStorage.getItem('bda_token')).toBe('new-login')
+    expect(refreshAccessToken()).toBe(newRequest)
+    finishNew(new Response(JSON.stringify({ access_token: 'new-refresh', user: { id: 'new' } })))
+    await expect(newRequest).resolves.toBe('new-refresh')
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
   it('does not resurrect browser credentials when an in-flight refresh finishes after logout', async () => {
     let finish!: (response: Response) => void
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve })))
