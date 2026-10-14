@@ -294,6 +294,7 @@ def test_research_agent_reports_project_scope_rejection_without_failing_turn(
 
     assert result.tool_calls == [
         {
+            "tool_call_id": "call-intelligence",
             "name": "start_target_intelligence",
             "status": "failed",
             "error": "target_not_found",

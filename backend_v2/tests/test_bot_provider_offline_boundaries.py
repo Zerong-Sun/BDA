@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from backend_v2.app.copilot import provider
+from backend_v2.tests._provider_transport import mock_post, mock_sleep
 
 
 @pytest.fixture
@@ -28,8 +29,8 @@ def test_transient_status_recovers_without_switching_model(configured, monkeypat
         requests.append((url, kwargs["json"]["model"]))
         return response(url, status if len(requests) == 1 else 200)
 
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", sleeps.append)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, sleeps.append)
     assert provider.complete(configured, [{"role": "user", "content": "offline"}]) == "scripted answer"
     assert requests == [("https://provider.invalid/v1/chat/completions", "selected-model")] * 2
     assert sleeps == [0.25]
@@ -43,8 +44,8 @@ def test_transient_status_exhaustion_raises_after_three_attempts(configured, mon
         requests.append(kwargs["json"]["model"])
         return response(url, status)
 
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", sleeps.append)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, sleeps.append)
     with pytest.raises(httpx.HTTPStatusError) as error:
         provider.complete(configured, [])
     assert error.value.response.status_code == status
@@ -60,8 +61,8 @@ def test_nonretryable_client_error_is_not_replayed(configured, monkeypatch, stat
         requests.append(url)
         return response(url, status)
 
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", sleeps.append)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, sleeps.append)
     with pytest.raises(httpx.HTTPStatusError) as error:
         provider.complete(configured, [])
     assert error.value.response.status_code == status
@@ -76,8 +77,8 @@ def test_timeout_exhaustion_is_bounded_and_surfaces_the_error(configured, monkey
         attempts.append(kwargs["json"]["model"])
         raise error_type("scripted offline timeout", request=httpx.Request("POST", url))
 
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", sleeps.append)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, sleeps.append)
     with pytest.raises(error_type, match="scripted offline timeout"):
         provider.complete(configured, [])
     assert attempts == ["selected-model"] * 3
@@ -93,7 +94,7 @@ def test_read_timeout_can_recover_on_the_last_attempt(configured, monkeypatch):
             raise httpx.ReadTimeout("scripted timeout", request=httpx.Request("POST", url))
         return response(url, 200)
 
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", lambda _: None)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, lambda _: None)
     assert provider.complete(configured, []) == "scripted answer"
     assert attempts == ["selected-model"] * 3

@@ -1299,7 +1299,8 @@ function createStrictRoutes({ scenario, routeId }) {
     }),
     next_cursor: null,
   }))
-  add('GET', `/api/v2/projects/${PROJECT_ID}/experiment-results`, { limit: '200' }, () => ok({
+  // Results and the saved-analysis history use separate cursor page sizes.
+  for (const limit of ['100', '200']) add('GET', `/api/v2/projects/${PROJECT_ID}/experiment-results`, { limit }, () => ok({
     items: empty
       ? []
       : [

@@ -566,9 +566,9 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
           <label htmlFor="structure-residue-query">{language === 'zh' ? '残基与侧链' : 'Residue & side chain'}</label>
           <Input id="structure-residue-query" aria-label={language === 'zh' ? '残基编号' : 'Residue identifier'} placeholder="A:54" value={residueQuery} onChange={event => setResidueQuery(event.target.value)} className="w-24 font-mono" />
           <Button type="button" size="sm" variant="outline" onClick={() => {
-            const match = residueQuery.trim().match(/^([^:]+):(-?\d+)$/)
+            const match = residueQuery.trim().match(/^([^:]+):(-?\d+)([A-Za-z]?)$/)
             const viewer = viewerRef.current
-            const selected = Boolean(match && viewer && focusResidueById(viewer.plugin, match[1], Number(match[2])))
+            const selected = Boolean(match && viewer && focusResidueById(viewer.plugin, match[1], Number(match[2]), match[3]))
             setResidueNotice(selected ? (language === 'zh' ? `已选择 ${residueQuery} · 球棍侧链与邻域` : `Selected ${residueQuery} · side chain & surroundings`) : (language === 'zh' ? '未找到该残基，请输入链名:编号' : 'Residue not found; use chain:number'))
           }}>{language === 'zh' ? '查看侧链' : 'Show side chain'}</Button>
           <span className="text-text-secondary" role="status">{residueNotice || (language === 'zh' ? '按结构文件中的链名与残基编号定位' : 'Locate by author chain and residue numbering')}</span>

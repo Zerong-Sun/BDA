@@ -18,6 +18,7 @@ import type { Candidate } from '../../lib/schemas/candidate'
 import { useI18n } from '../../lib/i18n'
 
 interface AlphaFoldResultsProps {
+  summaryOnly?: boolean
   candidates: Candidate[]
   artifacts: Artifact[]
   onDownload: (artifact: Artifact) => void
@@ -44,6 +45,7 @@ function confidenceClass(plddt: number): 'veryHigh' | 'confident' | 'low' | 'ver
 
 export function AlphaFoldResults({
   candidates,
+  summaryOnly = false,
   artifacts,
   onDownload,
 }: AlphaFoldResultsProps) {
@@ -190,7 +192,7 @@ export function AlphaFoldResults({
             <h2 className="text-base font-semibold text-text-primary">{copy.title}</h2>
             <p className="mt-1 text-sm text-text-secondary">{zh ? '查看结构置信度、界面指标与可追溯的原始结果。' : 'Review structural confidence, interface metrics and traceable source files.'}</p>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button>
+          {!summaryOnly ? <Button type="button" size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button> : null}
           <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-text-secondary">
             {zh ? `可用预测 · ${rows.length} 条` : `Available predictions · ${rows.length}`}
           </span>
@@ -250,7 +252,7 @@ export function AlphaFoldResults({
         ) : null}
       </div>
 
-      <DataGrid
+      {summaryOnly ? <div className="p-4"><Button variant="outline" render={<Link to={`/candidates?project=${encodeURIComponent(rows[0].project_id)}${typeof rows[0].properties.source_dataset === 'string' ? `&dataset=${encodeURIComponent(rows[0].properties.source_dataset)}` : ''}`} />}>{zh ? '打开候选页比较、筛选与选择' : 'Compare, filter and select in Candidates'}</Button></div> : <DataGrid
         table={table}
         recordCount={rows.length}
         tableLayout={{ dense: true, headerBackground: true, headerBorder: true, rowBorder: true }}
@@ -260,7 +262,7 @@ export function AlphaFoldResults({
             <DataGridTable />
           </DataGridScrollArea>
         </DataGridContainer>
-      </DataGrid>
+      </DataGrid>}
     </article>
   )
 }

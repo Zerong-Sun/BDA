@@ -1,3 +1,4 @@
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useState } from 'react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -363,7 +364,7 @@ export function AgentRunDetail({
         {turns.data && turns.data.length > 0 ? (
           <ol className="space-y-2">
             {turns.data.map((turn) => (
-              <TranscriptTurn key={turn.id} turn={turn} />
+              <TranscriptTurn key={turn.id} turn={turn} projectId={projectId} />
             ))}
           </ol>
         ) : (
@@ -376,7 +377,7 @@ export function AgentRunDetail({
   )
 }
 
-function TranscriptTurn({ turn }: { turn: AgentTurn }) {
+function TranscriptTurn({ turn, projectId }: { turn: AgentTurn; projectId: string }) {
   const { t, format } = useI18n()
   const copy = t.copilot.agentRuns
   const roles: Record<string, string> = {
@@ -400,8 +401,9 @@ function TranscriptTurn({ turn }: { turn: AgentTurn }) {
         {roles[turn.role] ?? turn.role}
       </span>
       {turn.content ? (
-        <p className="mt-1 text-sm whitespace-pre-wrap break-words">{turn.content}</p>
+        <div className="mt-1 text-sm whitespace-pre-wrap break-words">{turn.role === 'tool' ? <Disclosure title={copy.roleTool}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{turn.content}</pre></Disclosure> : turn.content}</div>
       ) : null}
+      {turn.role === 'tool' ? <ToolEvidenceLazy projectId={projectId} calls={turn.tool_calls} content={turn.content} /> : null}
       {calls.length > 0 ? (
         <p className="mt-1 font-mono text-xs text-text-secondary">
           {format(copy.toolCalls, { names: calls.join(', ') })}

@@ -420,6 +420,14 @@ export type Alternative = {
  */
 export type AnalysisPreviewRequest = {
     /**
+     * Analysis Method
+     */
+    analysis_method?: 'measured_global' | 'instrument_kobs';
+    /**
+     * Baseline Mode
+     */
+    baseline_mode?: 'initial_point' | 'fitted_offset';
+    /**
      * Channel
      */
     channel?: string | null;
@@ -428,13 +436,31 @@ export type AnalysisPreviewRequest = {
      */
     content_base64: string;
     /**
+     * Correction Note
+     */
+    correction_note?: string | null;
+    /**
+     * Excluded Labels
+     */
+    excluded_labels?: Array<string>;
+    /**
      * Instrument
      */
     instrument: string;
     /**
+     * Reference Label
+     */
+    reference_label?: string | null;
+    /**
      * Sample Id
      */
     sample_id?: string | null;
+    /**
+     * Sample Mapping
+     */
+    sample_mapping?: {
+        [key: string]: string;
+    };
     /**
      * Subtract Background
      */
@@ -1389,17 +1415,47 @@ export type BenchValue = {
  */
 export type BliAnalysisRequest = {
     /**
+     * Analysis Method
+     */
+    analysis_method?: 'measured_global' | 'instrument_kobs';
+    /**
      * Artifact Id
      */
     artifact_id: string;
+    /**
+     * Baseline Mode
+     */
+    baseline_mode?: 'initial_point' | 'fitted_offset';
     /**
      * Candidate Id
      */
     candidate_id?: string | null;
     /**
+     * Correction Note
+     */
+    correction_note?: string | null;
+    /**
+     * Excluded Labels
+     */
+    excluded_labels?: Array<string>;
+    /**
+     * Reference Label
+     */
+    reference_label?: string | null;
+    /**
      * Sample Id
      */
     sample_id?: string | null;
+    /**
+     * Sample Mapping
+     */
+    sample_mapping?: {
+        [key: string]: string;
+    };
+    /**
+     * Supersedes Result Id
+     */
+    supersedes_result_id?: string | null;
     /**
      * T Assoc
      */

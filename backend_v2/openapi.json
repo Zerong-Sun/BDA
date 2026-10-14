@@ -738,6 +738,24 @@
       },
       "AnalysisPreviewRequest": {
         "properties": {
+          "analysis_method": {
+            "default": "measured_global",
+            "enum": [
+              "measured_global",
+              "instrument_kobs"
+            ],
+            "title": "Analysis Method",
+            "type": "string"
+          },
+          "baseline_mode": {
+            "default": "initial_point",
+            "enum": [
+              "initial_point",
+              "fitted_offset"
+            ],
+            "title": "Baseline Mode",
+            "type": "string"
+          },
           "channel": {
             "anyOf": [
               {
@@ -756,10 +774,42 @@
             "title": "Content Base64",
             "type": "string"
           },
+          "correction_note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Note"
+          },
+          "excluded_labels": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 384,
+            "title": "Excluded Labels",
+            "type": "array"
+          },
           "instrument": {
             "pattern": "^(bli|akta|enzyme)$",
             "title": "Instrument",
             "type": "string"
+          },
+          "reference_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Label"
           },
           "sample_id": {
             "anyOf": [
@@ -772,6 +822,14 @@
               }
             ],
             "title": "Sample Id"
+          },
+          "sample_mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 384,
+            "title": "Sample Mapping",
+            "type": "object"
           },
           "subtract_background": {
             "default": true,
@@ -2339,9 +2397,27 @@
       },
       "BliAnalysisRequest": {
         "properties": {
+          "analysis_method": {
+            "default": "measured_global",
+            "enum": [
+              "measured_global",
+              "instrument_kobs"
+            ],
+            "title": "Analysis Method",
+            "type": "string"
+          },
           "artifact_id": {
             "format": "uuid",
             "title": "Artifact Id",
+            "type": "string"
+          },
+          "baseline_mode": {
+            "default": "initial_point",
+            "enum": [
+              "initial_point",
+              "fitted_offset"
+            ],
+            "title": "Baseline Mode",
             "type": "string"
           },
           "candidate_id": {
@@ -2356,6 +2432,38 @@
             ],
             "title": "Candidate Id"
           },
+          "correction_note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Note"
+          },
+          "excluded_labels": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 384,
+            "title": "Excluded Labels",
+            "type": "array"
+          },
+          "reference_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Label"
+          },
           "sample_id": {
             "anyOf": [
               {
@@ -2366,6 +2474,26 @@
               }
             ],
             "title": "Sample Id"
+          },
+          "sample_mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 384,
+            "title": "Sample Mapping",
+            "type": "object"
+          },
+          "supersedes_result_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Result Id"
           },
           "t_assoc": {
             "anyOf": [

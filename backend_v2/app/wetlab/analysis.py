@@ -27,6 +27,7 @@ import math
 import uuid
 from typing import Any
 
+import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,7 +36,7 @@ from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
 from ..experiments.models import ExperimentResult
 from .diagnostics import check, finite_json, quality, trace_arrays
-from .kernels import akta, bli, calculators
+from .kernels import akta, bli, bli_kinetic, calculators
 
 #: Instrument files are small - a ForteBio CSV or a Unicorn export is a few MB.
 #: The cap is a guard against a mis-typed artifact id pulling a genome into
@@ -50,8 +51,8 @@ MAX_INSTRUMENT_BYTES = 64 * 1024 * 1024
 #: shows nothing more. Decimated by stride rather than averaged, because a
 #: smoothed trace would no longer be the recorded measurement.
 #:
-#: The series is returned, never stored: `result_metadata` keeps the fitted
-#: numbers, and the artifact remains the trace's one immutable copy.
+#: A decimated plot snapshot is stored with each BLI analysis version so a
+#: saved review preserves its overlays; the artifact retains the original bytes.
 TRACE_POINTS = 600
 
 
@@ -145,86 +146,148 @@ def _record(
 
 
 def analyse_bli(
-    session: Session,
-    project_id: uuid.UUID,
-    user_id: uuid.UUID,
-    artifact_id: uuid.UUID,
-    *,
-    sample_id: str | None = None,
-    t_assoc: float | None = None,
-    t_dissoc: float | None = None,
-    candidate_id: uuid.UUID | None = None,
+    session: Session, project_id: uuid.UUID, user_id: uuid.UUID, artifact_id: uuid.UUID, *,
+    sample_id: str | None = None, t_assoc: float | None = None, t_dissoc: float | None = None,
+    candidate_id: uuid.UUID | None = None, sample_mapping: dict[str, str] | None = None,
+    excluded_labels: list[str] | None = None, reference_label: str | None = None,
+    analysis_method: str = "measured_global", correction_note: str | None = None, baseline_mode: str = "initial_point",
+    supersedes_result_id: uuid.UUID | None = None,
 ) -> tuple[ExperimentResult, dict[str, Any]]:
-    """Fit KD from a ForteBio export.
-
-    `t_assoc`/`t_dissoc` are worth passing whenever the run declares them: the
-    kernel falls back to a heuristic that reads the phase boundary off the
-    smoothed curve, which is fine for exploration and not what you want behind
-    a recorded number.
-    """
+    """Append an analysis and its plot snapshot; never update the source or prior fit."""
     artifact = _load_artifact(session, project_id, artifact_id)
-    measurement, summary = analyse_bli_bytes(_read(artifact), sample_id=sample_id, t_assoc=t_assoc, t_dissoc=t_dissoc)
-    row = _record(
-        session, project_id=project_id, user_id=user_id, artifact=artifact, candidate_id=candidate_id, **measurement
+    if supersedes_result_id is not None:
+        prior = session.get(ExperimentResult, supersedes_result_id)
+        if (prior is None or prior.project_id != project_id or prior.source_artifact_id != artifact.id
+                or prior.experiment_type != "bli_affinity"):
+            raise DomainError("bli_lineage_invalid", "Previous analysis must belong to this project and raw artifact.", status_code=422)
+        if not correction_note or not correction_note.strip():
+            raise DomainError("bli_correction_note_required", "Explain the correction when superseding an analysis.", status_code=422)
+    measurement, summary = analyse_bli_bytes(
+        _read(artifact), sample_id=sample_id, t_assoc=t_assoc, t_dissoc=t_dissoc,
+        sample_mapping=sample_mapping, excluded_labels=excluded_labels, reference_label=reference_label,
+        analysis_method=analysis_method, correction_note=correction_note, baseline_mode=baseline_mode,
     )
+    summary["source_artifact_id"] = str(artifact.id)
+    summary["supersedes_result_id"] = str(supersedes_result_id) if supersedes_result_id else None
+    row = _record(session, project_id=project_id, user_id=user_id, artifact=artifact,
+                  candidate_id=candidate_id, **measurement)
+    row.result_metadata = {**row.result_metadata, "source_checksum_sha256": artifact.checksum_sha256,
+                           "source_artifact_id": str(artifact.id), "summary": summary,
+                           "supersedes_result_id": summary["supersedes_result_id"],
+                           "evidence_kind": summary["evidence_kind"]}
+    session.flush()
     return row, summary
 
 
 def analyse_bli_bytes(
-    data: bytes, *, sample_id: str | None = None, t_assoc: float | None = None, t_dissoc: float | None = None
+    data: bytes, *, sample_id: str | None = None, t_assoc: float | None = None, t_dissoc: float | None = None,
+    sample_mapping: dict[str, str] | None = None, excluded_labels: list[str] | None = None,
+    reference_label: str | None = None, analysis_method: str = "measured_global", correction_note: str | None = None, baseline_mode: str = "initial_point",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    curves = bli.parse_fortebio_csv(data)
+    if any(value is not None and not math.isfinite(value) for value in (t_assoc, t_dissoc)):
+        raise DomainError("bli_phase_invalid", "Supplied phase times must be finite seconds.", status_code=422)
+    try:
+        curves = bli.parse_bli_csv(data)
+    except (UnicodeError, ValueError) as error:
+        raise DomainError("bli_format_invalid", str(error), status_code=422) from error
     if not curves:
         raise DomainError("bli_no_curves", "That file contained no usable curves.", status_code=422)
-
+    if analysis_method not in {"measured_global", "instrument_kobs"}:
+        raise DomainError("bli_method_invalid", "Unknown BLI analysis method.", status_code=422)
+    if baseline_mode not in {"initial_point", "fitted_offset"}:
+        raise DomainError("bli_baseline_invalid", "Unknown baseline mode.", status_code=422)
+    labels = {curve.label for curve in curves}
+    mapping, excluded = sample_mapping or {}, set(excluded_labels or [])
+    if set(mapping)-labels or excluded-labels or (reference_label is not None and reference_label not in labels):
+        raise DomainError("bli_sensor_not_found", "Sample mapping, exclusions and reference must name source sensor labels.", status_code=422)
+    if any(not name.strip() for name in mapping.values()):
+        raise DomainError("bli_sample_mapping_invalid", "Mapped sample identities cannot be blank.", status_code=422)
+    for curve in curves:
+        curve.sample_id = mapping.get(curve.label, curve.sample_id)
     grouped = bli.group_by_sample(curves)
     if sample_id is not None and sample_id not in grouped:
-        raise DomainError(
-            "bli_sample_not_found",
-            f"No sample {sample_id!r} in that file. Present: {', '.join(sorted(grouped))}.",
-            status_code=422,
-        )
+        raise DomainError("bli_sample_not_found", f"No sample {sample_id!r} in that file. Present: {', '.join(sorted(grouped))}.", status_code=422)
     chosen = sample_id or max(grouped, key=lambda key: len(grouped[key]))
-    fit = bli.fit_kd(grouped[chosen], t_assoc=t_assoc, t_dissoc=t_dissoc)
-
-    # The five methods disagree on real data; `joint` is the global fit over all
-    # concentrations at once, which is the one to record when it converged.
-    primary = fit.get("joint") or fit.get("standard") or {}
-    kd = primary.get("kd") if isinstance(primary, dict) else None
-
-    measurement = dict(
-        experiment_type="bli_affinity",
-        params={
-            "sample_id": chosen,
-            "t_assoc": t_assoc,
-            "t_dissoc": t_dissoc,
-            "curve_count": len(grouped[chosen]),
-        },
-        results=fit,
-        analysis_version=bli.BLI_ANALYSIS_VERSION,
-        value=float(kd) if isinstance(kd, int | float) else None,
-        unit="nM" if isinstance(kd, int | float) else None,
-    )
-    summary = {
-        "sample_id": chosen,
-        "samples_available": sorted(grouped),
-        "kd_nM": kd,
-        "methods": {name: fit.get(name) for name in ("standard", "split", "joint", "steady", "mixed")},
-        "phase": fit.get("phase"),
-        "quality_control": fit.get("quality_control"),
-        # The sensorgrams themselves, so the browser can draw what was fitted
-        # rather than only the numbers that came out of it. A KD with no curve
-        # behind it cannot be judged.
-        "curves": [
-            {
-                "label": curve.label,
-                "conc_nM": curve.conc_nM,
-                "points": _decimate(curve.time, curve.response),
-            }
-            for curve in sorted(grouped[chosen], key=lambda item: item.conc_nM, reverse=True)
-        ],
+    selected = [curve for curve in grouped[chosen] if curve.label not in excluded]
+    reference = next((c for c in curves if c.label == reference_label), None)
+    if reference is not None and (reference.conc_nM != 0 or reference.label in excluded):
+        raise DomainError("bli_reference_invalid", "Reference must be a non-excluded zero-concentration sensor.", status_code=422)
+    source_format = curves[0].source_format
+    instrument = bli_kinetic.instrument_kinetics(selected) if source_format == "kinetic_triplets" else None
+    overlays: dict[str, Any] = {}
+    fit: dict[str, Any]
+    if source_format == "kinetic_triplets" and analysis_method == "instrument_kobs":
+        # Independent evidence path: invalid measured windows or optimizer inputs
+        # must not prevent reading exported instrument kinetics.
+        fit = {"joint": None, "phase": None}
+    elif source_format == "kinetic_triplets":
+        try:
+            fit, overlays = bli_kinetic.fit_measured(selected, t_assoc=t_assoc, t_dissoc=t_dissoc, reference=reference, baseline_mode=baseline_mode)
+        except ValueError as error:
+            raise DomainError("bli_processing_invalid", str(error), status_code=422) from error
+    else:
+        if analysis_method == "instrument_kobs":
+            raise DomainError("bli_instrument_kinetics_unavailable", "This format does not contain instrument kinetic parameters.", status_code=422)
+        if reference is not None:
+            raise DomainError("bli_reference_unsupported", "Explicit reference subtraction is supported for kinetic triplet exports.", status_code=422)
+        if baseline_mode != "initial_point":
+            raise DomainError("bli_baseline_unsupported", "Explicit fitted offsets are supported for kinetic triplet exports.", status_code=422)
+        fit = bli.fit_kd(selected, t_assoc=t_assoc, t_dissoc=t_dissoc)
+    primary = instrument if analysis_method == "instrument_kobs" else (fit.get("joint") or fit.get("standard") or {})
+    primary = primary or {}
+    kd = primary.get("kd")
+    evidence_kind = "instrument_reported_kinetics" if analysis_method == "instrument_kobs" else "measured_trace_fit"
+    qc = primary.get("quality_control") if analysis_method == "instrument_kobs" else fit.get("quality_control")
+    if analysis_method == "measured_global" and isinstance(kd, int | float) and instrument and instrument.get("kd"):
+        ratio = kd / instrument["kd"]
+        if (ratio > 2 or ratio < 0.5) and isinstance(qc, dict):
+            qc["checks"].append(check("instrument_refit_disagreement", "Measured-trace refit and instrument-derived KD differ by more than two-fold. Investigate model, phase, baseline and reference settings before accepting a quantitative conclusion.", ratio=ratio))
+    uncertainty = primary.get("uncertainty") or {
+        "kd_standard_error_nM": None, "confidence_interval_nM": None,
+        "reason": "Independent assay replicates and a validated residual/covariance model are unavailable.",
     }
-    return measurement, summary
+    processing = {"sample_mapping": mapping, "excluded_labels": sorted(excluded), "reference_label": reference_label,
+                  "correction_note": correction_note, "analysis_method": analysis_method,
+                  "baseline": ("instrument_parameters_no_trace_preprocessing" if analysis_method == "instrument_kobs" else
+                               baseline_mode if source_format == "kinetic_triplets" else "legacy_kernel"),
+                  "baseline_mode": baseline_mode, "reference_applied": reference is not None and analysis_method == "measured_global",
+                  "concentration_input_unit": "M" if source_format == "kinetic_triplets" else "nM",
+                  "concentration_analysis_unit": "nM", "time_unit": "s", "response_unit": "nm"}
+    fit = {**fit, "instrument_kobs": instrument, "quality_control": qc, "uncertainty": uncertainty,
+           "evidence_kind": evidence_kind, "selected_method": analysis_method}
+    measurement = dict(experiment_type="bli_affinity",
+                       params={"sample_id": chosen, "t_assoc": t_assoc, "t_dissoc": t_dissoc,
+                               "curve_count": len(selected), **processing},
+                       results=fit, analysis_version=bli.BLI_ANALYSIS_VERSION,
+                       value=float(kd) if isinstance(kd, int | float) and math.isfinite(kd) else None,
+                       unit="nM" if isinstance(kd, int | float) and math.isfinite(kd) else None)
+    # Without a mapping, discovery returns every sensor so users can name groups.
+    display = curves if source_format == "kinetic_triplets" and not mapping and sample_id is None else grouped[chosen]
+    summary = {"sample_id": chosen, "samples_available": sorted(grouped), "kd_nM": measurement["value"],
+               "source_format": source_format, "source_checksum_sha256": hashlib.sha256(data).hexdigest(),
+               "evidence_kind": evidence_kind, "selected_method": analysis_method, "processing": processing,
+               "uncertainty": uncertainty, "instrument_kinetics": instrument,
+               "methods": {name: fit.get(name) for name in ("standard", "split", "joint", "steady", "mixed", "instrument_kobs")},
+               "phase": fit.get("phase"), "quality_control": qc,
+               "curves": [{"label": c.label, "sample_id": c.sample_id, "conc_nM": c.conc_nM,
+                           "points": _decimate(c.time, c.response), "evidence_kind": "measured",
+                           "excluded": c.label in excluded, "acquisition": c.metadata,
+                           "instrument_fit_points": _decimate(c.time, c.instrument_fit) if c.instrument_fit is not None else [],
+                           "instrument_fit_r2": _instrument_fit_r2(c),
+                           "analysis_fit_points": _decimate(c.time, overlays[c.label]) if c.label in overlays else [],
+                           "analysis_fit_basis": "reference_subtracted" if reference_label else "measured",
+                           "processed_points": _decimate(c.time, c.response - np.interp(c.time, reference.time, reference.response)) if reference is not None and analysis_method == "measured_global" else [],
+                           } for c in sorted(display, key=lambda item: item.conc_nM, reverse=True)]}
+    return measurement, finite_json(summary)
+
+
+def _instrument_fit_r2(curve: bli.Curve) -> float | None:
+    if curve.instrument_fit is None:
+        return None
+    valid = np.isfinite(curve.response) & np.isfinite(curve.instrument_fit)
+    if np.sum(valid) < 2 or np.ptp(curve.response[valid]) == 0:
+        return None
+    return float(bli._r2_score(curve.response[valid], curve.instrument_fit[valid]))
 
 
 def analyse_akta(
@@ -444,6 +507,14 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
     if mapping is None:
         return None
     metric_key, unit = mapping
+    summary = result.result_metadata.get("summary", {})
+    metric_context = {
+        "analysis_version": result.result_metadata.get("analysis_version", ""), "qc_review": review,
+        "source_evidence_kind": result.result_metadata.get("evidence_kind", "measured"),
+        "selected_method": summary.get("selected_method"), "processing": summary.get("processing"),
+        "source_artifact_id": str(result.source_artifact_id) if result.source_artifact_id else None,
+        "source_checksum_sha256": result.result_metadata.get("source_checksum_sha256"),
+    }
 
     # The unique key is (candidate, metric, method, variant, condition). Method
     # is the experiment type so a KD from BLI and one from another assay do not
@@ -462,7 +533,7 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
         existing.value = float(result.value)
         existing.unit = result.unit or unit
         existing.source_experiment_result_id = result.id
-        existing.context = {**existing.context, "qc_review": review, "analysis_version": result.result_metadata.get("analysis_version", "")}
+        existing.context = {**existing.context, **metric_context}
         existing.version += 1
         session.flush()
         return existing
@@ -480,7 +551,7 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
         assessor="instrument",
         condition="",
         unit=result.unit or unit,
-        context={"analysis_version": result.result_metadata.get("analysis_version", ""), "qc_review": review},
+        context=metric_context,
         source_experiment_result_id=result.id,
     )
     session.add(metric)

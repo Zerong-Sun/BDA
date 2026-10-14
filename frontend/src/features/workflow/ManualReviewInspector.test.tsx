@@ -20,6 +20,18 @@ beforeEach(() => { vi.resetAllMocks(); useAppStore.setState({ language: 'en', ap
 afterEach(cleanup)
 
 describe('manual workflow review editing', () => {
+  it('saves observations independently of recommended gates and keeps evidence metadata', async () => {
+    const recommended = { ...node, parameters: { ...node.parameters, criteria_basis: 'case_recommendation', evidence_summary: 'Measured source available; identity pending.' } }
+    api.update.mockResolvedValue({ ...recommended, version: 2, parameters: { ...recommended.parameters, review_notes: 'Source hash verified.' } })
+    renderWithProviders(<ManualReviewInspector node={recommended} workflowVersion={7} readOnly={false} />)
+    expect(screen.getByText(/do not indicate a passing result/)).toBeInTheDocument()
+    expect(screen.getByText('Measured source available; identity pending.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Step observations and conclusions'), { target: { value: 'Source hash verified.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save review criteria' }))
+    await waitFor(() => expect(api.update).toHaveBeenCalled())
+    expect(api.update.mock.calls[0][2].parameters).toMatchObject({ acceptance_criteria: 'Check the primary source.', review_notes: 'Source hash verified.', criteria_basis: 'case_recommendation', review_status: 'pending_review' })
+    expect(api.update.mock.calls[0][2]).not.toHaveProperty('status')
+  })
   it('saves criteria with the original workflow version without recording completion or losing metadata', async () => {
     api.update.mockResolvedValue({ ...node, version: 2, parameters: { ...node.parameters, acceptance_criteria: 'Add controls.' } })
     renderWithProviders(<ManualReviewInspector node={node} workflowVersion={7} readOnly={false} />)

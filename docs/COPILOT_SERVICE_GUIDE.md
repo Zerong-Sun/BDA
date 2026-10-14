@@ -181,7 +181,7 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | `research-gap-repair` | `resolve_research_gaps` | 对精确 Research target 修复可获取资料，科学性缺口仍保留。 |
 | `workflow-planning` | `get_workflow_status`, `plan_workflow_route` | 查询工作流，读取确定性模板目录供模型比较；创建与提交仍走用户页面/API。 |
 | `wetlab-read` | `list_proteins`, `calculate_bench`, `compute_concentration`, `plan_dilution_series` | 读蛋白库；9 类标量计算，无实验记录写入。专用聊天只提供前两项，旧工具继续服务其他路径。 |
-| `wetlab-authoring` | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | 明确请求后提升候选为实验构建体，或分析已上传 artifact 并记录实验结果。 |
+| `wetlab-authoring` | `promote_candidate_to_bench`, `preview_bli_artifact`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | 只读预览校验过哈希的 BLI artifact；明确请求后提升候选为实验构建体，或分析已上传 artifact 并记录新版本实验结果。 |
 | `research-trace-authoring` | `attach_to_research_goal` | 明确请求后将已有结果、候选、构建体等关联研究目标。 |
 | `agent-orchestration` | `await_compute_job`, `spawn_subagent` | 仅后台 agent run：等待已存在作业、创建受父任务权限和深度限制的子任务。不是提交计算工具。 |
 | `chain-messaging` | `post_handoff`, `read_handoffs`, `request_decision` | 记录交接和向人提出决策请求；不能代人回答或确认。 |

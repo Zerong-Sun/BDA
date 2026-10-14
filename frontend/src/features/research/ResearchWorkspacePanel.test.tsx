@@ -76,6 +76,7 @@ function fixture(projectId = activeProjectId): NormalizedResearchWorkspace {
 
 describe('ResearchWorkspacePanel', () => {
   beforeEach(() => {
+    window.location.hash = ''
     activeProjectId = 'project-one'
     useAppStore.setState({ language: 'en' })
     getWorkspace.mockReset()
@@ -118,6 +119,25 @@ describe('ResearchWorkspacePanel', () => {
     expect(await screen.findByRole('link', { name: 'Open decision record' })).toHaveAttribute('href', '#/research?project=project-one&tab=timeline')
     expect(screen.queryByRole('button', { name: 'Show reasoning' })).not.toBeInTheDocument()
     expect(screen.getByText('Unique method title')).toBeInTheDocument()
+  })
+
+  it('opens the exact saved Bot report and preserves its review status', async () => {
+    window.location.hash = '#/research?project=project-one&tab=methods&knowledge=method-one'
+    const data = fixture()
+    data.methods[0].source = { review_status: 'pending_review' }
+    getWorkspace.mockResolvedValue(data)
+    renderWithProviders(<ResearchWorkspacePanel view="methods" />)
+    expect(await screen.findByText('Unique method body')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unique method title' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Recorded review status: pending review')).toBeInTheDocument()
+    expect(screen.queryByText('knowledge operations')).not.toBeInTheDocument()
+  })
+
+  it('reports an unavailable linked report instead of opening an unrelated entry', async () => {
+    window.location.hash = '#/research?project=project-one&tab=methods&knowledge=other-project-report'
+    renderWithProviders(<ResearchWorkspacePanel view="methods" />)
+    expect(await screen.findByText(/The linked report was not found/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unique method title' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('renders the saved structure in the 3D viewer', async () => {

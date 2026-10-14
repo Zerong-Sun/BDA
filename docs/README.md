@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-10-11（RC2 发布、全平台能力升级与导航入口归整）
+最后核验：2026-10-14（新增版本化仪器分析、Bot 证据与结构复核指南入口）
 
 权威范围：公开 BDA 软件、PD1 演示包与部署文档的入口及文档分类。
 
@@ -48,6 +48,7 @@
 
 - [研究决策中心](RESEARCH_DECISION_CENTER.md)
 - [仪器分析与质控审核](WETLAB_QUALITY_CONTROL.md)
+- [版本化仪器分析、Bot 证据与结构复核](VERSIONED_INSTRUMENT_BOT_WORKFLOW.md)
 - [可核验的研究交付包](RESEARCH_DELIVERY_BUNDLES.md)
 - [文献整理开源方法调研与论据工作台](LITERATURE_EVIDENCE_WORKBENCH.md)
 - [研究工具能力、输入与来源限制](RESEARCH_TOOL_CAPABILITIES.md)

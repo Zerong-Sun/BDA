@@ -1,7 +1,7 @@
 import { ModelResultGuideLibrary } from '../features/results/ModelResultGuide'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { PackageIcon } from '@phosphor-icons/react'
 import { listExperimentResults } from '../lib/api/experiments'
 import { createDeliveryPackage, getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
@@ -30,6 +30,9 @@ import { Alert, AlertDescription } from '@/components/reui/alert'
 import { isDemoProject } from '../features/tour'
 import { useProjectAccess } from '../lib/hooks/useProjectAccess'
 import { useAppStore } from '../lib/store/appStore'
+
+const ArtifactEvidence = lazy(() => import('../features/results/ArtifactEvidence').then((module) => ({ default: module.ArtifactEvidence })))
+const SavedInstrumentReviews = lazy(() => import('../features/lab/SavedInstrumentReviews').then((module) => ({ default: module.SavedInstrumentReviews })))
 
 function ResultsMetricsSkeleton() {
   return (
@@ -206,7 +209,20 @@ export function ResultsPage() {
         }
       />
 
-      <ModelResultGuideLibrary />
+      {searchParams.get('artifact') ? <Suspense fallback={null}><ArtifactEvidence projectId={projectId} artifactId={searchParams.get('artifact')!} residues={searchParams.get('residues')} /></Suspense> : null}
+      <AppFrame className="mb-5" panelClassName="space-y-3 p-4">
+        <p className="text-sm text-text-secondary">{zh ? '在此审阅实测证据、计算证据与分析结论。候选页负责设计、筛选和选择。' : 'Review measured evidence, computational evidence and conclusions here. Use Candidates to manage designs, filtering and selection.'}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button render={<Link to={`/lab?project=${encodeURIComponent(projectId)}&section=analysis`} />}>{zh ? '上传原始实验文件并分析' : 'Upload raw experiment and analyse'}</Button>
+          <Button variant="outline" render={<Link to={`/candidates?project=${encodeURIComponent(projectId)}${candidateParam ? `&candidate=${encodeURIComponent(candidateParam)}` : ''}`} />}>{zh ? '管理候选与选择' : 'Manage candidates and selection'}</Button>
+          <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=methods`} />}>{zh ? '阅读已保存的讨论报告' : 'Read saved discussion reports'}</Button>
+          <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=timeline`} />}>{zh ? '查看决策记录' : 'Review decision record'}</Button>
+        </div>
+      </AppFrame>
+      <AppFrame className="mb-5" panelClassName="p-4">
+        <Suspense fallback={<p>{zh ? '加载分析视图…' : 'Loading analyses…'}</p>}><SavedInstrumentReviews key={projectId} projectId={projectId} autoLoad /></Suspense>
+      </AppFrame>
+      <Disclosure className="mb-5" title={zh ? '计算指标释义' : 'Computational metric guide'}><ModelResultGuideLibrary /></Disclosure>
 
       {isDemoReferenceProject ? (
         <div className="mb-5">
@@ -250,7 +266,7 @@ export function ResultsPage() {
           const groupArtifacts = artifacts.filter((a) => source
             ? a.lineage.package_id === source || keys.has(String(a.lineage.candidate_key ?? ''))
             : !a.lineage.package_id || keys.has(String(a.lineage.candidate_key ?? '')))
-          const panel = <AlphaFoldResults candidates={group} artifacts={groupArtifacts} onDownload={(a) => void handleArtifactDownload(a.id)} />
+          const panel = <AlphaFoldResults summaryOnly candidates={group} artifacts={groupArtifacts} onDownload={(a) => void handleArtifactDownload(a.id)} />
           return source ? <div key={source}>
             <h2 className="mb-2 text-sm font-semibold">{zh ? '导入数据集' : 'Imported dataset'} · {source}</h2>
             <p className="mb-3 text-sm text-text-secondary">{zh ? '上游已筛选子集；以下统计仅包含该数据集，不能推断总体通过率。' : 'An upstream-selected subset; statistics cover this dataset only, not population success rates.'}</p>
@@ -259,18 +275,20 @@ export function ResultsPage() {
             <div className="mt-3">{panel}</div>
           </Disclosure> : <div key="legacy">{panel}</div>
         })}
+        <Disclosure className="mb-5" title={zh ? 'Rosetta 计算证据与原始结果' : 'Rosetta computational evidence and source results'}>
         <RosettaResults
           candidates={candidates}
           artifacts={artifacts}
           onDownload={(artifact) => void handleArtifactDownload(artifact.id)}
         />
+        </Disclosure>
       </ApiState>
 
       {hasImported ? <p className="mb-4 rounded-lg border border-border-soft bg-surface-2 p-4 text-sm">
         {zh ? `导入的 ${nativeCandidates.length} 条候选关联实验读数：${nativeReadouts.length} 条。项目历史实验与交付记录在下方单独查看。` : `${nativeCandidates.length} imported candidates have ${nativeReadouts.length} linked experimental readouts. Project history is shown separately below.`}
       </p> : null}
       <div data-tour-id="results-history">
-      <Disclosure key={`experiment-history-${projectId}-${hasImported}`} defaultOpen={!hasImported} className="mb-5" title={zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}>
+      <Disclosure key={`experiment-history-${projectId}-${hasImported}`} defaultOpen className="mb-5" title={zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}>
       <div data-tour-id="results-metrics">
       <ApiState
         isLoading={summaryLoading}

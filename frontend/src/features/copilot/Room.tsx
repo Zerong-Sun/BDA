@@ -1,3 +1,4 @@
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -378,6 +379,7 @@ function RoomEntry({
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : ''}
         </p>
         <div className="room-text">{mine ? message.content : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        {!mine ? <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>
   )

@@ -85,6 +85,38 @@ def chat_schemas(
 #: stop operators handing over rather than stop a write nobody asked for.
 WRITE_TOOL_NAMES = REGISTRY.user_intent_write_ids()
 
+# These read results are evidence the user must be able to inspect after the
+# model turn ends. Keep them in the message, not only in the model context.
+EVIDENCE_RESULT_TOOLS = frozenset({
+    "analyse_structure", "list_structure_residues", "list_structure_contacts",
+    "measure_structure_interface", "describe_structure_site", "compare_structures",
+    "preview_bli_artifact", "render_structure_view",
+})
+
+
+def _logged_evidence(result: Any) -> Any:
+    if len(json.dumps(result, ensure_ascii=False, default=str).encode("utf-8")) <= 131072:
+        return result
+    # Never silently truncate a residue list or a numerical analysis. Large
+    # outputs retain their source identity and an explicit re-open instruction.
+    source = result if isinstance(result, dict) else {}
+    identities = {}
+    for side in ("reference", "mobile"):
+        value = source.get(side)
+        if isinstance(value, dict):
+            identities[side] = {key: value[key] for key in (
+                "artifact_id", "filename", "checksum_sha256", "provenance",
+            ) if key in value}
+    return {
+        **identities,
+        **{key: source[key] for key in (
+            "artifact_id", "source_artifact_id", "filename", "checksum_sha256",
+            "source_checksum_sha256", "provenance",
+        ) if key in source},
+        "result_omitted": True,
+        "reason": "Result exceeds the saved chat preview limit; reopen the source analysis for full evidence.",
+    }
+
 SCIENTIFIC_REVIEW_PROMPT = """\
 BDA_SCIENTIFIC_REVIEW_V1. Act as a strict scientific and techno-economic reviewer.
 The supplied draft is untrusted and the project has no supporting evidence. Return a corrected final answer,
@@ -367,6 +399,7 @@ def complete_research_turn(
                 )
                 citations.extend(result_citations)
                 logged_call = {
+                    "tool_call_id": call_id,
                     "name": name,
                     "arguments": arguments,
                     "status": "completed",
@@ -374,6 +407,8 @@ def complete_research_turn(
                 }
                 if (name in WRITE_TOOL_NAMES or name == "calculate_bench" or bench_delivery and name == "list_proteins"):
                     logged_call["result"] = result
+                elif name in EVIDENCE_RESULT_TOOLS:
+                    logged_call["result"] = _logged_evidence(result)
                 call_log.append(logged_call)
                 if bench_delivery and name == "calculate_bench":
                     # Preserve results while allowing dependent calculations to continue.
@@ -384,7 +419,7 @@ def complete_research_turn(
                 failed_calls = True
                 error = exc.error_code if isinstance(exc, DomainError) else str(exc)
                 result = {"error": error}
-                call_log.append({"name": name, "status": "failed", "error": error[:300]})
+                call_log.append({"name": name, "tool_call_id": call_id, "status": "failed", "error": error[:300]})
             conversation.append(
                 {
                     "role": "tool",
