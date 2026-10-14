@@ -29,6 +29,7 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
 import { localizeStatusLabel } from '../../components/ui/statusLabel'
+import { currentRole } from '../research/jsonHelpers'
 import { projectText } from '../../lib/i18n/projectText'
 
 interface ProjectChooserProps {
@@ -63,6 +64,7 @@ export function ProjectChooser({
   const queryClient = useQueryClient()
   const { visibleProjects, projectId, setProjectId } = useProjectContext()
   const appMode = useAppStore((state) => state.appMode)
+  const viewer = currentRole() === 'viewer'
   const selectedProject = visibleProjects.find((project) => project.id === projectId) ?? null
   const projectDelete = useDeleteProjectLifecycle()
   const [creatingInternal, setCreatingInternal] = useState(false)
@@ -160,7 +162,7 @@ export function ProjectChooser({
             type="button"
             variant="outline"
             className="self-end"
-            disabled={appMode === 'demo'}
+            disabled={viewer || appMode === 'demo'}
             onClick={() => setCreating(true)}
           >
             <FolderPlus aria-hidden="true" />
@@ -179,7 +181,7 @@ export function ProjectChooser({
               type="button"
               variant="destructive"
               size="sm"
-              disabled={appMode === 'demo' || projectDelete.isPending}
+              disabled={viewer || appMode === 'demo' || projectDelete.isPending}
               onClick={confirmDelete}
             >
               {projectDelete.isPending && projectDelete.deletingProjectId === selectedProject.id ? (
@@ -211,7 +213,7 @@ export function ProjectChooser({
         ) : null}
       </AppFrame>
 
-      <Dialog open={creating} onOpenChange={setCreating}>
+      <Dialog open={creating && !viewer} onOpenChange={setCreating}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t.projects.projectChooser.createProject}</DialogTitle>

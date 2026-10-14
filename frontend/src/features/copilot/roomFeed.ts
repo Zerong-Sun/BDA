@@ -20,9 +20,10 @@ import { LIVE_RUN_STATUSES } from '../../lib/api/agentRuns'
 export const copilotRoomQueryKey = (projectId: string | null) =>
   ['copilot', 'room', projectId] as const
 
-/** A task entry that can still move on its own, so the room keeps looking. */
+/** Pending messages also need a polling backstop after a reload or SSE loss. */
 function isLiveEntry(entry: RoomEvent): boolean {
-  return Boolean(entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
+  return entry.message?.status === 'pending'
+    || Boolean(entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
 }
 
 export function useCopilotRoom(projectId: string | null, limit = 100) {
@@ -39,9 +40,8 @@ export function useCopilotRoom(projectId: string | null, limit = 100) {
       })
       return data.items
     },
-    // Messages arrive over the chat stream and are refetched when a turn ends.
-    // A task moves because a worker moved it, with nothing to stream here, so a
-    // room holding a live task polls - and stops as soon as none is live.
+    // A pending turn or task can finish without a connected stream. Poll until
+    // every visible entry settles, including after a browser reload.
     refetchInterval: (query) => (query.state.data ?? []).some(isLiveEntry) ? 4000 : false,
   })
 }

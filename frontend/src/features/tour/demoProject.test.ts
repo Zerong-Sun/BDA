@@ -33,6 +33,13 @@ describe('findDemoProject', () => {
     expect(findDemoProject([project({ id: 'ordinary', status: 'running' })])).toBeUndefined()
   })
 
+  it('skips trashed demo copies and selects a usable demo', () => {
+    const trashed = project({ id: 'old-demo', source_project_key: 'PD1', status: 'trashed' })
+    const active = project({ id: 'active-demo', source_project_key: 'PD1' })
+    expect(findDemoProject([trashed, active])).toBe(active)
+    expect(findDemoProject([trashed])).toBeUndefined()
+  })
+
   it('does not treat a real project opened by URL as a demo', () => {
     expect(
       isDemoProject(

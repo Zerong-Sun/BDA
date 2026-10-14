@@ -1,10 +1,10 @@
 import { ModelResultGuideLibrary } from '../features/results/ModelResultGuide'
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router'
+import { lazy, Suspense, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router'
 import { PackageIcon } from '@phosphor-icons/react'
 import { listExperimentResults } from '../lib/api/experiments'
-import { getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
+import { createDeliveryPackage, getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
 import { interpretResults, type InterpretationReasoning } from '../lib/api/copilot'
 import { InterpretationCard } from '../components/ui/InterpretationCard'
 import { downloadArtifact, getArtifact } from '../lib/api/artifacts'
@@ -25,8 +25,14 @@ import { ApiState } from '../components/ui/ApiState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../components/ui/AppFrame'
+import { Disclosure } from '../components/ui/Disclosure'
 import { Alert, AlertDescription } from '@/components/reui/alert'
 import { isDemoProject } from '../features/tour'
+import { useProjectAccess } from '../lib/hooks/useProjectAccess'
+import { useAppStore } from '../lib/store/appStore'
+
+const ArtifactEvidence = lazy(() => import('../features/results/ArtifactEvidence').then((module) => ({ default: module.ArtifactEvidence })))
+const SavedInstrumentReviews = lazy(() => import('../features/lab/SavedInstrumentReviews').then((module) => ({ default: module.SavedInstrumentReviews })))
 
 function ResultsMetricsSkeleton() {
   return (
@@ -43,14 +49,22 @@ function ResultsMetricsSkeleton() {
 }
 
 export function ResultsPage() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const zh = language === 'zh'
   const { projectId, activeProject } = useProjectContext()
+  const access = useProjectAccess(projectId)
+  const demoMode = useAppStore((state) => state.appMode === 'demo')
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const showToast = useToastStore((s) => s.show)
   const [interpretation, setInterpretation] = useState<InterpretationReasoning | null>(null)
   const candidateParam = searchParams.get('candidate')?.trim() || null
   const isDemoReferenceProject = Boolean(activeProject && isDemoProject(activeProject))
+  const createPackage = useMutation({
+    mutationFn: () => createDeliveryPackage(projectId, `${activeProject?.name || 'Research'} · ${new Date().toISOString().slice(0, 10)}`),
+    onSuccess: (data) => { queryClient.setQueryData(['delivery-package', data.project_id], data) },
+    onError: (error) => showToast(error instanceof Error ? error.message : (zh ? '创建失败' : 'Could not create delivery'), 'error'),
+  })
 
   const {
     data: results = [],
@@ -86,6 +100,7 @@ export function ResultsPage() {
     queryKey: ['delivery-package', projectId],
     queryFn: () => getDeliveryPackageOrNull(projectId),
     enabled: Boolean(projectId),
+    refetchInterval: (query) => query.state.data?.status === 'pending' ? 2000 : false,
   })
 
   const {
@@ -100,6 +115,15 @@ export function ResultsPage() {
     enabled: Boolean(projectId),
   })
   const candidates = candidatePage?.items ?? []
+  const sourceGroups = new Map<string, typeof candidates>()
+  for (const candidate of candidates) {
+    const source = typeof candidate.properties.source_dataset === 'string' ? candidate.properties.source_dataset : ''
+    sourceGroups.set(source, [...(sourceGroups.get(source) ?? []), candidate])
+  }
+  const nativeCandidates = candidates.filter((c) => Boolean(c.properties.source_dataset))
+  const nativeIds = new Set(nativeCandidates.flatMap((c) => [c.id, c.candidate_key]))
+  const nativeReadouts = results.filter((r) => nativeIds.has(r.candidate_id ?? '') || nativeIds.has(r.candidate_ref ?? ''))
+  const hasImported = nativeCandidates.length > 0
 
   const {
     data: artifacts = [],
@@ -185,7 +209,20 @@ export function ResultsPage() {
         }
       />
 
-      <ModelResultGuideLibrary />
+      {searchParams.get('artifact') ? <Suspense fallback={null}><ArtifactEvidence projectId={projectId} artifactId={searchParams.get('artifact')!} residues={searchParams.get('residues')} /></Suspense> : null}
+      <AppFrame className="mb-5" panelClassName="space-y-3 p-4">
+        <p className="text-sm text-text-secondary">{zh ? '在此审阅实测证据、计算证据与分析结论。候选页负责设计、筛选和选择。' : 'Review measured evidence, computational evidence and conclusions here. Use Candidates to manage designs, filtering and selection.'}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button render={<Link to={`/lab?project=${encodeURIComponent(projectId)}&section=analysis`} />}>{zh ? '上传原始实验文件并分析' : 'Upload raw experiment and analyse'}</Button>
+          <Button variant="outline" render={<Link to={`/candidates?project=${encodeURIComponent(projectId)}${candidateParam ? `&candidate=${encodeURIComponent(candidateParam)}` : ''}`} />}>{zh ? '管理候选与选择' : 'Manage candidates and selection'}</Button>
+          <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=methods`} />}>{zh ? '阅读已保存的讨论报告' : 'Read saved discussion reports'}</Button>
+          <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=timeline`} />}>{zh ? '查看决策记录' : 'Review decision record'}</Button>
+        </div>
+      </AppFrame>
+      <AppFrame className="mb-5" panelClassName="p-4">
+        <Suspense fallback={<p>{zh ? '加载分析视图…' : 'Loading analyses…'}</p>}><SavedInstrumentReviews key={projectId} projectId={projectId} autoLoad /></Suspense>
+      </AppFrame>
+      <Disclosure className="mb-5" title={zh ? '计算指标释义' : 'Computational metric guide'}><ModelResultGuideLibrary /></Disclosure>
 
       {isDemoReferenceProject ? (
         <div className="mb-5">
@@ -224,18 +261,34 @@ export function ResultsPage() {
           void refetchArtifacts()
         }}
       >
-        <AlphaFoldResults
-          candidates={candidates}
-          artifacts={artifacts}
-          onDownload={(artifact) => void handleArtifactDownload(artifact.id)}
-        />
+        {[...sourceGroups].sort(([a], [b]) => Number(!a) - Number(!b) || a.localeCompare(b)).map(([source, group]) => {
+          const keys = new Set(group.map((c) => c.candidate_key))
+          const groupArtifacts = artifacts.filter((a) => source
+            ? a.lineage.package_id === source || keys.has(String(a.lineage.candidate_key ?? ''))
+            : !a.lineage.package_id || keys.has(String(a.lineage.candidate_key ?? '')))
+          const panel = <AlphaFoldResults summaryOnly candidates={group} artifacts={groupArtifacts} onDownload={(a) => void handleArtifactDownload(a.id)} />
+          return source ? <div key={source}>
+            <h2 className="mb-2 text-sm font-semibold">{zh ? '导入数据集' : 'Imported dataset'} · {source}</h2>
+            <p className="mb-3 text-sm text-text-secondary">{zh ? '上游已筛选子集；以下统计仅包含该数据集，不能推断总体通过率。' : 'An upstream-selected subset; statistics cover this dataset only, not population success rates.'}</p>
+            {panel}
+          </div> : hasImported ? <Disclosure key="legacy" className="mb-5 rounded-lg border border-border-soft p-4" title={zh ? '其他项目记录（不计入导入数据统计）' : 'Other project records (excluded from imported statistics)'}>
+            <div className="mt-3">{panel}</div>
+          </Disclosure> : <div key="legacy">{panel}</div>
+        })}
+        <Disclosure className="mb-5" title={zh ? 'Rosetta 计算证据与原始结果' : 'Rosetta computational evidence and source results'}>
         <RosettaResults
           candidates={candidates}
           artifacts={artifacts}
           onDownload={(artifact) => void handleArtifactDownload(artifact.id)}
         />
+        </Disclosure>
       </ApiState>
 
+      {hasImported ? <p className="mb-4 rounded-lg border border-border-soft bg-surface-2 p-4 text-sm">
+        {zh ? `导入的 ${nativeCandidates.length} 条候选关联实验读数：${nativeReadouts.length} 条。项目历史实验与交付记录在下方单独查看。` : `${nativeCandidates.length} imported candidates have ${nativeReadouts.length} linked experimental readouts. Project history is shown separately below.`}
+      </p> : null}
+      <div data-tour-id="results-history">
+      <Disclosure key={`experiment-history-${projectId}-${hasImported}`} defaultOpen className="mb-5" title={zh ? '项目实验与交付记录' : 'Project experiments and deliveries'}>
       <div data-tour-id="results-metrics">
       <ApiState
         isLoading={summaryLoading}
@@ -250,7 +303,9 @@ export function ResultsPage() {
 
       <AppFrame className="mb-5" panelClassName="p-4 text-sm text-text-secondary break-words">
         {summary
-          ? `${summary.experiment_result_count} results · ${summary.passed_result_count} pass · ${summary.failed_result_count} fail`
+          ? zh
+            ? `${summary.experiment_result_count} 条结果 · ${summary.passed_result_count} 条通过 · ${summary.failed_result_count} 条未通过`
+            : `${summary.experiment_result_count} results · ${summary.passed_result_count} pass · ${summary.failed_result_count} fail`
           : t.resultsExt.page.experimentSummaryEmpty}
       </AppFrame>
 
@@ -287,12 +342,17 @@ export function ResultsPage() {
           >
           <DeliveryPackage
             packageData={deliveryPackage ?? null}
+            onCreate={() => createPackage.mutate()}
+            creating={createPackage.isPending}
+            writable={!demoMode && access.data?.permissions.write === true}
             loading={packageLoading}
           />
           </ApiState>
         </div>
       </div>
 
+      </Disclosure>
+      </div>
       <NextStep stage="results" />
     </section>
   )

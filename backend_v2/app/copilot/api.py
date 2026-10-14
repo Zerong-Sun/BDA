@@ -27,6 +27,7 @@ from .capabilities import (
     normalize_capabilities,
 )
 from .models import CopilotAgentRun, CopilotConfig, CopilotMcpSession
+from .procedural_skills import ProceduralSkillDetail, ProceduralSkillSummary, catalog, require_skill
 from .provider import complete as complete_with_provider
 from .provider import credential_available
 from .provider_selection import select_provider
@@ -147,6 +148,17 @@ def list_skills(user: User = Depends(current_user)) -> list[SkillResponse]:
     return SKILLS
 
 
+@router.get("/procedural-skills", response_model=list[ProceduralSkillSummary])
+def list_procedural_skills(user: User = Depends(current_user)) -> list[ProceduralSkillSummary]:
+    """Bundled scientific methods. These do not grant project capabilities."""
+    return [ProceduralSkillSummary.model_validate(item.model_dump(exclude={"instructions"})) for item in catalog()]
+
+
+@router.get("/procedural-skills/{skill_id}", response_model=ProceduralSkillDetail)
+def get_procedural_skill(skill_id: str, user: User = Depends(current_user)) -> ProceduralSkillDetail:
+    return require_skill(skill_id)
+
+
 @router.get("/bots", response_model=list[BotResponse])
 def list_bots(user: User = Depends(current_user)) -> list[BotResponse]:
     """The roster, in chain order.
@@ -212,11 +224,15 @@ def post_chat(
         },
         intent=payload.intent,
     )
-    return ChatAccepted(
+    accepted = ChatAccepted(
         operation_id=operation.id,
         conversation_id=conversation.id,
         message=MessageResponse.model_validate(message),
     )
+    # The request-scoped session dependency exits after the response is sent.
+    # A 202 must already have a durable resource and its outbox operation.
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/conversations", response_model=ConversationPage)
@@ -596,7 +612,9 @@ def start_agent_run(
 ) -> AgentRunAccepted:
     project = require_project(session, payload.project_id, user)
     run, operation = start_agent_run_service(session, project, user, payload)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/agent-runs", response_model=AgentRunPage)
@@ -819,7 +837,9 @@ def continue_agent_run(
     if expected != run.version:
         raise DomainError("version_conflict", "The task changed. Reload it before continuing.", status_code=412)
     operation = continue_service(session, run, user, payload.message, payload.authorized_writes)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/task-readiness", response_model=TaskReadinessResponse)

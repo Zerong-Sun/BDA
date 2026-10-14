@@ -34,6 +34,7 @@ export async function startAgentRun(body: {
   service_kind?: 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation' | 'custom'
   authorized_writes?: string[]
   skills?: string[]
+  procedural_skills?: string[] | null
   max_turns?: number
   max_cost_usd_cents?: number | null
 }) {

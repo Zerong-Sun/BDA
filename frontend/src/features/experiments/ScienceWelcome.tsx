@@ -13,8 +13,8 @@ export function ScienceWelcome() {
   return <section className="science-welcome">
     <div>
       <p className="science-eyebrow">BIGO / AI FOR SCIENCE</p>
-      <h1>{zh ? <>从一个问题，<br />开始研究。</> : <>Your next discovery<br />starts with a question.</>}</h1>
-      <p className="science-intro">{zh ? '提出目标，与研究 Bot 协作。在证据、结构和结果之间，找到下一步。' : 'Set a goal. Work with your research Bots. Find the next step in evidence, structures and results.'}</p>
+      <h1>{zh ? <>选择项目，<br />开始研究。</> : <>Open a project.<br />Start your research.</>}</h1>
+      <p className="science-intro">{zh ? '整理证据、规划计算、复核结果。选择项目后，可向研究团队分配任务。' : 'Review evidence, plan computation, and check results. Select a project to give the research team a task.'}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button type="button" className="science-primary" render={<Link to={`/bots${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`} />}>
           {zh ? '进入研究团队' : 'Open research team'}<ArrowUpRightIcon />

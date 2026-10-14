@@ -4,6 +4,9 @@ import { MolScriptBuilder as MS } from 'molstar/lib/mol-script/language/builder'
 import { Script } from 'molstar/lib/mol-script/script'
 import { StructureElement, StructureProperties, StructureSelection } from 'molstar/lib/mol-model/structure'
 import { Color } from 'molstar/lib/mol-util/color'
+import { ProteinBackboneAtoms } from 'molstar/lib/mol-model/structure/model/types'
+import { SetUtils } from 'molstar/lib/mol-util/set'
+import { OrderedSet } from 'molstar/lib/mol-data/int'
 import { apiAuthorizationHeaders } from '../../lib/api/client'
 import {
   type ColorPreset,
@@ -80,12 +83,18 @@ export async function applyVisualPreset(
   await plugin.managers.structure.component.clear(hierarchy.structures)
 
   for (const { cell } of snapshot) {
-    const selection = selectedChain ? buildChainSelection(cell.obj?.data, selectedChain) : undefined
-    await plugin.builders.structure.representation.addRepresentation(cell, {
+    // Representations must belong to a component. Root representations are not
+    // removed by component.clear, so switching presets used to stack old views.
+    const component = selectedChain
+      ? await plugin.builders.structure.tryCreateComponentFromExpression(cell, MS.struct.generator.atomGroups({
+        'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), selectedChain]),
+      }), 'bda-view', { label: `Chain ${selectedChain}` })
+      : await plugin.builders.structure.tryCreateComponentStatic(cell, 'all', { label: 'Structure' })
+    if (!component) continue
+    await plugin.builders.structure.representation.addRepresentation(component, {
       type: reprType,
       color: colorType,
       typeParams: {},
-      ...(selection ? { selection } : {}),
     })
   }
 }
@@ -112,8 +121,8 @@ export async function resetCamera(plugin: PluginContext): Promise<void> {
 export async function applyResidueHighlights(
   plugin: PluginContext,
   residues: HighlightedResidue[],
-): Promise<void> {
-  if (!residues.length) return
+  options: { sideChainsOnly?: boolean; focus?: boolean; labels?: boolean } = {},
+): Promise<{ residues: HighlightedResidue[]; atomCount: number } | undefined> {
 
   const hierarchy = plugin.managers.structure.hierarchy.current
   if (!hierarchy.structures.length) return
@@ -122,47 +131,68 @@ export async function applyResidueHighlights(
   const structureData = structure.cell?.obj?.data
   if (!structureData) return
 
-  const selection = buildResidueSelection(structureData, residues)
-  if (!selection || StructureSelection.isEmpty(selection)) return
+  const old = (structure.components ?? []).filter(component => component.cell.transform.tags?.includes('structure-component-bda-residue-highlight'))
+  if (old.length) await plugin.managers.structure.hierarchy.remove(old)
+  if (!residues.length) return
 
-  await plugin.builders.structure.representation.addRepresentation(structure.cell, {
+  const component = await plugin.builders.structure.tryCreateComponentFromExpression(
+    structure.cell, buildResidueQuery(residues, options.sideChainsOnly), 'bda-residue-highlight', { label: options.sideChainsOnly ? 'Selected side chains' : 'Selected residues' },
+  )
+  if (!component) return
+
+  await plugin.builders.structure.representation.addRepresentation(component, {
     type: 'ball-and-stick',
     color: 'uniform',
-    colorParams: { value: Color(0xff6600) },
-    typeParams: { alpha: 1 },
-    selection,
+    colorParams: { value: Color(0xe83e9b) },
+    typeParams: { alpha: 1, sizeFactor: 0.35 },
   })
+  const data = component.cell?.obj?.data
+  if (!data) return
+  const found = new Map<string, HighlightedResidue>()
+  for (const unit of data.units) for (let index = 0; index < OrderedSet.size(unit.elements); index++) {
+    const element = OrderedSet.getAt(unit.elements, index)
+    const location = StructureElement.Location.create(data, unit, element)
+    const chainId = StructureProperties.chain.auth_asym_id(location)
+    const seq = StructureProperties.residue.auth_seq_id(location)
+    const insertionCode = StructureProperties.residue.pdbx_PDB_ins_code(location)
+    const name = StructureProperties.atom.label_comp_id(location)
+    found.set(`${chainId}:${seq}:${insertionCode}`, { chainId, seq, ...(insertionCode ? { insertionCode } : {}), label: `${chainId}:${seq}${insertionCode} ${name}` })
+  }
+  // A single 3D label is legible. Clustered selections use the residue list in
+  // the controls so overlapping labels cannot cover the highlighted side chains.
+  if (options.labels && found.size === 1) await plugin.builders.structure.representation.addRepresentation(component, {
+    type: 'label', color: 'uniform', colorParams: { value: Color(0x273026) },
+    typeParams: { level: 'residue', background: true, backgroundColor: Color(0xffffff), backgroundOpacity: 0.85, sizeFactor: 1.4, offsetZ: 12, attachment: 'bottom-left' },
+  })
+  if (options.focus) plugin.managers.camera.focusObject({ targets: [{ targetRef: component.ref, extraRadius: 12 }], minRadius: 12, durationMs: 250 })
+  return { residues: [...found.values()], atomCount: data.elementCount }
 }
 
-function buildChainSelection(structureData: unknown, chainId: string) {
-  if (!structureData) return undefined
-  const query = MS.struct.generator.atomGroups({
-    'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), chainId]),
-  })
-  return Script.getStructureSelection(query, structureData as Parameters<typeof Script.getStructureSelection>[1])
-}
-
-function buildResidueSelection(structureData: unknown, residues: HighlightedResidue[]) {
-  if (!residues.length) return undefined
-
+export function buildResidueQuery(residues: HighlightedResidue[], sideChainsOnly = false) {
+  const atomTest = sideChainsOnly ? MS.core.logic.not([MS.core.set.has([MS.set(...SetUtils.toArray(ProteinBackboneAtoms)), MS.ammp('label_atom_id')])]) : undefined
   let query = MS.struct.generator.atomGroups({
     'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), residues[0].chainId]),
-    'residue-test': MS.core.rel.eq([MS.ammp('auth_seq_id'), residues[0].seq]),
+    'residue-test': MS.core.logic.and([
+      MS.core.rel.eq([MS.ammp('auth_seq_id'), residues[0].seq]),
+      MS.core.rel.eq([MS.ammp('pdbx_PDB_ins_code'), residues[0].insertionCode ?? '']),
+    ]),
+    ...(atomTest ? { 'atom-test': atomTest } : {}),
   })
 
   for (let index = 1; index < residues.length; index += 1) {
     const residue = residues[index]
     const nextQuery = MS.struct.generator.atomGroups({
       'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), residue.chainId]),
-      'residue-test': MS.core.rel.eq([MS.ammp('auth_seq_id'), residue.seq]),
+      'residue-test': MS.core.logic.and([
+        MS.core.rel.eq([MS.ammp('auth_seq_id'), residue.seq]),
+        MS.core.rel.eq([MS.ammp('pdbx_PDB_ins_code'), residue.insertionCode ?? '']),
+      ]),
+      ...(atomTest ? { 'atom-test': atomTest } : {}),
     })
     query = MS.struct.combinator.merge([query, nextQuery])
   }
 
-  return Script.getStructureSelection(
-    query,
-    structureData as Parameters<typeof Script.getStructureSelection>[1],
-  )
+  return query
 }
 
 export async function loadStructureFromAuthenticatedUrl(
@@ -227,9 +257,22 @@ export function subscribeResiduePicks(
     if (!location) return
     const chainId = StructureProperties.chain.auth_asym_id(location)
     const seq = StructureProperties.residue.auth_seq_id(location)
+    const insertionCode = StructureProperties.residue.pdbx_PDB_ins_code(location)
     if (!chainId || typeof seq !== 'number') return
     const name = StructureProperties.atom.label_comp_id(location)
-    onPick({ chainId, seq, label: name ? `${chainId}${seq} ${name}` : `${chainId}${seq}` })
+    onPick({ chainId, seq, ...(insertionCode ? { insertionCode } : {}), label: name ? `${chainId}${seq}${insertionCode} ${name}` : `${chainId}${seq}${insertionCode}` })
   })
   return () => subscription.unsubscribe()
+}
+
+/** Select an existing author-numbered residue using the same Mol* focus as a canvas click. */
+export function focusResidueById(plugin: PluginContext, chainId: string, seq: number, insertionCode = ''): boolean {
+  const structure = plugin.managers.structure.hierarchy.current.structures[0]?.cell?.obj?.data
+  if (!structure) return false
+  const selection = Script.getStructureSelection(buildResidueQuery([{ chainId, seq, insertionCode }]), structure)
+  if (!selection || StructureSelection.isEmpty(selection)) return false
+  const loci = StructureSelection.toLociWithSourceUnits(selection)
+  plugin.managers.structure.focus.setFromLoci(loci)
+  plugin.managers.camera.focusLoci(loci, { minRadius: 18, extraRadius: 8, durationMs: 250 })
+  return true
 }

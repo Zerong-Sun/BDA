@@ -25,6 +25,7 @@ secrets/
 backend_v2/.venv/
 backend_v2/*.egg-info/
 backend_v2/coverage.json
+backend_v2/research-branch-coverage.json
 __pycache__/
 *.pyc
 

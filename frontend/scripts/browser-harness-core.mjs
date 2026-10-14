@@ -1,3 +1,6 @@
+import { PROCEDURAL_SKILLS } from './fixtures/procedural-skills.mjs'
+import { EXTENSION_CATALOG } from './fixtures/extension-catalog.mjs'
+
 const PROJECT_ID = 'proj_browser'
 const NOW = '2026-07-29T08:00:00Z'
 
@@ -6,7 +9,7 @@ export const CANDIDATE_SEARCH_FILTER_PATTERN = /candidate or family/i
 export const COPILOT_LAYER_SELECTOR = '[role="dialog"][data-tour-id="copilot-drawer"]'
 export const COPILOT_TRIGGER_PATTERN = /^Open Copilot$/
 export const LOGIN_INVALID_CREDENTIALS_PATTERN =
-  /invalid (?:browser acceptance credentials|credentials|username or password)/i
+  /(?:invalid|incorrect) (?:browser acceptance credentials|credentials|username or password)/i
 
 export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   login: { root: 'form', maxSteps: 24 },
@@ -19,7 +22,11 @@ export const FOCUS_AUDIT_CONTRACTS = Object.freeze({
   faq: { root: '[data-tour-id="faq-content"]', maxSteps: 96 },
   timeline: { root: '[data-tour-id="timeline-page"]', maxSteps: 128 },
   autopilot: { root: '[data-tour-id="autopilot-page"]', maxSteps: 96 },
+  learning: { root: '[data-tour-id="learning-page"]', maxSteps: 128 },
   lab: { root: '[data-tour-id="lab-page"]', maxSteps: 128 },
+  extensions: { root: '[data-testid="extension-center"]', maxSteps: 160 },
+  'research-goals': { root: '[data-testid="research-decision-center"]', maxSteps: 160 },
+  tools: { root: '[data-testid="lab-tools-page"]', maxSteps: 128 },
 })
 
 const exactText = (selector, text) => ({ selector, text })
@@ -83,7 +90,8 @@ export const SCENARIO_CONTRACTS = Object.freeze({
     root: '[data-tour-id="workflow-page"]',
     evidence: [exactText('[data-slot="alert"]', 'Target preparation is incomplete')],
     controls: [
-      disabledControl('button', 'Add workflow node', 'Target readiness blocks graph mutations.'),
+      { selector: 'button', name: 'Add workflow node', disabled: false,
+        reason: 'Incomplete targets still allow draft editing; execution remains gated.' },
       disabledControl('button', 'Submit workflow', 'Target readiness blocks workflow submission.'),
     ],
   },
@@ -102,9 +110,11 @@ export const SCENARIO_CONTRACTS = Object.freeze({
     }],
   },
   'candidates:empty': {
-    root: 'section',
-    evidence: [exactText('td', 'No candidates match the current filters.')],
+    root: '[data-tour-id="candidates-workspace"]',
+    evidence: [exactText('[role="status"]', 'No candidate updates yet. Add a proposal manually, or review candidates produced by a completed workflow.')],
     controls: [
+      { selector: 'button', name: 'Add candidate manually', disabled: false,
+        reason: 'An empty project can record a candidate proposal before computation.' },
       disabledControl('button', 'Download selected', 'No candidate selection exists in the empty grid.'),
     ],
   },
@@ -151,9 +161,9 @@ export const SCENARIO_CONTRACTS = Object.freeze({
   },
   'results:pending': {
     root: 'section',
-    evidence: [exactText('[data-tour-id="results-delivery"]', 'building')],
+    evidence: [exactText('[data-tour-id="results-delivery"]', 'pending')],
     controls: [
-      disabledControl('button', 'Prepare delivery package', 'A building delivery package is not downloadable yet.'),
+      disabledControl('button', 'Prepare delivery package', 'A pending delivery package is not downloadable yet.'),
     ],
   },
   'research:empty': {
@@ -249,7 +259,11 @@ export const ROUTES = Object.freeze([
   { id: 'autopilot', path: `/autopilot?project=${PROJECT_ID}`, authenticated: true },
   // The last route the matrix did not reach. Its three panels are the ones the React
   // Compiler skips (TanStack Table), so nothing else was watching them either.
+  { id: 'extensions', path: '/extensions', authenticated: true },
+  { id: 'research-goals', path: `/research?tab=goals&project=${PROJECT_ID}`, authenticated: true },
+  { id: 'learning', path: `/learning?project=${PROJECT_ID}`, authenticated: true },
   { id: 'lab', path: `/lab?project=${PROJECT_ID}`, authenticated: true },
+  { id: 'tools', path: '/tools?tool=protein-properties', authenticated: true },
 ])
 
 export const VIEWPORTS = Object.freeze([
@@ -304,7 +318,11 @@ const ROUTE_STATE_SCENARIOS = Object.freeze({
   // No state scenarios: the page reads nothing when it opens, so an empty/loading/error
   // case here would be asserting on a fixture rather than on the page.
   autopilot: [],
+  learning: [],
+  extensions: [],
+  'research-goals': [],
   lab: ['empty', 'loading', 'recoverable-error'],
+  tools: [],
 })
 
 export function buildBrowserMatrix() {
@@ -504,7 +522,7 @@ export function createProcessCloseMonitor(child) {
   }
 }
 
-export function createStorageSeed({ authenticated, language, themePreference, scenario = 'populated' }) {
+export function createStorageSeed({ authenticated, language, themePreference }) {
   const session = {
     'bda-research-package-sync-attempted': 'true',
   }
@@ -520,7 +538,6 @@ export function createStorageSeed({ authenticated, language, themePreference, sc
 
   const state = {
     activeProjectId: authenticated ? PROJECT_ID : '',
-    appMode: scenario === 'read-only' ? 'demo' : 'application',
     language,
     uiDensity: 'guided',
     themePreference,
@@ -959,10 +976,32 @@ function createStrictRoutes({ scenario, routeId }) {
   }
   const ok = (body, options) => routeResponse(200, body, options)
 
+  add('GET', '/api/v2/registry/extensions', {}, () => ok(EXTENSION_CATALOG))
+
+  const learningBase = { project_id: PROJECT_ID, version: 1, created_at: NOW, updated_at: NOW, created_by: 'user_browser' }
+  const learningAssay = { ...learningBase, id: 'assay_browser', name: 'Synthetic affinity assay', method: 'BLI fixture', unit: 'nM', conditions: { pH: '7' } }
+  const learningStudy = { ...learningBase, id: 'study_browser', name: 'Synthetic learning round', assay_id: learningAssay.id, research_goal_id: 'goal_browser_1', goal_snapshot: { version: 1 }, direction: 'minimize', threshold: 10, currency: 'USD', batch_budget_cents: 10000, max_batch_size: 2, max_rounds: 12, stop_on_threshold: false, supersedes_id: null }
+  const learningDataset = { ...learningBase, id: 'dataset_browser', study_id: learningStudy.id, digest: 'd'.repeat(64), manifest: { included: [{ result_id: 'result_browser_1' }], excluded: [{ result_id: 'result_browser_2', reason: 'qc_not_accepted' }] } }
+  const learningModel = { ...learningBase, id: 'model_browser', study_id: learningStudy.id, dataset_id: learningDataset.id, algorithm: 'composition-knn-v1', status: 'shadow', parameters: {}, evaluation: { groups: 6, rmse: 8.1, mean_baseline_rmse: 14.2, eligible_for_promotion: true, limitations: ['Synthetic UI fixture; not experimental evidence'] } }
+  const learningDecision = { ...learningBase, id: 'decision_browser', study_id: learningStudy.id, model_id: learningModel.id, timeline_entry_id: null, proposal_digest: 'e'.repeat(64), review_status: 'pending', review_note: null, reviewed_by: null, proposal: { model_status: 'shadow', currency: 'USD', estimated_cost_cents: 5000, action: 'review_batch', execution_authorized: false, selected: [{ candidate_id: 'candidate_browser_1', candidate_name: 'Synthetic candidate', prediction: 18, selection_reason: 'exploration', out_of_domain: true }], excluded: [], limitations: ['Distance heuristic, not calibrated uncertainty'] } }
+  add('POST', `/api/v2/projects/${PROJECT_ID}/learning/observations`, {}, () => routeResponse(201, experimentResultFixture('result_browser_new', 12.5, 'unknown')))
+  const learningRecords = { assays: [learningAssay], studies: [learningStudy], datasets: [learningDataset], models: [learningModel], decisions: [learningDecision], evidence: [], batches: [] }
+  for (const [kind, items] of Object.entries(learningRecords)) {
+    add('GET', `/api/v2/projects/${PROJECT_ID}/learning/${kind}`, { limit: '50' }, () => ok({ items: empty ? [] : items, next_cursor: null }))
+  }
+  add('GET', `/api/v2/projects/${PROJECT_ID}/candidates`, { limit: '200' }, () => ok({ items: empty ? [] : [candidateFixture('candidate_browser_1', 1), candidateFixture('candidate_browser_2', 2)], next_cursor: null }))
+
   add('GET', '/api/v2/wetlab/concentration', { a280: '1', ext_coeff: '10000', molecular_weight: '12000', path_length_cm: '1' }, () => ok({
     a280: 1, path_length_cm: 1, epsilon: 10000, mw: 12000,
     molar_conc_uM: 100, molar_conc_nM: 100000, molar_conc_M: 0.0001,
     mass_conc_mg_mL: 1.2, mass_conc_ug_mL: 1200, mass_conc_ng_uL: 1200,
+  }))
+  add('POST', '/api/v2/wetlab/calculations', {}, () => ok({
+    kind: 'nucleic-a260', calculation_version: 'bench-v1',
+    values: [{ key: 'concentration_ng_uL', label: 'Original sample mass concentration', label_zh: '原样本质量浓度', value: 50, unit: 'ng/uL' }],
+    formula: 'c = (A260 - blank) × factor × dilution / path',
+    assumptions: ['1 cm normalized absorbance; no repeat path correction.'], assumptions_zh: ['读数已归一化为 1 cm，不重复校正光程。'], warnings: [], warnings_zh: [],
+    references: [{ title: 'NanoDrop guide', url: 'https://www.thermofisher.com/TFS-Assets/CAD/manuals/NanoDrop-2000-User-Manual-EN.pdf' }], steps: [],
   }))
   add('GET', '/api/v2/health/ready', {}, () => ok({
     status: 'ok',
@@ -1260,11 +1299,12 @@ function createStrictRoutes({ scenario, routeId }) {
     }),
     next_cursor: null,
   }))
-  add('GET', `/api/v2/projects/${PROJECT_ID}/experiment-results`, { limit: '200' }, () => ok({
+  // Results and the saved-analysis history use separate cursor page sizes.
+  for (const limit of ['100', '200']) add('GET', `/api/v2/projects/${PROJECT_ID}/experiment-results`, { limit }, () => ok({
     items: empty
       ? []
       : [
-          experimentResultFixture('result_browser_1', 18, 'pass'),
+          { ...experimentResultFixture('result_browser_1', 18, 'pass'), result_metadata: { learning: { assay_id: 'assay_browser', status: 'measured', replicate_key: 'bio-1', qc_accepted: true } } },
           experimentResultFixture('result_browser_2', 64, 'review'),
         ],
     next_cursor: null,
@@ -1284,14 +1324,14 @@ function createStrictRoutes({ scenario, routeId }) {
     best_result_value: empty ? null : 18,
     best_result_unit: empty ? null : 'nM',
   }))
-  add('GET', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, { limit: '1' }, () => ok({
+  add('GET', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, { limit: '1', order: 'newest' }, () => ok({
     items: empty
       ? []
       : [{
           id: 'delivery_browser',
           project_id: PROJECT_ID,
           name: 'Browser delivery package',
-          status: scenario === 'pending' ? 'building' : 'ready',
+          status: scenario === 'pending' ? 'pending' : 'available',
           selection: { candidate_ids: ['candidate_browser_1'], include_experiment_results: true },
           artifact_id: null,
           error: null,
@@ -1302,7 +1342,7 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
   add('GET', '/api/v2/artifacts', { limit: '200', project_id: PROJECT_ID }, () => ok({
-    items: [],
+    items: routeId === 'learning' && !empty ? [{ ...learningBase, id: 'artifact_learning', artifact_type: 'experiment_data', filename: 'synthetic-assay.csv', content_type: 'text/csv', status: 'available', size_bytes: 256, checksum_sha256: 'a'.repeat(64), lineage: {} }] : [],
     next_cursor: null,
   }))
   add('GET', '/api/v2/registry/model-plugins', { limit: '200' }, () => ok({
@@ -1321,6 +1361,8 @@ function createStrictRoutes({ scenario, routeId }) {
     items: [],
     next_cursor: null,
   }))
+  add('GET', '/api/v2/copilot/procedural-skills', {}, () => ok(PROCEDURAL_SKILLS.map(({ instructions: _instructions, ...summary }) => summary)))
+  for (const skill of PROCEDURAL_SKILLS) add('GET', `/api/v2/copilot/procedural-skills/${skill.id}`, {}, () => ok(skill))
   add('GET', '/api/v2/copilot/task-services', {}, () => ok([{
     id: 'literature', title: 'Research the evidence', title_zh: '调研与比较证据',
     deliverable: 'Traced excerpts and evidence gaps', deliverable_zh: '可追溯的证据与缺口',
@@ -1333,6 +1375,7 @@ function createStrictRoutes({ scenario, routeId }) {
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/agent-runs`, { limit: '50' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/events`, {}, () => ok({}))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/room`, { limit: '100' }, () => ok({ items: [], next_cursor: null }))
+  add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/handoffs`, {}, () => ok({ items: [] }))
   add('GET', `/api/v2/copilot/projects/${PROJECT_ID}/decision-requests`, { status: 'open' }, () => ok({ items: [] }))
   // Hotspot sets are read on the Research structures view and by the workflow
   // node form, which asks only for the confirmed ones.
@@ -1445,6 +1488,11 @@ function createStrictRoutes({ scenario, routeId }) {
       : [],
     next_cursor: null,
   }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/knowledge`, { limit: '50', q: '' }, () => ok({
+    items: empty ? [] : [{id: 'knowledge_browser', project_id: PROJECT_ID, entry_type: 'evidence',
+      title: 'Browser knowledge', content: 'Deterministic knowledge fixture.', source: {}, tags: ['fixture'],
+      version: 1, created_at: NOW, updated_at: NOW}], next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/knowledge`, { limit: '100' }, () => ok({
     items: empty
       ? []
@@ -1461,6 +1509,20 @@ function createStrictRoutes({ scenario, routeId }) {
         }],
     next_cursor: null,
   }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/literature/evidence-notes`, { limit: '100' }, () => ok({
+    items: empty ? [] : [{
+      id: 'evidence_note_browser_1', document_id: 'document_browser_1', document_title: 'Browser evidence paper',
+      argument: 'The project needs a controlled comparison.', paper_claim: 'A measured response changed in the study.',
+      quote: 'The response changed under the reported conditions.', interpretation: 'This motivates a controlled comparison.',
+      limitations: 'It does not establish our candidate performance.', relation: 'supports', locator: 'Results, paragraph 1',
+      source_url: 'https://example.test/evidence', source_ref: { chunk_id: 'chunk_browser_1', chunk_position: 0, content_kind: 'database_abstract', selector: [{ type: 'TextPositionSelector', start: 0, end: 51 }] },
+      anchor_status: 'matched', review_status: 'pending', reviewed_by: null, reviewed_at: null, version: 1, created_at: NOW, updated_at: NOW,
+    }], next_cursor: null,
+  }))
+  add('GET', '/api/v2/literature/documents/document_browser_1/chunks', { limit: '50' }, () => ok({
+    items: [{ id: 'chunk_browser_1', document_id: 'document_browser_1', position: 0, content: 'The response changed under the reported conditions.', version: 1, created_at: NOW, updated_at: NOW }], next_cursor: null,
+  }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/literature/claims`, { limit: '200', review_status: 'pending' }, () => ok({ items: [], next_cursor: null }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/literature/claims`, { limit: '100' }, () => ok({
     items: [],
     next_cursor: null,
@@ -1480,6 +1542,8 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
 
+  add('GET', '/api/v2/auth/config', {}, () => ok({ deployment_kind: 'public', registration_mode: 'open', realm: 'browser-public', public_portal_url: '', private_portal_url: '' }))
+  add('POST', '/api/v2/auth/logout', {}, () => routeResponse(204, null))
   add('POST', '/api/v2/auth/token', {}, ({ count }) => {
     if (scenario === 'auth-retry' && count === 1) {
       return routeResponse(
@@ -1506,16 +1570,19 @@ function createStrictRoutes({ scenario, routeId }) {
     { expectedHttpFailure: true },
   ))
   add('POST', `/api/v2/projects/${PROJECT_ID}/delivery-packages`, {}, () => ok({
+    operation_id: 'operation_delivery_browser',
+    delivery_package: {
     id: 'delivery_browser_pending',
     project_id: PROJECT_ID,
     name: 'Browser candidate structures',
-    status: 'building',
+    status: 'pending',
     artifact_id: null,
-    candidate_ids: ['candidate_browser_1'],
-    include_experiment_results: true,
+    selection: { candidate_ids: [], include_experiment_results: true, format: 'ro-crate-1.1', frozen_at: NOW },
+    error: null,
     version: 1,
     created_at: NOW,
     updated_at: NOW,
+    },
   }, { delayMs: scenario === 'pending' ? 1_000 : 0 }))
   add('POST', `/api/v2/workflow-runs/${workflowRun.id}/submissions`, {}, () => ok({
     id: 'submission_browser',
@@ -1581,6 +1648,7 @@ export function createFixtureRouter({ scenario = 'populated', routeId = '', stal
       if (
         scenario === 'recoverable-error'
         && recoverablePath === url.pathname
+        && !url.searchParams.has('cursor')
         && count <= 4
       ) {
         return routeResponse(

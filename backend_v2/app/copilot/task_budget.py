@@ -19,6 +19,10 @@ from .provider import LLM_MAX_ATTEMPTS
 
 
 def reserve_model_call(session: Session, run: CopilotAgentRun, provider: LLMProvider, messages: list[dict], tools: list[dict] | None = None) -> None:
+    # Repair/review calls occur inside a step after its initial budget check.
+    # They still consume assistant turns and must obey the same hard ceiling.
+    if run.turn_count >= run.max_turns:
+        raise DomainError("copilot_turn_limit_reached", "The transcript turn limit was reached. No model call was made.", status_code=409)
     root = agent_runs.budget_root(session, run)
     # Sibling subagents spend the same allowance; serialize before reserving.
     from sqlalchemy import select

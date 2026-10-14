@@ -155,6 +155,7 @@ class ResearchGoal(UUIDVersionMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(300))
     detail: Mapped[str] = mapped_column(Text, default="")
+    decision_contract: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(24), default="open", index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     tags: Mapped[list] = mapped_column(JSON, default=list)

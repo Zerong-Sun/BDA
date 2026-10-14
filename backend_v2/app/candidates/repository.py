@@ -18,8 +18,14 @@ class CandidateRepository:
                 select(Candidate)
                 .where(Candidate.id == candidate_id)
                 .with_for_update()
+                .execution_options(populate_existing=True)
             )
         return self.session.get(Candidate, candidate_id)
+
+    def get_by_key(self, project_id: uuid.UUID, candidate_key: str) -> Candidate | None:
+        return self.session.scalar(
+            select(Candidate).where(Candidate.project_id == project_id, Candidate.candidate_key == candidate_key)
+        )
 
     def list_project(
         self,

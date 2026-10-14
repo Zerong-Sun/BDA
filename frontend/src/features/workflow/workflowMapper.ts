@@ -173,8 +173,40 @@ export function mapApiGraphToGraph(apiNodes: WorkflowNode[], apiEdges: WorkflowE
   nodes: BdaWorkflowNode[]
   edges: BdaWorkflowEdge[]
 } {
+  // Imported graphs often have no layout. Derive columns from their dependencies,
+  // rather than response order, and give parallel stages separate rows.
+  const nodes = mapApiNodesToGraph(apiNodes)
+  const byKey = new Map(apiNodes.flatMap((node) => [[node.id, node.id], [node.node_key, node.id]]))
+  const incoming = new Map(apiNodes.map((node) => [node.id, 0]))
+  const outgoing = new Map(apiNodes.map((node) => [node.id, [] as string[]]))
+  const depth = new Map(apiNodes.map((node) => [node.id, 0]))
+  for (const edge of apiEdges) {
+    const source = byKey.get(edge.source)
+    const target = byKey.get(edge.target)
+    if (!source || !target) continue
+    outgoing.get(source)!.push(target)
+    incoming.set(target, incoming.get(target)! + 1)
+  }
+  const queue = apiNodes.filter((node) => incoming.get(node.id) === 0).map((node) => node.id)
+  for (let index = 0; index < queue.length; index++) {
+    const source = queue[index]
+    for (const target of outgoing.get(source)!) {
+      depth.set(target, Math.max(depth.get(target)!, depth.get(source)! + 1))
+      incoming.set(target, incoming.get(target)! - 1)
+      if (incoming.get(target) === 0) queue.push(target)
+    }
+  }
+  if (apiEdges.length && queue.length === apiNodes.length && apiNodes.every((node) => !node.position)) {
+    const rows = new Map<number, number>()
+    for (const node of nodes) {
+      const column = depth.get(node.id)!
+      const row = rows.get(column) ?? 0
+      node.position = { x: 40 + column * 260, y: 80 + row * 180 }
+      rows.set(column, row + 1)
+    }
+  }
   return {
-    nodes: mapApiNodesToGraph(apiNodes),
+    nodes,
     edges: apiEdges.map((edge, index) => ({
       id: edge.id ?? `edge-${index}-${edge.source}-${edge.target}`,
       data: { gate: edge.gate },

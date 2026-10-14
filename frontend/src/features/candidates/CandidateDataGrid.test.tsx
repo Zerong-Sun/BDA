@@ -150,6 +150,21 @@ describe('CandidateTable ReUI data grid', () => {
     expect(screen.getByPlaceholderText('Search candidate or family')).toHaveValue('kinase')
   })
 
+  it('offers actual project statuses, including proposals and historical states', async () => {
+    const onStatusChange = vi.fn()
+    renderWithProviders(<CandidateFilters search="" status="All" priorityOnly={false}
+      statuses={['proposed', 'scored', 'generated_backbone']}
+      onSearchChange={vi.fn()} onStatusChange={onStatusChange} onPriorityOnlyChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add candidate filter' }))
+    expect(await screen.findByPlaceholderText('Find a filter field…')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'Status' }))
+    expect(await screen.findByRole('option', { name: 'generated_backbone' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Scored' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Validated' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'Proposed' }))
+    await waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith('proposed'))
+  })
+
   it('only exposes filter operators that map to candidate API query semantics', async () => {
     renderWithProviders(
       <CandidateFilters

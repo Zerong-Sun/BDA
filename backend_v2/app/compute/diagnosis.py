@@ -50,10 +50,8 @@ from .models import Job, JobEvent
 #: is treated as a violation in this project, not as a notice.
 GPU_FORCING_QUEUES = frozenset({"2v100-32-e5", "2v100-32", "gpu-v100"})
 
-#: A dispatch that failed this fast did not run the model. Something rejected it
-#: before the work began - a missing image, an entrypoint that is not there, a
-#: command that exits immediately - and all of those live in the plugin
-#: declaration rather than in the science.
+#: A short runtime can make startup configuration worth investigating, but it
+#: cannot prove that a model did not run or determine the failure's cause.
 IMMEDIATE_EXIT_SECONDS = 45
 
 #: How many of a job's most recent events the bundle carries. Enough to see the
@@ -112,18 +110,12 @@ class Rule:
     check: Callable[[dict[str, Any]], Finding | None]
 
 
-def _errors(evidence: dict[str, Any]) -> str:
-    """Every recorded error string in this job's retry chain, for matching.
-
-    This job's message and code, plus the messages of the attempts it replaced.
-    A retry that failed differently from its predecessor is the interesting
-    case, and matching only the latest would miss it.
-    """
-    parts = [str(evidence.get("error_message") or ""), str(evidence.get("error_code") or "")]
-    parts.extend(
-        str(item.get("error_message") or "") for item in evidence.get("previous_attempts", [])
-    )
-    return "\n".join(part for part in parts if part)
+def _error_fields(evidence: dict[str, Any]) -> list[tuple[str, str]]:
+    """Keep each error attached to the current job or its actual predecessor."""
+    fields = [(key, str(evidence.get(key) or "")) for key in ("error_message", "error_code")]
+    fields.extend((f"previous_attempts[{index}].error_message", str(item.get("error_message") or ""))
+                  for index, item in enumerate(evidence.get("previous_attempts", [])))
+    return [(path, value) for path, value in fields if value]
 
 
 def _resources(evidence: dict[str, Any]) -> dict[str, Any]:
@@ -138,18 +130,18 @@ def _rule_pending_inputs(evidence: dict[str, Any]) -> Finding | None:
         return None
     return Finding(
         id="pending_inputs_unresolved",
-        title="The job was dispatched with unresolved input ports",
+        title="The recorded input manifest contains unresolved ports",
         confidence="confirmed",
         detail=(
             f"The input manifest still lists {len(pending)} unresolved port(s): "
-            f"{', '.join(str(item) for item in pending[:6])}. The stage ran without "
-            "the artifact it was supposed to read."
+            f"{', '.join(str(item) for item in pending[:6])}. This declaration does not "
+            "establish whether execution began or which inputs were present at runtime."
         ),
         remedy=(
             "Bind the upstream output port to this node's input port, or wait for the "
             "producing stage to succeed, before submitting again."
         ),
-        evidence=("runtime_spec.input_manifest.pending_inputs",),
+        evidence=("pending_inputs",),
     )
 
 
@@ -158,17 +150,18 @@ def _rule_no_command(evidence: dict[str, Any]) -> Finding | None:
         return None
     return Finding(
         id="no_command_declared",
-        title="Neither the plugin nor the node declared a command",
+        title="No explicit command is present in the recorded runtime declaration",
         confidence="confirmed",
         detail=(
-            "The runtime spec carries no command, so the container had nothing to run. "
-            "A job in this state exits immediately and produces an empty log."
+            "No command was resolved from the runtime spec or plugin snapshot. This "
+            "does not establish that a container started, that its image has no default "
+            "entrypoint, or that a missing command caused the recorded failure."
         ),
         remedy=(
             "Set the command on the model plugin registry row (preferred, so every node "
             "using it inherits the fix) or on the workflow node."
         ),
-        evidence=("runtime_spec.command", "runtime_spec.plugin_snapshot.command"),
+        evidence=("command",),
     )
 
 
@@ -181,19 +174,19 @@ def _rule_gpu_queue(evidence: dict[str, Any]) -> Finding | None:
         return None
     return Finding(
         id="gpu_forced_by_queue",
-        title="A no-GPU stage was submitted to a queue that forces a GPU",
-        confidence="confirmed",
+        title="The declared queue may allocate a GPU that the plugin did not request",
+        confidence="possible",
         detail=(
             f"The plugin declares no GPU, but queue {queue!r} merges its own GPU "
-            "requirement into every job it accepts. The stage held a GPU exclusively "
-            "for its whole run without using it. This does not by itself fail a job, "
-            "and it is a violation here regardless of whether the job succeeded."
+            "requirement into jobs under the known queue policy. Confirm the current "
+            "scheduler allocation and actual utilisation; a declaration alone does "
+            "not establish that this job held or used a GPU."
         ),
         remedy=(
             "Submit CPU-only stages to a CPU queue, and have the stage exit when "
             "CUDA_VISIBLE_DEVICES is set so the mismatch cannot recur silently."
         ),
-        evidence=("runtime_spec.queue", "runtime_spec.plugin_snapshot.resources.gpu"),
+        evidence=("queue", "plugin_snapshot.resources"),
     )
 
 
@@ -210,7 +203,7 @@ def _rule_cpu_evidence(evidence: dict[str, Any]) -> Finding | None:
         confidence="possible",
         detail=(
             f"`-n`, `span[ptile=]` and $BDA_CPUS all derive from this one number, so the "
-            f"scheduler reserved {cpus} cores. The registry row names no measurement or "
+            f"declaration asks for {cpus} cores. The registry row names no measurement or "
             "upstream thread flag supporting that, and a job holding cores it cannot use "
             "draws low-utilisation inspection."
         ),
@@ -218,7 +211,7 @@ def _rule_cpu_evidence(evidence: dict[str, Any]) -> Finding | None:
             "Either record the measurement in `cpus_evidence` on the plugin row, or "
             "reduce `cpus` to what the tool actually saturates."
         ),
-        evidence=("runtime_spec.plugin_snapshot.resources.cpus",),
+        evidence=("plugin_snapshot.resources",),
     )
 
 
@@ -240,30 +233,24 @@ def _rule_immediate_exit(evidence: dict[str, Any]) -> Finding | None:
         return None
     return Finding(
         id="immediate_exit",
-        title="The job died before the model could have started",
+        title="The job failed shortly after it was reported running",
         confidence="possible",
         detail=(
-            f"It reached {evidence.get('phase_reached')!r} and failed {runtime}s later, "
-            f"which is under the {IMMEDIATE_EXIT_SECONDS}s floor for the model having run "
-            "at all. The cause is then almost always the plugin declaration - image, "
-            "command, entrypoint or runtime setup - rather than the input or the science."
+            f"It reached {evidence.get('phase_reached')!r}; recorded runtime is {runtime}s, "
+            f"below the {IMMEDIATE_EXIT_SECONDS}s diagnostic threshold. Startup configuration "
+            "is one possibility; this duration does not show whether the model ran or "
+            "exclude input errors, application failures or a genuinely short task."
         ),
         remedy=(
             "Preview the rendered script for this node, then check the plugin's image, "
             "command and runtime_setup against what the container actually provides."
         ),
-        evidence=("recent_events[].event_type", "recent_events[].at", "status"),
+        evidence=("runtime_seconds", "phase_reached", "status"),
     )
 
 
 def _rule_never_started(evidence: dict[str, Any]) -> Finding | None:
-    """Failed without the scheduler ever reporting it running.
-
-    Distinct from `immediate_exit`, and the distinction is the useful part: a
-    job that ran for three seconds got as far as the container; one that never
-    ran did not, so the input manifest, the queue and the submission are where
-    to look and the command is not.
-    """
+    """No running transition was recorded; missing observations are not a cause."""
     if evidence.get("status") != "failed" or evidence.get("reached_running"):
         return None
     return Finding(
@@ -272,14 +259,14 @@ def _rule_never_started(evidence: dict[str, Any]) -> Finding | None:
         confidence="confirmed",
         detail=(
             f"The event log stops at {evidence.get('phase_reached')!r}; there is no "
-            "`job.running`. Whatever went wrong happened before the model was given "
-            "control, so the container's command is not the first place to look."
+            "`job.running` in the recorded timeline. This is a recorded state, not a "
+            "cause or proof that execution never occurred outside these observations."
         ),
         remedy=(
             "Check the submission itself: input manifest resolution, the queue the job "
             "was sent to, and the backend's own rejection message."
         ),
-        evidence=("recent_events[].event_type", "status"),
+        evidence=("reached_running", "phase_reached", "status"),
     )
 
 
@@ -291,16 +278,19 @@ def _pattern_rule(
     remedy: str,
 ) -> Callable[[dict[str, Any]], Finding | None]:
     def check(evidence: dict[str, Any]) -> Finding | None:
-        match = _PATTERNS[pattern_key].search(_errors(evidence))
-        if match is None:
+        matches = [(path, match.group(0)) for path, value in _error_fields(evidence)
+                   if (match := _PATTERNS[pattern_key].search(value)) is not None]
+        if not matches:
             return None
         return Finding(
             id=rule_id,
-            title=title,
-            confidence="confirmed",
-            detail=f"{detail} The recorded error matches {match.group(0)!r}.",
+            title=f"Recorded error pattern: {title}",
+            confidence="possible",
+            detail=(f"Pattern interpretation to verify: {detail} Matches: {matches!r}. "
+                    "A text match alone does not confirm a cause or an actual execution; "
+                    "historical matches describe the named predecessor, not this attempt."),
             remedy=remedy,
-            evidence=("error_message", "attempts[].error"),
+            evidence=tuple(path for path, _ in matches),
         )
 
     return check
@@ -316,24 +306,23 @@ def _rule_repeated_failure(evidence: dict[str, Any]) -> Finding | None:
     the same question asked of the records that exist.
     """
     previous = [item for item in evidence.get("previous_attempts") or [] if item.get("error_message")]
-    if not previous:
+    current = str(evidence.get("error_message") or "").strip()
+    if not previous or not current or evidence.get("status") != "failed":
         return None
     messages = {str(item["error_message"]).strip() for item in previous}
-    current = str(evidence.get("error_message") or "").strip()
-    if current:
-        messages.add(current)
+    messages.add(current)
     if len(messages) > 1:
         return None
     return Finding(
         id="repeated_identical_failure",
-        title="This attempt and the ones it replaced all failed the same way",
+        title="This attempt and its predecessors recorded the same error text",
         confidence="confirmed",
         detail=(
             f"{len(previous) + 1} attempts in the retry chain recorded an identical "
-            "error. The failure is deterministic, so resubmitting the same "
-            "specification reproduces it."
+            "error. Repeated text does not establish a deterministic cause or "
+            "predict the result of another submission."
         ),
-        remedy="Change the specification before the next submission; a retry alone will not help.",
+        remedy="Compare the recorded logs and specifications before deciding whether a change or retry is justified.",
         evidence=("previous_attempts[].error_message", "error_message"),
     )
 
@@ -369,7 +358,7 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "out_of_memory",
             "oom",
-            "The job was killed for exceeding its memory",
+            "memory limit or allocation failure",
             "Memory limits are enforced by the scheduler and by the GPU driver separately.",
             "Raise `memory_gb` on the plugin row, or reduce the batch/crop size the stage uses.",
         ),
@@ -379,8 +368,8 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "walltime_exceeded",
             "timeout",
-            "The job hit its run-time limit",
-            "The work was still running when the limit expired; it did not fail on its own.",
+            "time limit or timeout",
+            "Check which operation timed out and whether execution began.",
             "Raise the stage's time limit, or split the input so one job does less.",
         ),
     ),
@@ -389,8 +378,8 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "image_unavailable",
             "image",
-            "The container image could not be obtained",
-            "The runtime could not pull or find the declared image.",
+            "container image unavailable",
+            "Check whether the runtime could pull or find the declared image.",
             "Correct the image reference on the plugin row, or make the image available "
             "on the execution host; compute nodes here have no internet.",
         ),
@@ -400,8 +389,8 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "input_file_missing",
             "missing_file",
-            "A file the job expected was not there",
-            "A staged input was absent at run time. A manifest check cannot catch this on "
+            "file unavailable",
+            "Check whether the named file is a staged input. A manifest check cannot catch this on "
             "its own: `sha256sum -c` verifies the files its manifest lists and is silent "
             "about one it never listed, which is why staged-input loops must also compare "
             "a count.",
@@ -414,8 +403,8 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "checksum_mismatch",
             "checksum",
-            "A staged file failed its checksum",
-            "The bytes on the execution host are not the bytes that were staged.",
+            "checksum verification problem",
+            "Check whether the error reports different bytes, an unreadable file or a failed verification command.",
             "Re-stage the input. On macOS-created archives, check for `._*` sidecar files: "
             "they pass `sha256sum -c` and then trip the job's own file-count guard.",
         ),
@@ -425,8 +414,8 @@ RULES: tuple[Rule, ...] = (
         _pattern_rule(
             "permission_denied",
             "permission",
-            "The job was denied access to a path or device",
-            "The execution account could not read or write something the stage needs.",
+            "permission problem",
+            "Check the account, operation and resource named by the error.",
             "Check the staging directory's ownership and the account the job runs under.",
         ),
     ),
@@ -475,11 +464,10 @@ def _timeline(events: list[JobEvent]) -> dict[str, Any]:
         if phase in PHASE_ORDER:
             if PHASE_ORDER.index(phase) > PHASE_ORDER.index(reached):
                 reached = phase
-            # The clock starts when the backend accepts the job, not when the
-            # row was created: time spent PEND in a queue is the scheduler's,
-            # not the stage's, and counting it would hide every fast failure
-            # behind a long wait.
-            if phase == "running" or (phase == "queued" and started_at is None):
+            # Queue acceptance is not execution. Only the first recorded running
+            # transition starts the execution clock; a queued rejection has no
+            # observed runtime, and duplicate running events must not shorten it.
+            if phase == "running" and started_at is None:
                 started_at = moment
         elif phase in {"failed", "succeeded", "cancelled"}:
             ended_at = moment
@@ -610,7 +598,7 @@ def findings_for(evidence: dict[str, Any]) -> dict[str, Any]:
         "findings": [finding.as_dict() for finding in findings],
         "summary": (
             f"{len(confirmed)} confirmed and {len(findings) - len(confirmed)} possible "
-            f"cause(s) identified from the recorded evidence."
+            f"finding(s) from the recorded evidence; findings do not by themselves establish causes."
             if findings
             else (
                 "The recorded evidence matches none of the known failure patterns. "

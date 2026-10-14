@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..compute.models import OutboxEvent
@@ -48,8 +49,10 @@ def enqueue_operation(
 
 
 def mark_operation_running(session: Session, operation_id: uuid.UUID) -> None:
-    operation = session.get(Operation, operation_id)
-    if operation is None or operation.status in {"succeeded", "failed", "cancelled"}:
+    operation = session.scalar(
+        select(Operation).where(Operation.id == operation_id).with_for_update().execution_options(populate_existing=True)
+    )
+    if operation is None or operation.status in {"running", "succeeded", "failed", "cancelled"}:
         return
     operation.status = "running"
     operation.started_at = operation.started_at or datetime.now(UTC)
@@ -64,7 +67,9 @@ def finish_operation(
     error: Exception | None = None,
 ) -> None:
     session.flush()
-    operation = session.get(Operation, operation_id, with_for_update=True, populate_existing=True)
+    operation = session.scalar(
+        select(Operation).where(Operation.id == operation_id).with_for_update().execution_options(populate_existing=True)
+    )
     if operation is None or operation.status in {"succeeded", "failed", "cancelled"}:
         return
     operation.finished_at = datetime.now(UTC)

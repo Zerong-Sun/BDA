@@ -55,15 +55,18 @@ def extract_europe_pmc_full_text(xml_bytes: bytes) -> tuple[list[str], dict[str,
                 if text:
                     paragraphs.append(text)
 
+    content_kind = "open_access_full_text" if paragraphs else "metadata_only"
     if not paragraphs:
         abstract = next((element for element in root.iter() if _local_name(element.tag) == "abstract"), None)
         abstract_text = _element_text(abstract)
         if abstract_text:
             paragraphs.append(abstract_text)
+            content_kind = "open_access_abstract"
     return paragraphs[:500], {
         "article_title": article_title,
         "license_text": license_text[:2000],
         "content_checksum_sha256": hashlib.sha256(xml_bytes).hexdigest(),
+        "content_kind": content_kind,
     }
 
 

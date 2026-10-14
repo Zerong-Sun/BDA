@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+import httpx
 
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
+from . import bench_tools
 from . import tools as _tools  # noqa: F401  (registers the tool catalogue)
 from .actions import CopilotActionService
-from .citations import citations_for
+from .citations import citations_for, inline_citation_instructions
 from .citations import dedupe as dedupe_citations
 from .project_context import ProjectContextService
 from .provider import completion_message
@@ -81,6 +84,38 @@ def chat_schemas(
 #: changes no research record, and gating it on the user saying "handoff" would
 #: stop operators handing over rather than stop a write nobody asked for.
 WRITE_TOOL_NAMES = REGISTRY.user_intent_write_ids()
+
+# These read results are evidence the user must be able to inspect after the
+# model turn ends. Keep them in the message, not only in the model context.
+EVIDENCE_RESULT_TOOLS = frozenset({
+    "analyse_structure", "list_structure_residues", "list_structure_contacts",
+    "measure_structure_interface", "describe_structure_site", "compare_structures",
+    "preview_bli_artifact", "render_structure_view",
+})
+
+
+def _logged_evidence(result: Any) -> Any:
+    if len(json.dumps(result, ensure_ascii=False, default=str).encode("utf-8")) <= 131072:
+        return result
+    # Never silently truncate a residue list or a numerical analysis. Large
+    # outputs retain their source identity and an explicit re-open instruction.
+    source = result if isinstance(result, dict) else {}
+    identities = {}
+    for side in ("reference", "mobile"):
+        value = source.get(side)
+        if isinstance(value, dict):
+            identities[side] = {key: value[key] for key in (
+                "artifact_id", "filename", "checksum_sha256", "provenance",
+            ) if key in value}
+    return {
+        **identities,
+        **{key: source[key] for key in (
+            "artifact_id", "source_artifact_id", "filename", "checksum_sha256",
+            "source_checksum_sha256", "provenance",
+        ) if key in source},
+        "result_omitted": True,
+        "reason": "Result exceeds the saved chat preview limit; reopen the source analysis for full evidence.",
+    }
 
 SCIENTIFIC_REVIEW_PROMPT = """\
 BDA_SCIENTIFIC_REVIEW_V1. Act as a strict scientific and techno-economic reviewer.
@@ -203,6 +238,28 @@ class ResearchAgentResult:
     citations: list[dict[str, Any]]
     tool_calls: list[dict[str, Any]]
     limit_reached: bool = False
+    reasoning_content: str | None = field(default=None, repr=False)
+    calculator_delivery: bool = False
+    delivery_incomplete: bool = False
+
+
+@dataclass(frozen=True)
+class ScientificAnswer:
+    content: str
+    reasoning_content: str | None = field(default=None, repr=False)
+
+
+def _response_reasoning(message: dict[str, Any]) -> str | None:
+    """Preserve provider protocol state exactly; absence is never synthesized."""
+    value = message.get("reasoning_content")
+    return value if isinstance(value, str) else None
+
+
+def _scientific_answer(message: dict[str, Any], error: str) -> ScientificAnswer:
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError(error)
+    return ScientificAnswer(content.strip(), _response_reasoning(message))
 
 
 def complete_research_turn(
@@ -219,11 +276,33 @@ def complete_research_turn(
     max_tool_calls: int = 12,
     bot: str | None = None,
     enabled_capabilities: set[str] | None = None,
+    bench_response_language: str | None = None,
 ) -> ResearchAgentResult:
     citations = list(initial_citations)
     call_log = list(initial_tool_calls)
     conversation = list(messages)
+    bench_results: list[dict] = []
+    bench_libraries: list[list[dict]] = []
+    skipped_calls = False
+    failed_calls = False
+    bench_delivery = (bench_response_language is not None and allowed_tools is not None
+                      and allowed_tools <= {"list_proteins", "compute_concentration", "plan_dilution_series", "calculate_bench"})
+    bench_delivery_instructed = False
+    if bench_delivery:
+        allowed_tools = set(allowed_tools or ()) & bench_tools.DELIVERY_TOOLS
+
+    def bench_answer(content: str, *, reasoning: str | None = None, interrupted: bool = False) -> ResearchAgentResult:
+        incomplete = skipped_calls or failed_calls or interrupted or not bench_tools.completion_status(content)[0]
+        answer = bench_tools.render_delivery(bench_results, content, language=bench_response_language or "en",
+                                             libraries=bench_libraries, exhausted=skipped_calls,
+                                             interrupted=failed_calls or interrupted)
+        return ResearchAgentResult(answer, dedupe_citations(citations), call_log, limit_reached=skipped_calls,
+                                   reasoning_content=reasoning, calculator_delivery=True, delivery_incomplete=incomplete)
+
     for _ in range(max_tool_calls + 1):
+        if (bench_results or bench_libraries) and not bench_delivery_instructed:
+            conversation.append({"role": "system", "content": bench_tools.DELIVERY_INSTRUCTION})
+            bench_delivery_instructed = True
         tools = chat_schemas(
             has_research=context is not None,
             has_project=project_context is not None,
@@ -233,29 +312,53 @@ def complete_research_turn(
             has_operator=bot is not None,
         )
         offered = {tool["function"]["name"] for tool in tools}
-        message = completion_message(
-            provider,
-            conversation,
-            tools=tools if max_tool_calls > 0 and tools else None,
-        )
+        try:
+            message = completion_message(
+                provider,
+                [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
+                tools=tools if max_tool_calls > 0 and tools else None,
+            )
+        except (DomainError, ValueError, httpx.HTTPError):
+            if bench_results or bench_libraries:
+                call_log.append({"name": "calculator_delivery", "status": "failed", "error": "llm_delivery_unavailable"})
+                return bench_answer("", interrupted=True)
+            raise
         requested = message.get("tool_calls")
         if not isinstance(requested, list) or not requested:
             content = message.get("content")
+            if bench_results or bench_libraries:
+                return bench_answer(content if isinstance(content, str) else "", reasoning=_response_reasoning(message))
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("llm_response_empty")
-            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log)
+            return ResearchAgentResult(
+                content.strip(), dedupe_citations(citations), call_log,
+                limit_reached=skipped_calls,
+                reasoning_content=_response_reasoning(message),
+            )
         if len(call_log) - len(initial_tool_calls) >= max_tool_calls:
+            skipped_calls = True
+            if bench_results or bench_libraries:
+                for request in requested:
+                    call_log.append({"name": str((request.get("function") or {}).get("name") or ""),
+                                     "status": "skipped", "error": "tool_call_budget_exhausted"})
+                return bench_answer("")
             conversation.append(
                 {
                     "role": "system",
-                    "content": "The 12-call Research tool limit was reached. Answer now and state the uncovered scope.",
+                    "content": f"The {max_tool_calls}-call Research tool limit was reached. Answer now and state the uncovered scope.",
                 }
             )
-            final = completion_message(provider, conversation)
+            final = completion_message(
+                provider,
+                [{"role": "system", "content": inline_citation_instructions(citations)}, *conversation],
+            )
             content = final.get("content")
+            reasoning = _response_reasoning(final)
             if not isinstance(content, str) or not content.strip():
                 content = "Research tool-call limit reached; the remaining workspace scope was not covered."
-            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True)
+                reasoning = None
+            return ResearchAgentResult(content.strip(), dedupe_citations(citations), call_log, True, reasoning,
+                                       calculator_delivery=False)
         assistant_turn: dict[str, Any] = {
             "role": "assistant",
             "content": message.get("content"),
@@ -267,8 +370,8 @@ def complete_research_turn(
         # to the API", which made every tool-using turn on such a model fail at
         # the second round. Copied through only when the provider sent it, so
         # providers that do not use the field see no change.
-        reasoning = message.get("reasoning_content")
-        if isinstance(reasoning, str) and reasoning:
+        reasoning = _response_reasoning(message)
+        if reasoning is not None:
             assistant_turn["reasoning_content"] = reasoning
         conversation.append(assistant_turn)
         answered: set[str] = set()
@@ -296,18 +399,27 @@ def complete_research_turn(
                 )
                 citations.extend(result_citations)
                 logged_call = {
+                    "tool_call_id": call_id,
                     "name": name,
                     "arguments": arguments,
                     "status": "completed",
                     "result_count": len(result) if isinstance(result, list) else (1 if result else 0),
                 }
-                if name in WRITE_TOOL_NAMES and isinstance(result, dict):
+                if (name in WRITE_TOOL_NAMES or name == "calculate_bench" or bench_delivery and name == "list_proteins"):
                     logged_call["result"] = result
+                elif name in EVIDENCE_RESULT_TOOLS:
+                    logged_call["result"] = _logged_evidence(result)
                 call_log.append(logged_call)
+                if bench_delivery and name == "calculate_bench":
+                    # Preserve results while allowing dependent calculations to continue.
+                    bench_results.append(result)
+                elif bench_delivery and name == "list_proteins":
+                    bench_libraries.append(result)
             except (DomainError, TypeError, ValueError, RuntimeError) as exc:
+                failed_calls = True
                 error = exc.error_code if isinstance(exc, DomainError) else str(exc)
                 result = {"error": error}
-                call_log.append({"name": name, "status": "failed", "error": error[:300]})
+                call_log.append({"name": name, "tool_call_id": call_id, "status": "failed", "error": error[:300]})
             conversation.append(
                 {
                     "role": "tool",
@@ -327,6 +439,9 @@ def complete_research_turn(
             call_id = str(request.get("id") or "")
             if not call_id or call_id in answered:
                 continue
+            skipped_calls = True
+            call_log.append({"name": str((request.get("function") or {}).get("name") or ""),
+                             "status": "skipped", "error": "tool_call_budget_exhausted"})
             conversation.append(
                 {
                     "role": "tool",
@@ -339,6 +454,10 @@ def complete_research_turn(
 
 
 def review_scientific_answer(provider: LLMProvider, request: str, draft: str) -> str:
+    return review_scientific_answer_result(provider, request, draft).content
+
+
+def review_scientific_answer_result(provider: LLMProvider, request: str, draft: str) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -350,10 +469,7 @@ def review_scientific_answer(provider: LLMProvider, request: str, draft: str) ->
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_review_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_review_response_empty")
 
 
 def review_computational_experiment_answer(
@@ -397,6 +513,15 @@ def review_grounded_scientific_answer(
     draft: str,
     evidence_packet: str,
 ) -> str:
+    return review_grounded_scientific_answer_result(provider, request, draft, evidence_packet).content
+
+
+def review_grounded_scientific_answer_result(
+    provider: LLMProvider,
+    request: str,
+    draft: str,
+    evidence_packet: str,
+) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -412,10 +537,7 @@ def review_grounded_scientific_answer(
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_grounded_review_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_grounded_review_response_empty")
 
 
 def grounded_answer_issues(answer: str) -> list[str]:
@@ -452,6 +574,16 @@ def repair_grounded_scientific_answer(
     evidence_packet: str,
     issues: list[str],
 ) -> str:
+    return repair_grounded_scientific_answer_result(provider, request, reviewed_answer, evidence_packet, issues).content
+
+
+def repair_grounded_scientific_answer_result(
+    provider: LLMProvider,
+    request: str,
+    reviewed_answer: str,
+    evidence_packet: str,
+    issues: list[str],
+) -> ScientificAnswer:
     message = completion_message(
         provider,
         [
@@ -468,10 +600,7 @@ def repair_grounded_scientific_answer(
         ],
         tools=None,
     )
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("llm_grounded_repair_response_empty")
-    return content.strip()
+    return _scientific_answer(message, "llm_grounded_repair_response_empty")
 
 
 def _execute(

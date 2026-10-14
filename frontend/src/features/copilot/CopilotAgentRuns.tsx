@@ -1,3 +1,4 @@
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useState } from 'react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,6 +15,7 @@ import {
   type AgentTurn,
 } from '../../lib/api/agentRuns'
 import { TaskDelivery } from './TaskDelivery'
+import { AppliedProceduralSkills } from './ProceduralSkills'
 import { BotAvatar } from './BotAvatar'
 import { useCopilotBots } from './bots/registry'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -208,8 +210,8 @@ function costLabel(
   copy: Record<string, string>,
   format: (template: string, values: Record<string, string | number>) => string,
 ): string {
-  if (run.task_contract?.cost_mode === 'unavailable') return 'Cost not measured / 费用未计量'
-  if (run.task_contract?.cost_mode === 'conservative_estimate') return `Estimated reserve / 保守预留 ${run.subtree_cost_usd_cents ?? run.cost_usd_cents}¢`
+  if (run.task_contract?.cost_mode === 'unavailable') return copy.costUnmeasured
+  if (run.task_contract?.cost_mode === 'conservative_estimate') return format(copy.costEstimatedReserve, { cents: run.subtree_cost_usd_cents ?? run.cost_usd_cents })
   // The server always sends the subtree total; falling back to the run's own
   // cost keeps an older response readable rather than showing a confident zero.
   const subtree = run.subtree_cost_usd_cents ?? run.cost_usd_cents
@@ -348,6 +350,7 @@ export function AgentRunDetail({
 
       {readOnly ? <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
       {run.data ? <TaskDelivery run={run.data} /> : null}
+      {run.data ? <AppliedProceduralSkills contract={run.data.task_contract ?? {}} outcome={run.data.outcome ?? {}} /> : null}
       {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
       {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
       {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
@@ -361,7 +364,7 @@ export function AgentRunDetail({
         {turns.data && turns.data.length > 0 ? (
           <ol className="space-y-2">
             {turns.data.map((turn) => (
-              <TranscriptTurn key={turn.id} turn={turn} />
+              <TranscriptTurn key={turn.id} turn={turn} projectId={projectId} />
             ))}
           </ol>
         ) : (
@@ -374,7 +377,7 @@ export function AgentRunDetail({
   )
 }
 
-function TranscriptTurn({ turn }: { turn: AgentTurn }) {
+function TranscriptTurn({ turn, projectId }: { turn: AgentTurn; projectId: string }) {
   const { t, format } = useI18n()
   const copy = t.copilot.agentRuns
   const roles: Record<string, string> = {
@@ -398,8 +401,9 @@ function TranscriptTurn({ turn }: { turn: AgentTurn }) {
         {roles[turn.role] ?? turn.role}
       </span>
       {turn.content ? (
-        <p className="mt-1 text-sm whitespace-pre-wrap break-words">{turn.content}</p>
+        <div className="mt-1 text-sm whitespace-pre-wrap break-words">{turn.role === 'tool' ? <Disclosure title={copy.roleTool}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{turn.content}</pre></Disclosure> : turn.content}</div>
       ) : null}
+      {turn.role === 'tool' ? <ToolEvidenceLazy projectId={projectId} calls={turn.tool_calls} content={turn.content} /> : null}
       {calls.length > 0 ? (
         <p className="mt-1 font-mono text-xs text-text-secondary">
           {format(copy.toolCalls, { names: calls.join(', ') })}

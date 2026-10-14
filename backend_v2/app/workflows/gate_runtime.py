@@ -104,11 +104,23 @@ def capture_results(session, job, artifacts, parsed, storage=None):
             row["files"].append({"artifact_id": str(artifact.id), "port": port, "selector": selector})
             if selector.get("sequence"):
                 row["sequence"] = selector["sequence"]
+            scale_metadata = metadata.get("confidence_scales", {})
+            prior_scales = row.setdefault("metric_scales", {})
+            if isinstance(scale_metadata, dict):
+                for metric_key, scale in scale_metadata.items():
+                    prior_scales[metric_key] = (
+                        "conflicting_declarations" if metric_key in prior_scales and prior_scales[metric_key] != scale else scale
+                    )
+            else:
+                row["invalid_confidence_scale_metadata"] = True
             row["metrics"].update(selector.get("metrics", {}))
             row["metrics"].update({k: v for k, v in metadata.get("metrics", {}).items() if isinstance(v, (int, float))})
             candidate = candidates.get(key)
             if candidate:
                 row["metrics"].update(candidate.scores)
+                # File declarations describe raw file values. Parsed candidate values
+                # replace them and carry their own stored scale, so keep both sources.
+                row["reported_confidence_scales"] = scale_metadata
                 if candidate.score is not None:
                     row["metrics"]["score"] = candidate.score
                 row["metric_sources"] = [
@@ -118,20 +130,36 @@ def capture_results(session, job, artifacts, parsed, storage=None):
                         "method": m.method,
                         "model_variant": m.model_variant,
                         "condition": m.condition,
+                        "unit": m.unit,
+                        "context": m.context,
                     }
                     for m in candidate.metrics
                 ]
+                declared_confidence = candidate.properties.get("confidence_scale", {})
+                invalid_confidence = not isinstance(declared_confidence, dict)
+                if invalid_confidence:
+                    declared_confidence = {}
+                metric_keys = {metric.key for metric in candidate.metrics}
+                row["metric_sources"].extend({
+                    "key": key, "value": value,
+                    "method": candidate.properties.get("folded_by") or candidate.properties.get("predicted_by") or "",
+                    "context": {"stored_scale": "invalid_declaration"} if invalid_confidence else declared_confidence.get(key, {}),
+                } for key, value in candidate.scores.items() if key not in metric_keys)
                 # Ambiguous metric variants must be addressed by their full name.
                 counts: dict[str, int] = defaultdict(int)
                 for m in candidate.metrics:
                     counts[m.key] += 1
                 for m in candidate.metrics:
+                    if isinstance(m.context, dict) and "stored_scale" in m.context and "reported_value" in m.context:
+                        prior_scales.pop(m.key, None)
                     row["metrics"][f"{m.key}:{m.method}:{m.model_variant}:{m.condition}"] = m.value
                     if counts[m.key] == 1:
                         row["metrics"][m.key] = m.value
                     else:
                         row["metrics"].pop(m.key, None)
     for key, payload in groups.items():
+        if payload.get("invalid_confidence_scale_metadata"):
+            payload["metric_scales"] = {key: "invalid_declaration" for key in payload["metrics"]}
         if key not in existing:
             session.add(
                 WorkflowResult(
@@ -463,7 +491,12 @@ def run_gate(session, gate, storage=None):
         passed = [d["id"] for d in decisions if d["passed"]]
         if not passed and any(d.get("needs_attention") for d in decisions):
             gate.status = "error"
-            gate.error_message = "structure_data_needs_attention"
+            gate.error_message = (
+                "confidence_scale_needs_attention" if any(
+                    str(reason).startswith(("scale_conflict:", "scale_unknown:"))
+                    for decision in decisions for reason in decision.get("reasons", [])
+                ) else "structure_data_needs_attention"
+            )
             gate.version += 1
             return
         if gate.preview:

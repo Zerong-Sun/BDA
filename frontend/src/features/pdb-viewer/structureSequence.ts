@@ -39,7 +39,7 @@ export function extractChainSequences(plugin: PluginContext): ChainSequence[] {
   if (!structure) return []
 
   const order: string[] = []
-  const byChain = new Map<string, Map<number, string>>()
+  const byChain = new Map<string, Map<string, { seqId: number; insertionCode: string; code: string }>>()
   const location = StructureElement.Location.create(structure)
 
   for (const unit of structure.units) {
@@ -60,23 +60,24 @@ export function extractChainSequences(plugin: PluginContext): ChainSequence[] {
 
       const chainId = StructureProperties.chain.auth_asym_id(location)
       const seqId = StructureProperties.residue.auth_seq_id(location)
+      const insertionCode = StructureProperties.residue.pdbx_PDB_ins_code(location)
       const compId = StructureProperties.atom.label_comp_id(location)
 
       let residues = byChain.get(chainId)
       if (!residues) {
-        residues = new Map<number, string>()
+        residues = new Map()
         byChain.set(chainId, residues)
         order.push(chainId)
       }
-      if (!residues.has(seqId)) residues.set(seqId, residueCode(compId))
+      const key = `${seqId}:${insertionCode}`
+      if (!residues.has(key)) residues.set(key, { seqId, insertionCode, code: residueCode(compId) })
     }
   }
 
   return order.map((chainId) => {
-    const residues = byChain.get(chainId) ?? new Map<number, string>()
-    const sequence = [...residues.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([, code]) => code)
+    const sequence = [...(byChain.get(chainId)?.values() ?? [])]
+      .sort((a, b) => a.seqId - b.seqId || a.insertionCode.localeCompare(b.insertionCode))
+      .map(({ code }) => code)
       .join('')
     return { chainId, sequence, residueCount: sequence.length }
   }).filter((entry) => entry.residueCount > 0)

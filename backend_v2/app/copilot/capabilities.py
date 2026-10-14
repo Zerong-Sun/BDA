@@ -69,6 +69,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "execution_mode": "read",
         "chat_tools": [
             "analyse_structure",
+            "list_structure_residues",
             "list_structure_contacts",
             "measure_structure_interface",
             "compare_structures",
@@ -195,7 +196,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series"],
+        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series", "calculate_bench"],
     },
     {
         "id": "wetlab-authoring",
@@ -208,6 +209,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "execution_mode": "draft",
         "chat_tools": [
             "promote_candidate_to_bench",
+            "preview_bli_artifact",
             "analyse_bli_run",
             "analyse_akta_run",
             "analyse_enzyme_plate",

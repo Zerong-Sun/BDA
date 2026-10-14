@@ -7,6 +7,7 @@ import httpx
 import pytest
 from backend_v2.app.copilot import provider, service
 from backend_v2.app.core.problem import DomainError
+from backend_v2.tests._provider_transport import mock_post, mock_sleep
 
 
 def test_credential_references(monkeypatch, tmp_path) -> None:
@@ -48,19 +49,90 @@ def test_openai_compatible_completion(monkeypatch) -> None:
         return Response()
 
     monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
-    monkeypatch.setattr(provider.httpx, "post", post)
+    mock_post(monkeypatch, post)
     configured = SimpleNamespace(
         endpoint="https://llm.example/v1",
         credential_ref="env:BDA_TEST_LLM_TOKEN",
         model="research-model",
-        config={"temperature": 0.1},
+        config={"temperature": 0.1, "thinking": {"type": "disabled"}, "max_tokens": 4096, "platform_default": True},
     )
     assert provider.complete(configured, [{"role": "user", "content": "question"}]) == "completed answer"
     assert captured["url"] == "https://llm.example/v1/chat/completions"
     assert captured["headers"]["Authorization"] == "Bearer secret"
     assert captured["json"]["model"] == "research-model"
+    assert captured["json"]["messages"] == [{"role": "user", "content": "question"}]
+    assert captured["json"]["thinking"] == {"type": "disabled"}
+    assert captured["json"]["max_tokens"] == 4096
+    assert "platform_default" not in captured["json"]
+    assert "stream" not in captured["json"]
     assert captured["timeout"].connect == 10.0
     assert captured["timeout"].read == 180.0
+
+
+@pytest.mark.parametrize("message", [{"content": "partial result"}, {"content": None, "tool_calls": []}])
+def test_truncated_output_is_not_accepted_as_a_complete_answer(monkeypatch, message) -> None:
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    mock_post(monkeypatch, lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": message, "finish_reason": "length"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "question"}])
+    assert error.value.error_code == "llm_output_truncated"
+
+
+def test_filtered_output_is_not_accepted_as_a_complete_answer(monkeypatch) -> None:
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    mock_post(monkeypatch, lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": {"content": "partial"}, "finish_reason": "content_filter"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "question"}])
+    assert error.value.error_code == "llm_output_filtered"
+
+
+@pytest.mark.parametrize("calls", ["not-an-array", [None], [{"id": "a", "function": None}],
+                                   [{"id": "a", "type": "function", "function": {"name": "tool", "arguments": {}}}]])
+def test_malformed_tool_calls_are_rejected_at_provider_boundary(monkeypatch, calls):
+    monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
+    mock_post(monkeypatch, lambda url, **kwargs: httpx.Response(
+        200, request=httpx.Request("POST", url),
+        json={"choices": [{"message": {"content": None, "tool_calls": calls}, "finish_reason": "tool_calls"}]},
+    ))
+    configured = SimpleNamespace(endpoint="https://llm.example/v1", credential_ref="env:BDA_TEST_LLM_TOKEN", model="model", config={})
+    with pytest.raises(ValueError, match="llm_response_schema_invalid"):
+        provider.completion_message(configured, [])
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("model", "different-model"),
+        ("messages", [{"role": "user", "content": "overridden input"}]),
+        ("stream", True),
+        ("stream", False),
+    ],
+)
+def test_completion_rejects_reserved_config_before_credentials_or_request(monkeypatch, field, value) -> None:
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid provider config must fail before reading credentials or sending a request")
+
+    monkeypatch.setattr(provider, "credential_value", forbidden)
+    mock_post(monkeypatch, forbidden)
+    configured = SimpleNamespace(
+        endpoint="https://llm.example/v1",
+        credential_ref="env:BDA_TEST_LLM_TOKEN",
+        model="selected-model",
+        config={field: value},
+    )
+    with pytest.raises(DomainError) as error:
+        provider.complete(configured, [{"role": "user", "content": "original input"}])
+    assert error.value.error_code == "llm_config_reserved_fields"
+    assert error.value.status_code == 422
+    assert error.value.detail == "LLM provider config cannot set reserved request fields: " + field
 
 
 def test_completion_rejects_missing_endpoint_and_invalid_payload(monkeypatch) -> None:
@@ -76,7 +148,7 @@ def test_completion_rejects_missing_endpoint_and_invalid_payload(monkeypatch) ->
         def json(self):
             return {"choices": []}
 
-    monkeypatch.setattr(provider.httpx, "post", lambda *args, **kwargs: Response())
+    mock_post(monkeypatch, lambda *args, **kwargs: Response())
     configured = SimpleNamespace(
         endpoint="https://llm.example/chat/completions",
         credential_ref="env:BDA_TEST_LLM_TOKEN",
@@ -106,8 +178,8 @@ def test_completion_retries_transient_network_error(monkeypatch) -> None:
         )
 
     monkeypatch.setenv("BDA_TEST_LLM_TOKEN", "secret")
-    monkeypatch.setattr(provider.httpx, "post", post)
-    monkeypatch.setattr(provider.time, "sleep", lambda _: None)
+    mock_post(monkeypatch, post)
+    mock_sleep(monkeypatch, lambda _: None)
     configured = SimpleNamespace(
         endpoint="https://llm.example/v1",
         credential_ref="env:BDA_TEST_LLM_TOKEN",

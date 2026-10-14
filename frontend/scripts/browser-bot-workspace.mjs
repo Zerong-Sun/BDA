@@ -206,9 +206,16 @@ try {
   await screenshot(page, 'bots-mobile')
   await page.getByRole('button', { name: 'More workspace actions', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Application settings', exact: true }).waitFor()
-  await page.getByRole('menuitem', { name: 'Toolbox', exact: true }).waitFor()
-  await page.getByRole('menuitem', { name: 'Interface tour', exact: true }).waitFor()
+  assert.equal(await page.getByRole('menuitem', { name: 'Toolbox', exact: true }).count(), 0)
+  assert.equal(await page.locator('a[href="#/tools?project=proj_browser"]').count(), 1, 'Lab tools has one dedicated navigation entry')
+  assert.equal(await page.getByRole('menuitem', { name: 'Interface tour', exact: true }).count(), 0)
   await screenshot(page, 'mobile-utilities')
+  await page.keyboard.press('Escape')
+  await page.getByRole('menu').waitFor({ state: 'hidden' })
+  assert.equal(await page.getByRole('button', { name: 'Help', exact: true }).count(), 1)
+  await page.getByRole('button', { name: 'Help', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Interface tour', exact: true }).waitFor()
+  await page.getByRole('menuitem', { name: 'FAQ', exact: true }).waitFor()
   await page.keyboard.press('Escape')
   await page.getByRole('menu').waitFor({ state: 'hidden' })
   const lastBot = page.locator('.bot-roster-item').last()
@@ -273,6 +280,7 @@ try {
     else await zh.locator('.project-row-actions a').first().click()
   })
   await zh.getByRole('region', { name: '项目简报' }).waitFor()
+  await zh.getByRole('button', { name: '管理问题与目标树', exact: true }).click()
   assert.ok(await zh.locator('[data-tour-id="research-goals"] input').isDisabled())
   await screenshot(zh, 'brief-zh-dark')
   for (const width of [320, 390, 768, 1024, 1440]) {
@@ -391,8 +399,12 @@ try {
   console.log(JSON.stringify({ passed: checks.length, output, checks }, null, 2))
 } catch (error) {
   for (const context of browser.contexts()) for (const page of context.pages()) {
-    await screenshot(page, 'failure')
-    await writeFile(`${output}/failure.txt`, await page.locator('body').innerText())
+    try {
+      await screenshot(page, 'failure')
+      await writeFile(`${output}/failure.txt`, await page.locator('body').innerText())
+    } catch (captureError) {
+      console.error('Failure capture unavailable:', captureError.message)
+    }
   }
   throw error
 } finally {

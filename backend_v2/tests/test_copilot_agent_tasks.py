@@ -338,3 +338,36 @@ def test_settling_an_operation_no_run_waits_on_changes_nothing(wired) -> None:
 
     assert copilot_tasks.copilot_agent_operation_settled.run(str(operation_id))["woken"] == []
     assert sent == []
+
+
+def test_duplicate_delivery_refreshes_state_after_acquiring_lock(wired, monkeypatch):
+    """A run loaded before waiting on a lock may have completed on another worker."""
+    from backend_v2.app.copilot import agent_loop
+    from sqlalchemy import update
+
+    factory, _ = wired
+    with factory() as session:
+        project_id, user_id = _project(session)
+        run = agent_runs.create_run(session, project_id=project_id, user_id=user_id,
+                                    goal="duplicate delivery", allowed_tools=[])
+        session.commit()
+        run_id = run.id
+    original_get = Session.get
+    raced = []
+
+    def get_then_other_worker_finishes(session, entity, ident, **kwargs):
+        row = original_get(session, entity, ident, **kwargs)
+        if entity is CopilotAgentRun and ident == run_id and not raced:
+            raced.append(True)
+            # Simulate a committed concurrent result without synchronizing this
+            # identity-map object, as happens while SELECT FOR UPDATE waits.
+            session.execute(update(CopilotAgentRun).where(CopilotAgentRun.id == run_id)
+                            .values(status="succeeded", version=2)
+                            .execution_options(synchronize_session=False))
+        return row
+
+    monkeypatch.setattr(Session, "get", get_then_other_worker_finishes)
+    monkeypatch.setattr(agent_loop, "provider_for", lambda *_: pytest.fail("duplicate model call"))
+    assert copilot_tasks.copilot_agent_step.run(str(run_id))["status"] == "succeeded"
+    with factory() as session:
+        assert session.get(CopilotAgentRun, run_id).status == "succeeded"

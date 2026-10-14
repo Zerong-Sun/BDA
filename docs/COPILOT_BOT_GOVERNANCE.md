@@ -355,7 +355,7 @@ nothing.
 |---|---|---|
 | 1 | A `review` bot declaring a write capability fails at import | `test_copilot_bots.py` |
 | 2 | A `direct` bot declaring a domain-write capability fails at import | `test_copilot_bots.py` |
-| 3 | Stance never widens: `resolve` is still the intersection for all 12 bots | `test_copilot_bots.py` |
+| 3 | Stance never widens: `resolve` is still the intersection for all 6 current bots | `test_copilot_bots.py` |
 | 4 | A delegated run is owned by the target bot, not the conductor | `test_copilot_chain.py` |
 | 5 | A delegated run's write gate reads the user's words, not the conductor's | `test_copilot_chain.py` |
 | 6 | A delegated run's tools are exactly target ∩ project, and a subagent's are still bounded by its parent | `test_copilot_chain.py` |

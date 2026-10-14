@@ -2,7 +2,7 @@
 
 状态：活跃 / §6 四步全部已实现
 
-最后核验：2026-09-15（Asia/Shanghai；重新实测 operation 与 `x-permission` 计数；新增的密码子优化端点**故意不做成工具**——它返回 DNA，而工具结果会写进 `copilot_messages.tool_calls`，等于在对话记录里多留一份构建体明文。工具与能力计数不变）
+最后核验：2026-10-14（导入工具注册表核对数量与 MCP 上下文过滤，并核对当前 OpenAPI；外部 MCP 宿主验收单独记录）
 
 权威范围：本文只规定「BDA 以 MCP 协议对外暴露哪些能力、凭什么授权、挂在哪里」。Copilot 自身的能力边界仍以 [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 为准；Autopilot 的执行与预算模型仍以 [Autopilot 协议与实现边界](AUTOPILOT_CAMPAIGNS.md) 为准。
 
@@ -16,11 +16,11 @@
 
 把 `/api/v2` 包成 MCP 工具是第一个会想到的做法，它有三个具体的、可量化的问题：
 
-- **体量**：当前 `openapi.json` 是 185 条 path / **251 个 operation** / 4.3 MB。一个工具清单塞进模型上下文就已经越界，而 MCP 客户端要在每轮对话里带着它。
+- **体量**：2026-10-14 的 `openapi.json` 有 262 条 path、329 个 operation。把全部端点变成工具会显著增加每轮模型上下文。
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
-- **控制面丢失**：286 个 operation 中只有 140 个带 `x-permission`（本轮实测；此处此前写的 251/121 已过期，数字按 `backend_v2/openapi.json` 重新数过）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
+- **控制面丢失**：329 个 operation 中 165 个带 `x-permission`（2026-10-14 按 `backend_v2/openapi.json` 核对）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
-同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。当前注册 **53 个工具 / 22 个 capability**，按执行模式分为 read 37 / draft 11 / queue 5。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
+同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。2026-10-14 导入 `copilot.tools` 后核验：**57 个工具 / 22 个 capability**，执行模式为 read 40 / draft 11 / queue 6。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
 ## 2. 结论
 
@@ -28,7 +28,7 @@
 
 `registry.py` 的模块 docstring 自陈了这个模块存在的原因：一个工具曾经散在三处（模型 schema、capability 映射、`if name == ...` 分发链），加一个要改三处，漏掉第三处不会报错——工具要么不可达，要么可达但跳过了 capability 检查。**为 MCP 另写一套工具定义就是加上第四处。**
 
-因此 MCP 层只负责三件事，一件不多：
+MCP 层负责以下四项：
 
 1. 把 `ToolSpec.schema()` 翻译成 MCP 的 `tools/list` 响应；
 2. 把 MCP 的 `tools/call` 翻译成 `REGISTRY.execute(tool_id, context, arguments, granted=…)`；
@@ -41,16 +41,16 @@
 
 写工具的保险丝是 `actions.CopilotActions.request_allows()`：它在**用户自己的原话**里找领域词 + 动词，并排除建议语气与否定从句。当前两个调用点分别传入：
 
-- `copilot/tasks.py:111` — `request_text=source.content`，即用户的聊天消息；
-- `copilot/agent_loop.py:179` — `request_text=run.goal`，即用户创建 agent run 时写下的目标。
+- `copilot/tasks.py` — `request_text=source.content`，即用户的聊天消息；
+- `copilot/agent_loop.py` — `request_text=run.goal`，即用户创建 agent run 时写下的目标。
 
 **MCP 客户端没有"用户原话"。** 它发来的 `arguments` 是对端模型生成的，把它当作 `request_text` 等于让模型给自己开门——这条保险丝会当场失效，而且不会报错。
 
 规则（本方案唯一的新增语义，且是减法）：
 
-- **MCP 会话必须绑定到一个已存在的 `copilot_agent_runs` 行。** `request_text = run.goal`，与 `agent_loop.py:179` 完全一致，不引入第三种意图来源。
-- **未绑定 run 的 MCP 会话只暴露 `execution_mode == "read"` 的 34 个工具**，`tools/list` 里根本不出现另外 14 个。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
-- `requires="session"` 的 5 个 draft 工具（`wetlab-authoring` 三个、`research-trace-authoring` 一个、`promote_candidate_to_bench`）**不经过 `actions` 服务，因而没有意图门**。在 MCP 上它们必须按 `execution_mode` 归入"需要 run 绑定"一档，否则会成为整条链上唯一没有用户授权的写路径。
+- **MCP 会话必须绑定到一个已存在的 `copilot_agent_runs` 行。** `request_text = run.goal`，与 `agent_loop.py` 完全一致，不引入第三种意图来源。
+- **未绑定 run 的 MCP 会话只暴露获授权且允许 MCP 调用的 `execution_mode == "read"` 工具**；写工具和要求 `agent_run` 上下文的工具不出现在列表中。不可见优于可见而拒绝：后者会让对端模型反复重试并把失败当作可以绕过的障碍。
+- `requires="session"` 不表示只读；仪器分析等写工具仍按 `execution_mode` 要求 run 绑定。注册入口统一检查用户写入意图，MCP 还按已保存任务范围与当前步骤收窄工具；内部交接的例外不授权领域写入。
 
 ### 3.2 身份与凭证
 
@@ -93,10 +93,44 @@ dispatch 里：`settings.writes_enabled` 为 false 时，`spec.execution_mode !=
 
 ## 4. 暴露什么
 
+### Structure residue evidence (2026-10-14)
+
+`structure-analysis` includes the project-scoped, read-only `list_structure_residues`
+tool. Chat, durable bot runs and MCP use the same registry declaration and handler.
+Start with `analyse_structure` to identify the actual artifact and author chain IDs;
+then use `residue_property="positive"` for LYS/ARG or `"titratable"` to include HIS.
+Histidine can be neutral or positive; the classification is a near-neutral-pH
+side-chain convention, not a pKa, protonation or electrostatic calculation.
+
+Supply `chain`, `partner_chain` and optionally `interface_only=true` to restrict
+the inventory to calculated heavy-atom contacts. Contact counts, distances and burial
+are geometry calculated from the source coordinates; predicted coordinates do not
+make them experimental measurements. A validated energetic hotspot requires independent
+experimental evidence. Confidence follows source declarations; an unattributed
+B-factor column is never assumed to be pLDDT.
+
+Each result carries artifact identity, checksum, sanitized provenance, author chain,
+residue number and insertion code, limits and a `viewer_selection` object. The
+selection contains at most 200 returned residues and explicitly reports truncation.
+Use these exact identities in saved reports and pass them to `render_structure_view`
+after reading the measurement result. `A:52` and `A:52A` remain distinct in MolViewSpec
+and the browser viewer. `describe_structure_site` rejects ambiguous numbering unless
+`insertion_code` is supplied; empty string selects the uninserted residue. Hotspot
+design writes reject nonempty insertion codes because current design parameter
+formats cannot represent them; never strip a code to target another residue.
+
+The full-identity contact summaries are `interface_residue_details_a` and
+`interface_residue_details_b`; older `interface_residues_a/b` number/name tuples are
+retained for compatibility and must not be used as residue selection identities.
+The scientific and viewer assumptions are covered by PDB/mmCIF, MCP project-scope,
+synthetic confidence, salt-bridge and real Mol* selection regressions.
+
 | 会话形态 | `tools/list` 内容 | 授权依据 |
 | --- | --- | --- |
-| 只读会话（无 run 绑定） | 34 个 `read` 工具 ∩ `granted_capabilities` | 用户签发 + 项目成员资格 |
-| 绑定 run 的会话 | 上述 + 11 个 `draft` + 3 个 `queue`，仍 ∩ `granted_capabilities` | 追加 `run.goal` 的意图门 |
+| 只读会话（无 run 绑定） | 最多 37 个 `read` 工具，再取能力交集 | 用户签发 + 项目成员资格 |
+| 绑定 live run 的会话 | 上限为 read 37 / draft 11 / queue 6，再按能力、任务步骤、写入授权与 operator 过滤 | 追加已保存任务范围/原始请求的意图门 |
+
+以上上限于 2026-10-14 从注册表及 `mcp.UNSUPPORTED_REQUIRES` 核验：3 个要求 `agent_run` 的 read 工具不会暴露给 MCP。实际会话工具数由 `tools/list` 决定。版本化 BLI、残基身份和跨页证据使用路径见[工作流指南](VERSIONED_INSTRUMENT_BOT_WORKFLOW.md)。
 
 `granted_capabilities` 取交集而非并集：`copilot_configs.enabled_skills` 是项目对 copilot 的授权上限，MCP 会话不得超过它。一个项目关掉了 `wetlab-authoring`，MCP 就拿不到它——不需要第二处开关。
 
@@ -137,7 +171,7 @@ MCP 没有 message 行，`tools/call` 的结果又只是内容块，所以第一
 
 ## 5. 明确不做
 
-- **不暴露 251 个 REST operation。** §1。
+- **不把完整 REST 端点清单逐个包装成工具。** §1。
 - **不新建第二套工具定义。** §2。
 - **不暴露 `spawn_subagent`。** 它的递归深度上限由 `copilot_agent_runs` 维护；MCP 客户端本身已经是一层编排者，再给它生成子 agent 的能力会让深度计数失去意义。
 - **不给文件系统、shell、凭证或数据库访问。** [Copilot 服务与权限指南](COPILOT_SERVICE_GUIDE.md) 已冻结此条，MCP 面不是重新讨论它的地方。

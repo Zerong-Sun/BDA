@@ -1,0 +1,103 @@
+{
+  "id": "experimental-result-review",
+  "version": "1.0.0",
+  "title": "Experimental result review",
+  "title_zh": "实验结果复核",
+  "description": "Assess recorded assay results, controls, units, failures and supported conclusions.",
+  "description_zh": "复核实际测量、对照、单位、失败状态和结论范围。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "d75aaa25105ae6e84fe319ca0224d4ec7cc65122196193c072c4c3220bc53fc3",
+  "default_for": [
+    "interpretation"
+  ],
+  "tool_requests": [
+    "list_experiment_results",
+    "get_dataset_slice",
+    "list_project_candidates",
+    "research_overview"
+  ],
+  "optional_write_tools": [],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "observations_and_units",
+      "controls_and_quality",
+      "supported_and_refuted",
+      "followup",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "observations_and_units": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "controls_and_quality": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "supported_and_refuted": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "followup": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

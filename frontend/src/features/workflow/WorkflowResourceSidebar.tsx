@@ -24,6 +24,7 @@ interface WorkflowResourceSidebarProps {
   onArtifactSelected: (artifact: Artifact) => void
   onPluginAdd?: (plugin: ModelPlugin) => void
   readOnly?: boolean
+  artifactReadOnly?: boolean
 }
 
 export function WorkflowResourceSidebar({
@@ -35,6 +36,7 @@ export function WorkflowResourceSidebar({
   onArtifactSelected,
   onPluginAdd,
   readOnly = false,
+  artifactReadOnly = readOnly,
 }: WorkflowResourceSidebarProps) {
   const { t, format } = useI18n()
   const [tab, setTab] = useState('artifacts')
@@ -43,12 +45,12 @@ export function WorkflowResourceSidebar({
     queryFn: listModelPlugins,
   })
   const nodeArtifacts = selectedNode
-    ? artifacts.filter((artifact) => artifact.lineage.workflow_node_id === selectedNode.id)
+    ? artifacts.filter((artifact) => artifact.lineage.workflow_node_id === selectedNode.id || (Array.isArray(selectedNode.parameters.evidence_artifact_ids) && selectedNode.parameters.evidence_artifact_ids.includes(artifact.id)))
     : artifacts
   const visibleArtifacts = selectedNode ? nodeArtifacts : artifacts
 
   return (
-    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-[300px] shrink-0 2xl:min-h-0">
+    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-full shrink-0 2xl:min-h-0">
       <FramePanel className="min-h-0 overflow-hidden p-0">
       <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="h-full min-h-0">
         <TabsList variant="line" className="mx-3 mt-2">
@@ -70,7 +72,7 @@ export function WorkflowResourceSidebar({
             ) : null}
             <ArtifactUploadDropzone
               projectId={projectId}
-              readOnly={readOnly}
+              readOnly={artifactReadOnly}
               onUploaded={onArtifactUploaded}
             />
             <div className="mt-3">

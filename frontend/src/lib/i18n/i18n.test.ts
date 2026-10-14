@@ -14,6 +14,19 @@ describe('i18n', () => {
     expect(zhKeys).toEqual(enKeys)
   })
 
+  it('preserves interpolation variables in every translated string', () => {
+    function entries(value: unknown, prefix = ''): [string, string][] {
+      if (typeof value === 'string') return [[prefix, value]]
+      if (!value || typeof value !== 'object') return []
+      return Object.entries(value).flatMap(([key, nested]) => entries(nested, prefix ? `${prefix}.${key}` : key))
+    }
+    const translated = new Map(entries(zh))
+    const variables = (text: string) => [...new Set([...text.matchAll(/\{([a-zA-Z_][a-zA-Z_0-9]*)\}/g)].map((match) => match[1]))].sort()
+    for (const [key, text] of entries(en)) {
+      expect(variables(translated.get(key) ?? ''), key).toEqual(variables(text))
+    }
+  })
+
   it('translates core navigation labels in zh', () => {
     expect(zh.nav.projects).not.toBe(en.nav.projects)
     expect(zh.login.signIn).not.toBe(en.login.signIn)

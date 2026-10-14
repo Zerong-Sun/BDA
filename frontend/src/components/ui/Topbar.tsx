@@ -1,8 +1,8 @@
 import { NavLink, useNavigate } from 'react-router'
 import clsx from 'clsx'
-import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon, PulseIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
-import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, type AppRoute } from '../../lib/nav/routes'
+import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchGroups, type AppRoute } from '../../lib/nav/routes'
 import { CommandPalette } from './CommandPalette'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
@@ -14,8 +14,9 @@ import { HelpMenu } from './HelpMenu'
 import { StatusPill } from './StatusPill'
 import { statusTone } from './statusTone'
 import { Button } from './Button'
+import { BigoBioLogo } from './BigoBioLogo'
 import { StatusBadge } from './statusBadge'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from './dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -32,7 +33,7 @@ const primaryRoutes = PRIMARY_ROUTES
 
 export function Topbar() {
   const navigate = useNavigate()
-  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, setTourMenuOpen, activityOpen, setActivityOpen } = useAppStore()
+  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, activityOpen, setActivityOpen } = useAppStore()
   const { t, language } = useI18n()
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
@@ -46,7 +47,8 @@ export function Topbar() {
           to={`/projects${projectQuery}`}
           className="science-brand shrink-0 text-sm font-semibold text-text-primary"
         >
-          <span className="science-brand-mark" aria-hidden="true"><AtomIcon weight="duotone" /></span>{t.brand}
+          <BigoBioLogo />
+          <span className="science-brand-product">{t.brand}</span>
         </NavLink>
 
         {/* Project is the anchor of the whole workbench: give it a prominent,
@@ -89,16 +91,15 @@ export function Topbar() {
         </div>
 
         <div className="topbar-actions flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
+          <HelpMenu />
           <div className="science-mobile-utilities">
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon" />} aria-label={language === 'zh' ? '更多工作区操作' : 'More workspace actions'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="science-utility-menu w-64">
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => setCopilotOpen(!copilotOpen)}><ChatCircleIcon aria-hidden="true" />{t.copilot.drawer.toggleTitle}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/tools')}><FlaskIcon aria-hidden="true" />{language === 'zh' ? '工具箱' : 'Toolbox'}</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActivityOpen(!activityOpen)}><PulseIcon aria-hidden="true" />{t.operations.toggleTitle}</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setSettingsOpen(true)}><GearIcon aria-hidden="true" />{t.shared.applicationSettings}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTourMenuOpen(true)}><QuestionIcon aria-hidden="true" />{language === 'zh' ? '界面导览' : 'Interface tour'}</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -110,20 +111,6 @@ export function Topbar() {
               label={appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
             />
           </span>
-          <span className="hidden sm:inline-flex">
-            <HelpMenu />
-          </span>
-          <Button
-            data-tour-id="tour-help"
-            type="button"
-            aria-label={language === 'zh' ? '打开界面导览' : 'Open interface tour'}
-            title={language === 'zh' ? '界面导览' : 'Interface tour'}
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTourMenuOpen(true)}
-          >
-            <QuestionIcon className="h-4 w-4" />
-          </Button>
           <Button
             type="button"
             aria-label={t.copilot.drawer.toggleTitle}
@@ -135,7 +122,6 @@ export function Topbar() {
             <ChatCircleIcon className="h-4 w-4" />
           </Button>
           <CommandPalette />
-          <Button type="button" variant="ghost" size="sm" render={<NavLink to="/tools" />}>{language === 'zh' ? '工具箱' : 'Toolbox'}</Button>
           <ActivityIndicatorButton />
           <Button
             type="button"
@@ -174,7 +160,7 @@ export function Topbar() {
               )
             }
           >
-            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/inbox' ? <ListChecksIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : null}
+            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/inbox' ? <ListChecksIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : route.to === '/tools' ? <FlaskIcon aria-hidden="true" /> : null}
             {navLabel(route.key)}
           </NavLink>
         ))}
@@ -182,11 +168,12 @@ export function Topbar() {
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" />}><WrenchIcon aria-hidden="true" />{zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuGroup>
-                {mobileRoutes.filter((route) => !primaryRoutes.includes(route.to) && route.to !== '/faq').map((route) => (
+              {workbenchGroups(zh).map((group) => <DropdownMenuGroup key={group.key}>
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                {group.routes.map((route) => (
                   <DropdownMenuItem key={route.to} onClick={() => navigate(`${route.to}${projectQuery}`)}>{navLabel(route.key)}</DropdownMenuItem>
                 ))}
-              </DropdownMenuGroup>
+              </DropdownMenuGroup>)}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

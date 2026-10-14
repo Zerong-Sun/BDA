@@ -8,6 +8,7 @@ from ..core.problem import DomainError
 from ..identity.models import User
 from .models import ComputeNode, LLMProvider, MethodPlugin, ModelPlugin, RegistryServer, ScriptAsset
 from .plugin_manifest import PluginManifest
+from .qualification import validate_qualification_resources
 from .schemas import PluginDeploymentCreate, RegistryDeactivateResponse, RegistryResourceUpdate, ScriptAssetCreate
 
 MODELS = {
@@ -23,6 +24,8 @@ def create_resource(session: Session, kind: str, data: dict):
     model = MODELS.get(kind)
     if model is None:
         raise DomainError("registry_kind_invalid", "Unsupported registry resource kind", status_code=422)
+    if kind == "model_plugin":
+        validate_qualification_resources(data.get("resources", {}))
     try:
         row = model(**data)
     except TypeError as exc:
@@ -44,6 +47,8 @@ def public_data(row) -> dict:
 def update_resource(row, payload: RegistryResourceUpdate, expected_version: int):
     if row.version != expected_version:
         raise DomainError("version_conflict", "Registry resource was modified", status_code=412)
+    if isinstance(row, ModelPlugin) and "resources" in payload.data:
+        validate_qualification_resources(payload.data["resources"])
     protected = {"id", "version", "created_at", "updated_at"}
     if isinstance(row, ModelPlugin) and row.manifest_checksum:
         protected.update(
@@ -80,6 +85,7 @@ def deploy_plugin_manifest(
     manifest: PluginManifest,
     payload: PluginDeploymentCreate,
 ) -> ModelPlugin:
+    validate_qualification_resources(manifest.resources)
     row = session.scalar(
         select(ModelPlugin).where(
             ModelPlugin.plugin_key == manifest.plugin_key,

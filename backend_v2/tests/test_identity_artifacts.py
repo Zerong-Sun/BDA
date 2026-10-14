@@ -156,13 +156,15 @@ def test_oidc_pkce_and_callback(monkeypatch, service_session, username_taken) ->
         session.add(User(username="person@example.test", display_name="Disabled", role="viewer", enabled=False))
         session.flush()
     config = {
+        "writes_enabled": True,
+        "registration_mode": "open",
         "oidc_providers": {
             "test": {
                 "issuer": "https://issuer",
                 "client_id": "client",
                 "redirect_uris": "https://app/callback",
             }
-        }
+        },
     }
     monkeypatch.setattr(identity_service, "get_settings", lambda: SimpleNamespace(**config))
     discovery = {
@@ -189,6 +191,17 @@ def test_oidc_pkce_and_callback(monkeypatch, service_session, username_taken) ->
     user = identity_service.complete_oidc(session, "test", state, "code")
     assert user.oidc_subject == "subject"
     assert user.username == ("person@example.test-2" if username_taken else "person@example.test")
+    # A configured external provider cannot bypass an invite-only Private portal.
+    config["registration_mode"] = "invite"
+    monkeypatch.setattr(
+        identity_service.jwt, "decode", lambda *a, **k: {"sub": "new-subject", "email": "other@example.test"}
+    )
+    _, closed_state = identity_service.begin_oidc(session, "test", "https://app/callback")
+    session.flush()
+    with pytest.raises(DomainError) as closed:
+        identity_service.complete_oidc(session, "test", closed_state, "code")
+    assert closed.value.status_code == 403
+    monkeypatch.setattr(identity_service.jwt, "decode", lambda *a, **k: {"sub": "subject"})
     user.enabled = False
     session.flush()
     _, disabled_state = identity_service.begin_oidc(session, "test", "https://app/callback")
@@ -209,7 +222,7 @@ def _oidc_settings(**provider_overrides) -> SimpleNamespace:
         "redirect_uris": "https://app/callback,https://app/alt-callback",
         **provider_overrides,
     }
-    return SimpleNamespace(oidc_providers={"test": provider})
+    return SimpleNamespace(oidc_providers={"test": provider}, writes_enabled=True, registration_mode="open")
 
 
 def test_begin_oidc_rejects_a_redirect_uri_outside_the_allowlist(monkeypatch, service_session) -> None:
@@ -223,9 +236,7 @@ def test_begin_oidc_rejects_a_redirect_uri_outside_the_allowlist(monkeypatch, se
         identity_service.begin_oidc(session, "test", "https://attacker.invalid/collect")
 
 
-def test_id_token_algorithms_come_from_the_allowlist_not_the_discovery_document(
-    monkeypatch, service_session
-) -> None:
+def test_id_token_algorithms_come_from_the_allowlist_not_the_discovery_document(monkeypatch, service_session) -> None:
     """A provider advertising HS256 must not be able to select it: the RSA public key
     would then be used as an HMAC secret, which is the algorithm-confusion substitution."""
     session, _, _ = service_session
@@ -348,14 +359,24 @@ def test_upload_completion_can_retry_without_reupload(monkeypatch, service_sessi
             self.objects[target] = self.objects.pop(source)
 
     monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
-    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
-        project_id=project.id, filename="result.json", artifact_type="score_table", content_type="application/json",
-    ), user)
+    upload, _ = artifact_service.create_upload(
+        session,
+        project,
+        UploadCreate(
+            project_id=project.id,
+            filename="result.json",
+            artifact_type="score_table",
+            content_type="application/json",
+        ),
+        user,
+    )
     body = b'{"result": 1}'
     Store.objects[upload.object_key] = body
     payload = UploadComplete(checksum_sha256=hashlib.sha256(body).hexdigest())
     if failure == "lineage":
-        invalid = payload.model_copy(update={"lineage_edges": [ArtifactLineageEdgeCreate(parent_artifact_id=uuid.uuid4())]})
+        invalid = payload.model_copy(
+            update={"lineage_edges": [ArtifactLineageEdgeCreate(parent_artifact_id=uuid.uuid4())]}
+        )
         with pytest.raises(DomainError, match="lineage parent"):
             artifact_service.complete_upload(session, upload, invalid, project, user)
     else:
@@ -388,12 +409,26 @@ def test_completion_stores_the_exact_bytes_it_validated(monkeypatch, service_ses
             Store.written = data
 
     monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
-    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
-        project_id=project.id, filename="result.json", artifact_type="score_table", content_type="application/json",
-    ), user)
-    artifact = artifact_service.complete_upload(session, upload, UploadComplete(
-        checksum_sha256=hashlib.sha256(body).hexdigest(),
-    ), project, user)
+    upload, _ = artifact_service.create_upload(
+        session,
+        project,
+        UploadCreate(
+            project_id=project.id,
+            filename="result.json",
+            artifact_type="score_table",
+            content_type="application/json",
+        ),
+        user,
+    )
+    artifact = artifact_service.complete_upload(
+        session,
+        upload,
+        UploadComplete(
+            checksum_sha256=hashlib.sha256(body).hexdigest(),
+        ),
+        project,
+        user,
+    )
     assert Store.written == body
     assert hashlib.sha256(Store.written).hexdigest() == artifact.checksum_sha256
 
@@ -595,9 +630,17 @@ def test_complete_upload_rejects_invalid_declared_format(monkeypatch, service_se
 def test_completion_checks_locked_upload_and_duplicate_lineage(monkeypatch, service_session, change) -> None:
     session, user, project = service_session
     monkeypatch.setattr(artifact_service, "ObjectStorage", FakeStorage)
-    upload, _ = artifact_service.create_upload(session, project, UploadCreate(
-        project_id=project.id, filename="data.pdb", artifact_type="structure", content_type="chemical/x-pdb",
-    ), user)
+    upload, _ = artifact_service.create_upload(
+        session,
+        project,
+        UploadCreate(
+            project_id=project.id,
+            filename="data.pdb",
+            artifact_type="structure",
+            content_type="chemical/x-pdb",
+        ),
+        user,
+    )
     upload_id = upload.id
     session.commit()
 
@@ -612,8 +655,10 @@ def test_completion_checks_locked_upload_and_duplicate_lineage(monkeypatch, serv
 
     monkeypatch.setattr(artifact_service, "ObjectStorage", Store)
     edge = ArtifactLineageEdgeCreate(parent_artifact_id=uuid.uuid4())
-    payload = UploadComplete(checksum_sha256=hashlib.sha256(FakeStorage.data).hexdigest(),
-                             lineage_edges=[edge, edge] if change == "duplicate" else [])
+    payload = UploadComplete(
+        checksum_sha256=hashlib.sha256(FakeStorage.data).hexdigest(),
+        lineage_edges=[edge, edge] if change == "duplicate" else [],
+    )
     expected = {"failed": "upload_expired", "missing": "upload_not_found", "duplicate": "lineage_duplicate"}
     with pytest.raises(DomainError) as caught:
         artifact_service.complete_upload(session, upload, payload, project, user)

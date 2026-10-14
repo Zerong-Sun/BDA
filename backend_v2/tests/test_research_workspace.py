@@ -4,12 +4,17 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
 from backend_v2.app import all_models  # noqa: F401
+from backend_v2.app.artifacts.models import Artifact
+from backend_v2.app.candidates.models import Candidate
+from backend_v2.app.copilot.research_context import ResearchContextService
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.models import Organization, User
 from backend_v2.app.projects.models import Project
 from backend_v2.app.research import workspace
 from backend_v2.app.research.models import ResearchBrief
+from backend_v2.app.targets.models import Target
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -115,6 +120,113 @@ def test_pdb_id_backfills_structure_reference_and_rcsb_url(monkeypatch) -> None:
     assert structure.reference_id == "PDB 1ABC"
     assert structure.rcsb_url == "https://www.rcsb.org/structure/1ABC"
     assert structure.download_url == "https://objects.test/structures/1ABC.pdb"
+
+
+@pytest.mark.parametrize(
+    ("value", "fallback", "expected"),
+    [
+        (None, {"zh": "结构", "en": "Structure"}, {"zh": "结构", "en": "Structure", "default": "结构"}),
+        ({"en": "Reviewed structure"}, {"zh": "结构", "en": "Structure"},
+         {"zh": "结构", "en": "Reviewed structure", "default": "结构"}),
+        ({"zh-CN": "已核对结构"}, {"zh": "结构", "en": "Structure", "default": "Source name"},
+         {"zh": "已核对结构", "en": "Structure", "default": "Source name"}),
+        ({"default": "Reviewed name"}, {"en": "Structure"},
+         {"zh": None, "en": "Structure", "default": "Reviewed name"}),
+        ({"en": ""}, {"en": "Structure"}, {"zh": None, "en": "Structure", "default": "Structure"}),
+        ("Explicit name", {"zh": "结构", "en": "Structure"},
+         {"zh": "结构", "en": "Structure", "default": "Explicit name"}),
+        ({"zh": "结构"}, "Original source", {"zh": "结构", "en": None, "default": "Original source"}),
+        (None, None, {"zh": None, "en": None, "default": ""}),
+    ],
+)
+def test_localized_fallback_keeps_stored_languages_and_default_precedence(value, fallback, expected) -> None:
+    assert workspace._localized(value, fallback).model_dump() == expected
+
+
+def test_bilingual_artifact_lineage_reaches_copilot_as_a_readable_structure_citation(monkeypatch) -> None:
+    monkeypatch.setattr(workspace, "ObjectStorage", lambda: SimpleNamespace(
+        download_url=lambda key: f"https://objects.test/{key}",
+    ))
+    engine = enforce_foreign_keys(create_engine(
+        "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    ))
+    Base.metadata.create_all(engine)
+    try:
+        with sessionmaker(engine, expire_on_commit=False)() as session:
+            user = User(username="structure-owner", display_name="Structure Owner", role="admin", enabled=True)
+            organization = Organization(name="Structure Org")
+            session.add_all([user, organization])
+            session.flush()
+            project = Project(organization_id=organization.id, owner_id=user.id,
+                              name="Structure project", project_type="research")
+            session.add(project)
+            session.flush()
+            lineage = {
+                "pdb_id": "1abc", "name": {"zh": "复合物结构", "en": "Complex structure"},
+                "role": {"zh": "靶标", "en": "Target"}, "reference_ids": ["R036"],
+                "localized_content": {"name": {"en": "Reviewed complex structure"}},
+            }
+            artifact = Artifact(
+                project_id=project.id, created_by=user.id, artifact_type="target_structure",
+                filename="1ABC.pdb", content_type="chemical/x-pdb", object_key="test/1ABC.pdb",
+                size_bytes=4, checksum_sha256="a" * 64, status="available", lineage=lineage,
+            )
+            session.add(artifact)
+            session.commit()
+            session.expire_all()
+
+            context = ResearchContextService(session, project)
+            item = context.search_research("1ABC", allowed_kinds={"structure"})[0]
+            citation = context.citation_for_item(item)
+            assert item["data"]["name"] == {
+                "zh": "复合物结构", "en": "Reviewed complex structure", "default": "复合物结构",
+            }
+            assert item["data"]["role"] == {"zh": "靶标", "en": "Target", "default": "靶标"}
+            assert citation["label"] == "复合物结构"
+            assert citation["entity_id"] == str(artifact.id)
+            assert citation["workspace_type"] == "structure"
+            assert citation["url"] == "https://www.rcsb.org/structure/1ABC"
+            assert artifact.lineage == lineage
+    finally:
+        drop_all(engine, Base.metadata)
+
+
+@pytest.mark.parametrize(("has_primary", "candidate_count"), [(True, 0), (False, 1), (False, 0)])
+def test_overview_distinguishes_primary_target_from_candidate_count(has_primary, candidate_count) -> None:
+    engine = enforce_foreign_keys(create_engine(
+        "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    ))
+    Base.metadata.create_all(engine)
+    try:
+        with sessionmaker(engine, expire_on_commit=False)() as session:
+            user = User(username="scope-owner", display_name="Owner", role="admin", enabled=True)
+            organization = Organization(name="Scope Org")
+            session.add_all([user, organization])
+            session.flush()
+            project = Project(organization_id=organization.id, owner_id=user.id,
+                              name="Scope project", project_type="protein_design")
+            session.add(project)
+            session.flush()
+            if has_primary:
+                target = Target(project_id=project.id, name="Confirmed target", identity_status="confirmed")
+                session.add(target)
+                session.flush()
+                project.primary_target_id = target.id
+            for index in range(candidate_count):
+                session.add(Candidate(project_id=project.id, candidate_key=f"target-{index}", name="Research target",
+                                      candidate_kind="research_target"))
+            session.add(Candidate(project_id=project.id, candidate_key="design", name="Binder design"))
+            session.flush()
+
+            result = ResearchContextService(session, project).research_overview()
+
+            assert result["primary_target_present"] is has_primary
+            assert (result["project"]["primary_target"] is not None) is has_primary
+            assert result["counts"]["research_targets"] == candidate_count
+            assert "Candidate records" in result["counts_scope"]["research_targets"]
+            assert "primary_target" in result["counts_scope"]["research_targets"]
+    finally:
+        drop_all(engine, Base.metadata)
 
 
 def test_seeded_boilerplate_is_not_rendered_as_a_review_finding() -> None:

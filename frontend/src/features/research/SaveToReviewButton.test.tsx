@@ -69,4 +69,16 @@ describe('SaveToReviewButton', () => {
     )
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('preserves prose references when a response has an empty citation array', async () => {
+    let payload: Record<string, unknown> | undefined
+    server.use(http.post('/api/v2/projects/proj_test/research-findings', async ({ request }) => {
+      payload = await request.json() as Record<string, unknown>
+      return HttpResponse.json(payload)
+    }))
+    renderWithProviders(<SaveToReviewButton projectId="proj_test" content="Review title\n\nRead PMID:12345678 before deciding." reviewTrack="binding_strategy" citations={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Save to project review' }))
+    await waitFor(() => expect(payload).toBeDefined())
+    expect((payload!.evidence as Record<string, unknown>).source_refs).toContain('PMID:12345678')
+  })
 })

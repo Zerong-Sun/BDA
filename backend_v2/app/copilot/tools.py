@@ -14,14 +14,20 @@ of the loop that only just arrived.
 
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
 from sqlalchemy import select
 
+from ..wetlab.schemas import BliAnalysisRequest
+from . import bench_tools, instrument_tools
+from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
+
+instrument_tools.register(REGISTRY)
 
 
 def _limit(maximum: int = 50, default_max: int = 50) -> dict[str, Any]:
@@ -325,7 +331,14 @@ _register(
     ToolSpec(
         id="get_reference_content",
         citation="research_items",
-        description="Read saved excerpts and evidence for one reference.",
+        description=(
+            "Read a page of saved excerpts for one reference. The first row's "
+            "data.read_window reports offset, returned_count, total_count, has_more, "
+            "next_offset and truncation. Page length is not the total: follow "
+            "next_offset to read more. Counts cover saved indexed chunks, not proof "
+            "that the complete publication was retrieved. An empty list means no "
+            "accessible chunks in this window, not that the publication has no content."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -682,6 +695,21 @@ _register(
 # reachable from here: `list_proteins` returns the same redacted projection the
 # API does, so no tool result can carry plaintext into a model prompt.
 
+_register(ToolSpec(
+    id="calculate_bench",
+    description=(
+        "Run the same validated scalar calculators as Lab tools: A260/A280 concentrations, mass/molar conversion, "
+        "solution mass, single/serial dilution, insert/vector ratio, copy number and RPM/RCF. "
+        "Pure calculation, no project writes or sequence access. Results include units, formula, assumptions and sources. "
+        "Use only supplied inputs; ask for missing sample type, blank, dilution and absorbance basis first. "
+        "For instrument-normalized 1 cm absorbance set path_length_cm=1; never apply its physical path again."
+        " For dilution, concentration_unit is the stock unit; set target_concentration_unit to the target's own unit. "
+        "The server converts these units before checking feasibility; 1 uM to 10 nM is a valid dilution."
+    ),
+    parameters=bench_tools.parameters(), capability="wetlab-read", execution_mode="read",
+    requires="session", handler=bench_tools.run,
+))
+
 
 def _list_proteins(ctx: ToolContext, args: dict[str, Any]) -> Any:
     from ..wetlab.repository import ProteinRepository
@@ -846,20 +874,28 @@ def _analyse_instrument_file(kind: str):
     def handler(ctx: ToolContext, args: dict[str, Any]) -> Any:
         import uuid as _uuid
 
+        from ..core.problem import DomainError
+        from ..identity.models import User
+        from ..projects.service import require_project_permission
         from ..wetlab import analysis
 
         artifact_id = _uuid.UUID(_arg_str(args, "artifact_id"))
         project_id, user_id = _project_of(ctx), _user_of(ctx)
+        user = ctx.session.get(User, user_id)
+        if user is None or not user.enabled:
+            raise DomainError("forbidden", "An enabled user is required to record an analysis", status_code=403)
+        require_project_permission(ctx.session, project_id, user, "experiment")
         candidate = args.get("candidate_id")
         candidate_id = _uuid.UUID(str(candidate)) if candidate else None
 
         if kind == "bli":
+            options = BliAnalysisRequest.model_validate(args).model_dump(
+                exclude={"artifact_id", "candidate_id"}
+            )
             row, summary = analysis.analyse_bli(
                 ctx.session, project_id, user_id, artifact_id,
-                sample_id=_arg_str(args, "sample_id") or None,
-                t_assoc=args.get("t_assoc"),
-                t_dissoc=args.get("t_dissoc"),
                 candidate_id=candidate_id,
+                **options,
             )
         elif kind == "akta":
             row, summary = analysis.analyse_akta(
@@ -873,8 +909,21 @@ def _analyse_instrument_file(kind: str):
                 subtract_background=bool(args.get("subtract_background", True)),
                 candidate_id=candidate_id,
             )
+        if kind == "bli":
+            # Full traces remain in the saved result for plots and exports. A
+            # model only needs their provenance and numerical/QC summary.
+            summary = {
+                **summary,
+                "curves": [
+                    {key: value for key, value in curve.items() if not key.endswith("points")}
+                    | {"displayed_measured_points": len(curve.get("points", []))}
+                    for curve in summary.get("curves", [])
+                ],
+            }
         return {
             "experiment_result_id": str(row.id),
+            "source_artifact_id": str(artifact_id),
+            "version": row.version,
             "experiment_type": row.experiment_type,
             "value": row.value,
             "unit": row.unit,
@@ -890,21 +939,12 @@ _register(
     ToolSpec(
         id="analyse_bli_run",
         description=(
-            "Fit KD from an uploaded ForteBio BLI export and record the result. "
-            "Pass t_assoc/t_dissoc when the run declares them; the fallback "
-            "infers the phase boundary from the curve."
+            "Analyse an uploaded BLI export and save a new, traceable result version. "
+            "Preview the file first. Triplet kinetic exports require explicit phase "
+            "times for measured fitting. Instrument kinetics are a separate evidence "
+            "kind, not an independent refit. Raw data is never modified."
         ),
-        parameters={
-            "type": "object",
-            "properties": {
-                **_ARTIFACT_ARG,
-                "sample_id": {"type": "string"},
-                "t_assoc": {"type": "number"},
-                "t_dissoc": {"type": "number"},
-            },
-            "required": ["artifact_id"],
-            "additionalProperties": False,
-        },
+        parameters={**BliAnalysisRequest.model_json_schema(), "additionalProperties": False},
         capability="wetlab-authoring",
         execution_mode="draft",
         requires="session",
@@ -1163,6 +1203,8 @@ _register(
 
 
 # --- Structure (read) --------------------------------------------------------
+from . import structure_tools as _structure_tools  # noqa: E402,F401
+
 # Residue-level reads over an uploaded structure artifact. All three are
 # measurements: they report what the coordinates say and never what it means.
 # `structures.service` does the artifact lookup and the project check, so these
@@ -1202,6 +1244,7 @@ def _structure_handler(kind: str):
             artifact_id,
             chain=_arg_str(args, "chain") or None,
             residue_seq=int(residue) if residue is not None else None,
+            insertion_code=args.get("insertion_code"),
             ligand=_arg_str(args, "ligand") or None,
             radius_angstrom=float(args.get("radius_angstrom") or 5.0),
         )
@@ -1269,6 +1312,7 @@ def _compare_structures(ctx: ToolContext, args: dict[str, Any]) -> Any:
         uuid.UUID(_arg_str(args, "mobile_artifact_id")),
         reference_chain=_arg_str(args, "reference_chain"),
         mobile_chain=_arg_str(args, "mobile_chain"),
+        pairing=str(args.get("pairing", "author_number")),
     )
 
 
@@ -1280,8 +1324,9 @@ _register(
             "RMSD over C-alpha atoms before and after the fit, the residues "
             "that moved most, and a TM-score when the chain is long enough for "
             "its formula. Residues are paired by author numbering, so the two "
-            "files must use the same numbering; a file missing a loop still "
-            "compares correctly. Use it for a design against its prediction, or "
+            "files must use the same numbering by default. Set pairing=sequence_alignment "
+            "explicitly for renumbered constructs; ambiguous sequence alignments are rejected. "
+            "Inspect coverage, correspondence and sequence identity. Use it for a design against its prediction, or "
             "a prediction against a solved structure. The TM-score is evaluated "
             "on this superposition and is not a TM-align result."
         ),
@@ -1292,6 +1337,7 @@ _register(
                 "mobile_artifact_id": {"type": "string"},
                 "reference_chain": {"type": "string"},
                 "mobile_chain": {"type": "string"},
+                "pairing": {"type": "string", "enum": ["author_number", "sequence_alignment"], "default": "author_number"},
             },
             "required": [
                 "reference_artifact_id",
@@ -1354,6 +1400,7 @@ _register(
                 "artifact_id": {"type": "string"},
                 "chain": {"type": "string"},
                 "residue_seq": {"type": "integer"},
+                "insertion_code": {"type": "string", "maxLength": 4, "description": "Author insertion code; empty string selects no insertion. Required when residue_seq is ambiguous."},
                 "ligand": {"type": "string"},
                 "radius_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 5.0},
             },
@@ -1468,9 +1515,10 @@ def _read_handoffs(ctx: ToolContext, args: dict[str, Any]) -> Any:
 _CLAIM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "statement": {"type": "string"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
         "evidence_ref": {
             "type": "string",
+            "maxLength": MAX_TEXT,
             "description": (
                 "The artifact, job, result, reference or goal id this rests on. "
                 "A claim with none is recorded as unsupported."
@@ -1488,20 +1536,23 @@ _register(
         description=(
             "Leave a structured handover for the next operator: what you did, the "
             "claims you are making with the evidence behind each one, what you "
-            "could not settle, and the ids the next operator needs. Append-only."
+            "could not settle, and the ids the next operator needs. Append-only. "
+            "Each summary, claim statement, evidence reference, open question and ref "
+            f"is limited to {MAX_TEXT} characters. Oversized input is rejected before saving; "
+            "shorten it and retry. Text is never truncated."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "to_bot": {"type": "string"},
-                "summary": {"type": "string"},
-                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": 20},
+                "summary": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
+                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": MAX_CLAIMS},
                 "open_questions": {
                     "type": "array",
-                    "items": {"type": "string"},
-                    "maxItems": 20,
+                    "items": {"type": "string", "maxLength": MAX_TEXT},
+                    "maxItems": MAX_OPEN_QUESTIONS,
                 },
-                "refs": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+                "refs": {"type": "array", "items": {"type": "string", "maxLength": MAX_TEXT}, "maxItems": MAX_REFS},
             },
             "required": ["to_bot", "summary"],
             "additionalProperties": False,
@@ -1565,11 +1616,16 @@ def _list_operator_charters(ctx: ToolContext, args: dict[str, Any]) -> Any:
     ]
 
 
+_REVIEW_TOOL_RESULT_CHARS = 8_000
+_REVIEW_TOOL_RESULTS_CHARS = 32_000
+
+
 def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
     """What an operator actually called, not what it said it did.
 
     The gap between the two is the whole subject of review, so this returns the
-    recorded tool calls rather than the assistant text around them.
+    recorded tool calls and their bounded results, not unrelated conversation.
+    Tool output lives in turn.content; turn.tool_calls only identifies its call.
     """
     from . import agent_runs
 
@@ -1581,9 +1637,37 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
 
     turns = agent_runs.turns_for(ctx.session, run, limit=_arg_int(args, "limit", 40))
     calls: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    remaining_chars = _REVIEW_TOOL_RESULTS_CHARS
     for turn in turns:
         for call in turn.tool_calls or []:
             calls.append({"sequence": turn.sequence, "role": turn.role, **dict(call)})
+        if turn.role != "tool":
+            continue
+        metadata = (turn.tool_calls or [{}])[0]
+        content = turn.content or ""
+        allowance = min(_REVIEW_TOOL_RESULT_CHARS, remaining_chars)
+        truncated = len(content) > allowance
+        evidence: dict[str, Any] = {
+            "sequence": turn.sequence,
+            "tool_call_id": metadata.get("tool_call_id"),
+            "name": metadata.get("name"),
+            "result": None,
+            "content_chars": len(content),
+            "truncated": truncated,
+            "parse_error": None,
+        }
+        if truncated:
+            # A fragment is not a JSON result and must never look like one.
+            evidence["content_preview"] = content[:allowance]
+        else:
+            try:
+                evidence["result"] = json.loads(content)
+            except (ValueError, RecursionError):
+                evidence["parse_error"] = "invalid_json"
+                evidence["content_preview"] = content
+        remaining_chars -= min(len(content), allowance)
+        results.append(evidence)
     return {
         "run_id": str(run.id),
         "bot": run.bot,
@@ -1592,6 +1676,8 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "turn_count": run.turn_count,
         "allowed_tools": list(run.allowed_tools or []),
         "tool_calls": calls,
+        "tool_results": results,
+        "transcript_truncated": len(turns) < run.turn_count,
     }
 
 
@@ -1620,7 +1706,8 @@ _register(
         description=(
             "What an operator's run actually called and what came back, turn by "
             "turn. Use this rather than its summary: the summary is the thing "
-            "under review."
+            "under review. Tool results are bounded; truncation or parse errors "
+            "mean the evidence is incomplete, not verified."
         ),
         parameters={
             "type": "object",
@@ -2079,6 +2166,14 @@ _RESIDUE_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+_VIEW_RESIDUE_SCHEMA = {
+    **_RESIDUE_SCHEMA,
+    "properties": {
+        **_RESIDUE_SCHEMA["properties"],
+        "insertion_code": {"type": ["string", "null"], "maxLength": 4, "description": "Author insertion code; null or empty string means no insertion."},
+    },
+}
+
 _register(
     ToolSpec(
         id="render_structure_view",
@@ -2087,12 +2182,14 @@ _register(
             "scene the viewer renders. Use it to make 'the interface I mean' "
             "unambiguous before arguing about it. It shows; it concludes "
             "nothing - the residues you pass are the ones you already measured."
+            " Read measurement results before choosing residues; call this in a subsequent turn, "
+            "not in the same batch as those measurements. A label applies to every highlighted residue."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "artifact_id": {"type": "string"},
-                "residues": {"type": "array", "items": _RESIDUE_SCHEMA, "maxItems": 200},
+                "residues": {"type": "array", "items": _VIEW_RESIDUE_SCHEMA, "maxItems": 200},
                 "title": {"type": "string", "maxLength": 200},
                 "label": {
                     "type": "string",
@@ -2107,6 +2204,7 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_render_structure_view,
+        defer_with=("analyse_structure", "list_structure_residues", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
     )
 )
 
@@ -2339,9 +2437,15 @@ def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "tier_order": list(tiers),
         "verdicts": verdicts,
         "reading_note": (
-            "A criterion is pass, fail or missing. Missing means nothing has "
-            "measured it - not that the design failed - so a design with "
-            "missing criteria has not been rejected by this route."
+            "A criterion is pass, fail or missing. Missing means the supplied "
+            "metrics contain no value - not that the design failed. Whether "
+            "it was measured elsewhere is unknown. Preserve each criterion's "
+            "method and assessor, including nulls; missing criteria do not "
+            "reject a design by this route. criteria_tier names the tier behind "
+            "the top-level criteria and counts; tier_assessments contains every "
+            "tier's comparisons. A recorded value that misses a threshold is "
+            "fail, not unassessable. Tier outcomes describe these supplied metrics, "
+            "not experimental validation."
         ),
     }
 
@@ -2352,7 +2456,7 @@ _register(
         description=(
             "Judge named candidates against a design route's declared "
             "acceptance tiers and say, per criterion, whether the recorded "
-            "metrics pass, fail, or were never measured. The thresholds are "
+            "metrics pass, fail, or have no recorded value. The thresholds are "
             "the route's own; this applies them rather than inventing any. "
             "A missing measurement is reported as missing and blocks a tier "
             "without condemning the design. Up to 25 candidates per call."

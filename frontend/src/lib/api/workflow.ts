@@ -118,6 +118,7 @@ export function addWorkflowNode(
   workflowRunId: string,
   payload: {
     node_type: string
+    execution_mode?: 'dispatch' | 'manual'
     key: string
     model_plugin?: string
     model_plugin_id?: string
@@ -129,6 +130,7 @@ export function addWorkflowNode(
   return workflowIfMatch(workflowRunId).then((headers) => addWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesPost<true>({
     path: { workflow_id: workflowRunId }, headers, body: {
       key: payload.key, node_type: payload.node_type,
+      ...(payload.execution_mode ? { execution_mode: payload.execution_mode } : {}),
       model_plugin: payload.model_plugin ?? payload.node_type,
       model_plugin_id: payload.model_plugin_id, parameters: payload.parameters ?? {}, position: payload.position,
     }, throwOnError: true,

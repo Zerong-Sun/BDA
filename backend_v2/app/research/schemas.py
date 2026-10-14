@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from ..core import review
@@ -453,11 +453,46 @@ class CopilotResearchImportResponse(BaseModel):
 # --- Research goal tree ------------------------------------------------------
 
 
+class ResearchDecisionContract(BaseModel):
+    """A human-authored decision definition. Criteria are not evaluated by this schema."""
+
+    model_config = ConfigDict(extra="forbid")
+    hypothesis: str = Field(default="", max_length=3000)
+    alternatives: list[str] = Field(default_factory=list, max_length=10)
+    success_criteria: list[str] = Field(default_factory=list, max_length=10)
+    falsification_criteria: list[str] = Field(default_factory=list, max_length=10)
+    next_decision: str = Field(default="", max_length=2000)
+    evidence_note_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+
+    @field_validator("hypothesis", "next_decision", mode="before")
+    @classmethod
+    def trim_text(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("alternatives", "success_criteria", "falsification_criteria")
+    @classmethod
+    def meaningful_bounded_items(cls, values: list[str]) -> list[str]:
+        trimmed = [value.strip() for value in values]
+        if any(not value or len(value) > 1000 for value in trimmed):
+            raise ValueError("Decision items must contain 1–1000 characters")
+        if len(set(trimmed)) != len(trimmed):
+            raise ValueError("Decision items must be unique")
+        return trimmed
+
+    @field_validator("evidence_note_ids")
+    @classmethod
+    def unique_evidence(cls, values: list[uuid.UUID]) -> list[uuid.UUID]:
+        if len(set(values)) != len(values):
+            raise ValueError("Evidence note IDs must be unique")
+        return values
+
+
 class ResearchGoalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     detail: str = ""
     parent_id: uuid.UUID | None = None
     tags: list[str] = Field(default_factory=list)
+    decision_contract: ResearchDecisionContract = Field(default_factory=ResearchDecisionContract)
 
 
 class ResearchGoalUpdate(BaseModel):
@@ -465,6 +500,7 @@ class ResearchGoalUpdate(BaseModel):
     detail: str | None = None
     status: str | None = Field(default=None, pattern="^(open|answered|abandoned)$")
     tags: list[str] | None = None
+    decision_contract: ResearchDecisionContract | None = None
     #: Sent together: `parent_id` alone cannot express "make this a root", because
     #: null is also "field omitted". `reparent` says the move was intended.
     reparent: bool = False
@@ -613,6 +649,7 @@ class ResearchGoalResponse(BaseModel):
     parent_id: uuid.UUID | None
     title: str
     detail: str
+    decision_contract: ResearchDecisionContract = Field(default_factory=ResearchDecisionContract)
     status: str
     sort_order: int
     tags: list[str]

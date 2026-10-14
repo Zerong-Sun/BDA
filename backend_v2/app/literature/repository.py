@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .evidence_notes import NOTE_KIND
 from .models import (
     LiteratureChunk,
     LiteratureClaim,
@@ -61,7 +62,9 @@ class LiteratureRepository:
             query = query.where(LiteratureChunk.id > after)
         return list(self.session.scalars(query.order_by(LiteratureChunk.id).limit(limit + 1)))
 
-    def claim(self, claim_id: uuid.UUID) -> LiteratureClaim | None:
+    def claim(self, claim_id: uuid.UUID, *, for_update: bool = False) -> LiteratureClaim | None:
+        if for_update:
+            return self.session.scalar(select(LiteratureClaim).where(LiteratureClaim.id == claim_id).with_for_update())
         return self.session.get(LiteratureClaim, claim_id)
 
     def list_claims(
@@ -75,6 +78,7 @@ class LiteratureRepository:
             select(LiteratureClaim)
             .join(LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id)
             .where(LiteratureDocument.project_id == project_id)
+            .where(LiteratureClaim.attributes["curation_kind"].as_string().is_distinct_from(NOTE_KIND))
         )
         if after:
             query = query.where(LiteratureClaim.id > after)

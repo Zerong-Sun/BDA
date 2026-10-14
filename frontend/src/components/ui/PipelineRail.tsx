@@ -4,6 +4,7 @@ import { BookOpenIcon, CheckIcon, LockIcon } from '@phosphor-icons/react'
 import { getProjectOverview } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
+import { projectText } from '../../lib/i18n/projectText'
 import { derivePipeline, type StageState } from '../../features/workflow/pipelineStages'
 import {
   Stepper,
@@ -101,7 +102,7 @@ export function PipelineRail() {
             <BookOpenIcon className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">{t.pipeline.guide}</span>
           </Link>
-          {activeProject ? <span className="hidden max-w-[16rem] truncate lg:inline">{activeProject.name}</span> : null}
+          {activeProject ? <span className="hidden max-w-[16rem] truncate lg:inline" title={projectText(activeProject, 'name', language)}>{projectText(activeProject, 'name', language)}</span> : null}
         </span>
       </div>
     </nav>

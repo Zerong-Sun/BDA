@@ -1,3 +1,4 @@
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,7 +13,7 @@ import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { BotAvatar } from './BotAvatar'
-import { CopilotCitations } from './CopilotCitations'
+import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { HandoffCard } from './CopilotChain'
 import { ownedService, parseMention } from './mentions'
@@ -22,6 +23,7 @@ import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { childTasksByParent, copilotRoomQueryKey, inReadingOrder, topLevelEntries, useCopilotRoom } from './roomFeed'
 import { roomTaskLabel } from './taskPresentation'
 import { useCopilotChat } from './useCopilotChat'
+import { ChatModeSwitch } from './ChatModeSwitch'
 
 /**
  * The project's research room.
@@ -66,7 +68,7 @@ export function Room({
   const bots = useCopilotBots()
   const roster = bots.data ?? []
   const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, messages } = useCopilotChat(
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode } = useCopilotChat(
     projectId,
     pageContext,
     language,
@@ -107,13 +109,14 @@ export function Room({
     endRef.current?.scrollIntoView?.({ block: 'end' })
   }, [visible.length, loading])
 
-  // The turn in flight. Its user message is already a row, but the room only
-  // refetches when the turn ends, so both halves are echoed until then.
-  const pending = loading ? messages.slice(-2) : []
+  // Project events can refresh the feed before the reply arrives. Replace
+  // local echoes by persisted message id, never by text (two "hi"s are valid).
+  const recordedMessageIds = new Set(entries.flatMap((entry) => entry.message ? [entry.message.id] : []))
+  const pending = pendingMessages.filter((message) => !message.id || !recordedMessageIds.has(message.id))
 
   // Who this message is addressed to, recomputed as it is typed so the room can
   // show the addressee before it is sent rather than after.
-  const mention = parseMention(input, roster)
+  const mention = mode === 'bench' ? null : parseMention(input, roster)
   const addressee = mention?.bot
   const unknownHandle = mention && !mention.bot ? mention.handle : null
   const assignable = addressee ? ownedService(addressee) : undefined
@@ -130,6 +133,7 @@ export function Room({
 
   return (
     <div className="room" data-tour-id="research-room">
+      <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
       <ApiState
         isLoading={feed.isLoading}
         isError={feed.isError}
@@ -158,7 +162,7 @@ export function Room({
               />
             ))}
             {pending.map((message, index) => (
-              <article className="room-entry" key={`pending-${index}`}>
+              <article className={`room-entry${message.role === 'user' ? ' room-entry--mine' : ''}`} key={message.id ?? `pending-${index}`}>
                 <div className="room-entry-body">
                   <p className="room-speaker">
                     {message.role === 'user' ? (zh ? '你' : 'You') : zh ? '正在回复' : 'Replying'}
@@ -374,11 +378,8 @@ function RoomEntry({
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : ''}
         </p>
-        <div className="room-text">{message.content}</div>
-        <CopilotCitations
-          citations={(message.citations ?? []) as Array<Record<string, unknown>>}
-          projectId={projectId}
-        />
+        <div className="room-text">{mine ? message.content : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        {!mine ? <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>
   )

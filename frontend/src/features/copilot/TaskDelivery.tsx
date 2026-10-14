@@ -20,9 +20,21 @@ const Outcome = z.object({
   deliverables: z.array(z.object({ kind: z.string(), id: z.string() })).optional(),
   evidence: z.array(z.object({ call_id: z.string(), tool: z.string(), successful: z.boolean() })).optional(),
 })
+const SECTION_LABELS: Record<string, [string, string]> = {
+  objective: ['Objective', '研究目标'], constraints: ['Constraints', '约束条件'],
+  success_criteria: ['Success criteria', '成功标准'], missing_inputs: ['Missing inputs', '待补充输入'],
+  search_scope: ['Search scope', '检索范围'], evidence_comparison: ['Evidence comparison', '证据比较'],
+  disagreements: ['Disagreements', '证据分歧'], limitations: ['Limitations', '限制'],
+  route_comparison: ['Route comparison', '路线比较'], inputs: ['Inputs', '所需输入'],
+  risks: ['Risks', '风险'], next_step: ['Next step', '下一步'],
+  current_state: ['Current state', '当前状态'], blockers: ['Blockers', '阻碍'],
+  recovery: ['Recovery proposal', '恢复建议'], observations: ['Observations', '观察结果'],
+  hypotheses: ['Hypotheses', '假设'], next_round: ['Next round', '下一轮计划'],
+}
 export function TaskDelivery({ run }: { run: AgentRun }) {
   const { language } = useI18n()
   const zh = language === 'zh'
+  const sectionLabel = (key: string) => SECTION_LABELS[key]?.[zh ? 1 : 0] ?? key.replaceAll('_', ' ')
   const readOnly = useCopilotReadOnly()
   const client = useQueryClient()
   const [brief, setBrief] = useState<{ text: string; version: number } | null>(null)
@@ -33,7 +45,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   }, onError: () => { void client.invalidateQueries({ queryKey: ['agent-run', run.project_id, run.id] }) } })
   const prepareBrief = useMutation({ mutationFn: () => getProjectOverview(run.project_id), onSuccess: (data) => {
     const sections = run.outcome?.sections as Record<string, string> | undefined
-    setBrief({ text: [String(run.outcome?.summary ?? ''), ...Object.entries(sections ?? {}).map(([key, value]) => `${key}\n${value}`)].join('\n\n'), version: data.project.version })
+    setBrief({ text: [String(run.outcome?.summary ?? ''), ...Object.entries(sections ?? {}).map(([key, value]) => `${sectionLabel(key)}\n${value}`)].join('\n\n'), version: data.project.version })
   } })
   const applyBrief = useMutation({ mutationFn: () => { requireCopilotWrite(); return updateProjectPrompt(run.project_id, brief!.text.trim(), brief!.version, reason.trim()) }, onSuccess: () => {
     setBrief(null); setReason('')
@@ -46,13 +58,15 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   const outcome = result.data
   const base = `/research?project=${encodeURIComponent(run.project_id)}`
   const terminal = ['succeeded', 'failed'].includes(run.status)
-  const issueLabels: Record<string, string> = zh ? { structured_delivery_required: '答复缺少合规的交付结构，请审核或补充要求。', unverified_evidence_call_ids: '部分引用没有对应的成功工具记录。', scientific_review_unavailable: '自动科学复核未完成，请人工审核。' } : {}
-  const missingLabel = (item: string) => issueLabels[item] ?? outcome.steps?.find((step) => step.id === item)?.[zh ? 'title_zh' : 'title'] ?? item
+  const issueLabels: Record<string, string> = zh
+    ? { structured_delivery_required: '答复缺少所需章节，请审核或补充要求。', unverified_evidence_call_ids: '部分引用没有对应的成功工具记录。', scientific_review_unavailable: '自动科学复核未完成，请人工审核。' }
+    : { structured_delivery_required: 'Required delivery sections are missing. Review the answer or add instructions.', unverified_evidence_call_ids: 'Some citations have no matching successful tool record.', scientific_review_unavailable: 'Scientific review did not complete. Review the answer manually.' }
+  const missingLabel = (item: string) => issueLabels[item] ?? outcome.steps?.find((step) => step.id === item)?.[zh ? 'title_zh' : 'title'] ?? SECTION_LABELS[item]?.[zh ? 1 : 0] ?? item
   return <section className="space-y-3 rounded-lg border border-border p-3" aria-label={zh ? '任务交付' : 'Task delivery'}>
     <h4 className="font-semibold">{deliveryLabel(run, zh)}</h4>
     {outcome.steps?.length ? <ol className="space-y-2">{outcome.steps.map((step) => <li key={step.id} className="rounded border border-border-soft p-2 text-sm"><span className="mr-2">{step.status === 'completed' ? '✓' : '○'}</span>{zh ? step.title_zh : step.title}<span className="ml-2 text-xs text-text-secondary">{step.status === 'completed' ? (zh ? '已核对记录' : 'Records checked') : (zh ? '待完成' : 'Pending')}</span></li>)}</ol> : null}
     {outcome.summary ? <div><p className="text-xs text-text-secondary">{zh ? '交付内容与依据' : 'Deliverable and basis'}</p><p className="whitespace-pre-wrap break-words text-sm">{outcome.summary}</p></div> : null}
-    {outcome.sections && Object.keys(outcome.sections).length ? <Disclosure title={zh ? '查看完整交付内容' : 'Full deliverable'}><dl className="space-y-3">{Object.entries(outcome.sections).map(([key, value]) => <div key={key}><dt className="text-xs font-semibold">{key.replaceAll('_', ' ')}</dt><dd className="whitespace-pre-wrap text-sm">{value}</dd></div>)}</dl></Disclosure> : null}
+    {outcome.sections && Object.keys(outcome.sections).length ? <Disclosure title={zh ? '查看完整交付内容' : 'Full deliverable'}><dl className="space-y-3">{Object.entries(outcome.sections).map(([key, value]) => <div key={key}><dt className="text-xs font-semibold">{sectionLabel(key)}</dt><dd className="whitespace-pre-wrap text-sm">{value}</dd></div>)}</dl></Disclosure> : null}
     {outcome.missing?.length ? <div><p className="text-xs text-text-secondary">{zh ? '尚未完成或需要核对' : 'Remaining work or checks'}</p><ul className="list-disc pl-5 text-sm">{outcome.missing.map((item, i) => <li key={i}>{missingLabel(item)}</li>)}</ul></div> : null}
     {outcome.next_action ? <div><p className="text-xs text-text-secondary">{zh ? '下一步' : 'Next action'}</p><p className="text-sm">{outcome.next_action}</p></div> : null}
     {outcome.deliverables?.map((item) => <Link className="block text-sm text-primary" key={`${item.kind}-${item.id}`} to={`${base}&tab=${item.kind === 'literature' ? 'references' : 'data'}`}>{item.kind === 'literature' ? (zh ? '打开检索与文献' : 'Open literature') : (zh ? '打开待审核研究笔记' : 'Open research notes')} · {item.id.slice(0, 8)}</Link>)}

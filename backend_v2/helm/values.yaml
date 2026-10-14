@@ -34,6 +34,11 @@ ingress:
   tlsSecret: bda-tls
 config:
   environment: production
+  deploymentKind: private
+  authRealm: private
+  registrationMode: closed
+  publicPortalUrl: ""
+  privatePortalUrl: ""
   databasePoolSize: "5"
   databaseMaxOverflow: "5"
   workerConcurrency: "2"
