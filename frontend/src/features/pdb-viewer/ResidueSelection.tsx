@@ -25,9 +25,9 @@ export function ResidueSelection({ disabled, onApply }: {
       const result = await onApply(residues, sideChains)
       if (clear) { setMessage(''); return }
       if (!result?.atomCount) throw new Error(zh ? '未找到对应原子，请检查链名和作者残基编号。' : 'No atoms found. Check the chain and author residue numbering.')
-      const missing = residues.filter(r => !result.residues.some(found => found.chainId === r.chainId && found.seq === r.seq))
+      const missing = residues.filter(r => !result.residues.some(found => found.chainId === r.chainId && found.seq === r.seq && (found.insertionCode ?? '') === (r.insertionCode ?? '')))
       setMessage(`${sideChains ? (zh ? '侧链' : 'Side chains') : (zh ? '氨基酸' : 'Residues')}: ${result.residues.map(r => r.label).join(' · ')} · ${result.atomCount} ${zh ? '个原子' : 'atoms'}`)
-      if (missing.length) setError(`${zh ? '未找到' : 'Not found'}: ${missing.map(r => `${r.chainId}:${r.seq}`).join(', ')}`)
+      if (missing.length) setError(`${zh ? '未找到' : 'Not found'}: ${missing.map(r => `${r.chainId}:${r.seq}${r.insertionCode ?? ''}`).join(', ')}`)
     } catch (caught) { setMessage(''); setError(zh && caught instanceof Error && caught.message.startsWith('Use chain:') ? '请输入链名:残基编号，例如 A:56 或 A:56, A:57。' : caught instanceof Error ? caught.message : 'Selection failed') }
     finally { setBusy(false) }
   }

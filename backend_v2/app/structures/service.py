@@ -19,6 +19,7 @@ from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
 from . import kernels, molviewspec
+from . import residues as residue_analysis
 
 #: A structure is coordinates, not a trajectory. A 3000-residue complex in
 #: mmCIF is a few MB; the cap is a guard against a mis-typed artifact id
@@ -84,6 +85,27 @@ def _run(
 
 def analyse(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> dict[str, Any]:
     return _run(session, project_id, artifact_id, kernels.analyse, with_confidence=True)
+
+
+def residues(
+    session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, *,
+    chain: str | None = None, residue_property: str = "all", partner_chain: str | None = None,
+    interface_only: bool = False, cutoff_angstrom: float = 4.5, limit: int = residue_analysis.MAX_RESIDUES,
+) -> dict[str, Any]:
+    result = _run(
+        session, project_id, artifact_id,
+        lambda text, provenance: residue_analysis.inventory(
+            text, chain=chain, residue_property=residue_property, partner_chain=partner_chain,
+            interface_only=interface_only, cutoff_angstrom=cutoff_angstrom, limit=limit, provenance=provenance,
+        ),
+        with_confidence=True,
+    )
+    result["viewer_selection"] = {
+        "artifact_id": str(artifact_id),
+        "residues": [{key: row[key] for key in ("chain", "seq", "insertion_code", "name")} for row in result["residues"]],
+        "truncated": result["truncated"],
+    }
+    return result
 
 
 def contacts(
@@ -184,6 +206,7 @@ def site(
     *,
     chain: str | None = None,
     residue_seq: int | None = None,
+    insertion_code: str | None = None,
     ligand: str | None = None,
     radius_angstrom: float = 5.0,
 ) -> dict[str, Any]:
@@ -195,6 +218,7 @@ def site(
             text,
             chain=chain,
             residue_seq=residue_seq,
+            insertion_code=insertion_code,
             ligand=ligand,
             radius_angstrom=radius_angstrom,
         ),

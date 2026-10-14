@@ -20,11 +20,14 @@ from typing import Any
 
 from sqlalchemy import select
 
-from . import bench_tools
+from ..wetlab.schemas import BliAnalysisRequest
+from . import bench_tools, instrument_tools
 from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
+
+instrument_tools.register(REGISTRY)
 
 
 def _limit(maximum: int = 50, default_max: int = 50) -> dict[str, Any]:
@@ -871,20 +874,28 @@ def _analyse_instrument_file(kind: str):
     def handler(ctx: ToolContext, args: dict[str, Any]) -> Any:
         import uuid as _uuid
 
+        from ..core.problem import DomainError
+        from ..identity.models import User
+        from ..projects.service import require_project_permission
         from ..wetlab import analysis
 
         artifact_id = _uuid.UUID(_arg_str(args, "artifact_id"))
         project_id, user_id = _project_of(ctx), _user_of(ctx)
+        user = ctx.session.get(User, user_id)
+        if user is None or not user.enabled:
+            raise DomainError("forbidden", "An enabled user is required to record an analysis", status_code=403)
+        require_project_permission(ctx.session, project_id, user, "experiment")
         candidate = args.get("candidate_id")
         candidate_id = _uuid.UUID(str(candidate)) if candidate else None
 
         if kind == "bli":
+            options = BliAnalysisRequest.model_validate(args).model_dump(
+                exclude={"artifact_id", "candidate_id"}
+            )
             row, summary = analysis.analyse_bli(
                 ctx.session, project_id, user_id, artifact_id,
-                sample_id=_arg_str(args, "sample_id") or None,
-                t_assoc=args.get("t_assoc"),
-                t_dissoc=args.get("t_dissoc"),
                 candidate_id=candidate_id,
+                **options,
             )
         elif kind == "akta":
             row, summary = analysis.analyse_akta(
@@ -898,8 +909,21 @@ def _analyse_instrument_file(kind: str):
                 subtract_background=bool(args.get("subtract_background", True)),
                 candidate_id=candidate_id,
             )
+        if kind == "bli":
+            # Full traces remain in the saved result for plots and exports. A
+            # model only needs their provenance and numerical/QC summary.
+            summary = {
+                **summary,
+                "curves": [
+                    {key: value for key, value in curve.items() if not key.endswith("points")}
+                    | {"displayed_measured_points": len(curve.get("points", []))}
+                    for curve in summary.get("curves", [])
+                ],
+            }
         return {
             "experiment_result_id": str(row.id),
+            "source_artifact_id": str(artifact_id),
+            "version": row.version,
             "experiment_type": row.experiment_type,
             "value": row.value,
             "unit": row.unit,
@@ -915,21 +939,12 @@ _register(
     ToolSpec(
         id="analyse_bli_run",
         description=(
-            "Fit KD from an uploaded ForteBio BLI export and record the result. "
-            "Pass t_assoc/t_dissoc when the run declares them; the fallback "
-            "infers the phase boundary from the curve."
+            "Analyse an uploaded BLI export and save a new, traceable result version. "
+            "Preview the file first. Triplet kinetic exports require explicit phase "
+            "times for measured fitting. Instrument kinetics are a separate evidence "
+            "kind, not an independent refit. Raw data is never modified."
         ),
-        parameters={
-            "type": "object",
-            "properties": {
-                **_ARTIFACT_ARG,
-                "sample_id": {"type": "string"},
-                "t_assoc": {"type": "number"},
-                "t_dissoc": {"type": "number"},
-            },
-            "required": ["artifact_id"],
-            "additionalProperties": False,
-        },
+        parameters={**BliAnalysisRequest.model_json_schema(), "additionalProperties": False},
         capability="wetlab-authoring",
         execution_mode="draft",
         requires="session",
@@ -1188,6 +1203,8 @@ _register(
 
 
 # --- Structure (read) --------------------------------------------------------
+from . import structure_tools as _structure_tools  # noqa: E402,F401
+
 # Residue-level reads over an uploaded structure artifact. All three are
 # measurements: they report what the coordinates say and never what it means.
 # `structures.service` does the artifact lookup and the project check, so these
@@ -1227,6 +1244,7 @@ def _structure_handler(kind: str):
             artifact_id,
             chain=_arg_str(args, "chain") or None,
             residue_seq=int(residue) if residue is not None else None,
+            insertion_code=args.get("insertion_code"),
             ligand=_arg_str(args, "ligand") or None,
             radius_angstrom=float(args.get("radius_angstrom") or 5.0),
         )
@@ -1382,6 +1400,7 @@ _register(
                 "artifact_id": {"type": "string"},
                 "chain": {"type": "string"},
                 "residue_seq": {"type": "integer"},
+                "insertion_code": {"type": "string", "maxLength": 4, "description": "Author insertion code; empty string selects no insertion. Required when residue_seq is ambiguous."},
                 "ligand": {"type": "string"},
                 "radius_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 5.0},
             },
@@ -2147,6 +2166,14 @@ _RESIDUE_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+_VIEW_RESIDUE_SCHEMA = {
+    **_RESIDUE_SCHEMA,
+    "properties": {
+        **_RESIDUE_SCHEMA["properties"],
+        "insertion_code": {"type": ["string", "null"], "maxLength": 4, "description": "Author insertion code; null or empty string means no insertion."},
+    },
+}
+
 _register(
     ToolSpec(
         id="render_structure_view",
@@ -2162,7 +2189,7 @@ _register(
             "type": "object",
             "properties": {
                 "artifact_id": {"type": "string"},
-                "residues": {"type": "array", "items": _RESIDUE_SCHEMA, "maxItems": 200},
+                "residues": {"type": "array", "items": _VIEW_RESIDUE_SCHEMA, "maxItems": 200},
                 "title": {"type": "string", "maxLength": 200},
                 "label": {
                     "type": "string",
@@ -2177,7 +2204,7 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_render_structure_view,
-        defer_with=("analyse_structure", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
+        defer_with=("analyse_structure", "list_structure_residues", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
     )
 )
 

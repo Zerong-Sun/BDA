@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   ChatCircleIcon,
@@ -110,6 +111,9 @@ function ReferenceUrl({ url, label }: { url: string; label: string }) {
 
 export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   const { activeProject, projectId } = useProjectContext()
+  const [searchParams] = useSearchParams()
+  const selectedKnowledgeId = searchParams.get('knowledge') ?? ''
+  const openKnowledge = useMemo(() => selectedKnowledgeId ? [selectedKnowledgeId] : NONE_OPEN, [selectedKnowledgeId])
   // The project's target and its current coordinates: the hotspot panel picks
   // residues on them, and reviews the sets recorded against them.
   const targetStructure = useProjectTargetStructure(projectId)
@@ -341,18 +345,20 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
               {/* Methods entries are long-form documents, so each one collapses; the
                   first stays open so the tab still shows content on arrival. */}
               {workspace.methods.length ? (
-                <Accordion defaultValue={NONE_OPEN}>
+                <Accordion key={`${projectId}-${selectedKnowledgeId}`} defaultValue={openKnowledge}>
                   {workspace.methods.map((method) => (
                     <AccordionItem key={method.id} value={method.id}>
                       <AccordionTrigger className="text-sm">{workspaceText(method.title, language)}</AccordionTrigger>
                       <AccordionContent className="border-t p-4">
                         <div className="mb-3"><AskCopilotButton entityId={method.id} entityType="method" label={workspaceText(method.title, language)} /></div>
+                        {typeof method.source?.review_status === 'string' ? <p className="mb-3 text-xs text-muted-foreground">{language === 'zh' ? '记录的审阅状态' : 'Recorded review status'}: {method.source.review_status.replaceAll('_', ' ')}</p> : null}
                         <ReviewMarkdown>{workspaceText(method.content, language)}</ReviewMarkdown>
                       </AccordionContent>
                     </AccordionItem>
                   ))}
                 </Accordion>
               ) : <Alert><AlertDescription>{w.methodsEmpty}</AlertDescription></Alert>}
+              {selectedKnowledgeId && !workspace.methods.some((method) => method.id === selectedKnowledgeId) ? <Alert><AlertDescription>{language === 'zh' ? '当前项目资料中未找到所链接的报告。请在下方知识编辑器中检索，或确认项目与报告 ID。' : 'The linked report was not found in this project’s loaded records. Search the knowledge editor below or check the project and report ID.'}</AlertDescription></Alert> : null}
             </FramePanel>
           </Frame>
           <OperationBlock title={w.methodsOperations}><KnowledgePanel /></OperationBlock>

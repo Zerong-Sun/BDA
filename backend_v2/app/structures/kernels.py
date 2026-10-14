@@ -66,11 +66,11 @@ HBOND_MAX_ANGSTROM = 3.5
 #: Charged-group distance for a salt bridge. 4.0 is the usual convention.
 SALT_BRIDGE_MAX_ANGSTROM = 4.0
 
-#: Side-chain atoms that carry formal charge at physiological pH.
+#: Conventional side-chain charge assignments near neutral pH. Histidine is
+#: excluded: its protonation depends on pH and environment, not its name alone.
 _ANIONIC_ATOMS = {("ASP", "OD1"), ("ASP", "OD2"), ("GLU", "OE1"), ("GLU", "OE2")}
 _CATIONIC_ATOMS = {
     ("LYS", "NZ"), ("ARG", "NE"), ("ARG", "NH1"), ("ARG", "NH2"),
-    ("HIS", "ND1"), ("HIS", "NE2"),
 }
 
 #: Residues counted as hydrophobic when describing what an interface is made of.
@@ -445,8 +445,28 @@ def _contact_result(
         "interface_residues_b": sorted(
             {(pair["b"]["seq"], pair["b"]["name"]) for pair in pairs}
         ),
+        # The older tuple summaries above omit insertion codes; use these
+        # complete identities for selections and reports. Aggregate before
+        # truncating pairs so residue-level counts remain correct.
+        "interface_residue_details_a": _contact_residues(pairs, "a"),
+        "interface_residue_details_b": _contact_residues(pairs, "b"),
+        "residue_numbering": "author chain and residue numbering; insertion_code is part of the identity",
+        "evidence_type": "geometric_contact",
+        "hotspot_interpretation": "Contacts do not establish an experimentally validated binding hotspot or energetic importance.",
         "pairs": shown,
     }
+
+
+def _contact_residues(pairs: list[dict[str, Any]], side: str) -> list[dict[str, Any]]:
+    found: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    for pair in pairs:
+        residue = pair[side]
+        key = (residue["chain"], residue["seq"], residue["insertion_code"] or "", residue["name"])
+        if key not in found:
+            found[key] = {**residue, "contact_pair_count": 0, "minimum_distance_angstrom": pair["distance_angstrom"]}
+        found[key]["contact_pair_count"] += 1
+        found[key]["minimum_distance_angstrom"] = min(found[key]["minimum_distance_angstrom"], pair["distance_angstrom"])
+    return [found[key] for key in sorted(found)]
 
 
 def site(
@@ -454,6 +474,7 @@ def site(
     *,
     chain: str | None = None,
     residue_seq: int | None = None,
+    insertion_code: str | None = None,
     ligand: str | None = None,
     radius_angstrom: float = 5.0,
 ) -> dict[str, Any]:
@@ -472,7 +493,7 @@ def site(
     structure, _ = _parse(text)
     model = list(structure)[0]
 
-    centre = _find_centre(model, chain=chain, residue_seq=residue_seq, ligand=ligand)
+    centre = _find_centre(model, chain=chain, residue_seq=residue_seq, insertion_code=insertion_code, ligand=ligand)
     centre_atoms = _heavy_atoms(centre)
     if not centre_atoms:
         raise StructureFormatError("The named centre has no heavy atoms.")
@@ -513,13 +534,25 @@ def site(
     }
 
 
-def _find_centre(model: Any, *, chain: str | None, residue_seq: int | None, ligand: str | None) -> Any:
+def _find_centre(
+    model: Any, *, chain: str | None, residue_seq: int | None, ligand: str | None,
+    insertion_code: str | None = None,
+) -> Any:
     if residue_seq is not None:
         if chain is None:
             raise StructureFormatError("A residue centre needs its chain; residue numbers repeat across chains.")
-        for residue in _chain_or_error(model, chain):
-            if int(residue.get_id()[1]) == residue_seq:
-                return residue
+        matches = [
+            residue for residue in _chain_or_error(model, chain)
+            if int(residue.get_id()[1]) == residue_seq
+            and (insertion_code is None or residue.get_id()[2].strip() == insertion_code.strip())
+        ]
+        if len(matches) > 1:
+            raise StructureFormatError(
+                f"Residue {residue_seq} in chain {chain!r} is ambiguous; supply insertion_code "
+                "(empty string selects the uninserted residue)."
+            )
+        if matches:
+            return matches[0]
         raise StructureFormatError(f"No residue {residue_seq} in chain {chain!r}.")
 
     wanted = str(ligand).strip().upper()
@@ -713,6 +746,13 @@ def interface(
             "no angle term, because hydrogens are absent from most of these files"
         ),
         "salt_bridge_count": len(bridges),
+        "salt_bridge_definition": (
+            f"ASP/GLU carboxylate and LYS/ARG side-chain nitrogen within {SALT_BRIDGE_MAX_ANGSTROM} A; "
+            "conventional near-neutral-pH charge assignments, not a protonation calculation. "
+            "Histidine is excluded because its charge depends on pH and local environment."
+        ),
+        "evidence_type": "geometric_interface",
+        "hotspot_interpretation": "Burial and contacts do not establish an experimentally validated binding hotspot or affinity.",
         "hydrogen_bonds": bonds[:MAX_CONTACT_PAIRS],
         "salt_bridges": bridges[:MAX_CONTACT_PAIRS],
         "interface_residues": interface_residues[:MAX_CONTACT_PAIRS],

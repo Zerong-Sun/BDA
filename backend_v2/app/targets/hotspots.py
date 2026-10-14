@@ -92,6 +92,12 @@ def normalise_residues(raw: Any) -> list[dict[str, Any]]:
                 status_code=422,
             )
         chain = str(entry.get("chain") or "").strip()
+        if str(entry.get("insertion_code") or entry.get("insertionCode") or "").strip():
+            raise DomainError(
+                "target_hotspot_insertion_code_unsupported",
+                "Hotspot design parameters do not support insertion codes. Renumber the construct with an explicit residue mapping before proposing this residue.",
+                status_code=422,
+            )
         if not _CHAIN.match(chain):
             raise DomainError(
                 "target_hotspot_invalid", f"{chain!r} is not a chain id.", status_code=422

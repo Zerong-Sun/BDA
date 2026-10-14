@@ -3,7 +3,7 @@ import { FOLD_CONFIDENCE_FLOOR, canonicalFoldConfidence, screenByFoldConfidence 
 import { candidatesCsv } from '../features/candidates/candidatesCsv'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { DownloadSimpleIcon } from '@phosphor-icons/react'
 import { downloadCandidateStructures, listAllCandidates } from '../lib/api/candidates'
 import { getCandidateFunnel } from '../lib/api/projects'
@@ -232,6 +232,10 @@ function CandidatesWorkspace() {
         }
       />
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-text-secondary">
+        <p>{zh ? '管理候选设计、计算筛选与实验选择；证据分析和结论见结果页。' : 'Manage candidate designs, computational screening and experimental selection. Review evidence and conclusions in Results.'}</p>
+        <Button variant="outline" size="sm" render={<Link to={`/results?project=${encodeURIComponent(projectId)}${activeCandidate ? `&candidate=${encodeURIComponent(activeCandidate.id)}` : ''}`} />}>{zh ? '查看实验证据与结论' : 'View evidence and conclusions'}</Button>
+      </div>
       {activeSource !== 'all' ? <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-tour-id="candidate-funnel">
         {[
           [zh ? '计算候选' : 'Candidates', candidates.length],

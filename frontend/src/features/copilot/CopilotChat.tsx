@@ -1,3 +1,4 @@
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { botDisplayText } from './bots/displayText'
 import { useCallback, useEffect, useRef } from 'react'
 import { useCopilotReadOnly } from './commandAccess'
@@ -355,6 +356,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                     ) : (
                       ''
                     ))}
+                  {message.role === 'assistant' ? <ToolEvidenceLazy calls={message.meta?.toolCalls} projectId={projectId} /> : null}
                   {showSaveButton ? (
                     <SaveToReviewButton
                       projectId={projectId}

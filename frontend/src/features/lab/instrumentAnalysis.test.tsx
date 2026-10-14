@@ -15,11 +15,11 @@ vi.mock('../../lib/api/artifacts', () => ({
 
 vi.mock('../../lib/api/wetlab', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('../../lib/api/wetlab')
-  return { ...actual, analyseBli: vi.fn(), analyseAkta: vi.fn(), analyseEnzyme: vi.fn(), previewInstrumentAnalysis: vi.fn() }
+  return { ...actual, analyseBli: vi.fn(), analyseAkta: vi.fn(), analyseEnzyme: vi.fn(), previewInstrumentAnalysis: vi.fn(), listSavedInstrumentAnalyses: vi.fn() }
 })
 
 const { uploadArtifact } = await import('../../lib/api/artifacts')
-const { analyseBli, previewInstrumentAnalysis } = await import('../../lib/api/wetlab')
+const { analyseBli, previewInstrumentAnalysis, listSavedInstrumentAnalyses } = await import('../../lib/api/wetlab')
 
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
@@ -122,6 +122,7 @@ describe('instrument analysis panel', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Sensorgrams')).toBeInTheDocument())
     expect(screen.getAllByText('did not converge')).toHaveLength(4)
+    expect(screen.getByText('Joint')).toBeInTheDocument()
   })
 
   it('reports a failed analysis instead of leaving the panel blank', async () => {
@@ -134,6 +135,22 @@ describe('instrument analysis panel', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('no usable curves'),
     )
+  })
+
+  it('reanalyses the preserved artifact with lineage and candidate identity without uploading it again', async () => {
+    const record = { experiment_result_id: 'previous', source_artifact_id: 'raw-1', candidate_id: 'candidate-1', experiment_type: 'bli_affinity', analysis_version: 'bli/3', value: 4, unit: 'nM', version: 1, qc_review: null }
+    const summary = BliSummarySchema.parse({ sample_id: 'S1', methods: { standard: null, split: null, joint: null, steady: null, mixed: null }, phase: { t_assoc: 0, t_dissoc: 60 }, processing: { sample_mapping: { A1: 'S1' }, excluded_labels: ['A2'], baseline_mode: 'fitted_offset' }, selected_method: 'measured_global' })
+    vi.mocked(listSavedInstrumentAnalyses).mockResolvedValue({ next_cursor: null, items: [{ label: 'original.csv', record, quality: null, analysis: { instrument: 'bli', record, summary }, summaryError: null }] })
+    vi.mocked(analyseBli).mockResolvedValue({ ...record, experiment_result_id: 'next', summary })
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Load saved results' }))
+    fireEvent.click(await screen.findByRole('button', { name: /S1 · KD 4 nM · unreviewed.*original.csv/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit parameters and create a new version' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sample mapping, reference subtraction and processing' }))
+    fireEvent.change(screen.getByLabelText('Correction and processing note'), { target: { value: 'Review phase boundaries' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save new analysis version' }))
+    await waitFor(() => expect(analyseBli).toHaveBeenCalledWith('project-1', expect.objectContaining({ artifact_id: 'raw-1', supersedes_result_id: 'previous', candidate_id: 'candidate-1', correction_note: 'Review phase boundaries', baseline_mode: 'fitted_offset', sample_mapping: { A1: 'S1' }, excluded_labels: ['A2'] })))
+    expect(uploadArtifact).not.toHaveBeenCalled()
   })
 
   it('cannot be submitted without a file', () => {
@@ -187,11 +204,11 @@ describe('analysis summary parsing', () => {
 })
 
 describe('trace styling', () => {
-  it('wraps into a dash rather than repeating a colour', () => {
-    // Five theme colours, and a BLI run can carry eight concentrations. Two
-    // curves that look identical are worse than one drawn dashed.
+  it('uses solid measured traces and dashed fitted traces with the same series color', () => {
     expect(traceStyle(0)).toEqual({ stroke: 'var(--color-chart-1)', dash: 'none' })
-    expect(traceStyle(5).stroke).toBe(traceStyle(0).stroke)
-    expect(traceStyle(5).dash).not.toBe(traceStyle(0).dash)
+    expect(traceStyle(5).dash).toBe('none')
+    expect(traceStyle(0, 'fitted').stroke).toBe(traceStyle(0).stroke)
+    expect(traceStyle(0, 'fitted').dash).not.toBe('none')
+    expect(traceStyle(0, 'simulated').dash).not.toBe(traceStyle(0, 'fitted').dash)
   })
 })

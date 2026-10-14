@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import json
 import uuid
 from types import SimpleNamespace
 from typing import Any, cast
@@ -8,8 +10,18 @@ from backend_v2.app.copilot.project_context import (
     MAX_CONTEXT_ITEMS,
     MAX_CONTEXT_TEXT,
     ProjectContextService,
+    _experiment_metadata,
     _sanitize,
 )
+from backend_v2.app.experiments.api import get_result
+from backend_v2.app.identity.models import OrganizationMember, User
+from backend_v2.app.projects.models import Project
+from backend_v2.app.wetlab import analysis
+from backend_v2.tests.test_bli_triplet_provenance import MAPPING, triplets
+from backend_v2.tests.test_wetlab_analysis import _artifact, _project
+from backend_v2.tests.test_wetlab_analysis import session as session  # noqa: F401
+from backend_v2.tests.test_wetlab_analysis import stored as stored  # noqa: F401
+from fastapi import Response
 
 
 class FakeSession:
@@ -176,3 +188,70 @@ def test_project_context_bounds_text_and_collection_size() -> None:
 
     assert sanitized["content"].endswith("[truncated]")
     assert len(sanitized["items"]) == MAX_CONTEXT_ITEMS
+
+
+def test_plot_counts_are_exact_before_sanitization_and_only_plot_arrays_are_compacted() -> None:
+    counts = {"points": 601, "instrument_fit_points": 511, "analysis_fit_points": 403, "processed_points": 0}
+    curve = {
+        "label": "sensor1", "conc_nM": 100, "excluded": False, "instrument_fit_r2": 0.98,
+        **{key: [[float(i), 0.123] for i in range(count)] for key, count in counts.items()},
+    }
+    metadata = {
+        "params": {"t_assoc": 0, "t_dissoc": 100},
+        "summary": {"curves": [curve], "processing": {"excluded_labels": ["sensor2"]},
+                    "methods": {"standard": {"kd_nM": 12.3, "interval": [10, 14]}},
+                    "quality_control": {"checks": [{"code": "review_required"}]},
+                    "source_checksum_sha256": "f" * 64},
+        # Neither an unrelated 'points' field nor other numeric lists are plots.
+        "results": {"points": [1, 2, 3], "covariance": [[1, 0], [0, 2]]},
+    }
+    before = copy.deepcopy(metadata)
+    row = SimpleNamespace(id=uuid.uuid4(), source_artifact_id=uuid.uuid4(), result_metadata=metadata)
+    compact = _experiment_metadata(cast(Any, row))
+    compact_curve = compact["summary"]["curves"][0]
+    assert compact_curve == {
+        "label": "sensor1", "conc_nM": 100, "excluded": False, "instrument_fit_r2": 0.98,
+        "plot_point_counts": counts,
+    }
+    assert _sanitize(compact)["summary"]["curves"][0]["plot_point_counts"] == counts
+    for key in ("processing", "methods", "quality_control", "source_checksum_sha256"):
+        assert compact["summary"][key] == before["summary"][key]
+    assert compact["params"] == before["params"]
+    assert compact["results"] == before["results"]
+    assert compact["context_plot_data"]["experiment_result_id"] == str(row.id)
+    assert compact["context_plot_data"]["source_artifact_id"] == str(row.source_artifact_id)
+    assert len(json.dumps(_sanitize(compact))) < len(json.dumps(_sanitize(metadata))) / 2
+    assert metadata == before
+
+
+def test_model_context_keeps_saved_bli_plots_and_raw_source_intact_in_storage_and_api(session, stored):
+    project_id, user_id = _project(session)
+    project, user = session.get(Project, project_id), session.get(User, user_id)
+    user.role = "researcher"
+    session.add(OrganizationMember(organization_id=project.organization_id, user_id=user_id, role="researcher"))
+    session.flush()
+    body = triplets()
+    artifact = _artifact(session, project_id, user_id, "synthetic.csv", body)
+    stored[artifact.object_key] = body
+    row, _ = analysis.analyse_bli(session, project_id, user_id, artifact.id,
+                                 sample_mapping=MAPPING, analysis_method="instrument_kobs")
+    before = copy.deepcopy(row.result_metadata)
+    assert len(before["summary"]["curves"][0]["points"]) > MAX_CONTEXT_ITEMS
+
+    item = ProjectContextService(session, project).list_experiment_results()[0]
+    context = item["data"]["metadata"]
+    for compact, full in zip(context["summary"]["curves"], before["summary"]["curves"], strict=True):
+        assert compact["plot_point_counts"] == {
+            key: len(full[key]) for key in ("points", "instrument_fit_points", "analysis_fit_points", "processed_points")
+        }
+        assert "points" not in compact
+    assert context["summary"]["source_checksum_sha256"] == artifact.checksum_sha256
+    assert item["data"]["source_artifact_id"] == str(artifact.id)
+    assert context["context_plot_data"]["omitted_from_model_context"] is True
+    assert "saved plot" in context["context_plot_data"]["note"]
+    assert row.result_metadata == before
+    session.flush()
+    session.expire(row, ["result_metadata"])
+    response = get_result(project_id, row.id, Response(), session, user)
+    assert response.result_metadata == before
+    assert stored[artifact.object_key] == body

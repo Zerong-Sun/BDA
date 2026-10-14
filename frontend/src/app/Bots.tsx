@@ -110,7 +110,10 @@ function BotProjectWorkspace() {
         <h1>{zh ? '研究团队' : 'Research team'}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
-      {projectId && canConfigure ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
+      {projectId ? <div className="flex flex-wrap gap-2">
+        <Button variant="outline" render={<Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'methods' })}`} />}>{zh ? '已保存的讨论报告' : 'Saved discussion reports'}</Button>
+        {canConfigure ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
+      </div> : null}
     </header>
     <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>
       {!activeProject ? <div className="science-empty"><BotAvatar id="director" stance="direct" /><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><p>{zh ? '任务、证据和对话会保存在同一个项目里。' : 'Tasks, evidence and conversations stay together in the same project.'}</p><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>

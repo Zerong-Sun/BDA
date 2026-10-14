@@ -597,6 +597,8 @@ describe('Layer 8 product contract pages', () => {
     renderWithProviders(<ResultsPage />)
 
     expect(await screen.findByText('No wet-lab readouts are recorded. Upload measurements and link them to the tested candidates.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Read saved discussion reports' })).toHaveAttribute('href', '#/research?project=proj_layer8&tab=methods')
+    expect(screen.getByRole('link', { name: 'Review decision record' })).toHaveAttribute('href', '#/research?project=proj_layer8&tab=timeline')
     expect(screen.getByRole('button', { name: 'Prepare delivery package' })).toBeDisabled()
     expect(
       screen.getByText('No delivery package has been generated from verified project artifacts yet.'),

@@ -298,7 +298,7 @@ def post_bli_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Fit KD from an uploaded ForteBio export and record the result."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_bli(
         session,
         project_id,
@@ -308,6 +308,12 @@ def post_bli_analysis(
         t_assoc=payload.t_assoc,
         t_dissoc=payload.t_dissoc,
         candidate_id=payload.candidate_id,
+        sample_mapping=payload.sample_mapping,
+        excluded_labels=payload.excluded_labels,
+        reference_label=payload.reference_label,
+        analysis_method=payload.analysis_method, baseline_mode=payload.baseline_mode,
+        correction_note=payload.correction_note,
+        supersedes_result_id=payload.supersedes_result_id,
     )
     return _analysis_response(row, summary)
 
@@ -325,7 +331,7 @@ def post_akta_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Detect peaks in an uploaded AKTA Unicorn export and record the peak table."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_akta(
         session,
         project_id,
@@ -350,7 +356,7 @@ def post_enzyme_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Fit per-well rates from an uploaded TECAN plate export and record them."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_enzyme(
         session,
         project_id,
@@ -405,7 +411,10 @@ def preview_analysis(payload: AnalysisPreviewRequest, user: User = Depends(curre
                     raise ValueError("Expanded instrument export exceeds 64 MiB")
         if payload.instrument == "bli":
             measurement, summary = analyse_bli_bytes(
-                data, sample_id=payload.sample_id, t_assoc=payload.t_assoc, t_dissoc=payload.t_dissoc
+                data, sample_id=payload.sample_id, t_assoc=payload.t_assoc, t_dissoc=payload.t_dissoc,
+                sample_mapping=payload.sample_mapping, excluded_labels=payload.excluded_labels,
+                reference_label=payload.reference_label, analysis_method=payload.analysis_method, baseline_mode=payload.baseline_mode,
+                correction_note=payload.correction_note,
             )
         elif payload.instrument == "akta":
             measurement, summary = analyse_akta_bytes(data, channel=payload.channel)

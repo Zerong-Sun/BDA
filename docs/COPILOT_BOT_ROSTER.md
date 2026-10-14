@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-14（Asia/Shanghai；名册由 12 个合并为 6 个：researcher、planner、runner、analyst 吸收原有产出型 bot，auditor 吸收 steward；退役 id 仅用于读取历史。本轮新增 `structure-interaction` 能力（planner 独有）与 `request_decision` 工具（随 `chain-messaging` 授予全员））
+最后核验：2026-10-14（核对当前六个 bot、结构/仪器工具与注册表数量；2026-09-14 的名册合并历史保留在下文，退役 id 仅用于读取历史）
 
 权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
 
@@ -178,25 +178,25 @@ and no module descriptor. Structures arrive as artifacts, which are already
 write-once and checksummed; a second table would only be somewhere for a copy to
 go stale.
 
-Five tools:
+Six read tools, verified against the registry on 2026-10-14:
 
 | Tool | Answers |
 | --- | --- |
 | `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, ligands and solvent counted separately, disulfides, and a pLDDT or B-factor summary |
-| `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
+| `list_structure_residues` | Filter residue identities by side-chain charge convention or geometric interface membership, preserving author chain, residue number and insertion code; HIS is protonation-dependent |
+| `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and distance calculated from the source coordinates |
 | `measure_structure_interface` | How much surface two chains bury and what the contact is made of: buried area per side, the conventional interface area, per-residue burial, hydrogen bonds (donor/acceptor distance, no angle term - hydrogens are absent), salt bridges, hydrophobic fraction. Buried area is not an affinity |
 | `compare_structures` | Fit one structure onto another: C-alpha RMSD before and after the fit, the residues that moved most, and a TM-score where its formula is defined. Residues are paired by author numbering, so a file missing a loop still compares; the TM-score is evaluated on this superposition and is not TM-align |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
-`structuralist` pairs this with `project-read` and nothing else, and the pairing
-is load-bearing rather than incidental: the structure tools all take an
+`planner` pairs this with `project-read`: the structure tools all take an
 `artifact_id`, and `project-read` is the bot's only route to one. Targets carry
 `structure_artifact_id`; candidates carry both `structure_artifact_id` and
 `complex_artifact_id`, and the second is what an interface question is actually
-asked about. Drop `project-read` from this bot and it keeps three tools it can
+asked about. Drop `project-read` from this bot and it keeps structure tools it can
 never supply an argument to.
 
-All three are `execution_mode="read"` under capability `structure-analysis`, and
+All six are `execution_mode="read"` under capability `structure-analysis`, and
 therefore appear on the MCP surface automatically: an external MCP client holding
 a grant for a project can analyse that project's structures with no new transport
 code.
@@ -277,9 +277,20 @@ vocabulary is what turns it on in chat, deliberately and one at a time.
 
 ## Skill and MCP inventory
 
-“Skill” means one capability id. The complete 2026-09-30 inventory is
-[the service guide's capability table](COPILOT_SERVICE_GUIDE.md#7-开发者能力与模型工具清单):
-22 capabilities and 54 tools, taken from `capabilities.py` and the registry.
+The `wetlab-authoring` capability includes read-only `preview_bli_artifact`:
+it verifies a completed artifact's SHA-256 and previews measured-trace fitting
+separately from instrument-reported kinetics. `analyse_bli_run` saves a new
+analysis with the source hash, processing choices, plot snapshot and optional
+superseded-result link; it never rewrites raw data. Kinetic triplet sample maps
+and phase switches must be explicit. A perfect fit to instrument-derived KObs
+values is not independent experimental validation or a confidence interval.
+
+“Skill” means one capability id. Importing `copilot.tools` and reading
+`REGISTRY.all()` plus `COPILOT_CAPABILITIES` on 2026-10-14 gives
+22 capabilities and 57 tools: 40 read, 11 draft and 6 queue.
+Capability descriptions are in [the service guide](COPILOT_SERVICE_GUIDE.md#7-开发者能力与模型工具清单);
+the [versioned workflow guide](VERSIONED_INSTRUMENT_BOT_WORKFLOW.md) covers current
+BLI review, residue identity and report/source links.
 The six operators' ownership is listed above; a task or project grant may narrow it.
 
 MCP filters individual tools by their required execution context:

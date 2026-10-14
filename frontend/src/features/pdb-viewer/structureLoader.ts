@@ -154,8 +154,9 @@ export async function applyResidueHighlights(
     const location = StructureElement.Location.create(data, unit, element)
     const chainId = StructureProperties.chain.auth_asym_id(location)
     const seq = StructureProperties.residue.auth_seq_id(location)
+    const insertionCode = StructureProperties.residue.pdbx_PDB_ins_code(location)
     const name = StructureProperties.atom.label_comp_id(location)
-    found.set(`${chainId}:${seq}`, { chainId, seq, label: `${chainId}:${seq} ${name}` })
+    found.set(`${chainId}:${seq}:${insertionCode}`, { chainId, seq, ...(insertionCode ? { insertionCode } : {}), label: `${chainId}:${seq}${insertionCode} ${name}` })
   }
   // A single 3D label is legible. Clustered selections use the residue list in
   // the controls so overlapping labels cannot cover the highlighted side chains.
@@ -167,11 +168,14 @@ export async function applyResidueHighlights(
   return { residues: [...found.values()], atomCount: data.elementCount }
 }
 
-function buildResidueQuery(residues: HighlightedResidue[], sideChainsOnly = false) {
+export function buildResidueQuery(residues: HighlightedResidue[], sideChainsOnly = false) {
   const atomTest = sideChainsOnly ? MS.core.logic.not([MS.core.set.has([MS.set(...SetUtils.toArray(ProteinBackboneAtoms)), MS.ammp('label_atom_id')])]) : undefined
   let query = MS.struct.generator.atomGroups({
     'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), residues[0].chainId]),
-    'residue-test': MS.core.rel.eq([MS.ammp('auth_seq_id'), residues[0].seq]),
+    'residue-test': MS.core.logic.and([
+      MS.core.rel.eq([MS.ammp('auth_seq_id'), residues[0].seq]),
+      MS.core.rel.eq([MS.ammp('pdbx_PDB_ins_code'), residues[0].insertionCode ?? '']),
+    ]),
     ...(atomTest ? { 'atom-test': atomTest } : {}),
   })
 
@@ -179,7 +183,10 @@ function buildResidueQuery(residues: HighlightedResidue[], sideChainsOnly = fals
     const residue = residues[index]
     const nextQuery = MS.struct.generator.atomGroups({
       'chain-test': MS.core.rel.eq([MS.ammp('auth_asym_id'), residue.chainId]),
-      'residue-test': MS.core.rel.eq([MS.ammp('auth_seq_id'), residue.seq]),
+      'residue-test': MS.core.logic.and([
+        MS.core.rel.eq([MS.ammp('auth_seq_id'), residue.seq]),
+        MS.core.rel.eq([MS.ammp('pdbx_PDB_ins_code'), residue.insertionCode ?? '']),
+      ]),
       ...(atomTest ? { 'atom-test': atomTest } : {}),
     })
     query = MS.struct.combinator.merge([query, nextQuery])
@@ -250,18 +257,19 @@ export function subscribeResiduePicks(
     if (!location) return
     const chainId = StructureProperties.chain.auth_asym_id(location)
     const seq = StructureProperties.residue.auth_seq_id(location)
+    const insertionCode = StructureProperties.residue.pdbx_PDB_ins_code(location)
     if (!chainId || typeof seq !== 'number') return
     const name = StructureProperties.atom.label_comp_id(location)
-    onPick({ chainId, seq, label: name ? `${chainId}${seq} ${name}` : `${chainId}${seq}` })
+    onPick({ chainId, seq, ...(insertionCode ? { insertionCode } : {}), label: name ? `${chainId}${seq}${insertionCode} ${name}` : `${chainId}${seq}${insertionCode}` })
   })
   return () => subscription.unsubscribe()
 }
 
 /** Select an existing author-numbered residue using the same Mol* focus as a canvas click. */
-export function focusResidueById(plugin: PluginContext, chainId: string, seq: number): boolean {
+export function focusResidueById(plugin: PluginContext, chainId: string, seq: number, insertionCode = ''): boolean {
   const structure = plugin.managers.structure.hierarchy.current.structures[0]?.cell?.obj?.data
   if (!structure) return false
-  const selection = Script.getStructureSelection(buildResidueQuery([{ chainId, seq }]), structure)
+  const selection = Script.getStructureSelection(buildResidueQuery([{ chainId, seq, insertionCode }]), structure)
   if (!selection || StructureSelection.isEmpty(selection)) return false
   const loci = StructureSelection.toLociWithSourceUnits(selection)
   plugin.managers.structure.focus.setFromLoci(loci)

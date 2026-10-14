@@ -73,6 +73,45 @@ def _uuid(value: str | None) -> uuid.UUID | None:
         raise ValueError("invalid_entity_id") from exc
 
 
+def _experiment_metadata(row: ExperimentResult) -> dict[str, Any]:
+    """Omit saved plot coordinates from model context without mutating the record.
+
+    Only these declared BLI plot fields are compacted: fit parameters, QC,
+    processing and unrelated numerical arrays remain evidence. Count before
+    `_sanitize` bounds lists so the count describes the complete saved snapshot.
+    """
+    metadata = row.result_metadata or {}
+    summary = metadata.get("summary")
+    if not isinstance(summary, dict) or not isinstance(summary.get("curves"), list):
+        return metadata
+    plot_fields = {"points", "instrument_fit_points", "analysis_fit_points", "processed_points"}
+    curves = []
+    omitted = False
+    for curve in summary["curves"]:
+        if not isinstance(curve, dict):
+            curves.append(curve)
+            continue
+        counts = {key: len(value) for key, value in curve.items() if key in plot_fields and isinstance(value, list)}
+        if counts:
+            omitted = True
+            curves.append({**{key: value for key, value in curve.items() if key not in counts}, "plot_point_counts": counts})
+        else:
+            curves.append(curve)
+    if not omitted:
+        return metadata
+    return {
+        **metadata,
+        "summary": {**summary, "curves": curves},
+        "context_plot_data": {
+            "omitted_from_model_context": True,
+            "experiment_result_id": str(row.id),
+            "source_artifact_id": str(row.source_artifact_id) if row.source_artifact_id else None,
+            "stored_at": "experiment_result.result_metadata.summary.curves",
+            "note": "Complete saved plot snapshots remain in the experiment result; original raw bytes remain in the source artifact. Counts refer to saved plot points, not raw observations.",
+        },
+    }
+
+
 class ProjectContextService:
     """Bounded, read-only access to operational project data."""
 
@@ -187,7 +226,7 @@ class ProjectContextService:
                     "unit": row.unit,
                     "conclusion": row.conclusion,
                     "failure_reason": row.failure_reason,
-                    "metadata": _sanitize(row.result_metadata or {}),
+                    "metadata": _sanitize(_experiment_metadata(row)),
                     "source_artifact_id": (
                         str(row.source_artifact_id)
                         if row.source_artifact_id

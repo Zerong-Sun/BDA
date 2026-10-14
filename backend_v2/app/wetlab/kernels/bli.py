@@ -19,7 +19,7 @@ experiment_raw 落 data_type="bli_curves" 原始曲线快照（只写一次）�
 import csv
 import re
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -30,7 +30,7 @@ from ..diagnostics import check, finite_json, optimizer_diagnostics, quality, tr
 
 # BLI 分析版本（随 v0.0.8 引入）：写入 results["BLI_ANALYSIS_VERSION"]，
 # 供未来 recompute 对照——同版本 + 同 raw 快照 → 可复现同结果（规则 #8）。
-BLI_ANALYSIS_VERSION = "0.0.8-qc1"
+BLI_ANALYSIS_VERSION = "0.0.9-provenance2"
 
 # ═══════════════════════════════════════════════════════════
 #  绘图样式（BLI 风格）—— 酶活等其他模块引用同一套
@@ -65,6 +65,21 @@ class Curve:
     conc_nM: float      # 样品浓度 (nM)
     time: np.ndarray    # 时间 (s)
     response: np.ndarray  # 响应 (nm)，NaN 为缺失
+    instrument_fit: np.ndarray | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    source_format: str = "fortebio_preprocessed"
+
+
+def parse_bli_csv(source: bytes) -> list[Curve]:
+    """Detect supported exports without treating instrument Fit columns as data."""
+    rows = list(csv.reader(source.decode("utf-8-sig").splitlines()))
+    if rows and rows[0] and rows[0][0].strip().lower() == "conc1":
+        from .bli_kinetic import parse_kinetic_triplets
+
+        return parse_kinetic_triplets(rows)
+    if len(rows) > 1 and any(re.fullmatch(r"t\d+[A-P]\d+c\d+", item.strip()) for item in rows[1]):
+        return parse_fortebio_csv(source)
+    raise ValueError("Unsupported BLI CSV format; expected ForteBio preprocessed or Time/Data/Fit kinetic triplets")
 
 
 def parse_fortebio_csv(source: str | bytes) -> list[Curve]:

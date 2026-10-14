@@ -140,6 +140,27 @@ describe('Room', () => {
     expect(screen.getByText('Two routes fit.')).toBeInTheDocument()
   })
 
+  it('shows persisted canonical selections and highlighted views as exact residue links after loading the room', async () => {
+    const residues = [{ chain: 'B', seq: 46, insertion_code: null, name: 'LYS' }, { chain: 'B', seq: 54, insertion_code: 'A', name: 'ARG' }]
+    stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      content: 'Geometric contacts from predicted coordinates.',
+      tool_calls: [
+        { name: 'list_structure_residues', status: 'completed', result: { artifact_id: 'artifact-one', filename: 'model.pdb', viewer_selection: { artifact_id: 'artifact-one', residues } } },
+        { name: 'render_structure_view', status: 'completed', result: { artifact_id: 'artifact-one', filename: 'model.pdb', highlighted: residues } },
+      ],
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Geometric contacts from predicted coordinates.')).toBeInTheDocument()
+    const selections = await screen.findAllByRole('link', { name: 'Open structure and residues in Results' })
+    expect(selections).toHaveLength(2)
+    for (const selection of selections) {
+      const query = new URLSearchParams(selection.getAttribute('href')!.split('?')[1])
+      expect(query.get('project')).toBe('proj_test')
+      expect(query.get('artifact')).toBe('artifact-one')
+      expect(JSON.parse(query.get('residues')!)).toEqual(residues)
+    }
+  })
+
   it('leaves an unattributed turn unattributed rather than defaulting it to a bot', async () => {
     stub([
       { kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: null, message: message({ bot: null }) },
