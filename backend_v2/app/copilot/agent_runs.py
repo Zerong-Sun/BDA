@@ -97,6 +97,10 @@ def create_run(
         parent_writes = set((parent.task_contract or {}).get("authorized_writes", []))
         contract = build_contract("custom", sorted(parent_writes & set(allowed_tools)))
         allowed_tools = sorted(set(allowed_tools) - (REGISTRY.user_intent_write_ids() - parent_writes))
+        if (parent.task_contract or {}).get("procedural_skills"):
+            # Carry the exact frozen method, while the child's tool scope is
+            # still independently narrowed above and rechecked each step.
+            contract["procedural_skills"] = parent.task_contract["procedural_skills"]
 
     run = CopilotAgentRun(
         project_id=project_id,
@@ -161,6 +165,7 @@ def append_turn(
     *,
     role: str,
     content: str = "",
+    reasoning_content: str | None = None,
     tool_calls: list[dict[str, Any]] | None = None,
     tokens_in: int = 0,
     tokens_out: int = 0,
@@ -177,6 +182,7 @@ def append_turn(
         sequence=run.turn_count,
         role=role,
         content=content,
+        reasoning_content=reasoning_content,
         tool_calls=list(tool_calls or []),
         tokens_in=tokens_in,
         tokens_out=tokens_out,

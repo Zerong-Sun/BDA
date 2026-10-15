@@ -20,6 +20,7 @@ from ..compute.binding import binding_blockers, edge_port_blockers
 from ..core.config import get_settings
 from ..registry.models import ModelPlugin
 from ..registry.ports import parse_output_ports
+from ..registry.qualification import model_qualification_issues
 from ..registry.runtime_validation import runtime_validation_is_current
 from .models import WorkflowRun
 from .repository import WorkflowRepository
@@ -258,6 +259,7 @@ def evaluate_preflight(
     # per plugin: a nine-node route on three plugins was emitting the same two sentences
     # nine times, which is how ten real binding blockers ended up looking like noise.
     plugin_warnings: dict[tuple[str, str], dict] = {}
+    qualification_checked: set[str] = set()
     for node in nodes:
         # A manual stage is part of the route but is not run here - target intake, a
         # hand-built hotspot map, a scientist reviewing candidates. Requiring a registry
@@ -292,6 +294,11 @@ def evaluate_preflight(
                     "node_id": str(node.id),
                 }
             )
+        if str(plugin.id) not in qualification_checked:
+            qualification_checked.add(str(plugin.id))
+            qualification_blockers, qualification_warnings = model_qualification_issues(plugin)
+            blockers.extend(qualification_blockers)
+            warnings.extend(qualification_warnings)
         if strict and node.container_image and node.container_image != plugin.container_image:
             blockers.append(
                 {

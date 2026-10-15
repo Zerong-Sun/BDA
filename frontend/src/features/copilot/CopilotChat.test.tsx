@@ -62,6 +62,58 @@ describe('CopilotChat', () => {
     vi.clearAllMocks()
   })
 
+  it('offers persistent calculation mode without sending conflicting bot hints or creating a research task', async () => {
+    const taskRequested = vi.fn()
+    const view = renderWithProviders(<CopilotChat externalRoster onTaskRequested={taskRequested} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Lab calculations' }))
+    expect(screen.getByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), { target: { value: 'Plan a dilution of 1 µM to 10 nM, 1000 µL final volume.' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0]).toMatchObject({ skill: 'wetlab-read', bot: undefined, intent: 'chat' })
+    expect(taskRequested).not.toHaveBeenCalled()
+    view.unmount()
+    renderWithProviders(<CopilotChat externalRoster />)
+    expect(await screen.findByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Research chat' }))
+    expect(useAppStore.getState().copilotSessions.proj_test.mode).toBe('general')
+  })
+
+  it('preserves the accepted conversation and unlocks input when waiting times out', async () => {
+    vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, _chunk, _status, _message, accepted) => {
+      accepted?.({ conversationId: 'accepted-conversation', messageId: 'accepted-message' })
+      throw new Error('copilot_wait_timeout')
+    })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    fireEvent.change(input, { target: { value: 'Hello' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(useAppStore.getState().copilotSessions.proj_test?.pending).toBeNull())
+    const session = useAppStore.getState().copilotSessions.proj_test
+    expect(session.conversationId).toBe('accepted-conversation')
+    expect(session.messages[0]).toMatchObject({ id: 'accepted-message', content: 'Hello' })
+    expect(session.error).toContain('may still be processing')
+    expect(input).toBeEnabled()
+    expect(streamCopilotMessage).toHaveBeenCalledOnce()
+  })
+
+  it('retains source links when the SSE message metadata arrives before its text chunk', async () => {
+    vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, onChunk, _onStatus, onMessage) => {
+      const content = 'Saved project observation. [cite:1]'
+      // This is the order used by the real JSON message SSE transport.
+      onMessage?.({ content, citations: [{ source_type: 'external', label: 'Saved source', url: 'https://example.test/source' }], tool_calls: [{ name: 'get_reference_content' }] })
+      onChunk(content)
+      return { conversationId: 'citation-conversation', messageId: 'citation-message' }
+    })
+    renderWithProviders(<CopilotChat />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Read the saved source.' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(screen.getByRole('link', { name: 'View source 1' })).toBeInTheDocument())
+    const message = useAppStore.getState().copilotSessions.proj_test.messages.at(-1)
+    expect(message?.meta?.citations).toHaveLength(1)
+    expect(message?.meta?.toolCalls).toEqual([{ name: 'get_reference_content' }])
+  })
+
   it('keeps one conversation across drawer/page remounts', async () => {
     const rendered = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
@@ -235,12 +287,13 @@ describe('CopilotChat', () => {
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
     expect(await screen.findByText('引用结果')).toBeInTheDocument()
-    const citation = await screen.findByRole('link')
-    expect(citation).toHaveAccessibleName('来源 1 外部')
+    expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '[1] 来源 1' }))
+    const citation = await screen.findByRole('link', { name: '打开原始来源 · 来源 1' })
+    expect(screen.getByText('外部参考来源')).toBeInTheDocument()
     expect(citation).toHaveAttribute('target', '_blank')
     expect(citation).toHaveAttribute('rel', expect.stringContaining('noopener'))
     expect(citation).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
-    expect(citation.querySelector('[data-slot="badge"]')).toBeInTheDocument()
   })
 
   it('shows the active tool while Copilot is preparing a streamed answer', async () => {
@@ -459,7 +512,7 @@ describe('CopilotChat', () => {
     fireEvent.pointerUp(conductor, { button: 0 })
     fireEvent.click(conductor)
 
-    expect(await screen.findByText('You route work; you do not do it.')).toBeInTheDocument()
+    expect(await screen.findByText(/A recommendation does not start a run/)).toBeInTheDocument()
     expect(screen.getByText('May delegate to')).toBeInTheDocument()
     // ...and the named operator is a control, not prose: selecting it is the
     // action a reader wants next.

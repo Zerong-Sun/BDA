@@ -53,19 +53,46 @@ export function apiAuthorizationHeaders(url: string): Record<string, string> {
   return isApiUrl ? { Authorization: `Bearer ${token}` } : {}
 }
 
-interface RefreshResponse { access_token: string }
+interface RefreshResponse { access_token: string; user?: { id: string; [key: string]: unknown } }
 let refreshPromise: Promise<string> | null = null
+let refreshController: AbortController | null = null
+let authGeneration = 0
+
+export function currentAuthGeneration(): number { return authGeneration }
+export function invalidateAuthRequests(): void {
+  authGeneration += 1
+  refreshController?.abort()
+  refreshController = null
+  refreshPromise = null
+}
 
 export function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
+    const generation = authGeneration
+    const previousUser = sessionStorage.getItem('bda_user')
+    const controller = new AbortController()
+    refreshController = controller
     refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}',
+      signal: controller.signal,
     }).then(async (response) => {
       if (!response.ok) throw new ApiError('Session expired', response.status)
       const payload = await response.json() as RefreshResponse
+      if (generation !== authGeneration) throw new ApiError('Session ended', 401)
+      if (previousUser && payload.user && JSON.parse(previousUser).id !== payload.user.id) {
+        throw new ApiError('Account changed; sign in again', 401)
+      }
       sessionStorage.setItem('bda_token', payload.access_token)
+      if (payload.user) sessionStorage.setItem('bda_user', JSON.stringify(payload.user))
       return payload.access_token
-    }).finally(() => { refreshPromise = null })
+    }).finally(() => {
+      // A late response from the previous account must not clear the new
+      // account's single flight, even if cancellation was already too late.
+      if (refreshController === controller) {
+        refreshPromise = null
+        refreshController = null
+      }
+    })
   }
   return refreshPromise
 }

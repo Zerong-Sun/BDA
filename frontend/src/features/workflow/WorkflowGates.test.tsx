@@ -75,7 +75,7 @@ beforeEach(() => {
   })
 })
 
-function inspector(runs: GateSummary[] = [gate]) {
+function inspector(runs: GateSummary[] = [gate], canOperate = true) {
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={cache}>
@@ -91,6 +91,7 @@ function inspector(runs: GateSummary[] = [gate]) {
         }}
         runs={runs}
         readOnly
+        canOperate={canOperate}
         onSave={vi.fn()}
         onClose={vi.fn()}
         onSource={vi.fn()}
@@ -103,6 +104,15 @@ function inspector(runs: GateSummary[] = [gate]) {
 }
 
 describe('workflow gates', () => {
+  it('lets viewers inspect results while disabling previews and release', async () => {
+    inspector([gate], false)
+    await screen.findByText('keep')
+    expect(screen.getByRole('button', { name: '试运行' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '选择本页合格项' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '不保留结果，结束分支' })).toBeDisabled()
+    expect(releaseGate).not.toHaveBeenCalled()
+  })
+
   it('blocks release and bulk selection until result loading completes', async () => {
     vi.mocked(gateResults).mockImplementation(() => new Promise(() => {}))
     inspector()

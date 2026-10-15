@@ -92,6 +92,9 @@ export function GatePolicyEditor({
           <WorkflowOption value="or">OR</WorkflowOption>
         </WorkflowSelect>
       </label>
+      {rules.conditions.some(rule => ['plddt', 'plddt_min', 'iplddt', 'binder_plddt', 'design_chain_plddt'].includes(rule.metric.split(':')[0])) ? (
+        <p className="text-xs text-text-secondary">{zh ? 'pLDDT / ipLDDT 阈值采用 0–100 量纲；量纲不明或冲突的结果需先核实。' : 'pLDDT / ipLDDT thresholds use 0–100. Results with unknown or conflicting scales require review.'}</p>
+      ) : null}
       {rules.conditions.map((rule, index) => (
         <div key={index} className="grid grid-cols-[1fr_55px_65px_24px] gap-1">
           <Input

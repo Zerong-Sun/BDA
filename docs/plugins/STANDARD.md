@@ -70,3 +70,13 @@ python3 qm-scripts/plugins/generate_docs.py --check
 ## 7. 本轮覆盖口径
 
 “完整”指 2026-09-15 注册表中每个键和版本、历史参数库以及手册明确列出的上游功能模式均有解释或明确的未知/未实现标记。它不是所有软件未来版本、Rosetta 任意 XML mover、任意第三方 checkpoint 和动态输出列的无限全集。新增模式/字段必须按本规范补 profile、来源与验证后才能加入受支持范围。
+
+### pLDDT 量纲与候选筛选
+
+平台 pLDDT / ipLDDT 门控阈值采用 0–100；阈值 0.7 仍表示该量纲内的 0.7，系统不按数值大小猜量纲。ProteinHunter 的 Boltz 原生汇总按上游声明的 0–1 转换，原始值、原量纲、来源文件和行号保存在 metric context 与候选 `properties.confidence_scale` 中。依据：[Boltz 输出说明](https://github.com/jwohlwend/boltz/blob/main/docs/prediction.md#output)。
+
+若包装器已经输出 0–100，CSV 应显式提供 `plddt_scale` / `iplddt_scale` 列，或输出 metadata 的 `confidence_scales` 对象；允许值为 `percent_0_100`、`fraction_0_1`。超出声明范围的值保留原始值并标记冲突，不能自动通过门控。已知 AlphaFold2/Superfold、AlphaFold3 来源继续按其 0–100 契约读取；没有来源或量纲声明的存量记录标记 `scale_unknown`，不自动改写。Triage 分别报告失败、缺失、量纲冲突和量纲不明。
+
+候选列表默认显示所有结果。用户可手动隐藏已确认 0–100 且低于 pLDDT 70 的候选，随时恢复；直接链接、缺失值和量纲不明记录仍可见。该操作只改变显示，不删除数据，也不代表实验活性判断。
+
+历史记录恢复：先核对原始结果文件及其工具版本/量纲，随后带明确量纲声明重新收集或导入经过核实的结果；保留原记录与来源供审计。未经来源核实的记录继续标记不确定，不能通过批量乘 100 修复。

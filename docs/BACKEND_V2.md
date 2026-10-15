@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-12（Asia/Shanghai；核对领域清单与模块登记处）
+最后核验：2026-10-11（领域及科研能力升级）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -18,7 +18,7 @@ v2 是 FastAPI 模块化单体。API、通用 worker、research worker、copilot
 
 ## 2. 模块边界
 
-`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、autopilot、timeline、ligands、wetlab、sequences、audit 与 platform 划分，共 23 个领域，登记在 `app/module_registry.py`。其中 sequences 没有表：序列分析与密码子优化都由其他领域已存的记录算出，存一份派生结果就会多出一个真值来源。`structures` 同样无表，且暂无 HTTP 路由，只经 copilot 工具调用。`app/core/` 与 `app/migration/` 不是领域：前者是跨域基础设施，后者是 v1 迁移原语。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
+`app/` 按 identity、projects、targets、workflows、compute、artifacts、candidates、experiments、campaigns、research、knowledge、literature、intelligence、registry、delivery、copilot、autopilot、timeline、ligands、wetlab、sequences、learning、audit 与 platform 划分，共 24 个领域，登记在 `app/module_registry.py`。其中 sequences 没有表：序列分析与密码子优化都由其他领域已存的记录算出，存一份派生结果就会多出一个真值来源。`structures` 同样无表，且暂无 HTTP 路由，只经 copilot 工具调用。`app/core/` 与 `app/migration/` 不是领域：前者是跨域基础设施，后者是 v1 迁移原语。路由负责协议与依赖注入，service 负责规则，repository 负责持久化，model/schema 分别表示数据库与外部契约。
 
 跨域写入通过 service 或 outbox 事件完成。Copilot 只编排领域服务；compute 不直接访问 Campaign repository。请求使用短生命周期 SQLAlchemy session，SSE 建立前完成授权并释放连接。
 
@@ -66,6 +66,8 @@ publisher 用 `FOR UPDATE SKIP LOCKED` 发布任务。队列为 `dispatch`、`po
 完成接口不立即删除 staging，确保数据库回滚后可在上传有效期内重试；最终对象不受仍有效的上传 URL 后续覆盖影响。已完成或失败的 staging 由现有 reconciliation 在对象最后修改超过一小时后清理，活动且未过期的上传继续受保护。默认内容上限为 100 MiB，配置为 `BDA_V2_MAX_UPLOAD_BYTES`；服务端内存与临时对象存储应按并发上传量预留。
 
 Artifact 状态为 uploading、available、failed、deleted。reconciliation 检查超时 staging、孤儿对象、缺失对象、共享 checksum 引用和软删除项目。
+
+对象清理仅处理本库已登记的对象或本库项目/作业命名空间内的孤儿对象。其他项目/作业前缀保留并计入 `foreign_objects`；未能确认归属的 staging、无前缀对象保留并计入 `unattributed_objects`，不能只因本库无引用而删除。复制数据库会复制项目/作业 ID；这样的独立部署仍必须配置独立存储桶，避免相同命名空间互相影响。
 
 ## 7. 高级领域
 

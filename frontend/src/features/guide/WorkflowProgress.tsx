@@ -44,7 +44,7 @@ export function WorkflowProgress({
         className={
           isVertical
             ? 'gap-1'
-            : 'min-w-max items-center rounded-full border border-accent-border bg-accent-bg px-3 py-2 backdrop-blur-sm'
+            : 'min-w-max items-center gap-2 rounded-full border border-accent-border bg-accent-bg px-3 py-2 backdrop-blur-sm'
         }
       >
         {stations.map((station, index) => (
@@ -52,11 +52,11 @@ export function WorkflowProgress({
             key={station.id}
             step={station.stepNumber}
             completed={station.stepNumber < activeStep}
-            className={isVertical ? 'justify-start' : undefined}
+            className={isVertical ? 'justify-start' : 'not-last:flex-none shrink-0'}
           >
             <StepperTrigger
               type="button"
-              className={isVertical ? 'w-full justify-start py-1.5 text-left' : 'shrink-0'}
+              className={isVertical ? 'w-full justify-start py-1.5 text-left' : 'shrink-0 whitespace-nowrap'}
               aria-label={
                 language === 'zh'
                   ? `第 ${station.stepNumber} 步：${station.title}`
@@ -68,7 +68,7 @@ export function WorkflowProgress({
                 {station.title}
               </StepperTitle>
             </StepperTrigger>
-            {index < totalSteps - 1 ? <StepperSeparator /> : null}
+            {index < totalSteps - 1 ? <StepperSeparator className={isVertical ? undefined : 'mx-3 w-5 shrink-0 group-data-[orientation=horizontal]/stepper-nav:flex-none'} /> : null}
           </StepperItem>
         ))}
       </StepperNav>

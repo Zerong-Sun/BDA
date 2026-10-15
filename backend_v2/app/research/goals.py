@@ -28,6 +28,25 @@ from .models import (
 MAX_DEPTH = 12
 
 
+def _decision_contract(session: Session, project_id: uuid.UUID, value: dict | None) -> dict:
+    from ..literature.evidence_notes import NOTE_KIND
+    from ..literature.models import LiteratureClaim, LiteratureDocument, LiteratureEvidence
+    from .schemas import ResearchDecisionContract
+
+    contract = ResearchDecisionContract.model_validate(value or {})
+    if contract.evidence_note_ids:
+        available = set(session.scalars(select(LiteratureClaim.id).join(
+            LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id,
+        ).join(LiteratureEvidence, LiteratureEvidence.claim_id == LiteratureClaim.id).where(
+                LiteratureDocument.project_id == project_id,
+                LiteratureClaim.id.in_(contract.evidence_note_ids),
+                LiteratureClaim.attributes["curation_kind"].as_string() == NOTE_KIND,
+                LiteratureEvidence.evidence_type == NOTE_KIND)))
+        if available != set(contract.evidence_note_ids):
+            raise DomainError("research_decision_evidence_mismatch", "Every linked evidence note must exist in this project", status_code=422)
+    return contract.model_dump(mode="json")
+
+
 def _goal(session: Session, goal_id: uuid.UUID) -> ResearchGoal:
     goal = session.get(ResearchGoal, goal_id)
     if goal is None:
@@ -63,7 +82,9 @@ def create_goal(
     detail: str = "",
     parent_id: uuid.UUID | None = None,
     tags: list[str] | None = None,
+    decision_contract: dict | None = None,
 ) -> ResearchGoal:
+    validated_contract = _decision_contract(session, project_id, decision_contract)
     if parent_id is not None:
         parent = _goal(session, parent_id)
         if parent.project_id != project_id:
@@ -90,6 +111,7 @@ def create_goal(
         parent_id=parent_id,
         title=title,
         detail=detail,
+        decision_contract=validated_contract,
         tags=list(tags or []),
         sort_order=int(next_order or 0),
         created_by=user_id,
@@ -109,13 +131,18 @@ def update_goal(
     parent_id: uuid.UUID | None = None,
     reparent: bool = False,
     tags: list[str] | None = None,
+    decision_contract: dict | None = None,
 ) -> ResearchGoal:
+    # Validate scoped references before changing any goal fields.
+    validated_contract = _decision_contract(session, goal.project_id, decision_contract) if decision_contract is not None else None
     if title is not None:
         goal.title = title
     if detail is not None:
         goal.detail = detail
     if tags is not None:
         goal.tags = list(tags)
+    if validated_contract is not None:
+        goal.decision_contract = validated_contract
     if status is not None:
         if status not in GOAL_STATUSES:
             raise DomainError(
@@ -158,8 +185,13 @@ def update_goal(
     return goal
 
 
-def require_goal(session: Session, goal_id: uuid.UUID) -> ResearchGoal:
+def require_goal(session: Session, goal_id: uuid.UUID, *, for_update: bool = False) -> ResearchGoal:
     """Load a goal or fail. The API layer must not query the session itself."""
+    if for_update:
+        goal = session.scalar(select(ResearchGoal).where(ResearchGoal.id == goal_id).with_for_update())
+        if goal is None:
+            raise DomainError("research_goal_not_found", "Research goal was not found", status_code=404)
+        return goal
     return _goal(session, goal_id)
 
 

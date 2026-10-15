@@ -10,13 +10,12 @@ two.**
 
     pass    - the metric was recorded and satisfies the threshold
     fail    - the metric was recorded and does not
-    missing - the metric was never recorded
+    missing - the metric is absent from the supplied records
 
 Folding `missing` into `fail` is the mistake this module exists to avoid. A
-design with no Rosetta score has not failed a Rosetta gate; nobody has run
-Rosetta on it. A triage that reports those alike tells a person to discard
-work that has not been assessed, and it does so most often exactly when a
-pipeline stage was skipped - which is when someone most needs to notice.
+design with no recorded Rosetta score cannot be judged against that gate.
+The supplied records do not establish whether it was measured elsewhere.
+Reporting missing as failed could discard work whose assessment is unknown.
 
 Thresholds are passed in rather than imported. The catalogue lives in
 `copilot/route_catalog.py`, and this is the candidates domain: a domain module
@@ -31,6 +30,8 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from ..core import confidence_scale
 
 #: Comparators a threshold may use, longest first so ">=" is not read as ">".
 _OPERATORS: tuple[tuple[str, Callable[[float, float], bool]], ...] = (
@@ -81,10 +82,14 @@ class Criterion:
 @dataclass(frozen=True)
 class Verdict:
     tier: str | None
+    criteria_tier: str | None = None
+    tier_criteria: dict[str, list[Criterion]] = field(default_factory=dict)
     criteria: list[Criterion] = field(default_factory=list)
     passed: int = 0
     failed: int = 0
     missing: int = 0
+    conflicted: int = 0
+    scale_unknown: int = 0
 
 
 def parse_threshold(text: str) -> tuple[Callable[[float, float], bool], float, str]:
@@ -152,11 +157,27 @@ def evaluate(
                     threshold=threshold,
                     outcome="missing",
                     note=(
-                        f"No {' or '.join(candidates_keys)} recorded for this candidate. "
-                        "Not a failure: nothing has measured it."
+                        f"No {' or '.join(candidates_keys)} recorded for this candidate in the supplied metrics. "
+                        "Not a failure: whether it was measured elsewhere is unknown."
                     ),
                 )
             )
+            continue
+        issues = [(item, confidence_scale.comparison_issue(
+            str(item.get("key")), item.get("value"), context=item.get("context"),
+            unit=str(item.get("unit") or ""), method=str(item.get("method") or ""),
+        )) for item in recorded]
+        # Do not choose a favourable seed before resolving its units. A mixed-scale
+        # set cannot be ranked safely, even if another row would happen to pass.
+        unresolved = next(((item, issue) for item, issue in issues if issue), None)
+        if unresolved:
+            item, issue = unresolved
+            criteria.append(Criterion(
+                name=name, threshold=threshold, outcome=str(issue), value=item.get("value"),
+                metric_key=str(item.get("key")), method=str(item.get("method") or "") or None,
+                assessor=str(item.get("assessor") or "") or None,
+                note="pLDDT thresholds use 0-100. Confirm the recorded scale before comparison; this is not a design failure.",
+            ))
             continue
         chosen = _best(recorded, compare, limit)
         assert chosen is not None  # `recorded` is non-empty
@@ -190,6 +211,8 @@ def triage(
     the reason in the module docstring. The returned criteria are those of the
     tier that was reached, or of the last (least demanding) tier when none was,
     because that is the list a person needs in order to know what to run next.
+    ``criteria_tier`` names that list; ``tier_criteria`` retains every tier's
+    comparisons so not reaching a tier cannot be mistaken for not assessing it.
     """
     if not tiers:
         return Verdict(tier=None)
@@ -201,6 +224,8 @@ def triage(
         if criteria and all(item.outcome == "pass" for item in criteria):
             return Verdict(
                 tier=name,
+                criteria_tier=name,
+                tier_criteria=evaluated,
                 criteria=criteria,
                 passed=len(criteria),
                 failed=0,
@@ -210,8 +235,12 @@ def triage(
     criteria = evaluated[fallback_name]
     return Verdict(
         tier=None,
+        criteria_tier=fallback_name,
+        tier_criteria=evaluated,
         criteria=criteria,
         passed=sum(1 for item in criteria if item.outcome == "pass"),
         failed=sum(1 for item in criteria if item.outcome == "fail"),
         missing=sum(1 for item in criteria if item.outcome == "missing"),
+        conflicted=sum(1 for item in criteria if item.outcome == "scale_conflict"),
+        scale_unknown=sum(1 for item in criteria if item.outcome == "scale_unknown"),
     )

@@ -1,4 +1,4 @@
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Artifact } from '../../lib/schemas/artifact'
 import type { Candidate } from '../../lib/schemas/candidate'
@@ -70,10 +70,23 @@ describe('AlphaFoldResults', () => {
     )
 
     expect(screen.getByText('AlphaFold structure confidence')).toBeInTheDocument()
-    expect(screen.getByText('Partial coverage · 1/1000')).toBeInTheDocument()
+    expect(screen.getByText('Available predictions · 1')).toBeInTheDocument()
     expect(screen.getAllByText('76.46')).toHaveLength(2)
-    expect(screen.getByText(/monomer mean PAE is not interface PAE/)).toBeInTheDocument()
+    expect(screen.getByText(/Prediction metrics do not establish experimental binding activity/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'PDB' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
+  })
+  it('exposes imported complex structures and available interface metrics', () => {
+    const download = vi.fn()
+    const complex = artifact('complex-1', 'predicted_structure', 'complex.pdb', candidate.candidate_key)
+    renderWithProviders(<AlphaFoldResults candidates={[{ ...candidate, structure_artifact_id: null,
+      complex_artifact_id: 'complex-1', scores: { plddt: 93.2, iptm: 0.88, pae_interaction: 5.2, rosetta_interface_dg: -78 } }]}
+      artifacts={[complex]} onDownload={download} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Complex PDB' }))
+    expect(download).toHaveBeenCalledWith(complex)
+    expect(screen.getByRole('link', { name: 'View structure' })).toHaveAttribute('href', '#/candidates?project=project-1&candidate=candidate-1')
+    expect(screen.getByText('0.880')).toBeInTheDocument()
+    expect(screen.getByText('-78.00')).toBeInTheDocument()
+    expect(screen.queryByText(/1000/)).not.toBeInTheDocument()
   })
 })

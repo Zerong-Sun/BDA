@@ -66,6 +66,10 @@ describe('CommandPalette', () => {
     // The two routes whose nav wording differs from their page titles.
     expect(await screen.findByText('Decisions')).toBeInTheDocument()
     expect(screen.getByText('Research team')).toBeInTheDocument()
+    expect(screen.getByText('Lab tools')).toBeInTheDocument()
+    expect(screen.getByText('Computational design')).toBeInTheDocument()
+    expect(screen.queryByText('FAQ')).not.toBeInTheDocument()
+    expect(screen.queryByText('Timeline')).not.toBeInTheDocument()
   })
 
   it('indexes the projects and the roster already loaded', async () => {

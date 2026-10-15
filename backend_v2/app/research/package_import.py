@@ -38,6 +38,16 @@ from .schemas import (
 
 BUILTIN_RESEARCH_PACKAGE_PREFIXES = ("pd1-demo",)
 
+# These describe server retrieval/review work, not the package's bibliography.
+# Never accept them from an import or replace a saved snapshot on reimport.
+_SERVER_REFERENCE_METADATA = frozenset({
+    "content_provenance", "latest_retrieval_provenance", "search_run_id", "search_query",
+    "retrieval_trace_id", "raw_content_artifact_id", "raw_response_artifact_id",
+    "content_checksum_sha256", "response_checksum_sha256", "content_kind", "retrieved_at",
+    "analysis_status", "review_status", "reviewed_by", "reviewed_at",
+    "patent_legal_status", "patent_claims",
+})
+
 
 def _builtin_package_family(package_id: str) -> str | None:
     return next((prefix for prefix in BUILTIN_RESEARCH_PACKAGE_PREFIXES if package_id.startswith(prefix)), None)
@@ -470,8 +480,12 @@ def _upsert_references(
         ref_id = str(ref.get("ref_id"))
         if ref_id not in allowed:
             continue
+        row = by_external.get(ref_id)
+        saved = (row.metadata_json or {}) if row is not None else {}
+        server_metadata = {key: saved[key] for key in _SERVER_REFERENCE_METADATA if key in saved}
         metadata = {
-            **ref,
+            **{key: value for key, value in ref.items() if key not in _SERVER_REFERENCE_METADATA},
+            **server_metadata,
             "package_id": package_id,
             "package_schema_version": package.get("schema_version") or "1.0",
             "source_project_key": project_key,
@@ -480,7 +494,15 @@ def _upsert_references(
             ),
         }
         document_status = "verified" if trusted_package else "pending_review"
-        row = by_external.get(ref_id)
+        if not trusted_package:
+            metadata["verification_status"] = "pending_human_review"
+        if row is not None and server_metadata:
+            # Keep the lifecycle and metadata verification of work already done
+            # by the server. Importing a bibliography does not retrieve content,
+            # review it, or invalidate an addressable chunk/trace/artifact.
+            document_status = row.status
+            if "verification_status" in saved:
+                metadata["verification_status"] = saved["verification_status"]
         if row is None:
             session.add(
                 LiteratureDocument(

@@ -1,6 +1,9 @@
 import { useId } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useI18n } from '../../lib/i18n'
+import { CitationDetails } from './CitationDetails'
+import { remarkCitationMarkers, type CitationRecord } from './citationMarkers'
 
 /**
  * Long-form research prose (project reviews, methods, validation notes) is
@@ -59,7 +62,8 @@ function headingText(node: React.ReactNode): string {
   return ''
 }
 
-export function ReviewMarkdown({ children }: { children: string }) {
+export function ReviewMarkdown({ children, citations = [], projectId }: { children: string; citations?: readonly CitationRecord[]; projectId?: string }) {
+  const { language } = useI18n()
   const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const headings = sectionHeadings(children)
   const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
@@ -68,7 +72,7 @@ export function ReviewMarkdown({ children }: { children: string }) {
   return (
     <div className={PROSE}>
       {showToc ? (
-        <nav aria-label="Sections" className="mb-4 border border-border-soft bg-surface-2 p-3">
+        <nav aria-label={language === 'zh' ? '章节' : 'Sections'} className="mb-4 border border-border-soft bg-surface-2 p-3">
           <ol className="!ml-4 grid gap-0.5 text-xs sm:grid-cols-2">
             {headings.map((heading) => (
               <li key={heading}>
@@ -85,8 +89,21 @@ export function ReviewMarkdown({ children }: { children: string }) {
         </nav>
       ) : null}
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, [remarkCitationMarkers, { citations }]]}
         components={{
+          a: ({ href, children: content, node }) => {
+            const match = node?.properties['data-bda-citation'] === true ? href?.match(/^#bda-citation-(\d+)$/) : null
+            if (!match || !citations[Number(match[1]) - 1]) return <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{content}</a>
+            const index = Number(match[1])
+            const id = `${prefix}-source-${index}`
+            return <sup><a href={`#${id}`} aria-label={`${language === 'zh' ? '查看来源' : 'View source'} ${index}`} onClick={(event) => {
+              event.preventDefault()
+              const detail = document.getElementById(id)
+              const trigger = detail?.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')
+              if (trigger?.getAttribute('aria-expanded') === 'false') trigger.click()
+              detail?.scrollIntoView?.({ block: 'nearest' })
+            }}>{content}</a></sup>
+          },
           h2: ({ children: content, ...props }) => (
             <h2 {...props} id={idByHeading.get(headingText(content))}>
               {content}
@@ -96,6 +113,7 @@ export function ReviewMarkdown({ children }: { children: string }) {
       >
         {children}
       </ReactMarkdown>
+      <CitationDetails citations={citations} prefix={prefix} projectId={projectId} />
     </div>
   )
 }

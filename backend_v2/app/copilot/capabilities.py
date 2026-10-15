@@ -42,6 +42,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
             "get_dataset_slice",
             "get_reference",
             "get_reference_content",
+            "get_reference_evidence_packet",
             "list_research_goals",
         ],
     },
@@ -69,6 +70,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "execution_mode": "read",
         "chat_tools": [
             "analyse_structure",
+            "list_structure_residues",
             "list_structure_contacts",
             "measure_structure_interface",
             "compare_structures",
@@ -123,7 +125,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Search project knowledge and create pending-review Copilot notes",
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["search_project_knowledge", "create_knowledge_draft"],
+        "chat_tools": ["search_project_knowledge", "create_knowledge_draft", "save_literature_analysis"],
         "requires_explicit_request": True,
     },
     {
@@ -195,7 +197,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "read",
-        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series"],
+        "chat_tools": ["list_proteins", "compute_concentration", "plan_dilution_series", "calculate_bench"],
     },
     {
         "id": "wetlab-authoring",
@@ -208,6 +210,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "execution_mode": "draft",
         "chat_tools": [
             "promote_candidate_to_bench",
+            "preview_bli_artifact",
             "analyse_bli_run",
             "analyse_akta_run",
             "analyse_enzyme_plate",

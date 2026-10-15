@@ -57,7 +57,7 @@ describe('Bot responsibility page', () => {
   it('shows what an operator owns, holds and hands over, and scopes the conversation to it', async () => {
     renderAt('/bots/researcher?project=project-bot')
     expect(await screen.findByRole('heading', { level: 1, name: 'Researcher' })).toBeInTheDocument()
-    expect(screen.getByText('Researcher charter: never invent evidence.')).toBeInTheDocument()
+    expect(screen.getByText(/Read saved abstracts or full text and identify sources/)).toBeInTheDocument()
     expect(await screen.findByText('Owns “Research the evidence”: Traced excerpts and evidence gaps')).toBeInTheDocument()
 
     const tasks = screen.getByRole('region', { name: 'Tasks it holds' })

@@ -20,6 +20,8 @@ from ..core.metrics import (
     COPILOT_UNSUPPORTED_CLAIMS,
 )
 from ..projects.models import Project
+from .citations import dedupe as dedupe_citations
+from .citations import rebase_history_markers
 from .models import CopilotAgentRun
 
 settings = get_settings()
@@ -57,9 +59,9 @@ def copilot_respond(message_id: str) -> dict:
         WRITE_TOOL_NAMES,
         complete_research_turn,
         grounded_answer_issues,
-        repair_grounded_scientific_answer,
-        review_grounded_scientific_answer,
-        review_scientific_answer,
+        repair_grounded_scientific_answer_result,
+        review_grounded_scientific_answer_result,
+        review_scientific_answer_result,
     )
     from ..copilot.research_context import ResearchContextService
     from ..identity.models import User
@@ -148,6 +150,14 @@ def copilot_respond(message_id: str) -> dict:
                 )
             )
             history.reverse()
+            # Follow-up edits can cite earlier answers. Preserve their actual
+            # source records, then rebase answer-local numbers for this request.
+            citations = dedupe_citations([
+                *citations,
+                *(citation for item in history if item.role == "assistant" for citation in item.citations or []),
+            ])
+            reasoning_content = None
+            delivery_context: dict = {}
             try:
                 if provider and provider.enabled:
                     configured_prompt = (
@@ -155,9 +165,9 @@ def copilot_respond(message_id: str) -> dict:
                     )
                     skills = ", ".join(sorted(enabled_capabilities))
                     active_skills = ", ".join(sorted(turn_capabilities)) or "none"
-                    from .policy import SCIENTIFIC_POLICY
+                    from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
 
-                    system_prompt = SCIENTIFIC_POLICY
+                    system_prompt = SCIENTIFIC_POLICY + "\n" + RESPONSE_STYLE
                     messages = [{"role": "system", "content": system_prompt}]
                     if configured_prompt:
                         messages.append(
@@ -200,7 +210,13 @@ def copilot_respond(message_id: str) -> dict:
                         }
                     )
                     messages.extend(
-                        {"role": item.role, "content": item.content}
+                        {
+                            "role": item.role,
+                            "content": rebase_history_markers(item.content, item.citations or [], citations)
+                            if item.role == "assistant" else item.content,
+                            **({"reasoning_content": item.reasoning_content}
+                               if item.role == "assistant" and isinstance(item.reasoning_content, str) else {}),
+                        }
                         for item in history
                         if item.role in {"user", "assistant"} and item.content.strip()
                     )
@@ -220,19 +236,28 @@ def copilot_respond(message_id: str) -> dict:
                         max_tool_calls=max_tool_calls,
                         bot=active_bot.id if active_bot else None,
                         enabled_capabilities=enabled_capabilities,
+                        bench_response_language=turn_context.get("language", "en")
+                        if turn_capabilities == {"wetlab-read"} else None,
                     )
                     answer = agent_result.content
+                    if agent_result.calculator_delivery:
+                        delivery_context = {"calculator_delivery": True,
+                                            "delivery_status": "partial" if agent_result.delivery_incomplete else "complete"}
+                    reasoning_content = agent_result.reasoning_content
                     citations = agent_result.citations
                     tool_calls = agent_result.tool_calls
                     grounded_citations = _traceable_literature_citations(citations)
-                    if len(answer) >= 1500 and grounded_citations:
+                    # Server-rendered arithmetic already carries its validated assumptions.
+                    # A prose reviewer must not rewrite the calculator's facts.
+                    if not agent_result.calculator_delivery and len(answer) >= 1500 and grounded_citations:
                         evidence_packet = research_context.grounding_packet(citations)
-                        answer = review_grounded_scientific_answer(
+                        reviewed = review_grounded_scientific_answer_result(
                             provider,
                             source.content,
                             answer,
                             evidence_packet,
                         )
+                        answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                         tool_calls.append(
                             {
                                 "name": "grounded_scientific_review",
@@ -242,13 +267,14 @@ def copilot_respond(message_id: str) -> dict:
                         )
                         review_issues = grounded_answer_issues(answer)
                         if review_issues:
-                            answer = repair_grounded_scientific_answer(
+                            reviewed = repair_grounded_scientific_answer_result(
                                 provider,
                                 source.content,
                                 answer,
                                 evidence_packet,
                                 review_issues,
                             )
+                            answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                             remaining_issues = grounded_answer_issues(answer)
                             tool_calls.append(
                                 {
@@ -265,8 +291,9 @@ def copilot_respond(message_id: str) -> dict:
                                     + "、".join(remaining_issues)
                                     + "。不得将本回答作为已验证科学结论。"
                                 )
-                    elif _needs_scientific_review(available_kinds, answer):
-                        answer = review_scientific_answer(provider, source.content, answer)
+                    elif not agent_result.calculator_delivery and _needs_scientific_review(available_kinds, answer):
+                        reviewed = review_scientific_answer_result(provider, source.content, answer)
+                        answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                 elif settings.is_production:
                     raise RuntimeError("copilot_provider_not_configured")
                 else:
@@ -288,12 +315,14 @@ def copilot_respond(message_id: str) -> dict:
                         bot=active_bot.id if active_bot else None,
                         status="completed",
                         content=answer,
+                        reasoning_content=reasoning_content,
                         citations=citations,
                         tool_calls=tool_calls,
                         context={
                             "policy_version": "BDA_COPILOT_POLICY_V6",
                             "capabilities": sorted(enabled_capabilities),
                             "active_capabilities": sorted(turn_capabilities),
+                            **delivery_context,
                         },
                     )
                 )
@@ -344,7 +373,10 @@ def copilot_agent_step(run_id: str) -> dict:
             agent_runs.require_run(session, candidate.parent_run_id, for_update=True)
         # Lock the run for the whole of this stay. Two workers driving one
         # transcript would interleave turns, and the transcript is the state.
-        run = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.id == parsed).with_for_update())
+        run = session.scalar(
+            select(CopilotAgentRun).where(CopilotAgentRun.id == parsed)
+            .with_for_update().execution_options(populate_existing=True)
+        )
         if run is None:
             return {"run_id": run_id, "status": "missing"}
         if run.status == "awaiting_tasks":

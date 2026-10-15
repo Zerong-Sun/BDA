@@ -18,6 +18,7 @@ These tests are about the relationships rather than about any operator:
 from __future__ import annotations
 
 import itertools
+import json
 import uuid
 from collections.abc import Iterator
 
@@ -396,6 +397,113 @@ def test_a_reviewer_reads_what_an_operator_called_not_what_it_said(session: Sess
 
     assert result["bot"] == "researcher"
     assert [call["name"] for call in result["tool_calls"]] == ["research_overview"]
+    assert result["tool_results"] == []
+
+
+def test_reviewer_sees_recorded_tool_results_without_unrelated_transcript(session: Session) -> None:
+    """Production stores tool output in content, not in the call metadata."""
+    project, user = _project(session)
+    worked = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id,
+        goal="Count the candidates", allowed_tools=["list_project_candidates"], bot="analyst",
+    )
+    agent_runs.append_turn(session, worked, role="user", content="Unrelated private conversation")
+    call = {"id": "count-1", "type": "function", "function": {
+        "name": "list_project_candidates", "arguments": "{}",
+    }}
+    agent_runs.append_turn(session, worked, role="assistant", tool_calls=[call])
+    recorded = {"items": [{"id": f"candidate-{index}"} for index in range(3)]}
+    tool_turn = agent_runs.append_turn(
+        session, worked, role="tool", content=json.dumps(recorded),
+        tool_calls=[{"tool_call_id": "count-1", "name": "list_project_candidates"}],
+    )
+    agent_runs.append_turn(session, worked, role="assistant", content="There are 30 candidates.")
+    reviewer = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id, goal="Check the claim of 30 candidates",
+        allowed_tools=["read_operator_work"], bot="auditor",
+    )
+
+    result = REGISTRY.execute("read_operator_work", _ctx(session, reviewer), {"run_id": str(worked.id)})
+
+    assert result["tool_calls"][0] == {"sequence": 1, "role": "assistant", **call}
+    evidence = result["tool_results"][0]
+    assert evidence["sequence"] == tool_turn.sequence
+    assert evidence["tool_call_id"] == "count-1"
+    assert evidence["name"] == "list_project_candidates"
+    assert evidence["result"] == recorded
+    assert len(evidence["result"]["items"]) == 3
+    assert evidence["truncated"] is False
+    assert evidence["parse_error"] is None
+    assert result["transcript_truncated"] is False
+    assert "Unrelated private conversation" not in json.dumps(result)
+    assert "There are 30 candidates." not in json.dumps(result)
+
+
+@pytest.mark.parametrize("content", [
+    pytest.param("not JSON", id="plain-text"),
+    pytest.param('{"items":', id="incomplete-object"),
+    pytest.param("[" * 2_000, id="incomplete-nested-arrays"),
+])
+def test_reviewer_marks_unparseable_tool_content_as_incomplete(session: Session, content: str) -> None:
+    project, user = _project(session)
+    worked = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id,
+        goal="Read saved evidence", allowed_tools=["research_overview"], bot="researcher",
+    )
+    agent_runs.append_turn(
+        session, worked, role="tool", content=content,
+        tool_calls=[{"tool_call_id": "broken-1", "name": "research_overview"}],
+    )
+    reviewer = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id, goal="Check",
+        allowed_tools=["read_operator_work"], bot="auditor",
+    )
+
+    result = REGISTRY.execute("read_operator_work", _ctx(session, reviewer), {"run_id": str(worked.id)})
+
+    evidence = result["tool_results"][0]
+    assert evidence["tool_call_id"] == "broken-1"
+    assert evidence["result"] is None
+    assert evidence["parse_error"] == "invalid_json"
+    assert evidence["truncated"] is False
+    assert evidence["content_preview"] == content
+
+
+def test_reviewer_bounds_large_results_and_marks_omitted_history(session: Session) -> None:
+    project, user = _project(session)
+    worked = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id,
+        goal="Read saved evidence", allowed_tools=["get_reference_content"], bot="researcher",
+    )
+    agent_runs.append_turn(
+        session, worked, role="tool", content=json.dumps({"omitted_history": True}),
+        tool_calls=[{"tool_call_id": "old", "name": "get_reference_content"}],
+    )
+    oversized = json.dumps({"text": "x" * 10_000, "hidden_tail": "not fully reviewed"})
+    for index in range(6):
+        agent_runs.append_turn(
+            session, worked, role="tool", content=oversized,
+            tool_calls=[{"tool_call_id": f"large-{index}", "name": "get_reference_content"}],
+        )
+    reviewer = agent_runs.create_run(
+        session, project_id=project.id, user_id=user.id, goal="Check",
+        allowed_tools=["read_operator_work"], bot="auditor",
+    )
+
+    result = REGISTRY.execute(
+        "read_operator_work", _ctx(session, reviewer), {"run_id": str(worked.id), "limit": 6}
+    )
+
+    assert result["transcript_truncated"] is True
+    assert "omitted_history" not in json.dumps(result)
+    assert len(result["tool_results"]) == 6
+    assert all(row["truncated"] and row["result"] is None for row in result["tool_results"])
+    assert all(row["parse_error"] is None for row in result["tool_results"])
+    assert all(row["content_chars"] == len(oversized) for row in result["tool_results"])
+    assert all(len(row["content_preview"]) <= 8_000 for row in result["tool_results"])
+    assert sum(len(row["content_preview"]) for row in result["tool_results"]) <= 32_000
+    assert result["tool_results"][-1]["content_preview"] == ""
+    assert "hidden_tail" not in json.dumps(result)
 
 
 def test_a_reviewer_cannot_read_across_projects(session: Session) -> None:
@@ -410,6 +518,10 @@ def test_a_reviewer_cannot_read_across_projects(session: Session) -> None:
         goal="Someone else's work",
         allowed_tools=["research_overview"],
         bot="planner",
+    )
+    agent_runs.append_turn(
+        session, elsewhere, role="tool", content=json.dumps({"another_project": "private evidence"}),
+        tool_calls=[{"tool_call_id": "private", "name": "research_overview"}],
     )
     reviewer = agent_runs.create_run(
         session,

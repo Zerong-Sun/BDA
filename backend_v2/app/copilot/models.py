@@ -40,6 +40,8 @@ class CopilotMessage(UUIDVersionMixin, Base):
     #: as a room where several operators speak.
     bot: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content: Mapped[str] = mapped_column(Text)
+    #: Private provider protocol state, never part of the public message schema.
+    reasoning_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="pending")
     citations: Mapped[list] = mapped_column(JSON, default=list)
     tool_calls: Mapped[list] = mapped_column(JSON, default=list)
@@ -167,6 +169,9 @@ class CopilotAgentTurn(UUIDVersionMixin, Base):
     sequence: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text, default="")
+    #: Kept verbatim for thinking-model replay, including across worker resumes.
+    #: Separate from public content and tool calls; absent for older providers.
+    reasoning_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Tool calls requested in this turn, and their results once they resolve.
     tool_calls: Mapped[list] = mapped_column(JSON, default=list)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)

@@ -629,3 +629,53 @@ def test_diagnose_runs_through_the_registry_and_needs_its_capability(session: Se
             {"job_id": str(job.id)},
             granted={"failure-diagnosis"},
         )
+
+
+@pytest.mark.parametrize("message", ["CUDA out of memory", "SYNTHETIC fixture: CUDA out of memory; no GPU ran", "exit code 137"])
+def test_error_text_alone_is_a_possible_cause_with_an_exact_receipt(message):
+    result = diagnosis.findings_for(_bundle(error_message=message))
+    finding = next(item for item in result["findings"] if item["id"] == "out_of_memory")
+    assert finding["confidence"] == "possible"
+    assert finding["evidence"] == ["error_message"]
+    assert "pattern" in finding["title"].lower()
+
+
+def test_pattern_receipts_distinguish_predecessor_and_current_errors():
+    result = diagnosis.findings_for(_bundle(error_message="permission denied", previous_attempts=[
+        {"job_id": "old", "status": "failed", "error_message": "TERM_MEMLIMIT"},
+    ]))
+    findings = {item["id"]: item for item in result["findings"]}
+    assert findings["out_of_memory"]["evidence"] == ["previous_attempts[0].error_message"]
+    assert findings["permission_denied"]["evidence"] == ["error_message"]
+
+
+def test_no_command_records_a_missing_declaration_without_asserting_execution():
+    finding = next(item for item in diagnosis.findings_for(_bundle(command=None, reached_running=False))["findings"]
+                   if item["id"] == "no_command_declared")
+    assert finding["confidence"] == "confirmed"
+    assert finding["evidence"] == ["command"]
+    assert "does not establish" in finding["detail"]
+
+
+@pytest.mark.parametrize("current", [None, "", "  "])
+def test_missing_current_error_cannot_prove_repeated_identical_failure(current):
+    assert "repeated_identical_failure" not in _ids(_bundle(error_message=current, previous_attempts=[
+        {"job_id": "old", "status": "failed", "error_message": "boom"},
+    ]))
+
+
+def test_queued_but_never_running_has_no_execution_duration():
+    base = datetime(2026, 9, 13, 1, 0, 0, tzinfo=UTC)
+    timeline = diagnosis._timeline([_event("job.queued", base), _event("job.failed", base + timedelta(seconds=5))])
+    assert timeline["runtime_seconds"] is None
+    assert timeline["reached_running"] is False
+    assert "immediate_exit" not in _ids(_bundle(**timeline))
+
+
+def test_duplicate_running_events_do_not_shorten_observed_runtime():
+    base = datetime(2026, 9, 13, 1, 0, 0, tzinfo=UTC)
+    timeline = diagnosis._timeline([_event("job.running", base),
+        _event("job.running", base + timedelta(seconds=90)),
+        _event("job.failed", base + timedelta(seconds=100))])
+    assert timeline["runtime_seconds"] == 100.0
+    assert "immediate_exit" not in _ids(_bundle(**timeline))

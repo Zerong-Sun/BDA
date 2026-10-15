@@ -11,10 +11,11 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router'
-import {
-  CopilotSettings,
-  type CopilotSettingsActions,
-} from '../../features/copilot/CopilotSettings'
+import { CopilotSettings } from '../../features/copilot/CopilotSettings'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
+import { PrivateAccessLinks } from '../../features/account/PrivateAccessLinks'
+import { useAuthConfig } from '../../lib/auth/account'
+import { managesProject, useProjectAccess } from '../../lib/hooks/useProjectAccess'
 import { getCopilotConfig } from '../../lib/api/copilot'
 import { getClusterHealth } from '../../lib/api/registry'
 import { getHealth } from '../../lib/api/health'
@@ -33,7 +34,10 @@ export function AppSettingsDrawer() {
   const { t, format, language } = useI18n()
   const { settingsOpen, setSettingsOpen, appMode, setAppMode, themePreference, setThemePreference, tourState, resumeTour, restartTour } = useAppStore()
   const { projects, projectId, setProjectId } = useProjectContext()
-  const [copilotActions, setCopilotActions] = useState<CopilotSettingsActions | null>(null)
+  const guest = isPublicVisitor()
+  const authConfig = useAuthConfig()
+  const access = useProjectAccess(projectId)
+  const canManage = !guest && managesProject(access.data)
   const backend = useQuery({
     queryKey: ['health'],
     queryFn: getHealth,
@@ -42,20 +46,20 @@ export function AppSettingsDrawer() {
   const cluster = useQuery({
     queryKey: ['cluster-health'],
     queryFn: getClusterHealth,
-    enabled: settingsOpen,
+    enabled: settingsOpen && !guest,
     retry: false,
   })
   const copilotConfig = useQuery({
     queryKey: ['copilot-config', projectId],
     queryFn: () => getCopilotConfig(projectId),
-    enabled: settingsOpen && Boolean(projectId),
+    enabled: settingsOpen && Boolean(projectId) && canManage,
     retry: false,
   })
 
   const refreshConnections = () => {
     void backend.refetch()
-    void cluster.refetch()
-    void copilotConfig.refetch()
+    if (!guest) void cluster.refetch()
+    if (projectId && canManage) void copilotConfig.refetch()
   }
 
   const setTheme = (pref: ThemePreference) => {
@@ -74,7 +78,7 @@ export function AppSettingsDrawer() {
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-accent">{t.settings.title}</p>
             <h2 className="text-lg font-semibold text-text-primary">{t.settings.subtitle}</h2>
-            <p className="text-sm text-text-secondary">{t.settings.description}</p>
+            <p className="text-sm text-text-secondary">{guest ? (language === 'zh' ? '外观、使用帮助与 Private 入口' : 'Appearance, help and Private access') : t.settings.description}</p>
           </div>
           <Button
             type="button"
@@ -87,30 +91,13 @@ export function AppSettingsDrawer() {
           </Button>
         </div>
       }
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={() => setSettingsOpen(false)}>
-            {t.settings.cancel}
-          </Button>
-          <Button type="button"
-            variant="outline"
-            disabled={!copilotActions?.canTest || copilotActions.testPending}
-            onClick={() => copilotActions?.test()}
-          >
-            {t.settings.testApi}
-          </Button>
-          <Button type="button"
-            variant="default"
-            disabled={!copilotActions?.canSave || copilotActions.savePending}
-            onClick={() => copilotActions?.save()}
-          >
-            {t.settings.save}
-          </Button>
-        </div>
-      }
+      footer={<Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{language === 'zh' ? '完成' : 'Done'}</Button>}
     >
       <div data-tour-id="settings-drawer">
-      <section className="space-y-3 border-b border-border-soft p-4">
+      <section className="border-b border-border-soft p-4">
+        {guest ? <PrivateAccessLinks config={authConfig.data} /> : <Link to="/account" onClick={() => setSettingsOpen(false)} className="text-sm font-medium text-primary underline underline-offset-4">{language === 'zh' ? '账号与访问：密码、邀请和工作区入口' : 'Account & access: password, invitations and workspaces'}</Link>}
+      </section>
+      {!guest ? <section className="space-y-3 border-b border-border-soft p-4">
         <div className="flex items-center gap-2 text-sm font-medium">
           <GearIcon className="h-4 w-4 text-accent" />
           {t.settings.operatingMode}
@@ -130,6 +117,7 @@ export function AppSettingsDrawer() {
           <Button
             type="button"
             variant={appMode === 'demo' ? 'secondary' : 'outline'}
+            disabled={!findDemoProject(projects)}
             className={clsx(
               'h-auto flex-col items-start p-3 text-left',
             )}
@@ -145,7 +133,7 @@ export function AppSettingsDrawer() {
             <span className="mt-1 block text-xs text-text-secondary">{t.settings.demoModeBody}</span>
           </Button>
         </div>
-      </section>
+      </section> : null}
 
       <section className="space-y-3 border-b border-border-soft p-4">
         <div className="flex items-center justify-between">
@@ -168,7 +156,7 @@ export function AppSettingsDrawer() {
           connected={backend.isSuccess}
           detail={backend.data ? Object.entries(backend.data.checks ?? {}).map(([name, status]) => `${name}: ${status}`).join(' · ') || backend.data.service || backend.data.status : backend.error instanceof Error ? backend.error.message : t.settingsExt.connections.awaitingValidation}
         />
-        <ConnectionRow
+        {!guest ? <ConnectionRow
           label={t.settingsExt.connections.lsf}
           connected={cluster.data?.connected === true}
           detail={
@@ -179,8 +167,8 @@ export function AppSettingsDrawer() {
                 })
               : cluster.data?.reason ?? t.settingsExt.connections.awaitingValidation
           }
-        />
-        <ConnectionRow
+        /> : null}
+        {canManage ? <ConnectionRow
           label={t.settingsExt.connections.openai}
           connected={copilotConfig.data?.api_key_configured === true}
           detail={
@@ -188,44 +176,29 @@ export function AppSettingsDrawer() {
               ? `${copilotConfig.data.llm_model} · ${t.settingsExt.connections.configured}`
               : t.settingsExt.connections.apiKeyNotConfigured
           }
-        />
+        /> : null}
       </section>
 
-      <ComputeTargetsSection />
-      <AdministrationSections />
+      {!guest ? <><ComputeTargetsSection /><AdministrationSections /></> : null}
 
       <section className="space-y-3 border-b border-border-soft p-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <MapPinIcon className="h-4 w-4 text-accent" />
-          {t.guide.settings.sectionTitle}
-        </div>
-        <p className="text-xs text-text-secondary">
-          {language === 'zh' ? '继续或重新开始交互式界面操作导览。' : 'Continue or restart the interactive interface tour.'}
-        </p>
-        <div className="flex gap-2">
-          {tourState.status === 'paused' ? <Button type="button" size="sm" variant="outline" onClick={() => { const demo = findDemoProject(projects); if (!demo) return; setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false); resumeTour() }}>{language === 'zh' ? '继续导览' : 'Continue tour'}</Button> : null}
-          <Button type="button" size="sm" variant="ghost" onClick={() => { const demo = findDemoProject(projects); if (!demo) return; setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false); restartTour() }}>{language === 'zh' ? '重新开始' : 'Restart tour'}</Button>
-        </div>
-      </section>
-
-      <section className="space-y-3 border-b border-border-soft p-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <MapPinIcon className="h-4 w-4 text-accent" />
-          {t.guide.settings.sectionTitle}
-        </div>
+        <h3 className="flex items-center gap-2 text-sm font-medium"><MapPinIcon className="h-4 w-4 text-accent" />{t.guide.settings.sectionTitle}</h3>
         <p className="text-xs text-text-secondary">{t.guide.settings.sectionBody}</p>
-        <Link
-          to="/guide"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-accent-border bg-accent-bg px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent-bg"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <MapPinIcon className="h-4 w-4" aria-hidden="true" />
-          {t.guide.settings.openGuide}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" render={<Link to={`/guide${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`} />} onClick={() => setSettingsOpen(false)}>{t.guide.settings.openGuide}</Button>
+          {findDemoProject(projects) ? <Button type="button" variant="ghost" onClick={() => {
+            const demo = findDemoProject(projects)
+            if (!demo) return
+            setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false)
+            if (tourState.status === 'paused') resumeTour()
+            else restartTour()
+          }}>{tourState.status === 'paused' ? (language === 'zh' ? '继续导览' : 'Continue tour') : (language === 'zh' ? '交互导览' : 'Interactive tour')}</Button> : null}
+        </div>
       </section>
 
       <section className="space-y-2 border-b border-border-soft p-4">
         <p className="text-sm font-medium text-text-primary">{t.settings.appearance}</p>
+        <p className="text-xs text-text-secondary">{language === 'zh' ? '外观设置即时生效，仅保存在此浏览器。' : 'Appearance changes apply immediately and are saved in this browser.'}</p>
         <div className="flex flex-wrap gap-2">
           {(['light', 'dark', 'system'] as const).map((pref) => (
             <Button
@@ -244,7 +217,7 @@ export function AppSettingsDrawer() {
         </div>
       </section>
 
-      <CopilotSettings hideActions onActionsReady={setCopilotActions} />
+      {canManage ? <CopilotSettings /> : null}
       </div>
     </DrawerShell>
   )

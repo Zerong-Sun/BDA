@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { useToastStore } from '../../components/ui/toastStore'
 import {
   type ColorPreset,
@@ -15,12 +16,14 @@ import {
   type ViewPreset,
 } from './ColorPresets'
 import { StructureControls } from './StructureControls'
+import { ResidueSelection } from './ResidueSelection'
 import { StructureEmptyState } from './StructureEmptyState'
 import { StructureErrorState } from './StructureErrorState'
 import { StructureLoadingState } from './StructureLoadingState'
 import { StructureMetadataPanel } from './StructureMetadataPanel'
 import {
   applyChainFilter,
+  focusResidueById,
   applyResidueHighlights,
   subscribeResiduePicks,
   applyVisualPreset,
@@ -100,7 +103,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
     },
     ref,
   ) {
-    const { t, format } = useI18n()
+    const { t, format, language } = useI18n()
     const v = t.viewer
     const showToast = useToastStore((state) => state.show)
     const sourceKey = structureSourceKey(source)
@@ -127,6 +130,10 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
     const [chains, setChains] = useState<string[]>(source?.chains ?? [])
     const [selectedChain, setSelectedChain] = useState<string | null>(null)
     const [reloadToken, setReloadToken] = useState(0)
+    const [residueQuery, setResidueQuery] = useState('')
+    const [residueNotice, setResidueNotice] = useState('')
+    const residueSelectionRef = useRef<{ residues: HighlightedResidue[]; sideChainsOnly: boolean } | null>(null)
+    useEffect(() => { residueSelectionRef.current = null }, [sourceKey])
 
     const onReadyRef = useRef(onReady)
     const onErrorRef = useRef(onError)
@@ -284,6 +291,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
           structureLoadedRef.current = false
           setStructureLoaded(false)
           setStructureLoading(false)
+          setResidueNotice('')
           setSelectedChain(null)
           selectedChainRef.current = null
           setChains([])
@@ -304,6 +312,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
           structureLoadedRef.current = false
           setStructureLoaded(false)
           setError(null)
+          setResidueNotice('')
           setSelectedChain(null)
           selectedChainRef.current = null
           setChains(currentSource?.chains ?? [])
@@ -395,8 +404,9 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
 
       setError(null)
       applyVisualPreset(viewer.plugin, representation, color, selectedChainRef.current)
-        .then(() => {
+        .then(async () => {
           if (viewerRef.current === viewer) {
+            if (residueSelectionRef.current) await applyResidueHighlights(viewer.plugin, residueSelectionRef.current.residues, { sideChainsOnly: residueSelectionRef.current.sideChainsOnly, labels: true })
             viewer.plugin.managers.camera.focusObject({ durationMs: 200 })
           }
         })
@@ -524,7 +534,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
 
     const body = (
       <>
-        {!isFullscreen && showMetadata && source ? (
+        {showMetadata && source ? (
           <StructureMetadataPanel source={source} />
         ) : null}
         {hasSource ? (
@@ -552,6 +562,17 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
             fullscreenButtonRef={fullscreenButtonRef}
           />
         ) : null}
+        {isFullscreen && structureLoaded ? <div className="mb-2 flex items-center gap-3 rounded-lg border border-border-soft bg-surface-1 px-4 py-2 text-sm">
+          <label htmlFor="structure-residue-query">{language === 'zh' ? '残基与侧链' : 'Residue & side chain'}</label>
+          <Input id="structure-residue-query" aria-label={language === 'zh' ? '残基编号' : 'Residue identifier'} placeholder="A:54" value={residueQuery} onChange={event => setResidueQuery(event.target.value)} className="w-24 font-mono" />
+          <Button type="button" size="sm" variant="outline" onClick={() => {
+            const match = residueQuery.trim().match(/^([^:]+):(-?\d+)([A-Za-z]?)$/)
+            const viewer = viewerRef.current
+            const selected = Boolean(match && viewer && focusResidueById(viewer.plugin, match[1], Number(match[2]), match[3]))
+            setResidueNotice(selected ? (language === 'zh' ? `已选择 ${residueQuery} · 球棍侧链与邻域` : `Selected ${residueQuery} · side chain & surroundings`) : (language === 'zh' ? '未找到该残基，请输入链名:编号' : 'Residue not found; use chain:number'))
+          }}>{language === 'zh' ? '查看侧链' : 'Show side chain'}</Button>
+          <span className="text-text-secondary" role="status">{residueNotice || (language === 'zh' ? '按结构文件中的链名与残基编号定位' : 'Locate by author chain and residue numbering')}</span>
+        </div> : null}
         {isFullscreen && (!hasSource || !allowFullscreen) ? (
           <Button
             ref={fullscreenButtonRef}
@@ -564,6 +585,18 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
             {v.exitFullscreen}
           </Button>
         ) : null}
+        {hasSource && isFullscreen ? <ResidueSelection key={sourceKey} disabled={!structureLoaded || loading} onApply={async (residues, sideChainsOnly) => {
+          const viewer = viewerRef.current
+          if (!viewer) return
+          if (residues.length && selectedChain && residues.some(residue => residue.chainId !== selectedChain)) {
+            setSelectedChain(null); selectedChainRef.current = null
+            await applyVisualPreset(viewer.plugin, representation, color, null)
+          }
+          residueSelectionRef.current = residues.length ? { residues, sideChainsOnly } : null
+          const result = await applyResidueHighlights(viewer.plugin, residues, { sideChainsOnly, focus: true, labels: true })
+          if (!residues.length) await resetCamera(viewer.plugin)
+          return result
+        }} /> : null}
         <div className={isFullscreen ? 'min-h-0 flex-1' : undefined}>
           <div
             className="molstar-viewer-host relative overflow-hidden border border-border"

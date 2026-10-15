@@ -9,6 +9,7 @@ interface WorkflowToolbarProps {
   createPending: boolean
   startPending: boolean
   submitDisabled?: boolean
+  creationDisabled?: boolean
   onCreateRun: () => void
   onNewRoute: () => void
   onAddNode: () => void
@@ -22,12 +23,13 @@ export function WorkflowToolbar({
   createPending,
   startPending,
   submitDisabled = false,
+  creationDisabled = false,
   onCreateRun,
   onNewRoute,
   onAddNode,
   onStart,
 }: WorkflowToolbarProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
 
   if (isDemoMode) {
     return <p className="mb-3 text-xs text-text-secondary">{t.workflowExt.toolbar.demoMode}</p>
@@ -36,9 +38,9 @@ export function WorkflowToolbar({
   if (!workflowRunId) {
     return (
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Button type="button" disabled={createPending} onClick={onCreateRun}>
+        <Button type="button" disabled={createPending || creationDisabled} onClick={onCreateRun}>
           <Plus className="h-4 w-4" />
-          {t.workflowExt.toolbar.createRun}
+          {language === 'zh' ? '手工创建空白工作流' : 'Create a blank workflow manually'}
         </Button>
       </div>
     )
@@ -49,7 +51,7 @@ export function WorkflowToolbar({
       <Button type="button"
         variant="ghost"
         size="sm"
-        disabled={createPending}
+        disabled={createPending || creationDisabled}
         onClick={onNewRoute}
         title={t.workflowExt.toolbar.newRouteTitle}
       >

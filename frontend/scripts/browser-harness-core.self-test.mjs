@@ -32,11 +32,11 @@ import {
 test('builds the complete route, viewport, appearance, and state matrix', () => {
   const matrix = buildBrowserMatrix()
 
-  assert.equal(ROUTES.length, 11)
+  assert.equal(ROUTES.length, 15)
   assert.equal(VIEWPORTS.length, 2)
   assert.equal(APPEARANCES.length, 4)
-  assert.equal(matrix.filter((entry) => entry.scenario === 'populated').length, 88)
-  assert.equal(matrix.length, 148)
+  assert.equal(matrix.filter((entry) => entry.scenario === 'populated').length, 120)
+  assert.equal(matrix.length, 180)
   assert.equal(new Set(matrix.map((entry) => entry.id)).size, matrix.length)
   assert.ok(matrix.every((entry) => entry.reducedMotion === 'reduce'))
   assert.ok(matrix.some((entry) => entry.routeId === 'workflow' && entry.scenario === 'read-only'))
@@ -86,6 +86,8 @@ test('seeds complete deterministic guest and authenticated browser storage', () 
   assert.equal(persisted.state.copilotOpen, false)
   assert.equal(persisted.state.settingsOpen, false)
   assert.equal(persisted.state.tourMenuOpen, false)
+  assert.equal(Object.hasOwn(persisted.state, 'appMode'), false,
+    'Session-only operating mode must be selected through the UI, not storage hydration')
 
   const guest = createStorageSeed({
     authenticated: false,
@@ -175,6 +177,20 @@ test('strict preview port validation rejects non-numeric and reserved values', (
   assert.equal(validatePort('4173'), 4173)
   assert.throws(() => validatePort('0'), /between 1024 and 65535/)
   assert.throws(() => validatePort('abc'), /integer/)
+})
+
+test('candidate recovery fails the first page only, then allows cursor pagination', async () => {
+  const router = createFixtureRouter({ scenario: 'recoverable-error', routeId: 'candidates' })
+  const firstUrl = 'http://app.test/api/v2/projects/proj_browser/candidates?limit=100'
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    assert.equal((await router.resolve('GET', firstUrl)).status, 503)
+  }
+  const first = await router.resolve('GET', firstUrl)
+  assert.equal(first.status, 200)
+  assert.equal(first.body.next_cursor, 'candidate-page-2')
+  const second = await router.resolve('GET', `${firstUrl}&cursor=candidate-page-2`)
+  assert.equal(second.status, 200)
+  assert.equal(second.body.next_cursor, null)
 })
 
 test('excludes Base UI hidden form proxies without excluding real controls', () => {

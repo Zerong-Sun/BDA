@@ -4,7 +4,10 @@ import {
   listCandidateMetricsApiV2CandidatesCandidateIdMetricsGet,
   listCandidatesApiV2ProjectsProjectIdCandidatesGet,
   postDeliveryApiV2ProjectsProjectIdDeliveryPackagesPost,
+  postCandidateApiV2ProjectsProjectIdCandidatesPost,
+  patchCandidateApiV2CandidatesCandidateIdPatch,
 } from './generated/sdk.gen'
+import type { CandidateCreate, CandidateUpdate } from './generated/types.gen'
 import {
   CandidateListSchema,
   CandidateMetricListSchema,
@@ -16,6 +19,20 @@ export interface CandidateQuery {
   candidate_kind?: 'design_candidate' | 'research_target'
   limit?: number
   cursor?: string
+}
+
+export async function createCandidate(projectId: string, body: CandidateCreate) {
+  const response = await postCandidateApiV2ProjectsProjectIdCandidatesPost<true>({
+    path: { project_id: projectId }, body, throwOnError: true,
+  })
+  return CandidateSchema.parse(response.data)
+}
+
+export async function updateCandidate(candidateId: string, version: number, body: CandidateUpdate) {
+  const response = await patchCandidateApiV2CandidatesCandidateIdPatch<true>({
+    path: { candidate_id: candidateId }, headers: { 'If-Match': `W/"${version}"` }, body, throwOnError: true,
+  })
+  return CandidateSchema.parse(response.data)
 }
 
 export async function listCandidates(projectId: string, query: CandidateQuery = {}) {

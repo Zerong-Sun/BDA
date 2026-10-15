@@ -606,7 +606,7 @@ def start_agent_run(
         raise DomainError("copilot_task_scope_invalid", "Requested writes exceed the service or project scope.", status_code=403)
     # Existing bot clients use the originating request as their mandate.
     # Task clients explicitly send a recipe or a write list (including []).
-    uses_contract = recipe is not None or payload.authorized_writes is not None or "service_kind" in payload.model_fields_set
+    uses_contract = recipe is not None or payload.authorized_writes is not None or "service_kind" in payload.model_fields_set or payload.procedural_skills is not None
     allowed_tools = sorted((available - REGISTRY.user_intent_write_ids()) | writes) if uses_contract else sorted(available)
     if payload.conversation_id:
         conversation = session.get(CopilotConversation, payload.conversation_id)
@@ -618,12 +618,18 @@ def start_agent_run(
             "An agent run with no tools cannot make progress; enable a capability first.",
             status_code=422,
         )
+    from .procedural_skills import snapshots_for
+    contract = build_contract(payload.service_kind, sorted(writes)) if uses_contract else {}
+    snapshots = snapshots_for(payload.procedural_skills, service_kind=payload.service_kind,
+                              goal=payload.goal, allowed_tools=allowed_tools)
+    if snapshots:
+        contract["procedural_skills"] = snapshots
     run = agent_runs.create_run(
         session,
         project_id=project.id,
         user_id=user.id,
         goal=payload.goal,
-        task_contract=build_contract(payload.service_kind, sorted(writes)) if uses_contract else {},
+        task_contract=contract,
         allowed_tools=allowed_tools,
         conversation_id=payload.conversation_id,
         max_turns=payload.max_turns,

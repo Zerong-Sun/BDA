@@ -15,7 +15,7 @@
 
 export interface AppRoute {
   to: string
-  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'results' | 'timeline' | 'faq'
+  key: 'projects' | 'inbox' | 'bots' | 'research' | 'workflow' | 'candidates' | 'lab' | 'learning' | 'results' | 'tools' | 'extensions'
 }
 
 /**
@@ -26,7 +26,7 @@ export interface AppRoute {
  * Encoding that here means a caller cannot pass a translator that would be
  * asked for a key it does not have.
  */
-export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots'>
+export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots' | 'learning' | 'extensions' | 'tools'>
 
 /** Every route reachable from navigation, in the order a person meets them. */
 export const APP_ROUTES: readonly AppRoute[] = [
@@ -34,12 +34,13 @@ export const APP_ROUTES: readonly AppRoute[] = [
   { to: '/inbox', key: 'inbox' },
   { to: '/bots', key: 'bots' },
   { to: '/research', key: 'research' },
+  { to: '/tools', key: 'tools' },
   { to: '/workflow', key: 'workflow' },
   { to: '/candidates', key: 'candidates' },
   { to: '/lab', key: 'lab' },
+  { to: '/learning', key: 'learning' },
   { to: '/results', key: 'results' },
-  { to: '/timeline', key: 'timeline' },
-  { to: '/faq', key: 'faq' },
+  { to: '/extensions', key: 'extensions' },
 ]
 
 /**
@@ -47,11 +48,20 @@ export const APP_ROUTES: readonly AppRoute[] = [
  * it, and the research record. The stage workbenches follow behind one menu on
  * desktop; on small screens every route stays a link for reachability.
  */
-export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research']
+export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research', '/tools']
 
 /** Routes that sit behind the Workbenches menu rather than in the primary bar. */
 export function workbenchRoutes(): AppRoute[] {
-  return APP_ROUTES.filter((route) => !PRIMARY_ROUTES.includes(route.to) && route.to !== '/faq')
+  return APP_ROUTES.filter((route) => !PRIMARY_ROUTES.includes(route.to))
+}
+
+/** Shared groups keep the menu and search palette aligned. */
+export function workbenchGroups(zh: boolean) {
+  return [
+    { key: 'design', label: zh ? '计算设计' : 'Computational design', paths: ['/workflow', '/candidates'] },
+    { key: 'learning', label: zh ? '实验学习' : 'Experimental learning', paths: ['/lab', '/learning', '/results'] },
+    { key: 'platform', label: zh ? '平台' : 'Platform', paths: ['/extensions'] },
+  ].map(({ paths, ...group }) => ({ ...group, routes: paths.flatMap((path) => APP_ROUTES.filter((route) => route.to === path)) }))
 }
 
 /**
@@ -69,6 +79,9 @@ export function routeLabel(
   // Both overrides return before the fallback, which is what narrows `key` to
   // the subset `t.nav` actually carries.
   if (key === 'inbox') return zh ? '待我决定' : 'Decisions'
+  if (key === 'learning') return zh ? '项目学习' : 'Project learning'
   if (key === 'bots') return zh ? '研究团队' : 'Research team'
+  if (key === 'extensions') return zh ? '能力与扩展' : 'Capabilities & extensions'
+  if (key === 'tools') return zh ? '实验工具' : 'Lab tools'
   return translate(key)
 }

@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
 import type { NormalizedResearchWorkspace } from '../../lib/api/researchWorkspace'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
+import { server } from '../../test/mocks/handlers'
 import { ResearchWorkspacePanel } from './ResearchWorkspacePanel'
 import type { ResearchTab } from './researchUi'
 
@@ -28,9 +30,6 @@ vi.mock('./GenerateSimilarResearchPanel', () => ({
 vi.mock('./LiteraturePanel', () => ({ LiteraturePanel: () => <div>literature operations</div> }))
 vi.mock('./TargetIntelligencePanel', () => ({ TargetIntelligencePanel: () => <div>target operations</div> }))
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => <div>knowledge operations</div> }))
-vi.mock('./DryLabDecisionTree', () => ({
-  DryLabDecisionTree: ({ projectId }: { projectId: string }) => <div>decision tree · {projectId}</div>,
-}))
 vi.mock('../pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: () => <div>structure viewer</div> }))
 
 const localized = (en: string, zh = `中文 ${en}`) => ({ en, zh, default: en })
@@ -77,10 +76,15 @@ function fixture(projectId = activeProjectId): NormalizedResearchWorkspace {
 
 describe('ResearchWorkspacePanel', () => {
   beforeEach(() => {
+    window.location.hash = ''
     activeProjectId = 'project-one'
     useAppStore.setState({ language: 'en' })
     getWorkspace.mockReset()
     getWorkspace.mockImplementation(async (projectId: string) => fixture(projectId))
+    server.use(http.get('/api/v2/projects/:projectId/literature/evidence-notes', () => HttpResponse.json({ items: [], next_cursor: null })))
+    server.use(http.get('/api/v2/projects/:projectId/primary-target', () =>
+      HttpResponse.json({ detail: 'Primary target is not configured for this workspace fixture' }, { status: 404 }),
+    ))
   })
 
   afterEach(cleanup)
@@ -93,6 +97,10 @@ describe('ResearchWorkspacePanel', () => {
     ['methods', 'Unique method title'],
   ] satisfies Array<[ResearchTab, string]>)('renders %s from the backend workspace once', async (tab, stableText) => {
     renderWithProviders(<ResearchWorkspacePanel view={tab} />)
+    if (tab === 'references') {
+      expect(await screen.findByRole('heading', { name: stableText })).toBeInTheDocument()
+      return
+    }
     await screen.findByText(stableText)
     expect(screen.getAllByText(stableText)).toHaveLength(1)
   })
@@ -106,10 +114,30 @@ describe('ResearchWorkspacePanel', () => {
     expect(screen.getAllByText('Unique review body')).toHaveLength(1)
   })
 
-  it('shows the computational decision tree above research methods', async () => {
+  it('links methods to the canonical decision record without embedding the tree', async () => {
     renderWithProviders(<ResearchWorkspacePanel view="methods" />)
-    expect(await screen.findByText('decision tree · project-one')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Open decision record' })).toHaveAttribute('href', '#/research?project=project-one&tab=timeline')
+    expect(screen.queryByRole('button', { name: 'Show reasoning' })).not.toBeInTheDocument()
     expect(screen.getByText('Unique method title')).toBeInTheDocument()
+  })
+
+  it('opens the exact saved Bot report and preserves its review status', async () => {
+    window.location.hash = '#/research?project=project-one&tab=methods&knowledge=method-one'
+    const data = fixture()
+    data.methods[0].source = { review_status: 'pending_review' }
+    getWorkspace.mockResolvedValue(data)
+    renderWithProviders(<ResearchWorkspacePanel view="methods" />)
+    expect(await screen.findByText('Unique method body')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unique method title' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Recorded review status: pending review')).toBeInTheDocument()
+    expect(screen.queryByText('knowledge operations')).not.toBeInTheDocument()
+  })
+
+  it('reports an unavailable linked report instead of opening an unrelated entry', async () => {
+    window.location.hash = '#/research?project=project-one&tab=methods&knowledge=other-project-report'
+    renderWithProviders(<ResearchWorkspacePanel view="methods" />)
+    expect(await screen.findByText(/The linked report was not found/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unique method title' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('renders the saved structure in the 3D viewer', async () => {
@@ -124,6 +152,23 @@ describe('ResearchWorkspacePanel', () => {
       'href',
       'https://doi.org/10.1000/example',
     )
+    expect(screen.getByText('Journal not recorded')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['en', 'Metadata checked in Europe PMC'],
+    ['zh', 'Europe PMC 元数据已核对'],
+  ] as const)('labels metadata checks and renders the recorded journal in %s', async (language, status) => {
+    useAppStore.setState({ language })
+    const workspace = fixture()
+    workspace.references[0].verification_status = 'verified_europe_pmc'
+    workspace.references[0].journal = 'Journal of Evidence'
+    workspace.references[0].year = '2026'
+    getWorkspace.mockResolvedValue(workspace)
+    renderWithProviders(<ResearchWorkspacePanel view="references" />)
+    expect(await screen.findByText(`REF-1 · ${status}`)).toBeInTheDocument()
+    expect(screen.getByText('2026 · Journal of Evidence')).toBeInTheDocument()
+    expect(screen.queryByText(/verified_europe_pmc/)).not.toBeInTheDocument()
   })
 
   it('switches research body language without fetching again', async () => {
@@ -187,7 +232,7 @@ describe('ResearchWorkspacePanel', () => {
     renderWithProviders(<ResearchWorkspacePanel view="references" />)
     expect(await screen.findByText('The research workspace could not be loaded from the backend.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByText('Unique paper title')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Unique paper title' })).toBeInTheDocument()
     expect(getWorkspace).toHaveBeenCalledTimes(2)
   })
 

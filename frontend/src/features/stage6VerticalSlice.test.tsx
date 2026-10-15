@@ -110,7 +110,7 @@ beforeEach(() => {
 })
 
 describe('Stage 6 vertical slice', () => {
-  it('keeps a non-expert on the readiness recovery path and explains candidate provenance', () => {
+  it('keeps imported evidence accessible while explaining the readiness blocker', () => {
     renderWithProviders(
       <>
         <Topbar />
@@ -135,7 +135,7 @@ describe('Stage 6 vertical slice', () => {
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute(
       'href',
-      '#/research?project=proj_vertical',
+      '#/results?project=proj_vertical',
     )
     expect(screen.getByText('Target structure interpretation overlay')).toBeInTheDocument()
     expect(screen.getByText('Confirm target identity')).toBeInTheDocument()

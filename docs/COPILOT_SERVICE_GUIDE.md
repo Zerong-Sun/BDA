@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-13（Asia/Shanghai；合并任务服务、bot 名册与 MCP 契约）
+最后核验：2026-10-11（六维审查、实验计算入口、异常交付及 DeepSeek Flash 实际运行）
 
 权威范围：BDA v2 的 Copilot 服务种类、前端入口、工具权限、HTTP 接口、模型配置与实现边界。平台整体成熟度见 [README](../README.md)。
 
@@ -14,7 +14,7 @@
 
 Copilot 是围绕研究目标推进工作的项目助手。默认入口是同一工作区中的目标输入、任务计划、进度和交付物；简单问题进入对话，连续工作先展示可修改的服务类型及授权范围。Research 的调研入口复用同一工作区。系统的文本分类只是可修改的建议，不决定权限。
 
-用户侧提供五类服务：**明确研究目标、调研与比较证据、制定实验方案、跟进执行与处理异常、解读结果与设计下一轮**。18 类能力是开发者的权限分组，40 个工具是执行接口，不要求用户理解这些内部分类。
+用户侧提供五类服务：**明确研究目标、调研与比较证据、制定实验方案、跟进执行与处理异常、解读结果与设计下一轮**。能力目录用于开发者权限分组，注册工具提供执行接口，不要求用户理解这些内部分类。
 
 启动前检查任务计划；外部检索和保存笔记分别勾选授权，未勾选只读取现有资料。运行时按步骤收窄工具范围。任务卡持续展示实际步骤、来源、交付内容、缺口和下一步，原始轮次默认折叠。项目首页可进入助手或直接继续专业页面。
 
@@ -24,7 +24,7 @@ Autopilot 保留高级“按批准方案运行”入口和独立的方案确认�
 
 ### Bots 与其他入口
 
-抽屉默认打开任务页，同时保留聊天、协作链、后台运行记录和 MCP 页签。12 个 bots 按产出、审核、调度划分职责；选择 bot 会把其能力与项目授权求交集。完整名册与交接关系见 [Bot 名册](COPILOT_BOT_ROSTER.md)，委派和审核约束见 [Bot 治理](COPILOT_BOT_GOVERNANCE.md)。
+抽屉默认打开任务页，同时保留聊天、协作链、后台运行记录和 MCP 页签。6 个 bots 按产出、审核、调度划分职责；选择 bot 会把其能力与项目授权求交集。完整名册与交接关系见 [Bot 名册](COPILOT_BOT_ROSTER.md)，委派和审核约束见 [Bot 治理](COPILOT_BOT_GOVERNANCE.md)。
 
 显式任务范围与旧客户端兼容：请求省略服务类型和 `authorized_writes` 时，继续按原始用户请求判断写入意图；提供服务类型或写入清单（包括空列表）则保存明确任务契约。子任务、切换 bot 和 MCP 均不能扩大已保存的写入范围；内部交接记录仍按 bot 章程保留。MCP 还受当前任务步骤限制，项目撤回全部能力后，已有会话也不再提供工具。
 
@@ -41,7 +41,7 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | 保存研究笔记 | 聊天明确要求“保存为待审核笔记”；或回答上的保存入口 | 新建待审核知识记录。保存不等于通过科学审核。 |
 | 选择计算路线 | Copilot → 制定实验方案；Workflow 中的路线规划 | 助手读取模板目录并交付待审核方案；Workflow 页面比较后创建工作流。两者都不提交计算。旧 CopilotActions 组件保留兼容实现，默认抽屉不再展示其直接建图按钮。 |
 | 从任务书建立目标和决策树 | 决策记录/时间线的空记录引导 | 起草目标与分支，用户逐项编辑、删除，再导入正式记录。 |
-| 查蛋白库、计算浓度或稀释方案 | 聊天调用实验工具；或 Lab 页面 | 查询和计算不写实验结果。无需项目和模型的直接计算入口是顶部工具箱。 |
+| 查蛋白库、计算浓度或稀释方案 | 研究室或 Copilot 聊天 → “实验计算”；或主导航“实验工具” | 查询和计算不写实验结果。`calculate_bench` 复用独立计算器，专用模式保留连续计算和蛋白库查询结果，最终直接呈现服务端数值、条件及未完成范围。 |
 | 将候选纳入实验、分析仪器文件、关联研究目标 | Lab/Candidates/结果页面；也有受限 Copilot tools | 部分动作会写入蛋白库、实验结果或目标关联，必须明确请求并满足权限。文件分析需要已上传的同项目 artifact。 |
 | 处理需等待的多步任务 | Copilot → 我的任务与交付物 | 服务端保存轮次、工具调用、成本与等待状态。可离开页面后返回；停止任务使用取消入口。 |
 | 看执行脚本并运行 | Workflow → 提交工作流 → 预览 → 确认；或计算草案确认面板 | 这是用户控制的执行接口，确认后 worker 才可能创建/提交真实作业。聊天没有提交工具。 |
@@ -59,6 +59,14 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 后台任务可以恢复等待中的**平台任务**；它并不是对任意网站、shell 或任意 HTTP 请求的自动重试代理。agent run 的 `skills` 缩小项目允许的能力集，不能扩大权限。Research 的专用调研入口使用 literature 配方，其能力上限为 `project-read`、`research-read`、`knowledge-authoring`、`literature-search`，其中写工具还须在计划中单独授权。
 
+### 实验计算模式
+
+研究室和聊天抽屉共用“研究问答 / 实验计算”切换，选择按项目保留在当前登录会话中。实验计算发送 `skill=wetlab-read`，不同时指定 bot；选择具体 bot 会回到研究问答。请求处理中不能切换模式，退出登录会清除会话状态。
+
+专用模式向模型提供 `calculate_bench` 和 `list_proteins`，仍受项目能力与用户权限约束；旧浓度及稀释工具保留给其他调用路径。A260/A280 的空白值、光程、稀释倍数和吸光度基准必须显式提供。稀释支持分别给出原液和目标浓度单位，服务端先换算再校验可行性；跨质量与摩尔浓度换算还需分子量。服务端只能检查模型实际提交的参数，不能证明每个参数都来自用户原话。
+
+成功结果直接保留数值、公式、条件、来源和蛋白库条目。后续模型失败、空回复、工具失败、超出调用额度或完成状态不合法时，已完成结果仍显示，并明确标注剩余工作未完成。消息 `context` 中的 `calculator_delivery=true` 与 `delivery_status=complete|partial` 记录交付状态；没有工具结果的澄清回复仍按普通聊天处理。模型完成标记不是科研结论审核，普通研究回答继续走科学审阅。具体复现与验证见 [六维审查及修复清单](DEEPSEEK_OUTPUT_AUDIT.md)。
+
 ## 3. 服务边界与权限
 
 - 查询以当前用户和项目为边界，实体 ID 仍由服务端复核。前端页面上下文和所选记录只提供定位信息，不授予权限。
@@ -75,7 +83,7 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 - 只读：“解释这条候选记录的评分，引用已有结果；缺失的指标请列出来，不新增记录。”
 - 检索：“请检索当前项目的文献，并读取可获取的正文或摘要；请保存带引用的待审核笔记。”多步请求优先用后台任务。
-- 实验计算：“用 A280=1、消光系数 10000、分子量 12000 Da、光程 1 cm 计算浓度。”数值和单位必须明确。
+- 实验计算：“用原始 A280=1、空白=0、消光系数 10000 M⁻¹·cm⁻¹、分子量 12000 Da、光程 1 cm、未稀释计算浓度。”数值、单位和读数基准必须明确。
 - 计算草案：“请为已有工作流准备 LSF 计算草案，列出输入、资源和待确认项。”接下来由用户在确认面板检查。
 
 ## 4. 模型配置：用户需要做什么
@@ -95,6 +103,8 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 3. 无默认标记时，仅在恰好一个共享启用模型的情况下继承；多个候选视为未配置明确默认。
 
 当前 wire 协议为 OpenAI-compatible **Chat Completions**，并使用 Bearer 凭据。服务地址会追加 `/chat/completions`（已经以此结尾则保持）；需要 `/v1` 的提供方应在 base URL 中包含 `/v1`。工具型任务还要求模型支持 function/tool calls；仅“连接测试通过”不能证明工具调用、引用或结构化输出可靠。
+
+上游报告 `finish_reason=length` 时，平台将其标为输出被截断，要求缩小请求或调整输出额度后重试，不把半截内容保存为已完成的答复。语义完整性和科学正确性仍需单独检查。实际 Flash 测试与限制见 [输出验收记录](DEEPSEEK_OUTPUT_REVIEW.md)。
 
 管理员使用 `/api/v2/registry/llm-providers` 注册模型，示意请求如下。占位地址和名称需按实际服务替换；不在请求中放原始 Key。
 
@@ -152,25 +162,29 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 ## 7. 开发者：能力与模型工具清单
 
-下表按 `capabilities.py` 的授权分组列出 18 类能力、40 个不同工具。部分读工具在多个能力中共享；实际参数、执行上下文及权限以工具注册和领域服务为准。`GET /api/v2/copilot/skills` 返回能力元数据，不是完整工具参数 schema。
+下表汇总能力目录与工具注册表，并包含本次新增的统一实验计算工具。部分读工具在多个能力中共享；实际参数、执行上下文及权限以工具注册和领域服务为准。`GET /api/v2/copilot/skills` 返回能力元数据，不是完整工具参数 schema。
 
 | 能力 ID | 模型工具名 | 服务及副作用 |
 | --- | --- | --- |
 | `project-read` | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | 读靶标、候选、实验、工作流及计算状态；不修改。 |
 | `research-read` | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | 读研究实体、数据集、目标和已保存的论文内容；搜索工作区不等于外部检索。 |
-| `result-interpretation` | `list_project_candidates`, `list_experiment_results` | 复用候选/实验读取工具供模型解释；不写评分或测量值。 |
+| `result-interpretation` | `list_project_candidates`, `list_experiment_results`, `triage_candidates` | 读取候选/实验并按已声明阈值分诊；缺值与不通过分别报告。 |
+| `structure-analysis` | `analyse_structure`, `list_structure_contacts`, `measure_structure_interface`, `compare_structures`, `describe_structure_site` | 读取同项目结构并测量接触、界面和叠合；不批准功能结论。 |
+| `structure-interaction` | `render_structure_view`, `propose_hotspot_set`, `request_residue_selection` | 显示结构、提出待审位点集合、请求用户选择残基；只有人可确认。 |
+| `sequence-analysis` | `analyse_sequence`, `analyse_conservation` | 按记录 ID 计算序列风险与保守性；不回传明文序列，不补造比对。 |
+| `failure-diagnosis` | `get_compute_status`, `diagnose_compute_failure` | 读取作业错误和执行记录；诊断不等于重提作业。 |
 | `knowledge-authoring` | `search_project_knowledge`, `create_knowledge_draft` | 搜索知识；明确请求后新建待审核知识草案。 |
 | `literature-search` | `start_literature_search` | 排队 Europe PMC 检索和摄取；返回可追踪的异步资源。 |
+| `patent-search` | `start_patent_search`, `start_patent_legal_status_lookup`, `summarise_patent_landscape` | 明确请求后排队 Europe PMC/EPO 专利或法律事件检索；格局只读已存记录，不输出 FTO 结论。 |
+| `druggability-assessment` | `start_druggability_assessment`, `get_druggability_assessment` | 明确请求后排队靶点/候选证据评估，读取已存报告；不生成成药概率。 |
 | `target-intelligence` | `start_target_intelligence` | 对同项目的精确 operational Target 排队分析。 |
 | `research-gap-repair` | `resolve_research_gaps` | 对精确 Research target 修复可获取资料，科学性缺口仍保留。 |
 | `workflow-planning` | `get_workflow_status`, `plan_workflow_route` | 查询工作流，读取确定性模板目录供模型比较；创建与提交仍走用户页面/API。 |
-| `wetlab-read` | `list_proteins`, `compute_concentration`, `plan_dilution_series` | 读蛋白库；做浓度和稀释计算，无实验记录写入。 |
-| `wetlab-authoring` | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | 明确请求后提升候选为实验构建体，或分析已上传 artifact 并记录实验结果。 |
+| `wetlab-read` | `list_proteins`, `calculate_bench`, `compute_concentration`, `plan_dilution_series` | 读蛋白库；9 类标量计算，无实验记录写入。专用聊天只提供前两项，旧工具继续服务其他路径。 |
+| `wetlab-authoring` | `promote_candidate_to_bench`, `preview_bli_artifact`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | 只读预览校验过哈希的 BLI artifact；明确请求后提升候选为实验构建体，或分析已上传 artifact 并记录新版本实验结果。 |
 | `research-trace-authoring` | `attach_to_research_goal` | 明确请求后将已有结果、候选、构建体等关联研究目标。 |
 | `agent-orchestration` | `await_compute_job`, `spawn_subagent` | 仅后台 agent run：等待已存在作业、创建受父任务权限和深度限制的子任务。不是提交计算工具。 |
-| `structure-analysis` | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | 读取同项目已上传结构；只报告记录与测量，不批准功能结论。 |
-| `failure-diagnosis` | `get_compute_status`, `diagnose_compute_failure` | 读取作业错误和执行记录；诊断不等于重提作业。 |
-| `chain-messaging` | `post_handoff`, `read_handoffs` | 具名 bot 的内部交接记录，不修改领域数据。 |
+| `chain-messaging` | `post_handoff`, `read_handoffs`, `request_decision` | 记录交接和向人提出决策请求；不能代人回答或确认。 |
 | `chain-orchestration` | `list_operators`, `delegate_to_operator` | 依章程委派；权限仍受项目及原始用户授权约束。 |
 | `review-audit` | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | 读取章程和执行记录供审核；不代替人工批准。 |
 | `compute-drafting` | `get_compute_status`, `create_compute_draft` | 读计算状态，创建待确认计算草案；不确认、不提交。 |
@@ -185,6 +199,11 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | --- | --- | --- |
 | `GET /api/v2/copilot/bots` | Bot 名册、章程与职责 | 200，同步，只读 |
 | `GET /api/v2/copilot/projects/{project_id}/handoffs` | 项目内交接收件箱 | 200，只读 |
+| `GET /api/v2/copilot/projects/{project_id}/room` | 项目研究室消息、交接与任务合流 | 200，只读、游标分页 |
+| `GET /api/v2/copilot/projects/{project_id}/events` | 项目变更通知 | 200，SSE；权限重查，客户端轮询兜底 |
+| `GET /api/v2/copilot/projects/{project_id}/decision-requests` | 待答及已处理的决策请求 | 200，只读 |
+| `POST /api/v2/copilot/decision-requests/{request_id}/answers` | 人回答决策请求并记录判断 | 200，须 If-Match 与 timeline.create |
+| `POST /api/v2/copilot/decision-requests/{request_id}/withdrawals` | 撤回问题，保留历史 | 200，须 If-Match 与 copilot.chat |
 | `POST /api/v2/copilot/mcp-sessions` | 签发受限 MCP 会话 | 201，令牌仅创建时返回 |
 | `GET /api/v2/copilot/projects/{project_id}/mcp-sessions` | 列出项目 MCP 会话 | 200 |
 | `GET /api/v2/copilot/mcp-sessions/{session_id}` | 读取会话范围与状态 | 200 |
@@ -267,4 +286,6 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 
 部署本次代码前须执行迁移 `0056_copilot_task_contracts`，然后同步更新 API 与 worker。迁移已在隔离 PostgreSQL 数据库验证升级、模型一致性和降级，没有修改现有运行数据库。
 
-交付目标为桌面网页版，Copilot 的交互设计与验收以桌面浏览器为准，手机端不在当前开发与交付范围内。本次验证覆盖自动化测试、构建和中英文桌面浏览器流程，没有调用真实模型、外部检索或客户集群。真实部署验收按[平台验收清单](GUIDED_PLATFORM_WORKFLOW.md#客户部署验收)记录模型、环境、时间、输出和失败场景。历史验证报告只证明当时的环境，不能替代本次交付验收。
+交付目标为桌面网页版，Copilot 的交互设计与验收以桌面浏览器为准，手机端不在当前开发与交付范围内。早期验证覆盖自动化测试、构建和中英文桌面浏览器流程，未调用真实模型、外部检索或客户集群。2026-10-11 已补充真实模型和本地异步聊天验证，范围及局限见 [DeepSeek 输出验收](DEEPSEEK_OUTPUT_REVIEW.md)。真实部署验收按[平台验收清单](GUIDED_PLATFORM_WORKFLOW.md#客户部署验收)记录模型、环境、时间、输出和失败场景。历史验证报告只证明当时的环境，不能替代本次交付验收。
+
+上游以 `finish_reason=length` 或 `content_filter` 结束时，平台分别返回 `llm_output_truncated` 或 `llm_output_filtered`；畸形工具调用在提供方边界被拒绝，不执行其中的参数。专用计算模式若已有成功结果，会保留这些结果并交付为部分完成。这些检查不能识别被上游标为正常结束的所有语义残缺。

@@ -1,0 +1,103 @@
+{
+  "id": "experimental-design",
+  "version": "1.0.0",
+  "title": "Experimental design",
+  "title_zh": "实验设计",
+  "description": "Prepare controls, replication, decision thresholds and a bounded experimental plan.",
+  "description_zh": "形成包含对照、重复、判据与资源边界的实验方案。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "c85a041278abd295001fbddd6e30aa98caa376574369a670e397329ac494d180",
+  "default_for": [
+    "planning"
+  ],
+  "tool_requests": [
+    "research_overview",
+    "list_project_targets",
+    "list_experiment_results",
+    "plan_workflow_route"
+  ],
+  "optional_write_tools": [],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "hypothesis",
+      "controls_and_replication",
+      "readouts_and_thresholds",
+      "confounders_and_stopping",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "hypothesis": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "controls_and_replication": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "readouts_and_thresholds": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "confounders_and_stopping": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

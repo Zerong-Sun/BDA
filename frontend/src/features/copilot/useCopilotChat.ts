@@ -12,9 +12,12 @@ const MAX_COPILOT_HISTORY = 20
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
 
 function explainCopilotError(err: unknown): string {
-  const { t, format } = getTranslations()
+  const { t, format, language } = getTranslations()
   const e = t.copilot.errors
   const raw = err instanceof Error ? err.message : e.requestFailed
+  if (raw === 'copilot_wait_timeout') return language === 'zh'
+    ? '等待回复超时。消息可能仍在后台处理，请先查看研究室中的回复再决定是否重新发送。'
+    : 'Waiting for the reply timed out. Your message may still be processing. Check the research room before sending again.'
   if (raw.includes('Failed to fetch') || raw.includes('NetworkError')) {
     return e.connectionFailed
   }
@@ -73,6 +76,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   // phase of work is several messages long, so component state quietly sent the
   // operator back to Auto whenever the user looked at a page.
   const bot = session?.bot ?? null
+  const mode = session?.mode ?? 'general'
+  const setSessionMode = useAppStore((state) => state.setCopilotSessionMode)
+  const setMode = (next: 'general' | 'bench') => {
+    if (projectId) setSessionMode(projectId, next)
+  }
   const setSessionBot = useAppStore((state) => state.setCopilotSessionBot)
   const setBot = (next: string | null) => {
     if (projectId) setSessionBot(projectId, next)
@@ -114,11 +122,13 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     // An address for this turn, then the operator the room is scoped to, then
     // the served roster's own triggers. Each is a narrowing hint the server
     // intersects with the project's capabilities; none of them can widen a turn.
-    const activeBot = options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
-    const reviewIntent = detectReviewIntent(trimmed)
+    const skill = mode === 'bench' ? 'wetlab-read' : undefined
+    const activeBot = skill ? undefined : options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
+    const reviewIntent = !skill && detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
       {
+        id: requestId,
         role: 'user',
         content: trimmed,
         ...(reviewIntent ? { meta: { reviewIntent: true } } : {}),
@@ -132,10 +142,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const payload = {
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
-      // `skill` stays on the request contract - an agent run, an MCP grant or
-      // another client may still narrow to one capability - and this UI simply
-      // no longer guesses one. Sending neither means the project's configured
-      // set, which is the documented undifferentiated case.
+      // Explicit calculation mode narrows the turn; never send both hints.
+      skill,
       bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,
@@ -154,7 +162,9 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         streamed += chunk
         writeMessages((prev) => {
           const copy = [...prev]
-          copy[copy.length - 1] = { role: 'assistant', content: streamed }
+          // JSON SSE sends metadata before the matching text chunk. Preserve
+          // that metadata so the final answer retains citations and tool links.
+          copy[copy.length - 1] = { ...copy[copy.length - 1], role: 'assistant', content: streamed }
           return copy
         })
       }, (stage) => {
@@ -170,6 +180,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         writeMessages((prev) => {
           const copy = [...prev]
           copy[copy.length - 1] = {
+            id: message.id,
             role: 'assistant',
             content: message.content,
             meta: { citations: message.citations, toolCalls: message.tool_calls },
@@ -183,6 +194,14 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         if ((message.tool_calls ?? []).some((call) => call?.name === 'post_handoff')) {
           void queryClient.invalidateQueries({ queryKey: copilotHandoffsQueryKey(projectId ?? null) })
         }
+      }, (accepted) => {
+        if (!isCurrent()) return
+        // Remember acceptance before waiting for a reply, including when the
+        // stream later disconnects. The room uses the same id to deduplicate.
+        setConversationId(projectId, accepted.conversationId)
+        writeMessages((prev) => prev.map((message) => message.id === requestId
+          ? { ...message, id: accepted.messageId || requestId }
+          : message))
       })
       if (!isCurrent()) return
       setConversationId(projectId, accepted.conversationId)
@@ -208,7 +227,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   }
 
   return {
-    messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages,
-    lastMode, bots: bots ?? [], bot, setBot,
+    messages: usableMessages, pendingMessages: loading ? messages.slice(-2) : [],
+    loading, loadingStage, loadingDetail, error, send, resetMessages,
+    lastMode, bots: bots ?? [], bot, setBot, mode, setMode,
   }
 }

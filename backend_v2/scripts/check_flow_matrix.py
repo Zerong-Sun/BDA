@@ -13,7 +13,7 @@ from backend_v2.app import all_models  # noqa: E402, F401
 from backend_v2.app.core.models import Base  # noqa: E402
 from backend_v2.app.main import app  # noqa: E402
 
-PUBLIC_WRITE_PATHS = {"/api/v2/auth/token", "/api/v2/auth/refresh"}
+PUBLIC_WRITE_PATHS = {"/api/v2/auth/token", "/api/v2/auth/refresh", "/api/v2/auth/register", "/api/v2/auth/logout", "/api/v2/auth/password/reset"}
 WRITE_METHODS = {"post", "put", "patch", "delete"}
 
 

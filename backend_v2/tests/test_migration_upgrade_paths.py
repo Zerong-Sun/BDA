@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from backend_v2.app.core import config as settings_module
 from backend_v2.app.identity.models import User
 from sqlalchemy import create_engine, inspect, select, text
@@ -50,7 +51,7 @@ def test_existing_feature_head_upgrades_and_downgrades(previous, monkeypatch):
         command.upgrade(config, "head")
         with Session(engine) as session:
             assert session.scalar(select(User.display_name).where(User.username == "migration-canary")) == "Keep this row"
-            assert session.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0070_af3_msa_port"
+            assert session.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == ScriptDirectory.from_config(config).get_current_head()
         assert {"workflow_results", "workflow_gate_evaluations"} <= set(inspect(engine).get_table_names())
         command.check(config)
         command.downgrade(config, "base")

@@ -633,7 +633,7 @@ def test_an_owner_is_offered_only_the_writes_it_can_be_granted() -> None:
     # the literature review (search and pending-review notes); a reviewer owns none.
     assert bots.task_write_tools(bots.require("researcher")) == {
         "brief": [],
-        "literature": ["start_literature_search", "create_knowledge_draft"],
+        "literature": ["start_literature_search", "create_knowledge_draft", "save_literature_analysis"],
     }
     assert bots.task_write_tools(bots.require("auditor")) == {}
 
@@ -703,13 +703,14 @@ def test_a_bot_run_carries_its_charter_into_every_turn(session: Session) -> None
     assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
 
 
-def test_a_run_without_a_bot_gets_the_loop_policy_and_nothing_else(session: Session) -> None:
+def test_a_run_without_a_bot_gets_loop_policy_without_a_bot_charter(session: Session) -> None:
     project, user = _project(session, enabled_skills=["research"])
     run = _run(session, project, user)
 
     system = [m for m in agent_loop.messages_for(run, []) if m["role"] == "system"]
 
-    assert len(system) == 1
+    assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
+    assert not any(bot.charter in message["content"] for bot in bots.all_bots() for message in system)
 
 
 def test_a_bot_removed_from_the_roster_leaves_an_undifferentiated_run(session: Session) -> None:
@@ -724,7 +725,8 @@ def test_a_bot_removed_from_the_roster_leaves_an_undifferentiated_run(session: S
 
     system = [m for m in agent_loop.messages_for(run, []) if m["role"] == "system"]
 
-    assert len(system) == 1
+    assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
+    assert not any(bot.charter in message["content"] for bot in bots.all_bots() for message in system)
 
 
 def test_a_subagent_inherits_its_parents_charter(session: Session) -> None:

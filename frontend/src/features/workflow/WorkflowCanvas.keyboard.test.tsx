@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { WorkflowCanvas } from './WorkflowCanvas'
@@ -60,5 +60,18 @@ describe('WorkflowCanvas keyboard selection', () => {
     const element = await nodeElement(container, firstId)
 
     await waitFor(() => expect(element).toHaveClass('selected'))
+  })
+
+  it.each([true, false])('does not locally delete server nodes with Backspace (readOnly=%s)', async (readOnly) => {
+    const { container } = renderWithProviders(<WorkflowCanvas
+      initialNodes={defaultWorkflowNodes} initialEdges={defaultWorkflowEdges}
+      selectedNodeId={firstId} readOnly={readOnly}
+    />)
+    const element = await nodeElement(container, firstId)
+    await waitFor(() => expect(element).toHaveClass('selected'))
+    element.focus()
+    fireEvent.keyDown(element, { key: 'Backspace', code: 'Backspace' })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    expect(container.querySelector(`.react-flow__node[data-id="${firstId}"]`)).toBeInTheDocument()
   })
 })

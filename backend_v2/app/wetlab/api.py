@@ -11,14 +11,19 @@ from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.service import require_project
+from ..projects.service import require_project, require_project_permission
+from .access import calculator_user
 from .analysis import analyse_akta, analyse_bli, analyse_enzyme
+from .bench import calculate
+from .bench_schemas import BenchCalculationInput, BenchCalculationResult
 from .repository import ProteinRepository
 from .schemas import (
     AktaAnalysisRequest,
     AnalysisPreviewRequest,
     AnalysisPreviewResponse,
     AnalysisResponse,
+    AnalysisReviewRequest,
+    AnalysisReviewResponse,
     BliAnalysisRequest,
     ConcentrationRequest,
     ConcentrationResult,
@@ -41,6 +46,7 @@ from .service import (
     dilution_series,
     import_fasta,
     promote_candidate,
+    review_analysis,
     to_read,
     update_protein,
 )
@@ -162,10 +168,23 @@ def patch_protein(
 
 
 # --- Bench calculators -------------------------------------------------------
-# GET, not POST: each is a pure function of its scalar inputs - same arguments,
-# same answer, nothing persisted. That makes them idempotent and cacheable, and
-# it keeps them out of the write-permission surface, which is the honest place
-# for a calculation a read-only account should be able to run.
+# Legacy scalar calculators use GET. The unified calculator below accepts POST
+# to keep sequence inputs out of URLs; all calculations are pure and read-only.
+
+
+@router.post(
+    "/wetlab/calculations", response_model=BenchCalculationResult,
+    openapi_extra={"x-permission": "wetlab.calculate", "x-read-only": True},
+)
+def post_bench_calculation(
+    payload: BenchCalculationInput, user: User | None = Depends(calculator_user),
+) -> BenchCalculationResult:
+    """Pure calculation; Public visitors need no account. Private requires login.
+
+    No result, supplied sequence or project record is persisted. Viewer accounts
+    may use this endpoint; it does not authorize any mutation.
+    """
+    return calculate(payload)
 
 
 @router.get("/projects/{project_id}/wetlab/concentration", response_model=ConcentrationResult)
@@ -201,7 +220,7 @@ def get_unit_conversion(
     from_unit: str = Query(max_length=10),
     to_unit: str = Query(max_length=10),
     molecular_weight: float | None = Query(default=None, gt=0),
-    user: User = Depends(current_user),
+    user: User | None = Depends(calculator_user),
 ) -> UnitConversionResult:
     return convert_units(
         UnitConversionRequest(value=value, from_unit=from_unit, to_unit=to_unit, molecular_weight=molecular_weight)
@@ -216,7 +235,7 @@ def get_dilution_series(
     n_steps: int = Query(ge=1, le=24),
     vol_per_well_uL: float = Query(gt=0),
     extra_dead_vol_uL: float = Query(default=0.0, ge=0),
-    user: User = Depends(current_user),
+    user: User | None = Depends(calculator_user),
 ) -> DilutionResult:
     return dilution_series(
         DilutionRequest(
@@ -245,7 +264,26 @@ def _analysis_response(row, summary: dict) -> AnalysisResponse:
         unit=row.unit,
         source_artifact_id=row.source_artifact_id,
         summary=summary,
+        version=row.version,
+        qc_review=row.result_metadata.get("instrument_qc_review"),
     )
+
+
+@router.post(
+    "/projects/{project_id}/wetlab/results/{result_id}/review",
+    response_model=AnalysisReviewResponse,
+    openapi_extra={"x-permission": "experiment.record"},
+)
+def post_instrument_review(
+    project_id: uuid.UUID, result_id: uuid.UUID, payload: AnalysisReviewRequest,
+    if_match: str | None = Header(default=None), session: Session = Depends(get_session),
+    user: User = Depends(require_command),
+) -> AnalysisReviewResponse:
+    project = require_project_permission(session, project_id, user, "experiment")
+    row, recorded = review_analysis(session, project, result_id, user, expected=parse_if_match(if_match),
+                                    accept=payload.accept, rationale=payload.rationale)
+    return AnalysisReviewResponse(experiment_result_id=row.id, version=row.version,
+        review=row.result_metadata["instrument_qc_review"], candidate_metric_recorded=recorded)
 
 
 @router.post(
@@ -261,7 +299,7 @@ def post_bli_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Fit KD from an uploaded ForteBio export and record the result."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_bli(
         session,
         project_id,
@@ -271,6 +309,12 @@ def post_bli_analysis(
         t_assoc=payload.t_assoc,
         t_dissoc=payload.t_dissoc,
         candidate_id=payload.candidate_id,
+        sample_mapping=payload.sample_mapping,
+        excluded_labels=payload.excluded_labels,
+        reference_label=payload.reference_label,
+        analysis_method=payload.analysis_method, baseline_mode=payload.baseline_mode,
+        correction_note=payload.correction_note,
+        supersedes_result_id=payload.supersedes_result_id,
     )
     return _analysis_response(row, summary)
 
@@ -288,7 +332,7 @@ def post_akta_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Detect peaks in an uploaded AKTA Unicorn export and record the peak table."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_akta(
         session,
         project_id,
@@ -313,7 +357,7 @@ def post_enzyme_analysis(
     user: User = Depends(require_command),
 ) -> AnalysisResponse:
     """Fit per-well rates from an uploaded TECAN plate export and record them."""
-    require_project(session, project_id, user)
+    require_project_permission(session, project_id, user, "experiment")
     row, summary = analyse_enzyme(
         session,
         project_id,
@@ -368,7 +412,10 @@ def preview_analysis(payload: AnalysisPreviewRequest, user: User = Depends(curre
                     raise ValueError("Expanded instrument export exceeds 64 MiB")
         if payload.instrument == "bli":
             measurement, summary = analyse_bli_bytes(
-                data, sample_id=payload.sample_id, t_assoc=payload.t_assoc, t_dissoc=payload.t_dissoc
+                data, sample_id=payload.sample_id, t_assoc=payload.t_assoc, t_dissoc=payload.t_dissoc,
+                sample_mapping=payload.sample_mapping, excluded_labels=payload.excluded_labels,
+                reference_label=payload.reference_label, analysis_method=payload.analysis_method, baseline_mode=payload.baseline_mode,
+                correction_note=payload.correction_note,
             )
         elif payload.instrument == "akta":
             measurement, summary = analyse_akta_bytes(data, channel=payload.channel)

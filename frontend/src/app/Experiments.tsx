@@ -1,3 +1,5 @@
+import { currentRole } from '../features/research/jsonHelpers'
+import { isPublicVisitor } from '../lib/auth/publicWorkspace'
 import { Disclosure } from '../components/ui/Disclosure'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -28,6 +30,7 @@ export function ExperimentsPage() {
   const { t, format, language } = useI18n()
   const setAppMode = useAppStore((s) => s.setAppMode)
   const appMode = useAppStore((s) => s.appMode)
+  const viewer = currentRole() === 'viewer'
   const tourState = useAppStore((s) => s.tourState)
   const startTour = useAppStore((s) => s.startTour)
   const resumeTour = useAppStore((s) => s.resumeTour)
@@ -41,6 +44,7 @@ export function ExperimentsPage() {
   const showCampaigns = searchParams.get('view') === 'campaigns'
 
   const openCreate = () => {
+    if (viewer) return
     setCreateOpen(true)
     setManageOpen(true)
   }
@@ -66,14 +70,11 @@ export function ExperimentsPage() {
     })
 
   const query = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
-  // Target preparation opens on arrival unless the target is already known to be
-  // ready. Decided once: an uncontrolled disclosure whose default moves after
-  // mount warns, and remounting it would close a panel the visitor is reading.
-  const [targetPanelOpen] = useState(() => overview?.target_readiness?.ready_for_workflow !== true)
 
   return (
     <section className="projects-page">
       <ScienceWelcome />
+      {viewer && !isPublicVisitor() ? <Alert className="mb-5"><AlertDescription>{language === 'zh' ? '当前账号为查看者，可以浏览已授权的项目。需要创建或编辑项目时，请联系组织管理员调整权限。' : 'Your account is read-only. You can browse authorized projects; contact your organization administrator to request editing access.'}</AlertDescription></Alert> : null}
 
       {appMode === 'demo' ? (
         <Alert className="mb-5" variant="warning">
@@ -145,11 +146,11 @@ export function ExperimentsPage() {
 
       {showCampaigns ? <div className="mb-6"><CampaignPanel /></div> : null}
 
-      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" defaultOpen={targetPanelOpen} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
+      <Disclosure className="mb-6 rounded-lg border border-border-soft p-4" key={projectId || 'no-project'} title={language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation'}>
       <ActiveProjectPanel
         project={activeProject}
         projectQuery={query}
-        readOnly={appMode === 'demo'}
+        readOnly={appMode === 'demo' || viewer}
         onManage={() => setManageOpen(true)}
         onCreate={openCreate}
       />
