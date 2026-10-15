@@ -11,6 +11,15 @@ import { InstrumentAnalysis } from '../features/lab/InstrumentAnalysis'
 import { SerialDilutionPlanner } from '../features/lab/SerialDilutionPlanner'
 import { BenchToolForm, type BenchDraft } from '../features/lab/BenchToolForm'
 import { BENCH_TOOLS, TOOL_CATEGORIES, type ToolId } from '../features/lab/toolCatalog'
+import { useAuthConfig } from '../lib/auth/account'
+import { PrivateAccessLinks } from '../features/account/PrivateAccessLinks'
+import { isPublicVisitor } from '../lib/auth/publicWorkspace'
+
+function PrivateInstrumentAccess() {
+  const { language } = useI18n()
+  const config = useAuthConfig()
+  return <div className="space-y-4"><p>{language === 'zh' ? '注册或登录 Private 后，上传仪器数据、分析并保存版本。' : 'Register or sign in to Private to upload instrument data, analyze it and save versions.'}</p><PrivateAccessLinks config={config.data} /></div>
+}
 
 function InstrumentPreview({ instrument }: { instrument: 'bli' | 'akta' | 'enzyme' }) {
   const { language } = useI18n()
@@ -30,7 +39,7 @@ function InstrumentPreview({ instrument }: { instrument: 'bli' | 'akta' | 'enzym
   </div>
 }
 
-export function ToolsPage() {
+export function ToolsPage({ publicPreview = false }: { publicPreview?: boolean }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const [params, patch] = useSearchParamPatch()
@@ -61,7 +70,7 @@ export function ToolsPage() {
         {rawTool && !BENCH_TOOLS.some((tool) => tool.id === rawTool) ? <p role="status" className="text-sm text-muted-foreground">{zh ? '链接中的工具不存在，下面显示蛋白分子量工具。' : 'The linked tool is unavailable. Protein molecular mass is shown below.'}</p> : null}
         <div className="space-y-2 border-b pb-4"><h2 className="text-xl font-semibold">{selected.title[language]}</h2><p className="text-sm leading-6 text-muted-foreground">{selected.description[language]}</p></div>
         {currentPrefill ? <p role="status" className="text-sm text-muted-foreground">{zh ? '已带入上一个工具的结果，请补齐其余输入并确认适用条件。' : 'Values from the previous tool are filled in. Complete the remaining inputs and check assumptions.'}</p> : null}
-        {instrument ? <InstrumentPreview key={instrument} instrument={instrument} /> : selected.id === 'serial-dilution' ? <SerialDilutionPlanner hideTitle /> : <BenchToolForm key={`${selected.id}-${currentPrefill?.serial ?? 'fresh'}`} tool={selected} prefill={currentPrefill?.values} draft={drafts[selected.id]} onDraft={(draft) => setDrafts((current) => ({ ...current, [selected.id]: draft }))} onUse={useResult} />}
+        {instrument ? (publicPreview || isPublicVisitor() ? <PrivateInstrumentAccess /> : <InstrumentPreview key={instrument} instrument={instrument} />) : selected.id === 'serial-dilution' ? <SerialDilutionPlanner hideTitle /> : <BenchToolForm key={`${selected.id}-${currentPrefill?.serial ?? 'fresh'}`} tool={selected} prefill={currentPrefill?.values} draft={drafts[selected.id]} onDraft={(draft) => setDrafts((current) => ({ ...current, [selected.id]: draft }))} onUse={useResult} />}
       </section>
     </div>
   </div>

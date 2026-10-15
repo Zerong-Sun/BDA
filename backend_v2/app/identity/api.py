@@ -147,6 +147,7 @@ def auth_config() -> AuthConfigResponse:
         realm=settings.auth_realm,
         public_portal_url=settings.public_portal_url,
         private_portal_url=settings.private_portal_url,
+        public_workspace_enabled=settings.public_workspace_enabled,
     )
 
 

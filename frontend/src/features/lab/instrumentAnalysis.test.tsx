@@ -2,6 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { InstrumentAnalysis } from './InstrumentAnalysis'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../test/mocks/handlers'
+import { useAppStore } from '../../lib/store/appStore'
 import { traceStyle } from './traceStyle'
 import {
   AktaSummarySchema,
@@ -34,7 +37,12 @@ function choose(file: File) {
   fireEvent.change(screen.getByLabelText('Export file'), { target: { files: [file] } })
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  sessionStorage.clear()
+  useAppStore.setState({ appMode: 'application', language: 'en' })
+  server.use(http.get('/api/v2/projects/:id/access', () => HttpResponse.json({ project_id: 'project-1', role: 'owner', permissions: { read: true, write: true, compute: true, experiment: true, autopilot: true } })))
+})
 afterEach(() => vi.restoreAllMocks())
 
 describe('instrument analysis panel', () => {
@@ -90,6 +98,7 @@ describe('instrument analysis panel', () => {
     renderPanel()
     const file = new File(['t,y\n0,0\n'], 'run.csv', { type: 'text/csv' })
     choose(file)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Analyse' }))
 
     await waitFor(() => expect(analyseBli).toHaveBeenCalled())
@@ -118,6 +127,7 @@ describe('instrument analysis panel', () => {
 
     renderPanel()
     choose(new File(['x'], 'run.csv', { type: 'text/csv' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Analyse' }))
 
     await waitFor(() => expect(screen.getByLabelText('Sensorgrams')).toBeInTheDocument())
@@ -130,6 +140,7 @@ describe('instrument analysis panel', () => {
 
     renderPanel()
     choose(new File(['x'], 'run.csv', { type: 'text/csv' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Analyse' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Analyse' }))
 
     await waitFor(() =>
@@ -211,4 +222,15 @@ describe('trace styling', () => {
     expect(traceStyle(0, 'fitted').dash).not.toBe('none')
     expect(traceStyle(0, 'simulated').dash).not.toBe(traceStyle(0, 'fitted').dash)
   })
+})
+
+it('keeps saved analyses available but blocks uploads when experiment access is denied', async () => {
+  server.use(http.get('/api/v2/projects/:id/access', () => HttpResponse.json({ project_id: 'project-1', role: 'viewer', permissions: { read: true, write: false, experiment: false, compute: false, autopilot: false } })))
+  renderPanel()
+  expect(await screen.findByText(/You can browse saved analyses/)).toBeVisible()
+  expect(screen.getByLabelText('Export file')).toBeDisabled()
+  choose(new File(['export'], 'test.csv'))
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse' }))
+  expect(uploadArtifact).not.toHaveBeenCalled()
+  expect(analyseBli).not.toHaveBeenCalled()
 })

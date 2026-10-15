@@ -911,6 +911,10 @@ export type AuthConfigResponse = {
      */
     public_portal_url: string;
     /**
+     * Public Workspace Enabled
+     */
+    public_workspace_enabled?: boolean;
+    /**
      * Realm
      */
     realm: string;

@@ -258,3 +258,32 @@ def test_legacy_refresh_writers_survive_atomic_upgrade_and_migration_reversal(ac
     command.upgrade(config, "head")
     command.downgrade(config, "base")
     assert set(inspect(engine).get_table_names()) == {"alembic_version"}
+
+
+def test_public_reader_is_fenced_under_production_rls(account_role, monkeypatch):
+    from backend_v2.app.identity.public_workspace import public_workspace_user
+    from starlette.requests import Request
+
+    engine, role = account_role
+    with Session(engine) as db:
+        reader = User(username='public-reader', display_name='Public', role='viewer')
+        owner = User(username='owner', display_name='Owner', role='admin')
+        published = Organization(name='Published')
+        private = Organization(name='Private')
+        db.add_all([reader, owner, published, private])
+        db.flush()
+        visible = Project(name='Visible', organization_id=published.id, owner_id=owner.id, project_type='test')
+        hidden = Project(name='Hidden', organization_id=private.id, owner_id=owner.id, project_type='test')
+        db.add_all([visible, hidden, OrganizationMember(organization_id=published.id, user_id=reader.id, role='viewer')])
+        db.commit()
+        reader_id, org_id, visible_id, hidden_id = reader.id, published.id, visible.id, hidden.id
+    settings = account_service.get_settings()
+    for key, value in dict(deployment_kind='public', public_workspace_user_id=reader_id, public_workspace_organization_id=org_id, rate_limit_enabled=False).items():
+        monkeypatch.setattr(settings, key, value)
+    with Session(engine) as db:
+        _api_role(db, role)
+        user = public_workspace_user(Request({'type':'http', 'method':'GET', 'path':'/projects'}), db)
+        assert user.id == reader_id and user.role == 'viewer'
+        assert list(db.scalars(select(Project.id))) == [visible_id]
+        assert db.get(Project, hidden_id) is None
+        assert db.scalar(text("SELECT current_setting('bda.is_global_admin', true)")) == 'false'

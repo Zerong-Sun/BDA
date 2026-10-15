@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useI18n } from './lib/i18n'
 import { Topbar } from './components/ui/Topbar'
+import { Button } from './components/ui/Button'
 import { PipelineRail } from './components/ui/PipelineRail'
 import { Toast } from './components/ui/Toast'
 import { CopilotDrawer } from './components/ui/CopilotDrawer'
@@ -17,6 +18,8 @@ import { useAppStore } from './lib/store/appStore'
 import { applyTheme, resolveTheme, watchSystemTheme } from './lib/theme/initTheme'
 import { isDemoProject, TourOverlay } from './features/tour'
 import { clearAuthenticatedBrowserState } from './lib/auth/browserSession'
+import { WorkspaceAccessGate } from './features/account/WorkspaceAccessGate'
+import { PublicWorkspaceNotice } from './features/account/PublicWorkspaceNotice'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +51,7 @@ const LabPage = lazy(() => import('./app/Lab').then((module) => ({ default: modu
 const ToolsPage = lazy(() => import('./app/Tools').then((module) => ({ default: module.ToolsPage })))
 const ResultsPage = lazy(() => import('./app/Results').then((module) => ({ default: module.ResultsPage })))
 const LoginPage = lazy(() => import('./app/Login').then((module) => ({ default: module.LoginPage })))
+const PublicWorkspacePage = lazy(() => import('./app/PublicWorkspace').then(module => ({ default: module.PublicWorkspacePage })))
 const RegisterPage = lazy(() => import('./app/Login').then((module) => ({ default: module.RegisterPage })))
 const ResetPasswordPage = lazy(() => import('./app/Login').then((module) => ({ default: module.ResetPasswordPage })))
 const AccountPage = lazy(() => import('./app/Account').then((module) => ({ default: module.AccountPage })))
@@ -74,15 +78,6 @@ function AuthHandler() {
     })
   }, [navigate])
   return null
-}
-
-function RequireAuth() {
-  const location = useLocation()
-  const token = sessionStorage.getItem('bda_token')
-  if (!token) {
-    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />
-  }
-  return <Outlet />
 }
 
 /** Old bookmarks share the one research decision-record page. */
@@ -168,11 +163,12 @@ export function AppShell() {
       className="flex min-h-screen min-w-0 flex-col bg-background text-foreground"
     >
       <Topbar />
+      <PublicWorkspaceNotice />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {showRail ? <PipelineRail /> : null}
           <div className="app-content mx-auto max-w-[1600px] px-6 py-6">
-            <ErrorBoundary>
+            <ErrorBoundary key={`${location.pathname}:${projectId}`}>
               <Outlet />
             </ErrorBoundary>
           </div>
@@ -196,13 +192,14 @@ export default function App() {
         <ThemeSync />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
+            <Route index element={<Navigate to="/projects" replace />} />
+            <Route path="/public" element={<PublicWorkspacePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/guide" element={<GuidePage />} />
-            <Route element={<RequireAuth />}>
+            <Route element={<WorkspaceAccessGate />}>
               <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="/projects" element={<ExperimentsPage />} />
                 <Route path="/account" element={<AccountPage />} />
                 <Route path="/inbox" element={<InboxPage />} />
@@ -219,10 +216,11 @@ export default function App() {
                 <Route path="/lab" element={<ProjectRequired><LabPage /></ProjectRequired>} />
                 <Route path="/learning" element={<ProjectRequired><LearningPage /></ProjectRequired>} />
                 <Route path="/results" element={<ProjectRequired><ResultsPage /></ProjectRequired>} />
-                <Route path="/research" element={<ResearchPage />} />
+                <Route path="/research" element={<ProjectRequired><ResearchPage /></ProjectRequired>} />
                 <Route path="/timeline" element={<TimelineRedirect />} />
                 <Route path="/autopilot" element={<ProjectRequired><AutopilotPage /></ProjectRequired>} />
                 <Route path="/faq" element={<FAQPage />} />
+                <Route path="*" element={<WorkspaceNotFound />} />
               </Route>
             </Route>
           </Routes>
@@ -230,4 +228,14 @@ export default function App() {
       </HashRouter>
     </QueryClientProvider>
   )
+}
+
+function WorkspaceNotFound() {
+  const { language } = useI18n()
+  const navigate = useNavigate()
+  return <section className="space-y-4 py-8">
+    <h1 className="text-2xl font-semibold">{language === 'zh' ? '页面不存在' : 'Page not found'}</h1>
+    <p className="text-muted-foreground">{language === 'zh' ? '链接可能已过期，请从项目或顶部导航继续。' : 'This link may be outdated. Continue from your projects or the navigation above.'}</p>
+    <Button type="button" variant="outline" onClick={() => navigate('/projects', { replace: true })}>{language === 'zh' ? '返回项目' : 'Back to projects'}</Button>
+  </section>
 }

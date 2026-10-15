@@ -48,7 +48,7 @@ app.add_middleware(MetricsMiddleware)
 @app.middleware("http")
 async def production_write_gate(request, call_next):
     if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/api/v2"):
-        # A bounded, authenticated pure calculator accepts a body to avoid
+        # A bounded, rate-limited pure calculator accepts a body to avoid
         # exposing sequences in URLs. Only this exact POST is read-only; neither
         # headers nor a general wetlab prefix can bypass the write fence.
         read_only_calculation = (request.method, request.url.path) == ("POST", "/api/v2/wetlab/calculations")

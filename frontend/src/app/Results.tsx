@@ -1,11 +1,11 @@
 import { ModelResultGuideLibrary } from '../features/results/ModelResultGuide'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { PackageIcon } from '@phosphor-icons/react'
 import { listExperimentResults } from '../lib/api/experiments'
 import { createDeliveryPackage, getDeliveryPackageOrNull, getResultsSummary } from '../lib/api/projects'
-import { interpretResults, type InterpretationReasoning } from '../lib/api/copilot'
+import { interpretResults } from '../lib/api/copilot'
 import { InterpretationCard } from '../components/ui/InterpretationCard'
 import { downloadArtifact, getArtifact } from '../lib/api/artifacts'
 import { listProjectArtifacts } from '../lib/api/artifacts'
@@ -49,6 +49,11 @@ function ResultsMetricsSkeleton() {
 }
 
 export function ResultsPage() {
+  const { projectId } = useProjectContext()
+  return <ProjectResults key={projectId} />
+}
+
+function ProjectResults() {
   const { t, language } = useI18n()
   const zh = language === 'zh'
   const { projectId, activeProject } = useProjectContext()
@@ -57,7 +62,10 @@ export function ResultsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const showToast = useToastStore((s) => s.show)
-  const [interpretation, setInterpretation] = useState<InterpretationReasoning | null>(null)
+  const interpretation = useMutation({
+    mutationFn: () => interpretResults(projectId),
+    onError: (error) => showToast(error instanceof Error ? error.message : t.resultsExt.toasts.interpretFailed, 'error'),
+  })
   const candidateParam = searchParams.get('candidate')?.trim() || null
   const isDemoReferenceProject = Boolean(activeProject && isDemoProject(activeProject))
   const createPackage = useMutation({
@@ -157,15 +165,6 @@ export function ResultsPage() {
     }
   }
 
-  const handleInterpret = async () => {
-    try {
-      const response = await interpretResults(projectId)
-      setInterpretation(response)
-    } catch {
-      showToast(t.resultsExt.toasts.interpretFailed, 'error')
-    }
-  }
-
   const handleArtifactDownload = async (artifactId: string) => {
     try {
       await downloadArtifact(await getArtifact(artifactId))
@@ -193,9 +192,11 @@ export function ResultsPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => void handleInterpret()}
+              disabled={demoMode || access.data?.permissions.write !== true || interpretation.isPending || resultsLoading || artifactsLoading || resultsError || artifactsError || (!results.length && !artifacts.length)}
+              title={access.data?.permissions.write !== true ? (zh ? '需要项目编辑权限' : 'Project editing access is required') : undefined}
+              onClick={() => interpretation.mutate()}
             >
-              {t.results.interpret}
+              {interpretation.isPending ? (zh ? '正在解读…' : 'Interpreting…') : t.results.interpret}
             </Button>
             <Button
               type="button"
@@ -219,8 +220,12 @@ export function ResultsPage() {
           <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=timeline`} />}>{zh ? '查看决策记录' : 'Review decision record'}</Button>
         </div>
       </AppFrame>
+      {candidateParam ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border p-3 text-sm" role="status">
+        <span>{zh ? '实验明细筛选：' : 'Experimental detail filter: '}{candidates.find((candidate) => candidate.id === candidateParam)?.name ?? candidateParam}<span className="ml-2 text-muted-foreground">{zh ? '项目汇总和计算统计仍包含全部记录。' : 'Project and computational summaries still include all records.'}</span></span>
+        <Button type="button" variant="outline" size="sm" onClick={clearCandidateFilter}>{zh ? '查看全部项目结果' : 'Show all project results'}</Button>
+      </div> : null}
       <AppFrame className="mb-5" panelClassName="p-4">
-        <Suspense fallback={<p>{zh ? '加载分析视图…' : 'Loading analyses…'}</p>}><SavedInstrumentReviews key={projectId} projectId={projectId} autoLoad /></Suspense>
+        <Suspense fallback={<p>{zh ? '加载分析视图…' : 'Loading analyses…'}</p>}><SavedInstrumentReviews key={projectId} projectId={projectId} candidateId={candidateParam} autoLoad /></Suspense>
       </AppFrame>
       <Disclosure className="mb-5" title={zh ? '计算指标释义' : 'Computational metric guide'}><ModelResultGuideLibrary /></Disclosure>
 
@@ -232,7 +237,7 @@ export function ResultsPage() {
         </div>
       ) : null}
 
-      {interpretation ? (
+      {interpretation.data ? (
         <AppFrame
           className="mb-5"
           panelClassName="p-4"
@@ -242,13 +247,13 @@ export function ResultsPage() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setInterpretation(null)}
+              onClick={() => interpretation.reset()}
             >
               {t.resultsExt.page.dismiss}
             </Button>
           }
         >
-          <InterpretationCard reasoning={interpretation} />
+          <InterpretationCard reasoning={interpretation.data} />
         </AppFrame>
       ) : null}
 

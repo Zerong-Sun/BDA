@@ -51,6 +51,16 @@ def _answer():
     })
 
 
+def _historical_contract():
+    # Existing version-1 runs allow explicitly scoped excerpt answers. New
+    # literature recipes require per-paper figure/data coverage as well.
+    contract = build_contract("literature", [])
+    contract["version"] = 1
+    contract["steps"] = [step for step in contract["steps"] if step["id"] != "evidence_packet"]
+    contract["required_sections"] = ["search_scope", "evidence_comparison", "disagreements", "limitations"]
+    return contract
+
+
 def test_first_page_is_evidence_but_not_complete_source_coverage():
     turns = [_turn(_page())]
     assert progress(build_contract("literature", []), turns)[1]["status"] == "completed"
@@ -66,7 +76,7 @@ def test_first_page_is_evidence_but_not_complete_source_coverage():
 
 def test_source_coverage_does_not_force_narrow_answer_to_be_partial():
     turns = [_turn([], "discovery", "search_research"), _turn(_page())]
-    run = SimpleNamespace(task_contract=build_contract("literature", []), outcome={})
+    run = SimpleNamespace(task_contract=_historical_contract(), outcome={})
     run.outcome = evaluate_delivery(run, _answer(), turns)
     assert run.outcome["status"] == "completed"
     view = task_view(run, turns)
@@ -129,7 +139,7 @@ def _seeded_run(session, monkeypatch, **kwargs):
     project, user = _project(session)
     run = _run(session, project, user, bot="researcher", goal="Answer from the named saved source.",
                allowed_tools=kwargs.pop("allowed_tools", ["get_reference_content", "search_research"]),
-               task_contract=build_contract("literature", []), **kwargs)
+               task_contract=_historical_contract(), **kwargs)
     for turn in [_turn([], "discovery", "search_research"), _turn(_page())]:
         agent_runs.append_turn(session, run, role=turn.role, content=turn.content, tool_calls=turn.tool_calls)
     # Scientific review is a separate phase; these tests pin only the coverage check.

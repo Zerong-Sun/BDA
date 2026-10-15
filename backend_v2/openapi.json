@@ -1538,6 +1538,11 @@
             "title": "Public Portal Url",
             "type": "string"
           },
+          "public_workspace_enabled": {
+            "default": false,
+            "title": "Public Workspace Enabled",
+            "type": "boolean"
+          },
           "realm": {
             "title": "Realm",
             "type": "string"
@@ -174506,7 +174511,7 @@
     },
     "/api/v2/wetlab/calculations": {
       "post": {
-        "description": "Authenticated pure calculation; POST keeps sequences out of URL histories.\n\nNo result, supplied sequence or project record is persisted. Viewer accounts\nmay use this endpoint; it does not authorize any mutation.",
+        "description": "Pure calculation; Public visitors need no account. Private requires login.\n\nNo result, supplied sequence or project record is persisted. Viewer accounts\nmay use this endpoint; it does not authorize any mutation.",
         "operationId": "post_bench_calculation_api_v2_wetlab_calculations_post",
         "requestBody": {
           "content": {

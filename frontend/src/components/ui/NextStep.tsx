@@ -41,6 +41,8 @@ export function NextStep({ stage }: { stage: StageKey }) {
           </p>
           <p className="mt-0.5 text-sm text-text-secondary">{hasEvidence ? language === 'zh' ? '复核证据，记录判断和仍待解决的问题。' : 'Review the evidence and record decisions and open questions.' : language === 'zh' ? '尚无结果。返回项目检查输入和任务进度。' : 'No results are available yet. Review project inputs and task progress.'}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {overview.experiment_result_count > 0 ? <Button render={<Link to={`/learning${query}`} />}>{language === 'zh' ? '用实验数据规划下一轮' : 'Plan the next learning cycle'}<ArrowRightIcon aria-hidden="true" /></Button> : null}
         <Button
           variant="outline"
           render={<Link to={hasEvidence ? `/research${query}&tab=timeline` : `/projects${query}`} />}
@@ -48,6 +50,7 @@ export function NextStep({ stage }: { stage: StageKey }) {
           <ArrowCounterClockwiseIcon className="h-4 w-4" aria-hidden="true" />
           {hasEvidence ? language === 'zh' ? '查看项目决策' : 'Review project decisions' : language === 'zh' ? '返回项目' : 'Review project'}
         </Button>
+        </div>
       </AppFrame>
     )
   }

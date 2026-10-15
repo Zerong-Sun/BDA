@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { ArrowUpRight, Books, Cube, Quotes, Plus, CircleNotch, MagnifyingGlass, Trash } from '@phosphor-icons/react'
+import { ArrowUpRight, Books, Cube, Quotes, Plus, CircleNotch, MagnifyingGlass, Trash, DotsThree, Gear } from '@phosphor-icons/react'
 import { Alert, AlertAction, AlertDescription } from '@/components/reui/alert'
-import { Disclosure } from '../../components/ui/Disclosure'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { ApiState } from '../../components/ui/ApiState'
 import { Button } from '@/components/ui/Button'
@@ -25,6 +25,7 @@ import { listProjectLibrary } from '../../lib/api/projects'
 import { getBundledProteinResearchPackage, syncBundledProteinResearchPackage } from '../../lib/api/researchPackages'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import type { useDeleteProjectLifecycle } from '../../lib/hooks/useDeleteProjectLifecycle'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { currentRole } from '../research/jsonHelpers'
 import { projectBrief } from '../projects/projectBrief'
 
@@ -51,7 +52,7 @@ function formatProjectType(projectType: string) {
 function ProjectLibrarySkeleton() {
   const { t } = useI18n()
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label={t.projectLibrary.loading}>
+    <div className="project-list" aria-label={t.projectLibrary.loading}>
       {Array.from({ length: 3 }).map((_, index) => (
         <AppFrame key={index} panelClassName="grid gap-3 p-4">
           <Skeleton className="h-4 w-24" />
@@ -105,15 +106,6 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
     },
   })
 
-  useEffect(() => {
-    if (import.meta.env.MODE === 'test' || projectsLoading || projectsError) return
-    if (!['admin', 'researcher'].includes(role)) return
-    const marker = 'bda-research-package-sync-attempted'
-    if (sessionStorage.getItem(marker)) return
-    sessionStorage.setItem(marker, 'true')
-    packageSync.mutate()
-  }, [packageSync, projectsError, projectsLoading, role])
-
   const viewerPackageOutdated = role === 'viewer' && Boolean(bundleVersion.data) && visibleProjects.some((project) => {
     if (project.source_package_id !== bundleVersion.data?.packageId) return false
     const packageInfo = project.localized_content?.package
@@ -166,9 +158,11 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
           <p className="mt-1 text-sm text-text-secondary">{t.projectLibrary.subtitle}</p>
         </div>
         <div className="project-library-actions"><Button type="button" variant="ghost" onClick={onToggleIntro} aria-expanded={introOpen}>{t.experimentsExt.gettingStarted}</Button>
-        <Button type="button" className="science-primary" disabled={role === 'viewer'} onClick={onCreate}>
-          <Plus aria-hidden="true" />{t.common.newExperiment}
-        </Button></div>
+        <Button type="button" className="science-primary" disabled={role === 'viewer' && !isPublicVisitor()} render={isPublicVisitor() ? <Link to="/account" /> : undefined} onClick={isPublicVisitor() ? undefined : onCreate}>
+          <Plus aria-hidden="true" />{isPublicVisitor() ? (language === 'zh' ? '在 Private 新建项目' : 'Create in Private') : t.common.newExperiment}
+        </Button>
+        {['admin', 'researcher'].includes(role) ? <Button type="button" variant="outline" disabled={packageSync.isPending} onClick={() => packageSync.mutate()}>{language === 'zh' ? '导入 / 更新示例研究' : 'Import / update example research'}</Button> : null}
+        </div>
       </div>
 
       <div className="project-library-filters">
@@ -219,6 +213,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
             <AlertDescription>{t.projectLibrary.builtinSyncing}</AlertDescription>
           </Alert>
         ) : null}
+        {packageSync.isSuccess ? <p role="status" className="mb-4 text-sm">{language === 'zh' ? '示例研究已更新，已有项目内容按研究包规则保留。' : 'Example research updated using the package merge rules.'}</p> : null}
         {packageSync.isError ? (
           <Alert className="mb-4" variant="destructive">
             <AlertDescription>{t.projectLibrary.syncFailed}</AlertDescription>
@@ -236,7 +231,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
           <AppFrame className="border-dashed" panelClassName="p-6 text-sm text-text-secondary">
             <h3 className="text-lg font-semibold text-text-primary">{t.projectLibrary.empty}</h3>
             <p className="mt-2 max-w-2xl">{t.projectLibrary.emptyBody}</p>
-            <Button type="button" className="mt-4" disabled={role === 'viewer'} onClick={onCreate}>
+            <Button type="button" className="mt-4" disabled={role === 'viewer' && !isPublicVisitor()} render={isPublicVisitor() ? <Link to="/account" /> : undefined} onClick={isPublicVisitor() ? undefined : onCreate}>
               {t.projectLibrary.createFirst}
             </Button>
           </AppFrame>
@@ -256,7 +251,7 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
               const brief = projectBrief(project, language)
               const query = `?project=${encodeURIComponent(project.id)}`
               return <article key={project.id} className="project-row" data-active={isActive || undefined}>
-                <span className="project-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="project-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 <div className="project-row-body">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="science-eyebrow">{formatProjectType(project.project_type)}</span>
@@ -271,18 +266,21 @@ export function ProjectLibrary({ onCreate, onToggleIntro, introOpen, onManage, p
                       <Link to={`/research${query}&tab=structures`}><Cube aria-hidden="true" />{format(t.projectLibrary.pdbCount, { count: summary.structure_count })}</Link>
                       <Link to={`/research${query}&tab=evidence`}><Quotes aria-hidden="true" />{format(t.projectLibrary.claimsCount, { count: summary.finding_count })}</Link>
                     </> : <span>{language === 'zh' ? '资料统计待加载' : 'Material counts unavailable'}</span>}
-                    <span>{language === 'zh' ? '更新于 ' : 'Updated '}{new Date(project.updated_at || project.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
+                    <span className="project-updated">{language === 'zh' ? '更新于 ' : 'Updated '}{new Date(project.updated_at || project.created_at).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')}</span>
                   </div>
                 </div>
                 <div className="project-row-actions">
                   <Button type="button" render={<Link to={`/research${query}&tab=goals&brief=1`} />}>{t.projectLibrary.open}<ArrowUpRight aria-hidden="true" /></Button>
                   <Button type="button" variant="outline" render={<Link to={`/bots${query}`} />}>{language === 'zh' ? '研究团队' : 'Research team'}</Button>
-                  <Disclosure className="project-row-menu" title={language === 'zh' ? '更多操作' : 'More actions'}><div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => onManage(project)}>{t.projectLibrary.manage}</Button>
-                    <Button type="button" variant="ghost" size="sm" disabled={isDeleting || projectDelete.isPending} onClick={() => projectDelete.confirmAndDeleteProject(project)}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="project-row-menu-trigger" render={<Button type="button" variant="ghost" size="icon" />} aria-label={`${language === 'zh' ? '更多操作' : 'More actions'} · ${localizedProjectText(project, 'name')}`}><DotsThree aria-hidden="true" /></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onManage(project)}><Gear aria-hidden="true" />{t.projectLibrary.manage}</DropdownMenuItem>
+                    {role !== 'viewer' ? <DropdownMenuItem disabled={isDeleting || projectDelete.isPending} onClick={() => projectDelete.confirmAndDeleteProject(project)}>
                       {isDeleting ? <CircleNotch className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}{t.projectLibrary.moveToTrash}
-                    </Button>
-                  </div></Disclosure>
+                    </DropdownMenuItem> : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </article>
             })}

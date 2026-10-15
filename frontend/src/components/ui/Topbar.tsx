@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router'
+import { NavLink, useLocation, useNavigate } from 'react-router'
 import clsx from 'clsx'
 import { DotsThreeIcon, PulseIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
@@ -15,6 +15,7 @@ import { StatusPill } from './StatusPill'
 import { statusTone } from './statusTone'
 import { Button } from './Button'
 import { BigoBioLogo } from './BigoBioLogo'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { StatusBadge } from './statusBadge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from './dropdown-menu'
 import {
@@ -33,11 +34,13 @@ const primaryRoutes = PRIMARY_ROUTES
 
 export function Topbar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, activityOpen, setActivityOpen } = useAppStore()
   const { t, language } = useI18n()
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
   const zh = language === 'zh'
+  const activeWorkbench = APP_ROUTES.find((route) => !PRIMARY_ROUTES.includes(route.to) && location.pathname === route.to)
   const navLabel = (key: AppRoute['key']) => routeLabel(key, zh, (item) => t.nav[item])
 
   return (
@@ -108,7 +111,7 @@ export function Topbar() {
           <span className="hidden sm:inline-flex">
             <StatusBadge
               status={appMode === 'application' ? 'info' : 'warning'}
-              label={appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
+              label={isPublicVisitor() ? (zh ? 'Public · 只读' : 'Public · Read only') : appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
             />
           </span>
           <Button
@@ -166,7 +169,7 @@ export function Topbar() {
         ))}
         <div className="hidden items-stretch md:flex">
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" />}><WrenchIcon aria-hidden="true" />{zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
+            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" aria-current={activeWorkbench ? 'true' : undefined} />}><WrenchIcon aria-hidden="true" />{activeWorkbench ? navLabel(activeWorkbench.key) : zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               {workbenchGroups(zh).map((group) => <DropdownMenuGroup key={group.key}>
                 <DropdownMenuLabel>{group.label}</DropdownMenuLabel>

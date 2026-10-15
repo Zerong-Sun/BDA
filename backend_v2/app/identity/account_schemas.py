@@ -23,6 +23,7 @@ class AuthConfigResponse(BaseModel):
     realm: str
     public_portal_url: str
     private_portal_url: str
+    public_workspace_enabled: bool = False
 
 
 class RegisterRequest(BaseModel):

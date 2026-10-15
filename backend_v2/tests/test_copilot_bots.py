@@ -633,7 +633,7 @@ def test_an_owner_is_offered_only_the_writes_it_can_be_granted() -> None:
     # the literature review (search and pending-review notes); a reviewer owns none.
     assert bots.task_write_tools(bots.require("researcher")) == {
         "brief": [],
-        "literature": ["start_literature_search", "create_knowledge_draft"],
+        "literature": ["start_literature_search", "create_knowledge_draft", "save_literature_analysis"],
     }
     assert bots.task_write_tools(bots.require("auditor")) == {}
 

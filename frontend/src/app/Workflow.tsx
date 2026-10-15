@@ -692,6 +692,10 @@ function WorkflowWorkspace() {
       className="bg-transparent"
       data-tour-id="workflow-page"
     >
+      <header className="mb-4 space-y-1">
+        <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>
+        <p className="text-sm text-text-secondary">{language === 'zh' ? '连接计算步骤、检查输入与门控，追踪运行和产物。' : 'Connect computation steps, check inputs and gates, and track runs and artifacts.'}</p>
+      </header>
       <WorkflowContextBar
         workflowRunId={workflowRunId}
         workflowStatus={workflowRun?.status}
@@ -712,7 +716,7 @@ function WorkflowWorkspace() {
 
       {!isDemoMode && projectId ? <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
         <Link className="text-primary underline" to={`/research?project=${encodeURIComponent(projectId)}&tab=methods`}>{language === 'zh' ? '查看研究路线、文献依据与放行条件' : 'Review the research plan, evidence and acceptance criteria'}</Link>
-        {!workflowRunId && workflowRunsQuery.isSuccess && projectWorkflowRuns.length === 0 ? <span className="text-text-secondary">{language === 'zh' ? '尚未有工作流更新，可手工创建草稿。' : 'No workflow updates yet. Create a draft manually.'}</span> : null}
+        {!workflowRunId && workflowRunsQuery.isSuccess && projectWorkflowRuns.length === 0 ? <span className="text-text-secondary">{canEdit ? (language === 'zh' ? '尚未有工作流更新，可手工创建草稿。' : 'No workflow updates yet. Create a draft manually.') : (language === 'zh' ? '尚未有工作流更新。保存后的工作流会显示在这里。' : 'No workflow updates yet. Saved workflows will appear here.')}</span> : null}
       </div> : null}
 
       {!isDemoMode && projectAccess.isError ? <Alert variant="destructive" className="mb-3"><AlertDescription>{language === 'zh' ? '项目权限读取失败，编辑暂不可用。' : 'Project permissions could not be loaded. Editing is unavailable.'}</AlertDescription><Button type="button" variant="outline" onClick={() => void projectAccess.refetch()}>{language === 'zh' ? '重试权限检查' : 'Retry permission check'}</Button></Alert>
@@ -939,6 +943,7 @@ function WorkflowWorkspace() {
               <FrameDescription>{language === 'zh' ? '根据目标生成完整路线，创建草稿后检查输入、参数和筛选规则。' : 'Generate a route from your objective, then review inputs, parameters and screening rules in its draft.'}</FrameDescription>
             </FrameHeader>
             <FramePanel>
+            {!canEdit ? <p role="status" className="mb-3 text-sm text-text-secondary">{language === 'zh' ? '当前项目可浏览；创建或修改工作流需要项目编辑权限。' : 'You can browse this project. Creating or changing a workflow requires project editing access.'}</p> : null}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <div className="min-w-0 flex-1">
                 <label
@@ -952,7 +957,7 @@ function WorkflowWorkspace() {
                   rows={2}
                   className="w-full resize-none rounded-md border border-border-soft bg-bg-app px-3 py-2 text-sm text-text-primary"
                   value={goal}
-                  disabled={applyPlannedRoute.isPending}
+                  disabled={!canEdit || applyPlannedRoute.isPending}
                   onChange={(e) => setGoal(e.target.value)}
                   placeholder={projectObjective(activeProject, t.workflowExt.routePlanner, format)}
                 />

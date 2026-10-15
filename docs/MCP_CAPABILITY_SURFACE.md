@@ -20,7 +20,7 @@
 - **粒度错配**：REST 端点的粒度是**资源**（`GET /candidates`、`PATCH /candidates/{id}`），agent 需要的粒度是**任务**（"这个项目的候选物里哪些通过了折叠门"）。前者要 agent 自己拼装三四次调用，每次都可能拼错。
 - **控制面丢失**：329 个 operation 中 165 个带 `x-permission`（2026-10-14 按 `backend_v2/openapi.json` 核对）。REST 层的授权是 HTTP 依赖注入，它保护的是"能不能调这个端点"，回答不了"这次调用是不是用户要的"。
 
-同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。2026-10-14 导入 `copilot.tools` 后核验：**57 个工具 / 22 个 capability**，执行模式为 read 40 / draft 11 / queue 6。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
+同时，**能力面已经存在**：`backend_v2/app/copilot/registry.py` 的 `ToolSpec` 把 schema、capability、execution_mode、handler、audit、citation 声明在同一个对象上，`REGISTRY.execute` 是唯一的 dispatch 点。2026-10-15 导入 `copilot.tools` 后核验：**59 个工具 / 22 个 capability**，执行模式为 read 41 / draft 12 / queue 6。工具与 capability 的归属，以及哪个 bot 对哪一段链条负责，见 [Copilot bot 名册](COPILOT_BOT_ROSTER.md)。
 
 ## 2. 结论
 

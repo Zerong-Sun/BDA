@@ -39,6 +39,10 @@ config:
   registrationMode: closed
   publicPortalUrl: ""
   privatePortalUrl: ""
+  # Public only. Every project in this dedicated organization is published.
+  publicWorkspaceUserId: ""
+  publicWorkspaceOrganizationId: ""
+  publicWorkspaceReadLimit: "600"
   databasePoolSize: "5"
   databaseMaxOverflow: "5"
   workerConcurrency: "2"

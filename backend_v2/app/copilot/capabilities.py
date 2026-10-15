@@ -42,6 +42,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
             "get_dataset_slice",
             "get_reference",
             "get_reference_content",
+            "get_reference_evidence_packet",
             "list_research_goals",
         ],
     },
@@ -124,7 +125,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "description": "Search project knowledge and create pending-review Copilot notes",
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["search_project_knowledge", "create_knowledge_draft"],
+        "chat_tools": ["search_project_knowledge", "create_knowledge_draft", "save_literature_analysis"],
         "requires_explicit_request": True,
     },
     {

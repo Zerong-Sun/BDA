@@ -19,6 +19,8 @@ import { accountError, passwordProblem, useAuthConfig } from '@/lib/auth/account
 import { useAccountText } from '@/lib/auth/accountText'
 import { clearAuthenticatedBrowserState } from '@/lib/auth/browserSession'
 import { useI18n } from '@/lib/i18n'
+import { isPublicVisitor } from '@/lib/auth/publicWorkspace'
+import { PrivateAccessLinks } from '@/features/account/PrivateAccessLinks'
 
 
 function AccountGrants() {
@@ -103,6 +105,20 @@ function AccountGrants() {
 }
 
 export function AccountPage() {
+  return isPublicVisitor() ? <PublicAccountAccess /> : <SignedInAccount />
+}
+
+function PublicAccountAccess() {
+  const { language } = useI18n()
+  const config = useAuthConfig()
+  return <section className="mx-auto max-w-2xl space-y-5 py-8">
+    <h1 className="text-2xl font-semibold">{language === 'zh' ? '进入 Private 开展研究' : 'Work on your research in Private'}</h1>
+    <p className="text-muted-foreground">{language === 'zh' ? 'Public 无需账号。注册或登录 Private 后，可创建项目、保存分析和运行 Bot 任务。' : 'Public needs no account. Register or sign in to Private to create projects, save analyses and run Bot tasks.'}</p>
+    <PrivateAccessLinks config={config.data} />
+  </section>
+}
+
+function SignedInAccount() {
   const t = useAccountText()
   const navigate = useNavigate()
   const queryClient = useQueryClient()

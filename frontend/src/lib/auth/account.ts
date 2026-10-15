@@ -36,12 +36,14 @@ export function safeReturnTo(value: string | null): string {
     && !/[\\\r\n]/.test(value) ? value : '/projects'
 }
 
-export function portalLoginUrl(value: string | undefined): string | null {
+export function portalUrl(value: string | undefined, page: 'public' | 'login' | 'register'): string | null {
   if (!value) return null
   try {
     const url = new URL(value)
     const local = url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
     if ((url.protocol !== 'https:' && !local) || url.username || url.password || url.search || url.hash || url.pathname !== '/') return null
-    return `${url.origin}/#/login`
+    return `${url.origin}/#/${page}`
   } catch { return null }
 }
+
+export function portalLoginUrl(value: string | undefined): string | null { return portalUrl(value, 'login') }

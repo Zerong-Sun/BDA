@@ -59,6 +59,17 @@ class ResearchContextService:
         self.session = session
         self.project_id = project.id
         self.workspace = _sanitize(build_research_workspace(session, project).model_dump(mode="json"))
+        # Bibliographic discovery must not inject an entire paper collection into
+        # the model context. Full packets are read explicitly through bounded windows.
+        for reference in self.workspace.get("references", []):
+            metadata = reference.get("metadata") or {}
+            for key in ("evidence_packet", "latest_evidence_packet"):
+                saved = metadata.get(key)
+                if isinstance(saved, dict):
+                    metadata[key] = {"schema": saved.get("schema"), "source_sha256": saved.get("source_sha256"),
+                                     "coverage_status": saved.get("coverage_status"),
+                                     "counts": {name: len(saved.get(name) or []) for name in ("arguments", "figures", "tables", "data", "supplements", "passages")},
+                                     "read_tool": "get_reference_evidence_packet"}
         self._documents = {
             row.id: row
             for row in session.scalars(
@@ -231,6 +242,29 @@ class ResearchContextService:
             }
         return rows
 
+    def get_reference_evidence_packet(
+        self, reference_id: str, *, section: str = "arguments", offset: int = 0, limit: int = 5,
+        revision: str = "current",
+    ) -> dict[str, Any]:
+        from ..literature.evidence_packets import packet_window
+
+        reference = next((r for r in self.workspace.get("references", [])
+                          if reference_id in {str(r.get("document_id")), str(r.get("ref_id"))}), None)
+        if reference is None:
+            raise ValueError("reference_not_found_in_project")
+        document = self._documents.get(uuid.UUID(str(reference["document_id"])))
+        if document is None:
+            raise ValueError("reference_not_found_in_project")
+        key = "latest_evidence_packet" if revision == "latest" else "evidence_packet"
+        packet = (document.metadata_json or {}).get(key)
+        if not isinstance(packet, dict):
+            return {"document_id": str(document.id), "status": "not_extracted", "gaps": ["evidence_packet_not_saved"], "items": []}
+        window = _sanitize(packet_window(packet, section, offset, limit))
+        window["window_sha256"] = hashlib.sha256(json.dumps(window["items"], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        return {"document_id": str(document.id), "document_version": document.version, "title": document.title,
+                "revision": revision, "newer_source_available": bool((document.metadata_json or {}).get("latest_evidence_packet")),
+                **window}
+
     def grounding_packet(
         self,
         citations: list[dict[str, Any]],
@@ -252,6 +286,24 @@ class ResearchContextService:
         used_chars = 0
         for citation in ordered:
             if citation.get("source_type") != "scientific_literature":
+                continue
+            if citation.get("workspace_type") == "literature_packet":
+                try:
+                    window = self.get_reference_evidence_packet(
+                        str(citation.get("document_id") or ""), section=str(citation.get("packet_section") or ""),
+                        offset=int(citation.get("packet_offset", 0)), limit=int(citation.get("packet_limit", 5)),
+                        revision=str(citation.get("packet_revision") or "current"),
+                    )
+                except (ValueError, TypeError):
+                    continue
+                if window.get("source_sha256") != citation.get("content_checksum_sha256") or window.get("window_sha256") != citation.get("window_sha256"):
+                    continue
+                serialized = json.dumps(window, ensure_ascii=False)
+                if used_chars + len(serialized) > max_chars or len(packet) >= max_chunks:
+                    continue
+                packet.append({**window, "citation_markers": [f"[cite:{i}]" for i, c in enumerate(catalog, 1) if c == citation],
+                               "scope": "Saved source/interpretation rows; model drafts and caption-only readings remain explicitly unreviewed."})
+                used_chars += len(serialized)
                 continue
             chunk_id = str(citation.get("chunk_id") or "")
             if not chunk_id or chunk_id in seen:

@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../test/mocks/handlers'
 import { useAppStore } from '../../lib/store/appStore'
 import { uploadArtifact } from '../../lib/api/artifacts'
 import { analyseBli, previewInstrumentAnalysis } from '../../lib/api/wetlab'
@@ -24,7 +26,9 @@ function choose(filename = 'sample.csv') {
 }
 
 beforeEach(() => {
-  useAppStore.setState({ language: 'en' })
+  sessionStorage.clear()
+  useAppStore.setState({ language: 'en', appMode: 'application' })
+  server.use(http.get('/api/v2/projects/:id/access', ({ params }) => HttpResponse.json({ project_id: params.id, role: 'owner', permissions: { read: true, write: true, compute: true, experiment: true, autopilot: true } })))
   vi.mocked(uploadArtifact).mockResolvedValue({ id: 'artifact-1' } as Awaited<ReturnType<typeof uploadArtifact>>)
   vi.mocked(analyseBli).mockResolvedValue(saved)
   vi.mocked(previewInstrumentAnalysis).mockResolvedValue({ instrument: 'bli', record, summary: bli })
@@ -59,7 +63,7 @@ describe('Single instrument previews', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview without saving' }))
     expect(await screen.findByRole('button', { name: 'Save to selected project' })).toBeDisabled()
     view.rerender(panel('selected-project'))
-    expect(screen.getByRole('button', { name: 'Save to selected project' })).toBeEnabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save to selected project' })).toBeEnabled())
     expect(uploadArtifact).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Save to selected project' }))
     await waitFor(() => expect(analyseBli).toHaveBeenCalledWith('selected-project', expect.objectContaining({ artifact_id: 'artifact-1' })))

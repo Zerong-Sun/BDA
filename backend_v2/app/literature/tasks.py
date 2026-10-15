@@ -408,10 +408,17 @@ def literature_search(search_run_id: str) -> dict:
         retrieval_trace_id: str | None = None
         raw_artifact_id: uuid.UUID | None = None
         license_text = ""
+        evidence_packet = None
         if fetch_full_text and result["pmcid"] and result["is_open_access"]:
             try:
                 full_text = tools.get_europe_pmc_full_text(result["pmcid"])
                 paragraphs, xml_metadata = extract_europe_pmc_full_text(full_text.content)
+                from .evidence_packets import discover_pmc_media, extract_packet
+                media_catalog = discover_pmc_media(result["pmcid"])
+                evidence_packet = extract_packet(full_text.content, media_urls=media_catalog["urls"])
+                evidence_packet["media_catalog"] = media_catalog
+                evidence_packet["license_code"] = media_catalog.get("license_code")
+                evidence_packet["retracted"] = media_catalog.get("is_retracted")
                 content_checksum = str(xml_metadata["content_checksum_sha256"])
                 license_text = str(xml_metadata.get("license_text") or "")
                 # A later retrieval must never replace the bytes behind an older
@@ -545,6 +552,27 @@ def literature_search(search_run_id: str) -> dict:
             }
             if raw_artifact_id and not has_chunks:
                 document.artifact_id = raw_artifact_id
+            # Keep the curated packet and its original anchors when the same
+            # source is fetched again. A changed source is a separate revision.
+            from .evidence_packets import empty_packet
+            if evidence_packet is None:
+                evidence_packet = empty_packet(content_kind=content_kind)
+                evidence_packet["gaps"].extend(["full_text_not_recovered", "figures_and_tables_not_recovered"])
+                evidence_packet["passages"] = [
+                    {"id": f"retrieved-paragraph-{i + 1}", "section": content_kind, "text": p, "figure_table_refs": []}
+                    for i, p in enumerate(paragraphs)
+                ]
+            evidence_packet.update(
+                document_id=str(document.id), source_sha256=content_checksum or None,
+                raw_content_artifact_id=str(raw_artifact_id) if raw_artifact_id else None,
+                retrieval_trace_id=retrieval_trace_id,
+                source_url=f"https://pmc.ncbi.nlm.nih.gov/articles/{result['pmcid']}/" if result.get("pmcid") else "",
+            )
+            previous_packet = (document.metadata_json or {}).get("evidence_packet")
+            if not previous_packet:
+                document.metadata_json = {**document.metadata_json, "evidence_packet": evidence_packet}
+            elif previous_packet.get("source_sha256") != evidence_packet.get("source_sha256"):
+                document.metadata_json = {**document.metadata_json, "latest_evidence_packet": evidence_packet}
             if has_chunks:
                 document.status = "available"
             elif paragraphs:

@@ -21,6 +21,7 @@ from backend_v2.app.identity.service import (
     rotate_refresh_token,
 )
 from backend_v2.app.main import app
+from backend_v2.app.projects.models import Project
 from backend_v2.tests._sqlite import enforce_foreign_keys
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -52,6 +53,8 @@ def account_env(monkeypatch):
         )
         organization = Organization(name="Restricted team")
         db.add_all([admin, organization])
+        db.flush()
+        db.add(Project(name="Existing private research", organization_id=organization.id, owner_id=admin.id, project_type="protein_design"))
         db.commit()
         ids = admin.id, organization.id
 
@@ -80,8 +83,10 @@ def admin_headers(engine, ids):
         return {"Authorization": "Bearer " + create_access_token(db.get(User, ids[0]))}
 
 
-def test_public_registration_creates_only_own_workspace(account_env):
+@pytest.mark.parametrize("deployment", ["public", "private"])
+def test_registration_creates_only_own_workspace(account_env, monkeypatch, deployment):
     client, engine, ids, settings = account_env
+    monkeypatch.setattr(settings, "deployment_kind", deployment)
     response = client.post("/api/v2/auth/register", json=signup("  NEW-USER  "))
     assert response.status_code == 201, response.text
     user = response.json()["user"]
@@ -107,6 +112,10 @@ def test_public_registration_creates_only_own_workspace(account_env):
         == 403
     )
     assert client.get("/api/v2/projects", headers=headers).json()["items"] == []
+    with Session(engine) as db:
+        existing_project = db.scalar(select(Project).where(Project.organization_id == ids[1]))
+        existing_id = str(existing_project.id)
+    assert client.get(f"/api/v2/projects/{existing_id}", headers=headers).status_code == 403
     for illegal in [{"role": "admin"}, {"organization_id": str(ids[1])}, {"enabled": True}]:
         r = client.post("/api/v2/auth/register", json=signup("another", **illegal))
         assert r.status_code == 422 and "New-pass-123" not in r.text
@@ -323,7 +332,6 @@ def test_realm_isolation_cookie_origin_and_validation_redaction(account_env, mon
 @pytest.mark.parametrize(
     "options",
     [
-        dict(deployment_kind="private", registration_mode="open"),
         dict(public_portal_url="javascript:alert(1)"),
         dict(private_portal_url="https://user:password@example.test"),
         dict(private_portal_url="http://example.test"),
@@ -336,6 +344,11 @@ def test_realm_isolation_cookie_origin_and_validation_redaction(account_env, mon
 def test_unsafe_portal_settings_rejected(options):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, **options)
+
+
+def test_private_self_service_registration_is_a_supported_policy():
+    settings = Settings(_env_file=None, deployment_kind="private", registration_mode="open")
+    assert settings.registration_mode == "open"
 
 
 def test_write_gate_blocks_signup_but_allows_logout(account_env, monkeypatch):

@@ -286,8 +286,12 @@ and phase switches must be explicit. A perfect fit to instrument-derived KObs
 values is not independent experimental validation or a confidence interval.
 
 “Skill” means one capability id. Importing `copilot.tools` and reading
-`REGISTRY.all()` plus `COPILOT_CAPABILITIES` on 2026-10-14 gives
-22 capabilities and 57 tools: 40 read, 11 draft and 6 queue.
+`REGISTRY.all()` plus `COPILOT_CAPABILITIES` on 2026-10-15 gives
+22 capabilities and 59 tools: 41 read, 12 draft and 6 queue.
+`get_reference_evidence_packet` reads bounded source windows;
+`save_literature_analysis` writes an explicitly authorized, version-checked draft.
+New literature recipes use contract version 2 and require per-paper figure and
+data coverage. Existing contracts retain their saved requirements.
 Capability descriptions are in [the service guide](COPILOT_SERVICE_GUIDE.md#7-开发者能力与模型工具清单);
 the [versioned workflow guide](VERSIONED_INSTRUMENT_BOT_WORKFLOW.md) covers current
 BLI review, residue identity and report/source links.

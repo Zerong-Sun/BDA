@@ -161,9 +161,10 @@ describe('Layer 8 product contract pages', () => {
     renderWithProviders(<ExperimentsPage />)
 
     expect((await screen.findAllByText('Binder Design MVP')).length).toBeGreaterThan(0)
-    // A project that is not target-ready opens target preparation on arrival:
-    // the repair is the next thing to do, so it is not behind a disclosure.
-    expect(screen.getByRole('button', { name: 'Project details and target preparation' })).toHaveAttribute('aria-expanded', 'true')
+    // Project selection stays primary; target preparation remains one click away.
+    const details = screen.getByRole('button', { name: 'Project details and target preparation' })
+    expect(details).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(details)
     expect((await screen.findAllByText('Confirm target identity')).length).toBeGreaterThan(0)
     const readinessLinks = screen.getAllByRole('link', { name: 'Resolve target readiness' })
     expect(readinessLinks.length).toBeGreaterThan(0)

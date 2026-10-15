@@ -3364,7 +3364,7 @@ export const previewAnalysisApiV2WetlabAnalysisPreviewsPost = <ThrowOnError exte
 /**
  * Post Bench Calculation
  *
- * Authenticated pure calculation; POST keeps sequences out of URL histories.
+ * Pure calculation; Public visitors need no account. Private requires login.
  *
  * No result, supplied sequence or project record is persisted. Viewer accounts
  * may use this endpoint; it does not authorize any mutation.

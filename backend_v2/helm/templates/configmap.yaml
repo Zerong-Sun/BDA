@@ -10,6 +10,13 @@ data:
   BDA_V2_REGISTRATION_MODE: {{ .Values.config.registrationMode | quote }}
   BDA_V2_PUBLIC_PORTAL_URL: {{ .Values.config.publicPortalUrl | quote }}
   BDA_V2_PRIVATE_PORTAL_URL: {{ .Values.config.privatePortalUrl | quote }}
+  {{- if .Values.config.publicWorkspaceUserId }}
+  BDA_V2_PUBLIC_WORKSPACE_USER_ID: {{ .Values.config.publicWorkspaceUserId | quote }}
+  {{- end }}
+  {{- if .Values.config.publicWorkspaceOrganizationId }}
+  BDA_V2_PUBLIC_WORKSPACE_ORGANIZATION_ID: {{ .Values.config.publicWorkspaceOrganizationId | quote }}
+  {{- end }}
+  BDA_V2_PUBLIC_WORKSPACE_READ_LIMIT: {{ .Values.config.publicWorkspaceReadLimit | quote }}
   BDA_V2_ENVIRONMENT: {{ .Values.config.environment | quote }}
   BDA_V2_DATABASE_POOL_SIZE: {{ .Values.config.databasePoolSize | quote }}
   BDA_V2_DATABASE_MAX_OVERFLOW: {{ .Values.config.databaseMaxOverflow | quote }}

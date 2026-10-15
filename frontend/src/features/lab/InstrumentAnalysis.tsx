@@ -21,6 +21,9 @@ import {
 } from '../../components/ui/select'
 import { AnalysisResult } from './InstrumentResult'
 import { SavedInstrumentReviews } from './SavedInstrumentReviews'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
+import { useAppStore } from '../../lib/store/appStore'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 
 type Instrument = 'bli' | 'akta' | 'enzyme'
 
@@ -64,6 +67,13 @@ export function InstrumentAnalysis({ projectId = '', previewOnly = false, instru
 function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrument: fixedInstrument }: InstrumentAnalysisProps) {
   const { t, language } = useI18n()
   const copy = t.lab.instruments
+  const access = useProjectAccess(projectId)
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const canSave = !demo && access.data?.permissions.experiment === true
+  const canRun = previewOnly ? !isPublicVisitor() : canSave
+  const accessMessage = language === 'zh'
+    ? '当前为只读浏览，可查看已保存的分析。上传、分析和保存新版本需要项目实验权限。'
+    : 'You can browse saved analyses. Uploading, analyzing and saving new versions requires project experiment access.'
 
   const [instrument, setInstrument] = useState<Instrument>(fixedInstrument ?? 'bli')
   const [file, setFile] = useState<File | null>(null)
@@ -86,6 +96,7 @@ function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrume
 
   const run = useMutation({
     mutationFn: async (save: boolean): Promise<DisplayAnalysis> => {
+      if (!canRun || (save && !canSave)) throw new Error(accessMessage)
       if (!file && !source) throw new Error(copy.file)
       const sample_mapping: Record<string, string> = {}
       for (const line of mapping.split('\n').map((line) => line.trim()).filter(Boolean)) {
@@ -142,7 +153,9 @@ function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrume
       <div className="space-y-5 p-4">
         <p className="max-w-3xl text-sm text-text-secondary">{previewOnly ? (language === 'zh' ? '先预览仪器导出文件与拟合结果。只有选择项目并点击保存后，才记录原始文件、分析结果及后续人工质控。' : 'Preview an instrument export and its fitted results. The source file and analysis are recorded only after you select a project and save; you can then record a human quality review.') : copy.intro}</p>
 
-        <fieldset disabled={run.isPending}>
+        {!canRun ? <p role="status" className="text-sm text-muted-foreground">{accessMessage}</p> : null}
+        {access.isError ? <Button type="button" variant="outline" onClick={() => void access.refetch()}>{language === 'zh' ? '重新检查实验权限' : 'Retry experiment access'}</Button> : null}
+        <fieldset disabled={run.isPending || !canRun}>
         <form
           onChange={() => { setAnalysed(null); run.reset() }}
           className="flex flex-wrap items-end gap-3"
@@ -288,7 +301,7 @@ function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrume
         {source ? <p className="break-all text-xs text-text-secondary">{language === 'zh' ? '新版本基于原始文件；替代分析记录' : 'New version from the preserved raw source; supersedes analysis'}: {source.resultId}</p> : null}
         {previewOnly && analysed && !analysed.record.experiment_result_id ? <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-text-secondary">{language === 'zh' ? '预览未保存。选择项目后可保存原始文件和分析结果。' : 'Unsaved preview. Choose a project to save the source file and analysis.'}</p>
-          <Button type="button" disabled={!projectId || run.isPending} onClick={() => run.mutate(true)}>{language === 'zh' ? '保存到所选项目' : 'Save to selected project'}</Button>
+          <Button type="button" disabled={!canSave || run.isPending} onClick={() => run.mutate(true)}>{language === 'zh' ? '保存到所选项目' : 'Save to selected project'}</Button>
         </div> : null}
 
         {run.error ? (
@@ -297,7 +310,8 @@ function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrume
           </p>
         ) : null}
 
-        {projectId && !previewOnly ? <SavedInstrumentReviews key={projectId} projectId={projectId} onReanalyse={(saved, label) => {
+        {projectId && !previewOnly ? <SavedInstrumentReviews key={projectId} projectId={projectId} onReanalyse={canSave ? (saved, label) => {
+          if (!canSave) return
           setCandidate({ projectId, value: saved.record.candidate_id ?? '' }); setInstrument(saved.instrument); setFile(null); setSource({ artifactId: saved.record.source_artifact_id, resultId: saved.record.experiment_result_id, label }); setAnalysed(null); run.reset()
           if (saved.instrument === 'bli') {
             setSampleId(saved.summary.sample_id); setTAssoc(String(saved.summary.phase?.t_assoc ?? '')); setTDissoc(String(saved.summary.phase?.t_dissoc ?? ''))
@@ -311,7 +325,7 @@ function InstrumentAnalysisPanel({ projectId = '', previewOnly = false, instrume
           if (saved.instrument === 'akta') setChannel(saved.summary.channel)
           if (saved.instrument === 'enzyme') setSubtractBackground(saved.summary.background_subtracted)
           fileInput.current?.closest('section')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
-        }} /> : null}
+        } : undefined} /> : null}
         {analysed ? <AnalysisResult analysed={analysed} projectId={analysed.savedProjectId} onReviewed={(record) => setAnalysed((current) => current?.record.experiment_result_id === record.experiment_result_id ? { ...current, record } : current)} /> : null}
       </div>
     </Frame>

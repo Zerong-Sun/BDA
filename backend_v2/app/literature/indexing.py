@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .evidence_packets import extract_packet
 from .models import LiteratureChunk, LiteratureClaim, LiteratureDocument, LiteratureEvidence
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?。！？])\s+")
@@ -67,6 +68,7 @@ def extract_europe_pmc_full_text(xml_bytes: bytes) -> tuple[list[str], dict[str,
         "license_text": license_text[:2000],
         "content_checksum_sha256": hashlib.sha256(xml_bytes).hexdigest(),
         "content_kind": content_kind,
+        "evidence_packet": extract_packet(xml_bytes),
     }
 
 

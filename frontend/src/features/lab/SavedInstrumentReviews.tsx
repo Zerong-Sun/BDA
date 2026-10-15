@@ -42,12 +42,13 @@ function SavedAnalysisTitle({ item }: { item: SavedAnalysis }) {
   </span>
 }
 
-export function SavedInstrumentReviews({ projectId, onReanalyse, autoLoad = false }: { projectId: string; autoLoad?: boolean; onReanalyse?: (analysis: InstrumentAnalysisData, label: string) => void }) {
+export function SavedInstrumentReviews({ projectId, candidateId, onReanalyse, autoLoad = false }: { projectId: string; candidateId?: string | null; autoLoad?: boolean; onReanalyse?: (analysis: InstrumentAnalysisData, label: string) => void }) {
   const { language } = useI18n()
   const copy = (cn: string, en: string) => language === 'zh' ? cn : en
   const [items, setItems] = useState<Awaited<ReturnType<typeof listSavedInstrumentAnalyses>>['items']>([])
   const [cursor, setCursor] = useState<string | null | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
+  const visibleItems = candidateId ? items.filter((item) => item.record.candidate_id === candidateId) : items
   const load = useMutation({
     mutationFn: (restart: boolean) => listSavedInstrumentAnalyses(projectId, restart ? undefined : cursor ?? undefined),
     onSuccess: (data, restart) => {
@@ -65,8 +66,8 @@ export function SavedInstrumentReviews({ projectId, onReanalyse, autoLoad = fals
     {!loaded || cursor ? <Button type="button" variant="outline" disabled={load.isPending} onClick={() => load.mutate(false)}>{loaded ? copy('继续读取实验记录', 'Load more experiment records') : copy('读取已保存结果', 'Load saved results')}</Button> : null}
     {loaded && <Button type="button" variant="outline" disabled={load.isPending} onClick={() => load.mutate(true)}>{copy('刷新结果和审阅状态', 'Refresh results and reviews')}</Button>}
     {load.error && <p role="alert" className="text-sm text-destructive">{load.error instanceof Error ? load.error.message : String(load.error)}</p>}
-    {loaded && !items.length && <p className="text-sm text-text-secondary">{cursor ? copy('已读页面中没有仪器分析，可继续读取。', 'No instrument analyses on the loaded pages; continue loading.') : copy('当前项目没有已保存的仪器分析。', 'No saved instrument analyses in this project.')}</p>}
-    {items.map((item) => <Disclosure key={item.record.experiment_result_id} title={<SavedAnalysisTitle item={item} />}>
+    {loaded && !visibleItems.length && <p className="text-sm text-text-secondary">{candidateId ? (cursor ? copy('已读页面中没有此候选的分析，可继续读取。', 'No analyses for this candidate on the loaded pages; continue loading.') : copy('没有明确关联此候选的仪器分析。可清除筛选查看项目全部记录。', 'No instrument analyses are linked to this candidate. Clear the filter to review all project records.')) : cursor ? copy('已读页面中没有仪器分析，可继续读取。', 'No instrument analyses on the loaded pages; continue loading.') : copy('当前项目没有已保存的仪器分析。', 'No saved instrument analyses in this project.')}</p>}
+    {visibleItems.map((item) => <Disclosure key={item.record.experiment_result_id} title={<SavedAnalysisTitle item={item} />}>
       <p className="mb-2 text-sm">{item.record.experiment_type} · {item.record.value ?? '—'} {item.record.unit} · {item.record.analysis_version}</p>
       {item.analysis ? <AnalysisResult projectId={projectId} analysed={{ ...item.analysis, record: item.record }} onReviewed={(record) => setItems((current) => current.map((saved) => saved.record.experiment_result_id === record.experiment_result_id ? { ...saved, record: { ...record, version: record.version ?? saved.record.version, qc_review: record.qc_review ?? null } } : saved))} /> : <>
         <AnalysisProvenance record={item.record} summary={{}} />

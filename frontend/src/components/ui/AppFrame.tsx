@@ -28,7 +28,7 @@ export function AppFrame({
   ...props
 }: AppFrameProps) {
   return (
-    <Frame className={cn('min-w-0', className)} {...props}>
+    <Frame dense className={cn('min-w-0', className)} {...props}>
       <FramePanel className={cn('min-w-0', panelClassName)}>
         {heading || description || actions ? (
           <FrameHeader className="flex-row items-start justify-between gap-3">

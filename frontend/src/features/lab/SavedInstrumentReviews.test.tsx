@@ -8,6 +8,24 @@ import { listSavedInstrumentAnalyses } from '../../lib/api/wetlab'
 vi.mock('../../lib/api/wetlab', () => ({ listSavedInstrumentAnalyses: vi.fn(), reviewInstrumentAnalysis: vi.fn() }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
+it('filters instrument evidence by candidate without hiding pagination or treating unlinked records as matches', async () => {
+  const record = { experiment_result_id: 'r', experiment_type: 'bli_affinity', value: 5, unit: 'nM', source_artifact_id: 'a', analysis_version: 'old', version: 1, qc_review: null }
+  vi.mocked(listSavedInstrumentAnalyses).mockResolvedValue({ next_cursor: 'next', items: [
+    { label: 'linked.csv', quality: null, analysis: null, summaryError: null, record: { ...record, candidate_id: 'a' } },
+    { label: 'unlinked.csv', quality: null, analysis: null, summaryError: null, record: { ...record, experiment_result_id: 'unlinked', candidate_id: null } },
+  ] })
+  const client = new QueryClient()
+  const view = render(<QueryClientProvider client={client}><SavedInstrumentReviews projectId="p" candidateId="b" autoLoad /></QueryClientProvider>)
+  expect(await screen.findByText('No analyses for this candidate on the loaded pages; continue loading.')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Load more experiment records' })).toBeEnabled()
+  expect(screen.queryByText(/unlinked.csv/)).not.toBeInTheDocument()
+  view.rerender(<QueryClientProvider client={client}><SavedInstrumentReviews projectId="p" candidateId="a" autoLoad /></QueryClientProvider>)
+  expect(await screen.findByRole('button', { name: 'linked.csv · unreviewed · r' })).toBeVisible()
+  expect(screen.queryByText(/unlinked.csv/)).not.toBeInTheDocument()
+  view.rerender(<QueryClientProvider client={client}><SavedInstrumentReviews projectId="p" autoLoad /></QueryClientProvider>)
+  expect(await screen.findByRole('button', { name: 'unlinked.csv · unreviewed · unlinked' })).toBeVisible()
+})
+
 it('loads saved analyses on request and explicitly reads further experiment pages', async () => {
   vi.mocked(listSavedInstrumentAnalyses)
     .mockResolvedValueOnce({ next_cursor: 'next', items: [] })

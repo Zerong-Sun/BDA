@@ -357,6 +357,36 @@ _register(
 )
 
 
+def _get_reference_evidence_packet(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    if ctx.allowed_kinds is not None and not ({"literature_evidence", "literature_excerpt", "reference"} & ctx.allowed_kinds):
+        raise ValueError("research_kind_not_enabled")
+    return ctx.research.get_reference_evidence_packet(
+        _arg_str(args, "reference_id"), section=_arg_str(args, "section", "arguments"),
+        offset=_arg_int(args, "offset", 0), limit=_arg_int(args, "limit", 5),
+        revision=_arg_str(args, "revision", "current"),
+    )
+
+
+_register(ToolSpec(
+    id="get_reference_evidence_packet",
+    citation="literature_packet",
+    description=("Read a bounded page of project arguments, original figures/captions, table cells, "
+                 "reported quantitative data, supplement inventory or source passages for one paper. "
+                 "Read every relevant section and follow read_window.next_offset. Missing or unreviewed "
+                 "content is a gap, not a negative result. Figure captions do not mean pixels or supplements "
+                 "were reviewed. Values require source anchors, units, conditions and uncertainty. "
+                 "A newer source revision does not overwrite curated current evidence."),
+    parameters={"type": "object", "properties": {
+        "reference_id": {"type": "string"},
+        "section": {"type": "string", "enum": ["arguments", "figures", "tables", "data", "supplements", "passages"]},
+        "revision": {"type": "string", "enum": ["current", "latest"]},
+        "offset": {"type": "integer", "minimum": 0}, "limit": _limit(20, 5),
+    }, "required": ["reference_id", "section"], "additionalProperties": False},
+    capability="research-read", execution_mode="read", requires="research",
+    handler=_get_reference_evidence_packet,
+))
+
+
 # --- Writes ------------------------------------------------------------------
 # Each requires the user to have asked, in their own words, this turn.
 
@@ -630,6 +660,28 @@ _register(
         ),
     )
 )
+
+_register(ToolSpec(
+    id="save_literature_analysis",
+    description=("Save a pending-review evidence analysis for one paper, after reading its evidence packet. "
+                 "analysis_json is a JSON object containing project_relevance, paper_claim; arguments "
+                 "(project_argument, paper_claim, relation supports/contradicts/context/insufficient, "
+                 "interpretation, limitations, source_ids); data (measure, value, unit, condition, comparator, "
+                 "n, uncertainty, source_id, source_quote); figure_notes (id, panels, use, limits); and gaps. "
+                 "Use null for unreported data fields. Values and quotes must occur verbatim at the saved "
+                 "source_id. Existing evidence cards and prior analysis versions are preserved."),
+    parameters={"type": "object", "properties": {
+        "document_id": {"type": "string"}, "expected_version": {"type": "integer", "minimum": 1},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "analysis_json": {"type": "string", "maxLength": 80000},
+    }, "required": ["document_id", "expected_version", "source_sha256", "analysis_json"], "additionalProperties": False},
+    capability="knowledge-authoring", execution_mode="draft", requires="actions", audit=True,
+    defer_with=("get_reference_evidence_packet", "get_reference_content"),
+    handler=lambda ctx, args: ctx.actions.save_literature_analysis(
+        _arg_str(args, "document_id"), _arg_int(args, "expected_version", 0),
+        _arg_str(args, "source_sha256"), _arg_str(args, "analysis_json"),
+    ),
+))
 
 _register(
     ToolSpec(

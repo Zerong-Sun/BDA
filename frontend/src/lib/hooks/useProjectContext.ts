@@ -4,6 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { listProjects } from '../api/projects'
 import { useAppStore } from '../store/appStore'
 
+// Keep view preferences, but never carry another project's evidence or draft.
+const PROJECT_SELECTION_PARAMS = ['run', 'node', 'candidate', 'dataset', 'structureA', 'structureB', 'compare', 'artifact', 'residues', 'knowledge', 'goal', 'draft', 'draft_project', 'service', 'from']
+
 export function useProjectContext() {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeProjectId = useAppStore((state) => state.activeProjectId)
@@ -50,7 +53,7 @@ export function useProjectContext() {
   const staleActiveProject = Boolean(projectsReady && activeProjectId && !projectIds.has(activeProjectId))
 
   const projectId = useMemo(() => {
-    if (urlProjectId && projectIds.has(urlProjectId)) return urlProjectId
+    if (urlProjectId) return projectIds.has(urlProjectId) ? urlProjectId : ''
     if (activeProjectId && projectIds.has(activeProjectId)) return activeProjectId
     return ''
   }, [activeProjectId, projectIds, urlProjectId])
@@ -63,10 +66,11 @@ export function useProjectContext() {
   useEffect(() => {
     if (!projectsReady) return
     if (!staleUrlProject && !staleActiveProject) return
-    if (staleActiveProject && !projectId) setActiveProjectId('')
+    if (staleUrlProject || (staleActiveProject && !projectId)) setActiveProjectId('')
     if (staleUrlProject) {
       const next = new URLSearchParams(searchParams)
       next.delete('project')
+      for (const key of PROJECT_SELECTION_PARAMS) next.delete(key)
       setSearchParams(next, { replace: true })
     }
   }, [
@@ -85,7 +89,7 @@ export function useProjectContext() {
     setActiveProjectId(nextProjectId)
     const next = new URLSearchParams(searchParams)
     if (nextProjectId !== projectId) {
-      for (const key of ['run', 'node', 'candidate', 'dataset', 'structureA', 'structureB', 'compare']) next.delete(key)
+      for (const key of PROJECT_SELECTION_PARAMS) next.delete(key)
     }
     if (nextProjectId) next.set('project', nextProjectId)
     else next.delete('project')

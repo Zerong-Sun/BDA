@@ -211,6 +211,10 @@ _ACTION_REQUEST_TERMS = {
 
 
 _ACTION_REQUEST_TERMS.update({
+    "save_literature_analysis": {
+        "domains": {"literature", "paper", "papers", "文献", "论文"},
+        "verbs": {"search", "find", "extract", "analyze", "save", "检索", "查找", "找", "提取", "分析", "整理", "保存"},
+    },
     "promote_candidate_to_bench": {"domains": {"candidate", "construct", "候选", "构建体"}, "verbs": {"promote", "register", "纳入", "登记", "注册", "转入"}},
     "analyse_bli_run": {"domains": {"bli"}, "verbs": {"analyse", "analyze", "fit", "分析", "拟合"}},
     "analyse_akta_run": {"domains": {"akta"}, "verbs": {"analyse", "analyze", "分析"}},
@@ -566,6 +570,46 @@ class CopilotActionService:
             )
 
         return self._once("start_druggability_assessment", payload, execute)
+
+    def save_literature_analysis(self, document_id: str, expected_version: int, source_sha256: str, analysis_json: str) -> dict[str, Any]:
+        self._require_explicit("save_literature_analysis")
+        from ..audit.service import record_audit
+        from ..literature.evidence_packets import anchored_analysis
+        from ..literature.models import LiteratureDocument
+        from ..projects.service import require_project_permission
+
+        require_project_permission(self.session, self.project.id, self.user, "write")
+        payload = {"document_id": document_id, "expected_version": expected_version,
+                   "source_sha256": source_sha256, "analysis_json": analysis_json}
+
+        def execute() -> dict[str, Any]:
+            document = self.session.scalar(select(LiteratureDocument).where(
+                LiteratureDocument.id == uuid.UUID(document_id), LiteratureDocument.project_id == self.project.id,
+            ).with_for_update())
+            if document is None or document.version != expected_version:
+                raise ValueError("literature_document_missing_or_version_changed")
+            metadata = dict(document.metadata_json or {})
+            packet = dict(metadata.get("evidence_packet") or {})
+            if not source_sha256 or packet.get("source_sha256") != source_sha256:
+                raise ValueError("literature_source_snapshot_changed")
+            analysis = anchored_analysis(packet, json.loads(analysis_json))
+            if packet.get("analysis"):
+                packet["analysis_history"] = [*(packet.get("analysis_history") or []), packet["analysis"]]
+            packet["analysis"] = {**analysis, "source_message_id": str(self.source_message_id)}
+            packet["data"] = analysis["data"]
+            packet["gaps"] = [g for g in packet.get("gaps", []) if g not in {
+                "project_argument_mapping_pending", "quantitative_interpretation_pending", "existing_argument_figure_data_mapping_pending",
+            }]
+            packet["gaps"] = list(dict.fromkeys([*packet["gaps"], *analysis["gaps"]]))
+            document.metadata_json = {**metadata, "evidence_packet": packet}
+            document.version += 1
+            record_audit(self.session, action="literature.analysis.save", entity_type="literature_document", entity_id=document.id,
+                         project_id=self.project.id, organization_id=self.project.organization_id, actor_id=self.user.id,
+                         payload={"author_type": "agent", "source_sha256": source_sha256, "review_status": "pending_review"})
+            self.session.flush()
+            return {"document_id": str(document.id), "version": document.version, "status": "pending_review", "data_count": len(analysis["data"])}
+
+        return self._once("save_literature_analysis", payload, execute)
 
     def create_knowledge_draft(
         self,

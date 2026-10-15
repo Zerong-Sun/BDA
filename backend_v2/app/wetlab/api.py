@@ -12,6 +12,7 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..projects.service import require_project, require_project_permission
+from .access import calculator_user
 from .analysis import analyse_akta, analyse_bli, analyse_enzyme
 from .bench import calculate
 from .bench_schemas import BenchCalculationInput, BenchCalculationResult
@@ -176,9 +177,9 @@ def patch_protein(
     openapi_extra={"x-permission": "wetlab.calculate", "x-read-only": True},
 )
 def post_bench_calculation(
-    payload: BenchCalculationInput, user: User = Depends(current_user),
+    payload: BenchCalculationInput, user: User | None = Depends(calculator_user),
 ) -> BenchCalculationResult:
-    """Authenticated pure calculation; POST keeps sequences out of URL histories.
+    """Pure calculation; Public visitors need no account. Private requires login.
 
     No result, supplied sequence or project record is persisted. Viewer accounts
     may use this endpoint; it does not authorize any mutation.
@@ -219,7 +220,7 @@ def get_unit_conversion(
     from_unit: str = Query(max_length=10),
     to_unit: str = Query(max_length=10),
     molecular_weight: float | None = Query(default=None, gt=0),
-    user: User = Depends(current_user),
+    user: User | None = Depends(calculator_user),
 ) -> UnitConversionResult:
     return convert_units(
         UnitConversionRequest(value=value, from_unit=from_unit, to_unit=to_unit, molecular_weight=molecular_weight)
@@ -234,7 +235,7 @@ def get_dilution_series(
     n_steps: int = Query(ge=1, le=24),
     vol_per_well_uL: float = Query(gt=0),
     extra_dead_vol_uL: float = Query(default=0.0, ge=0),
-    user: User = Depends(current_user),
+    user: User | None = Depends(calculator_user),
 ) -> DilutionResult:
     return dilution_series(
         DilutionRequest(

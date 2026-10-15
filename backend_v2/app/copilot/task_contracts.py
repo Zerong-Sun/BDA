@@ -25,13 +25,14 @@ SERVICES: dict[str, dict] = {
     },
     "literature": {
         "title": "Research the evidence", "title_zh": "调研与比较证据",
-        "deliverable": "Search scope, traced excerpts, disagreements and evidence gaps",
-        "deliverable_zh": "检索范围、来源片段、证据分歧与缺口；可选保存待审核笔记",
+        "deliverable": "Per-paper project arguments, traced evidence, figures, quantitative data and gaps",
+        "deliverable_zh": "逐篇提取项目论点、原文论据、图表、定量数据与局限；保留明确缺口",
         "capabilities": ["project-read", "research-read", "knowledge-authoring", "literature-search"],
-        "write_tools": ["start_literature_search", "create_knowledge_draft"],
+        "write_tools": ["start_literature_search", "create_knowledge_draft", "save_literature_analysis"],
         "steps": [
             _step("discovery", "Find evidence", "发现相关文献", ["search_research"]),
-            _step("excerpts", "Read traced excerpts", "读取可追溯正文或摘要", ["get_reference_content"]),
+            _step("excerpts", "Read traced excerpts", "读取可追溯正文或摘要", ["get_reference_content", "get_reference_evidence_packet"]),
+            _step("evidence_packet", "Read figures and data", "逐篇读取图表与数据证据包", ["get_reference_evidence_packet"]),
         ],
     },
     "planning": {
@@ -65,7 +66,7 @@ SERVICES: dict[str, dict] = {
 
 DELIVERY_SECTIONS = {
     "brief": ["objective", "constraints", "success_criteria", "missing_inputs"],
-    "literature": ["search_scope", "evidence_comparison", "disagreements", "limitations"],
+    "literature": ["search_scope", "evidence_comparison", "per_paper_arguments", "figures_and_data", "disagreements", "limitations"],
     "planning": ["route_comparison", "inputs", "risks", "next_step"],
     "execution": ["current_state", "blockers", "recovery"],
     "interpretation": ["observations", "limitations", "hypotheses", "next_round"],
@@ -97,7 +98,9 @@ def build_contract(kind: str, writes: list[str]) -> dict:
             steps[0] = _step("discovery", "Search external literature", "执行外部文献检索", ["start_literature_search"])
         if "create_knowledge_draft" in writes:
             steps.append(_step("note", "Save a review draft", "保存待审核笔记", ["create_knowledge_draft"]))
-    return {"version": 1, "required_sections": DELIVERY_SECTIONS.get(kind, []), "service_kind": kind, "authorized_writes": sorted(writes), "steps": steps,
+        if "save_literature_analysis" in writes:
+            steps.append(_step("save_evidence", "Save per-paper analysis", "保存逐篇论点、图表和数据", ["save_literature_analysis"]))
+    return {"version": 2 if kind == "literature" else 1, "required_sections": DELIVERY_SECTIONS.get(kind, []), "service_kind": kind, "authorized_writes": sorted(writes), "steps": steps,
             "deliverable": service["deliverable"] if service else "Reviewable answer to the stated goal",
             "deliverable_zh": service["deliverable_zh"] if service else "针对目标的可审核答复",
             "submission_policy": "human_confirmation"}
@@ -219,15 +222,61 @@ def pending_source_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
             if source["observed_has_more"] and not source["coverage_complete"]]
 
 
+def evidence_packet_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Track each paper and section actually read, including explicit empty lists."""
+    groups: dict[tuple[str, str], dict] = {}
+    required = {"arguments", "figures", "tables", "data", "supplements"}
+    for record in tool_records(turns):
+        r = record["result"]
+        if record["tool"] != "get_reference_evidence_packet" or not record["successful"] or not isinstance(r, dict) or not r.get("source_sha256"):
+            continue
+        key = (str(r.get("document_id")), str(r["source_sha256"]))
+        if key not in groups or groups[key].get("document_version") != r.get("document_version"):
+            groups[key] = {"document_id": key[0], "source_sha256": key[1], "document_version": r.get("document_version"), "sections": {}, "gaps": []}
+        group = groups[key]
+        section, window = r.get("section"), r.get("read_window") or {}
+        evidence_gaps = r.get("gaps") or []
+        if (not isinstance(window, dict) or not isinstance(r.get("items"), list)
+                or not isinstance(evidence_gaps, list) or any(not isinstance(g, str) for g in evidence_gaps)):
+            continue
+        offset, count, total = window.get("offset"), window.get("returned_count"), window.get("total_count")
+        if (not isinstance(section, str) or section not in required or type(offset) is not int or type(count) is not int or type(total) is not int
+                or min(offset, count, total) < 0 or offset + count > total
+                or count != len(r.get("items") or [])):
+            continue
+        slot = group["sections"].setdefault(section, {"totals": set(), "positions": set()})
+        slot["totals"].add(total)
+        slot["positions"].update(range(offset, offset + count))
+        group["gaps"].extend(evidence_gaps)
+    output = []
+    for group in groups.values():
+        complete = []
+        for section, slot in group.pop("sections").items():
+            # Positions have already been bounded to [0, total). Avoid allocating
+            # a potentially huge range for malformed source metadata.
+            if len(slot["totals"]) == 1 and len(slot["positions"]) == next(iter(slot["totals"])):
+                complete.append(section)
+        group["missing_sections"] = sorted(required - set(complete))
+        group["read_sections"] = sorted(complete)
+        group["gaps"] = list(dict.fromkeys(group["gaps"]))
+        output.append(group)
+    return output
+
+
 def progress(contract: dict, turns: list[CopilotAgentTurn]) -> list[dict]:
     records = tool_records(turns)
     rows = []
     for step in contract.get("steps", []):
         matches = [r for r in records if r["tool"] in step["tools"] and r["successful"]]
         if step["id"] == "excerpts":
-            matches = [r for r in matches if _has_excerpt(r["result"])]
+            matches = [r for r in matches if _has_excerpt(r["result"]) or (
+                isinstance(r["result"], dict) and r["result"].get("schema") == "literature-evidence-packet-v1"
+                and r["result"].get("section") == "passages" and r["result"].get("source_sha256")
+                and r["result"].get("retrieval_trace_id") and r["result"].get("items"))]
         if step["id"] == "results":
             matches = [r for r in matches if isinstance(r["result"], list) and r["result"] or isinstance(r["result"], dict) and r["result"].get("items")]
+        if step["id"] == "evidence_packet":
+            matches = [r for r in matches if isinstance(r["result"], dict) and r["result"].get("schema") == "literature-evidence-packet-v1" and r["result"].get("source_sha256")]
         rows.append({**step, "status": "completed" if matches else "pending", "evidence_call_ids": [r["call_id"] for r in matches]})
     return rows
 
@@ -282,6 +331,19 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     gaps += [key for key in (run.task_contract or {}).get("required_sections", []) if key not in sections]
     status = data["status"]
     checks = []
+    # New contracts require per-paper figure/data coverage. Historical contracts
+    # retain their original acceptance rule rather than becoming retroactively incomplete.
+    if any(step.get("id") == "evidence_packet" for step in (run.task_contract or {}).get("steps", [])):
+        coverage = evidence_packet_coverage(turns)
+        for paper in coverage:
+            if paper["missing_sections"]:
+                gaps.append(f"paper_sections_unread:{paper['document_id']}:{','.join(paper['missing_sections'])}")
+            if paper["gaps"]:
+                gaps.append(f"paper_evidence_gaps:{paper['document_id']}")
+        known = {p["document_id"] for p in coverage}
+        for paper in source_coverage(turns):
+            if paper["document_id"] not in known:
+                gaps.append(f"paper_evidence_packet_unread:{paper['document_id']}")
     if invalid_sections:
         checks.append("invalid_section_values")
     if invalid:
@@ -306,6 +368,7 @@ def task_view(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> dict:
     result["steps"] = progress(run.task_contract or {}, turns)
     if (run.task_contract or {}).get("service_kind") == "literature":
         result["source_coverage"] = source_coverage(turns)
+        result["evidence_packet_coverage"] = evidence_packet_coverage(turns)
     records = tool_records(turns)
     result["evidence"] = [{"call_id": r["call_id"], "tool": r["tool"], "successful": r["successful"]} for r in records]
     result["deliverables"] = [

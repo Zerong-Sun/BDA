@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from ..core.database import SessionFactory, get_session, set_request_rls_context
 from ..core.problem import DomainError
 from .models import User
+from .public_workspace import public_workspace_user
 from .repository import IdentityRepository
 from .service import decode_access_token
 
@@ -38,12 +39,16 @@ def _resolve_user(
 def current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     session: Session = Depends(get_session),
+    *, request: Request,
 ) -> User:
+    if credentials is None:
+        return public_workspace_user(request, session)
     return _resolve_user(credentials, session)
 
 
 def streaming_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    *, request: Request,
 ) -> User:
     """Authenticate before a stream is created without retaining a request UoW.
 
@@ -54,7 +59,7 @@ def streaming_user(
     """
 
     with SessionFactory() as session:
-        user = _resolve_user(credentials, session)
+        user = _resolve_user(credentials, session) if credentials else public_workspace_user(request, session)
         session.expunge(user)
         return user
 

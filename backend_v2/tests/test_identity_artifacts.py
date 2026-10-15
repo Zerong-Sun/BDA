@@ -109,24 +109,26 @@ def test_password_at_bcrypt_byte_limit_still_authenticates(service_session) -> N
 
 
 def test_authentication_dependencies_enforce_roles(monkeypatch, service_session) -> None:
+    from starlette.requests import Request
+    request = Request({"type": "http", "method": "GET", "path": "/"})
     session, user, _ = service_session
     with pytest.raises(DomainError, match="required"):
-        identity_deps.current_user(None, session)
+        identity_deps.current_user(None, session, request=request)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
     monkeypatch.setattr(identity_deps, "decode_access_token", lambda token: {"sub": str(user.id)})
-    assert identity_deps.current_user(credentials, session).id == user.id
+    assert identity_deps.current_user(credentials, session, request=request).id == user.id
     monkeypatch.setattr(identity_deps, "SessionFactory", lambda: nullcontext(session))
-    assert identity_deps.streaming_user(credentials).id == user.id
+    assert identity_deps.streaming_user(credentials, request=request).id == user.id
     session.add(user)
     monkeypatch.setattr(identity_deps, "decode_access_token", lambda token: {"sub": "bad"})
     with pytest.raises(DomainError, match="subject"):
-        identity_deps.current_user(credentials, session)
+        identity_deps.current_user(credentials, session, request=request)
     monkeypatch.setattr(identity_deps, "decode_access_token", lambda token: {"sub": str(user.id)})
     user.enabled = False
     session.add(user)
     session.commit()
     with pytest.raises(DomainError, match="unavailable"):
-        identity_deps.current_user(credentials, session)
+        identity_deps.current_user(credentials, session, request=request)
     user.enabled = True
     user.role = "viewer"
     with pytest.raises(DomainError, match="read-only"):

@@ -45,6 +45,24 @@ def citations_for(
     policy = getattr(spec, "citation", "none")
     if policy == "none" or result is None:
         return []
+    if policy == "literature_packet":
+        if not isinstance(result, dict) or not result.get("source_sha256") or not result.get("items"):
+            return []
+        window = result.get("read_window") or {}
+        return [{
+            "source_type": "scientific_literature", "workspace_type": "literature_packet",
+            "document_id": result["document_id"],
+            "entity_id": f"{result['document_id']}:{result.get('section')}:{window.get('offset')}:{result.get('window_sha256')}",
+            "label": result.get("title"), "url": result.get("source_url"),
+            "content_kind": result.get("content_kind"), "content_checksum_sha256": result["source_sha256"],
+            "retrieval_trace_id": result.get("retrieval_trace_id"),
+            "raw_content_artifact_id": result.get("raw_content_artifact_id"),
+            "archive_artifact_id": result.get("archive_artifact_id"),
+            "window_sha256": result.get("window_sha256"), "packet_section": result.get("section"),
+            "packet_offset": window.get("offset", 0), "packet_limit": window.get("returned_count", 5),
+            "packet_revision": result.get("revision", "current"),
+            "review_status": result.get("analysis_status"),
+        }]
     if policy == "project_items" and project_context is not None:
         return [project_context.citation_for_item(item) for item in result]
     if policy == "project_compute" and project_context is not None:

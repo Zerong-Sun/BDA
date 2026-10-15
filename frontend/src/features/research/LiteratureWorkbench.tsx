@@ -12,6 +12,7 @@ import { EvidenceNoteCard } from './EvidenceNoteCard'
 import { EvidenceNoteEditor } from './EvidenceNoteEditor'
 import { EvidenceSourceRetrieval } from './EvidenceSourceRetrieval'
 import { LiteratureSourceDetails } from './LiteratureSourceDetails'
+import { LiteratureEvidencePacket } from './LiteratureEvidencePacket'
 import { citationValueLabel, safeCitationUrl } from './citationMarkers'
 import { argumentKey, evidenceMarkdown, evidenceRelations, noteMatches, referenceUrl, relationLabel, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
 import { citationBibliography, downloadEvidenceFile, evidenceAnnotations } from './evidenceExports'
@@ -99,6 +100,7 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
             {canWrite ? <Button type="button" variant="outline" onClick={() => setEditor({ reference: selected })}>{zh ? '添加论点与原文' : 'Add argument & passage'}</Button> : null}</div>
           {canWrite ? <EvidenceSourceRetrieval key={`retrieve-${selected.document_id}`} projectId={projectId} reference={selected} /> : null}
           <LiteratureSourceDetails key={`source-${selected.document_id}`} projectId={projectId} documentId={selected.document_id} metadata={selected.metadata ?? {}} abstract={selected.abstract} />
+          <LiteratureEvidencePacket key={`evidence-packet-${selected.document_id}`} documentId={selected.document_id} metadata={selected.metadata ?? {}} />
         </div>
         {displayedNotes.map(card)}
         {complete && !displayedNotes.length ? <div className="border border-dashed p-6"><h4 className="font-medium">{hasNote(selected.document_id) ? (zh ? '没有符合筛选条件的论据' : 'No evidence matches this filter') : (zh ? '这篇文献还没有形成项目论据' : 'This paper has no project evidence card yet')}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{zh ? '已有题录或自动拆句仍需整理。请选出所需原文，写清它支持或限制哪个论点，以及适用条件。' : 'Bibliographic records and extracted sentences still need interpretation. Select a passage, identify the argument it supports or limits, and record its conditions.'}</p></div> : null}

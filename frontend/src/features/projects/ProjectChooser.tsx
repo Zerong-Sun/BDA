@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleNotch, Flask, FolderPlus, MagicWand, Trash } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/reui/alert'
@@ -162,11 +164,12 @@ export function ProjectChooser({
             type="button"
             variant="outline"
             className="self-end"
-            disabled={viewer || appMode === 'demo'}
-            onClick={() => setCreating(true)}
+            disabled={(viewer || appMode === 'demo') && !isPublicVisitor()}
+            render={isPublicVisitor() ? <Link to="/account" /> : undefined}
+            onClick={isPublicVisitor() ? undefined : () => setCreating(true)}
           >
             <FolderPlus aria-hidden="true" />
-            {appMode === 'demo'
+            {isPublicVisitor() ? (language === 'zh' ? '在 Private 新建项目' : 'Create in Private') : appMode === 'demo'
               ? t.projects.projectChooser.readOnlyDemo
               : t.projects.projectChooser.createProject}
           </Button>

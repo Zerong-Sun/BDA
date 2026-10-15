@@ -10,6 +10,7 @@ from backend_v2.app.core.database import get_session
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.deps import current_user
 from backend_v2.app.identity.models import User
+from backend_v2.app.wetlab.access import calculator_user
 from backend_v2.app.wetlab.bench import AVOGADRO, calculate
 from backend_v2.app.wetlab.bench_schemas import BenchCalculationInput
 from backend_v2.app.wetlab.kernels.calculators import calc_dilution_series
@@ -194,6 +195,7 @@ def test_absorbance_negative_correction_zero_epsilon_and_underflow_are_explicit(
 def api():
     previous = dict(main.app.dependency_overrides)
     main.app.dependency_overrides[current_user] = lambda: User(id=uuid.uuid4(), username="viewer", role="viewer", enabled=True)
+    main.app.dependency_overrides[calculator_user] = main.app.dependency_overrides[current_user]
 
     def no_database_needed():
         yield None
@@ -219,6 +221,7 @@ def test_calculator_http_allows_viewer_without_project_or_database_write(api, mo
         assert api.post(path, json={}).status_code == 503
     assert api.patch("/api/v2/wetlab/calculations", json={}).status_code == 503
     main.app.dependency_overrides.pop(current_user)
+    main.app.dependency_overrides.pop(calculator_user)
     assert api.post("/api/v2/wetlab/calculations", json={"kind": "protein-properties", "sequence": "ACD"}).status_code == 401
 
 

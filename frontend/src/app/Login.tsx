@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button'
 import { BigoBioLogo } from '@/components/ui/BigoBioLogo'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { PasswordField } from '@/components/ui/PasswordField'
 import { WorkspacePortals } from '@/features/account/WorkspacePortals'
+import { PrivateAccessLinks } from '@/features/account/PrivateAccessLinks'
 import { loginApiV2AuthTokenPost, registerApiV2AuthRegisterPost, passwordResetApiV2AuthPasswordResetPost } from '@/lib/api/generated/sdk.gen'
 import '@/lib/api/generatedTransport'
 import { useI18n } from '@/lib/i18n'
@@ -32,16 +34,19 @@ function AuthPage({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [code, setCode] = useState('')
+  const [useInvitation, setUseInvitation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const invitation = config.data?.registration_mode === 'invite'
+  const invitation = config.data?.registration_mode === 'invite' || useInvitation
   const closed = config.data?.registration_mode === 'closed'
   const title = mode === 'login' ? t.signIn : mode === 'reset' ? t.recover : invitation ? t.invitedRegister : t.register
   const returnTo = safeReturnTo(params.get('returnTo'))
+  const publicPortal = config.data?.deployment_kind === 'public'
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (loading) return
+    if (publicPortal) return
     setError(null)
     if (mode !== 'login') {
       const problem = passwordProblem(password, confirmation, t)
@@ -78,11 +83,13 @@ function AuthPage({ mode }: { mode: Mode }) {
           <h1 className="whitespace-pre-line text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{t.hero}</h1>
           <p className="max-w-lg text-base leading-relaxed text-muted-foreground">{t.intro}</p>
           <WorkspacePortals config={config.data} />
+          <Link to="/public" className="w-fit text-sm font-medium text-primary underline underline-offset-4">{t.browsePublic}</Link>
           <p className="max-w-lg text-xs leading-relaxed text-muted-foreground">{t.isolation}</p>
         </section>
         <section className="w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8" aria-labelledby="auth-title">
           {config.data ? <p className="mb-3 font-mono text-xs uppercase tracking-widest text-primary">{config.data.deployment_kind === 'public' ? 'Public' : 'Private'}</p> : null}
-          <h2 id="auth-title" className="text-2xl font-semibold">{title}</h2>
+          <h2 id="auth-title" className="text-2xl font-semibold">{publicPortal ? t.privateTitle : title}</h2>
+          {publicPortal ? <div className="mt-6"><PrivateAccessLinks config={config.data} /></div> : <>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`} aria-current={mode === 'login' ? 'page' : undefined} className={mode === 'login' ? 'font-medium text-primary' : 'text-muted-foreground'}>{t.signIn}</Link>
             {config.data && !closed ? <Link to="/register" aria-current={mode === 'register' ? 'page' : undefined} className={mode === 'register' ? 'font-medium text-primary' : 'text-muted-foreground'}>{invitation ? t.invitedRegister : t.register}</Link> : null}
@@ -97,6 +104,7 @@ function AuthPage({ mode }: { mode: Mode }) {
               {mode === 'register' ? <p className="text-xs text-muted-foreground">{t.usernameHint}</p> : null}
             </div>}
             {mode === 'register' ? <div className="grid gap-2"><Label htmlFor="register-name">{t.displayName}</Label><Input id="register-name" value={displayName} onChange={event => setDisplayName(event.target.value)} autoComplete="nickname" required maxLength={160} /></div> : null}
+            {mode === 'register' && config.data?.registration_mode === 'open' ? <Label className="flex items-center gap-2 text-sm"><Checkbox checked={useInvitation} onCheckedChange={checked => { setUseInvitation(checked); setCode('') }} />{language === 'zh' ? '已有邀请码，加入现有团队' : 'I have an invitation to an existing team'}</Label> : null}
             {(mode === 'register' && invitation) || mode === 'reset' ? <div className="grid gap-2">
               <Label htmlFor="account-code">{mode === 'reset' ? t.recoveryCode : t.invitation}</Label>
               <Input id="account-code" value={code} onChange={event => setCode(event.target.value)} autoComplete="off" spellCheck={false} required maxLength={256} />
@@ -107,6 +115,7 @@ function AuthPage({ mode }: { mode: Mode }) {
             <Button type="submit" className="mt-2 w-full" disabled={loading || (mode === 'register' && (!config.data || closed))} aria-busy={loading}>{loading ? t.working : title}</Button>
             <Link to={mode === 'login' ? '/reset-password' : '/login'} className="text-center text-sm text-muted-foreground hover:text-primary">{mode === 'login' ? t.forgot : t.back}</Link>
           </form>}
+          </>}
         </section>
       </div>
     </div>

@@ -6,16 +6,16 @@ import { server } from '../test/mocks/handlers'
 import { useAppStore } from '../lib/store/appStore'
 import { LoginPage, RegisterPage, ResetPasswordPage } from './Login'
 import { AccountPage } from './Account'
-import { portalLoginUrl, safeReturnTo } from '../lib/auth/account'
+import { portalLoginUrl, portalUrl, safeReturnTo } from '../lib/auth/account'
 
-const config = { deployment_kind: 'public', registration_mode: 'open', realm: 'public', public_portal_url: 'http://localhost:5176', private_portal_url: 'http://localhost:5177' }
+const config = { deployment_kind: 'private', registration_mode: 'open', realm: 'private', public_portal_url: 'http://localhost:5176', private_portal_url: 'http://localhost:5177' }
 const user = { id: 'user-test', username: 'alice', display_name: 'Alice', role: 'researcher', version: 4, has_password: true }
 function field(name: string, value: string) { fireEvent.change(screen.getByLabelText(name, { exact: true }), { target: { value } }) }
 function passwords() { field('Password', 'Example-pass-123'); field('Confirm password', 'Example-pass-123') }
 afterEach(() => { sessionStorage.clear(); window.location.hash = ''; useAppStore.getState().setLanguage('en') })
 
 describe('account access', () => {
-  it('registers a public account without client-supplied role or organization', async () => {
+  it('registers a Private account without client-supplied role or organization', async () => {
     let body: unknown
     server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json(config)), http.post('*/api/v2/auth/register', async ({ request }) => { body = await request.json(); return HttpResponse.json({ access_token: 'new-access', user }) }))
     renderWithProviders(<RegisterPage />)
@@ -37,6 +37,29 @@ describe('account access', () => {
     fireEvent.submit(document.querySelector('form')!)
     expect(await screen.findByText('The passwords do not match.')).toBeVisible()
     expect(submit).not.toHaveBeenCalled()
+  })
+
+  it('lets a Private self-service user choose an existing team invitation', async () => {
+    let body: unknown
+    server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json(config)), http.post('*/api/v2/auth/register', async ({ request }) => { body = await request.json(); return HttpResponse.json({ access_token: 'invited-access', user }) }))
+    renderWithProviders(<RegisterPage />)
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'I have an invitation to an existing team' }))
+    field('Username', 'alice'); field('Display name', 'Alice'); passwords(); field('Invitation code', 'synthetic-invitation')
+    fireEvent.submit(document.querySelector('form')!)
+    await waitFor(() => expect(sessionStorage.getItem('bda_token')).toBe('invited-access'))
+    expect(body).toEqual({ username: 'alice', display_name: 'Alice', password: 'Example-pass-123', invitation_token: 'synthetic-invitation' })
+  })
+
+  it.each([LoginPage, RegisterPage])('routes Public account entry to Private and offers anonymous browsing', async Page => {
+    const submit = vi.fn(() => HttpResponse.json({}))
+    server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json({ ...config, deployment_kind: 'public', registration_mode: 'closed' })), http.post('*/api/v2/auth/register', submit))
+    renderWithProviders(<Page />)
+    expect(await screen.findByRole('link', { name: 'Create a Private account' })).toHaveAttribute('href', 'http://localhost:5177/#/register')
+    expect(screen.getByRole('link', { name: 'Sign in to Private' })).toHaveAttribute('href', 'http://localhost:5177/#/login')
+    expect(screen.getByRole('link', { name: 'View Public without an account' })).toHaveAttribute('href', '#/public')
+    expect(document.querySelector('form')).toBeNull()
+    expect(submit).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('bda_token')).toBeNull()
   })
 
   it('shows closed registration and disables registration when config is unavailable', async () => {
@@ -100,6 +123,18 @@ describe('portal navigation', () => {
   it.each(['https://evil.test', '//evil.test', '/\\evil.test', '/login', '/projects\nhttps://evil.test'])('rejects unsafe return path %s', value => expect(safeReturnTo(value)).toBe('/projects'))
   it('only constructs explicit trusted portal roots and never transfers query strings or credentials', () => {
     expect(portalLoginUrl('https://research.example.org')).toBe('https://research.example.org/#/login')
+    expect(portalUrl('https://research.example.org', 'public')).toBe('https://research.example.org/#/public')
+    expect(portalUrl('https://research.example.org', 'register')).toBe('https://research.example.org/#/register')
     for (const value of ['javascript:alert(1)', 'http://example.org', 'https://u:p@example.org', 'https://example.org/?token=secret']) expect(portalLoginUrl(value)).toBeNull()
   })
+})
+
+it('never loads the anonymous service identity as a personal account', async () => {
+  sessionStorage.setItem('bda_user', JSON.stringify({ public_visitor: true, role: 'viewer' }))
+  const loadAccount = vi.fn(() => HttpResponse.json(user))
+  server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json({ ...config, deployment_kind: 'public' })), http.get('*/api/v2/auth/account', loadAccount))
+  renderWithProviders(<AccountPage />)
+  expect(await screen.findByRole('link', { name: 'Create a Private account' })).toHaveAttribute('href', 'http://localhost:5177/#/register')
+  expect(loadAccount).not.toHaveBeenCalled()
+  expect(screen.queryByText('Alice')).not.toBeInTheDocument()
 })
