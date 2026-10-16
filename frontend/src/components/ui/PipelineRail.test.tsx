@@ -5,11 +5,13 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { PipelineRail } from './PipelineRail'
 import { getProjectOverview } from '../../lib/api/projects'
 
+let projectStatus = 'active'
+
 vi.mock('../../lib/hooks/useProjectContext', () => ({
   useProjectContext: () => ({
     projectId: 'proj_ready',
     hasProject: true,
-    activeProject: { id: 'proj_ready', name: 'Ready project' },
+    activeProject: { id: 'proj_ready', name: 'Ready project', status: projectStatus },
   }),
 }))
 
@@ -23,10 +25,20 @@ vi.mock('../../lib/api/projects', () => ({
 
 describe('PipelineRail route selection', () => {
   beforeEach(() => {
+    projectStatus = 'active'
+    vi.clearAllMocks()
     useAppStore.setState({ language: 'en' })
   })
 
   afterEach(cleanup)
+
+  it.each(['archived', 'completed'])('omits workflow execution progress on a %s research review', (status) => {
+    projectStatus = status
+    window.location.hash = '/research?project=proj_ready'
+    renderWithProviders(<PipelineRail />)
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(getProjectOverview).not.toHaveBeenCalled()
+  })
 
   it('opens imported results and lab records when the target is not ready, without marking research done', async () => {
     vi.mocked(getProjectOverview).mockResolvedValueOnce({ target_readiness: { ready_for_workflow: false },

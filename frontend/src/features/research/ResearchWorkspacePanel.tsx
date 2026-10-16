@@ -199,9 +199,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   })
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 [&>*]:min-w-0">
-      <Frame>
-        <FramePanel>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div aria-label={language === 'zh' ? '资料概况' : 'Workspace contents'} className="flex flex-wrap items-center justify-between gap-2 border-b border-border-soft pb-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-accent">{workspace.project.source_project_key || workspace.project.project_type}</p>
 
@@ -213,21 +211,19 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
             <Badge variant="secondary">{format(w.targetsCount, { count: workspace.research_targets.length })}</Badge>
             <Badge variant="secondary">{format(w.structuresCount, { count: workspace.structures.length })}</Badge>
           </div>
-        </div>
-        </FramePanel>
-      </Frame>
+      </div>
 
       {view === 'evidence' ? (
         <>
           {workspace.review_document ? (
             <Disclosure className="science-document" title={w.reviewTitle}>
               <div>
-              <div className="flex items-start justify-between gap-3"><SectionHeading title={w.reviewTitle} /><AskCopilotButton entityId={workspace.review_document.id} entityType="review" label={workspaceText(workspace.review_document.title, language)} /></div>
+              <div className="flex items-start justify-between gap-3"><SectionHeading title={workspaceText(workspace.review_document.title, language) || w.reviewTitle} /><AskCopilotButton entityId={workspace.review_document.id} entityType="review" label={workspaceText(workspace.review_document.title, language)} /></div>
               <div className="mt-4"><ReviewMarkdown citations={workspaceCitationRecords(workspace.references, language)}>{workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
               </div>
             </Disclosure>
           ) : <Alert><AlertDescription>{w.reviewEmpty}</AlertDescription></Alert>}
-          <Disclosure className="science-document" defaultOpen title={language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
+          <Disclosure className="science-document" title={<span>{language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'} <span className="ml-2 text-xs font-normal text-text-muted">{workspace.review_sections.reduce((total, section) => total + (section.items?.length ?? 0), 0)} {language === 'zh' ? '条' : 'records'}</span></span>}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0">
@@ -342,8 +338,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0"><FrameTitle>{w.methodsTitle}</FrameTitle><FrameDescription>{w.methodsDescription}</FrameDescription></FrameHeader>
-              {/* Methods entries are long-form documents, so each one collapses; the
-                  first stays open so the tab still shows content on arrival. */}
+              {/* Open only an explicitly linked report; long documents stay behind their titles. */}
               {workspace.methods.length ? (
                 <Accordion key={`${projectId}-${selectedKnowledgeId}`} defaultValue={openKnowledge}>
                   {workspace.methods.map((method) => (

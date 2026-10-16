@@ -88,7 +88,7 @@ describe('ResearchPage', () => {
     renderWithProviders(<ResearchPage />)
     expect(await screen.findByText('The historical research question.')).toBeVisible()
     expect(screen.getByText('The historical result.')).toBeVisible()
-    expect(within(nav()).getByRole('tab', { name: 'Project summary' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByTestId('decision-center')).not.toBeInTheDocument()
     expect(screen.queryByTestId('next-step')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Structured questions and decision definitions' }))

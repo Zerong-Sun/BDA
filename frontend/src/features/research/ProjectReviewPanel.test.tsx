@@ -57,7 +57,7 @@ describe('ProjectReviewPanel', () => {
     renderWithProviders(<ProjectReviewPanel workspace={workspace} showDocument={false} />)
 
     expect(await screen.findByTestId('research-finding')).toHaveAttribute('data-finding-id', 'finding-one')
-    fireEvent.click(screen.getByRole('button', { name: 'Sources (2)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reference materials (2)' }))
     fireEvent.click(screen.getByRole('button', { name: '[1] PMID 12345678' }))
     fireEvent.click(screen.getByRole('button', { name: '[2] DOI 10.1000/example' }))
     expect(screen.getByRole('link', { name: 'Open original source · PMID 12345678' })).toHaveAttribute(
@@ -110,7 +110,7 @@ describe('ProjectReviewPanel', () => {
     expect(screen.queryByText(/Record updated:/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Record information' }))
     expect(screen.getByText(/Record updated:/)).toHaveTextContent(finding.updated_at)
-    expect(screen.getByRole('button', { name: 'Sources (1)' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Reference materials (1)' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
   })
 

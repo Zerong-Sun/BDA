@@ -1,4 +1,5 @@
-import { Disclosure } from '../../components/ui/Disclosure'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
+import { groupCitations } from './citationGroups'
 import { Link } from 'react-router'
 import { useI18n } from '../../lib/i18n'
 import { citationText, citationValueLabel, safeCitationUrl, type CitationRecord } from './citationMarkers'
@@ -23,7 +24,8 @@ export function CitationDetails({ citations, prefix, projectId }: { citations: r
     <p className="text-text-muted">{zh
       ? '标记对应前一句；段末引用须支持整段。来源清单不代表所有论断已有依据，未标注内容需核实。'
       : 'Markers support the preceding sentence, or a fully supported paragraph. Listed sources do not verify every claim; check unmarked text separately.'}</p>
-    {citations.map((citation, index) => {
+    {groupCitations(citations).map(({ citation, numbers }) => {
+      const index = numbers[0] - 1
       const label = citationLabel(citation, language, index)
       const href = safeCitationUrl(citation.url)
       const workspaceType = citationText(citation.workspace_type)
@@ -50,7 +52,7 @@ export function CitationDetails({ citations, prefix, projectId }: { citations: r
         [zh ? '检索记录 ID' : 'Retrieval trace ID', citation.retrieval_trace_id],
         [zh ? '获取时间' : 'Retrieved at', citation.retrieved_at],
       ].filter(([, value]) => value !== undefined && value !== null && value !== '')
-      return <div key={index} id={`${prefix}-source-${index + 1}`} className="mt-1"><Disclosure title={`[${index + 1}] ${label}`}>
+      return <div key={index} id={`${prefix}-source-${index + 1}`} className="mt-1"><Accordion><AccordionItem value="source" className="border-0"><AccordionTrigger heading={false} className="gap-2 py-1.5 text-xs"><span className="min-w-0 break-words">[{numbers.join(", ")}] {label}</span></AccordionTrigger><AccordionContent>
         {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">{zh ? '打开原始来源' : 'Open original source'} · {label}</a> : null}
         {projectHref ? <Link to={projectHref} className="mt-2 block">{zh ? '查看项目资料' : 'View project material'}</Link> : null}
         {citationText(citation.project_argument) ? <p className="mt-3"><strong>{zh ? '项目论点：' : 'Project argument: '}</strong>{citationText(citation.project_argument)}</p> : null}
@@ -58,7 +60,7 @@ export function CitationDetails({ citations, prefix, projectId }: { citations: r
         {citationText(citation.excerpt) ? <><p className="mt-2 font-medium">{zh ? '保存的原文片段' : 'Saved source excerpt'}{citation.excerpt_truncated ? (zh ? '（预览已截短）' : ' (preview truncated)') : ''}</p><blockquote className="mt-1 whitespace-pre-wrap border-l-2 pl-2">{citationText(citation.excerpt)}</blockquote></> : <p className="mt-2 text-text-muted">{zh ? '未附原文片段，需查阅来源内容核实。' : 'No excerpt attached. Check the source content to verify the claim.'}</p>}
         {[[zh ? '论文观点' : 'Paper claim', citation.paper_claim], [zh ? '论据解释' : 'Interpretation', citation.interpretation], [zh ? '适用边界' : 'Limits', citation.limitations], [zh ? '原文位置' : 'Location', citation.locator]].filter(([, value]) => citationText(value)).map(([name, value]) => <p className="mt-2" key={citationText(name)}><strong>{citationText(name)}: </strong>{citationText(value)}</p>)}
         <dl className="mt-3 grid gap-1 border-t pt-2 sm:grid-cols-[auto_1fr]">{fields.map(([name, value]) => <div key={String(name)} className="contents"><dt className="text-text-muted">{String(name)}</dt><dd className="break-all">{String(value)}</dd></div>)}</dl>
-      </Disclosure></div>
+      </AccordionContent></AccordionItem></Accordion></div>
     })}
   </div>
 }

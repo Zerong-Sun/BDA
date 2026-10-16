@@ -114,6 +114,16 @@ describe('ResearchWorkspacePanel', () => {
     expect(screen.getAllByText('Unique review body')).toHaveLength(1)
   })
 
+  it('keeps long research notes behind a counted disclosure while evidence stays visible', async () => {
+    renderWithProviders(<ResearchWorkspacePanel view="evidence" />)
+    const notes = await screen.findByRole('button', { name: 'Research notes & review record 0 records' })
+    expect(notes).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('review operations')).not.toBeInTheDocument()
+    expect(screen.getByText('Unique edge summary')).toBeVisible()
+    fireEvent.click(notes)
+    expect(await screen.findByText('review operations')).toBeVisible()
+  })
+
   it('links methods to the canonical decision record without embedding the tree', async () => {
     renderWithProviders(<ResearchWorkspacePanel view="methods" />)
     expect(await screen.findByRole('link', { name: 'Open decision record' })).toHaveAttribute('href', '#/research?project=project-one&tab=timeline')

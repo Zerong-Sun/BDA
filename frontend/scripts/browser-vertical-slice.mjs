@@ -1137,7 +1137,17 @@ async function exerciseCandidateGrid(page, diagnostics) {
   }
 }
 
+async function openResearchNotes(page) {
+  const notes = page.getByRole('button', { name: /^(Research notes & review record|研究笔记与审阅记录)\s+\d+\s+(records|条)$/ })
+  await expectVisible(notes, 'research notes disclosure')
+  if (await notes.getAttribute('aria-expanded') !== 'true') await notes.click()
+  if (await notes.getAttribute('aria-expanded') !== 'true') {
+    throw new Error('Research notes disclosure did not expand.')
+  }
+}
+
 async function exerciseResearchGrids(page, diagnostics) {
+  await openResearchNotes(page)
   const readingGuide = page.getByRole('region', { name: 'Research reading guide' })
   await expectVisible(readingGuide, 'research reading guide')
   const notesBefore = await page.getByTestId('research-finding').count()
@@ -1556,6 +1566,7 @@ async function assertScenarioState(page, testCase, diagnostics) {
   if (testCase.routeId === 'research' && testCase.scenario === 'populated') {
     // The tab shell mounts before its data. Auditing focus stops while the
     // loading panel is replaced races the arrival of the real controls.
+    await openResearchNotes(page)
     await expectVisible(page.getByRole('region', { name: /^(Research reading guide|研究阅读导览)$/ }),
       'populated research content before focus audit')
   }

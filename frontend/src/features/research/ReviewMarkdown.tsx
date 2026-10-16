@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useI18n } from '../../lib/i18n'
 import { CitationDetails } from './CitationDetails'
+import { groupCitations } from './citationGroups'
 import { remarkCitationMarkers, type CitationRecord } from './citationMarkers'
 
 /**
@@ -64,10 +65,11 @@ function headingText(node: React.ReactNode): string {
   return ''
 }
 
-export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = false }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean }) {
+export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = true }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean }) {
   const { language } = useI18n()
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const sourceGroups = groupCitations(citations)
   const headings = sectionHeadings(children)
   const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
   const showToc = headings.length >= TOC_THRESHOLD
@@ -98,7 +100,8 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
             const match = node?.properties['data-bda-citation'] === true ? href?.match(/^#bda-citation-(\d+)$/) : null
             if (!match || !citations[Number(match[1]) - 1]) return <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{content}</a>
             const index = Number(match[1])
-            const id = `${prefix}-source-${index}`
+            const sourceNumber = sourceGroups.find(group => group.numbers.includes(index))?.numbers[0] ?? index
+            const id = `${prefix}-source-${sourceNumber}`
             return <sup><a href={`#${id}`} aria-label={`${language === 'zh' ? '查看来源' : 'View source'} ${index}`} onClick={(event) => {
               event.preventDefault()
               // Mount the compact source list before locating the exact source.
@@ -122,7 +125,7 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
       {compactCitations && citations.length ? (
         <Accordion className="mt-2" value={sourcesOpen ? ['sources'] : []} onValueChange={value => setSourcesOpen(value.includes('sources'))}>
           <AccordionItem value="sources" className="border-0">
-            <AccordionTrigger>{language === 'zh' ? `来源（${citations.length}）` : `Sources (${citations.length})`}</AccordionTrigger>
+            <AccordionTrigger heading={false} className="py-1.5">{language === 'zh' ? `参考资料（${sourceGroups.length}）` : `Reference materials (${sourceGroups.length})`}</AccordionTrigger>
             <AccordionContent><CitationDetails citations={citations} prefix={prefix} projectId={projectId} /></AccordionContent>
           </AccordionItem>
         </Accordion>

@@ -81,6 +81,29 @@ describe('traceable inline citations', () => {
   afterEach(cleanup)
   const citation = { entity_id: 'chunk-one', label: 'Saved paper', url: 'https://example.org/paper', document_id: 'doc-one', chunk_id: 'chunk-one', content_kind: 'database_abstract', content_checksum_sha256: 'a'.repeat(64), retrieval_trace_id: 'trace-one', excerpt: 'The measured result.', review_status: 'pending_review' }
 
+  it('keeps consulted sources behind one compact control without adding document headings', () => {
+    const { container } = render(<ReviewMarkdown citations={[citation, { ...citation, entity_id: 'other', label: 'Methods' }]}>{'The answer remains the main content.'}</ReviewMarkdown>)
+    expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Methods')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reference materials (2)' }))
+    expect(screen.getByRole('button', { name: '[2] Methods' })).toBeVisible()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    for (const icon of container.querySelectorAll('svg')) expect(icon).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('deduplicates identical records while every original citation number opens its saved evidence', () => {
+    render(<ReviewMarkdown citations={[citation, { ...citation }, { ...citation, excerpt: 'A different passage.' }]}>{'First.[cite:1] Repeated.[cite:2] Different passage.[cite:3]'}</ReviewMarkdown>)
+    expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('link', { name: 'View source 2' }))
+    expect(screen.getByRole('button', { name: '[1, 2] Saved paper' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('The measured result.')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View source 1' })).toHaveAttribute('href', screen.getByRole('link', { name: 'View source 2' }).getAttribute('href'))
+    fireEvent.click(screen.getByRole('link', { name: 'View source 3' }))
+    expect(screen.getByRole('button', { name: '[3] Saved paper' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('A different passage.')).toBeVisible()
+  })
+
   it('links only an explicit marker at its original position and opens its exact evidence', () => {
     const { container } = render(<ReviewMarkdown citations={[citation]}>{'Supported result.[cite:1] Unverified hypothesis.'}</ReviewMarkdown>)
     const paragraph = container.querySelector('p')!
@@ -101,19 +124,19 @@ describe('traceable inline citations', () => {
     HTMLElement.prototype.scrollIntoView = scroll
     try {
       render(<ReviewMarkdown compactCitations citations={[citation, { ...citation, entity_id: 'second', label: 'Second paper' }]}>{'Supported result.[cite:2]'}</ReviewMarkdown>)
-      expect(screen.getByRole('button', { name: 'Sources (2)' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
       const hash = window.location.hash
       const marker = screen.getByRole('link', { name: 'View source 2' })
       fireEvent.click(marker)
-      expect(screen.getByRole('button', { name: 'Sources (2)' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByRole('button', { name: '[1] Saved paper' })).toHaveAttribute('aria-expanded', 'false')
       expect(screen.getByText('The measured result.')).toBeInTheDocument()
       expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
       expect(scroll.mock.contexts[0]).toBe(document.getElementById(marker.getAttribute('href')!.slice(1)))
       expect(window.location.hash).toBe(hash)
-      fireEvent.click(screen.getByRole('button', { name: 'Sources (2)' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Reference materials (2)' }))
       fireEvent.click(screen.getByRole('link', { name: 'View source 2' }))
       expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
     } finally {

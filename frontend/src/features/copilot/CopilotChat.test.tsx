@@ -287,6 +287,8 @@ describe('CopilotChat', () => {
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
     expect(await screen.findByText('引用结果')).toBeInTheDocument()
+    expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '参考资料（1）' }))
     expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: '[1] 来源 1' }))
     const citation = await screen.findByRole('link', { name: '打开原始来源 · 来源 1' })

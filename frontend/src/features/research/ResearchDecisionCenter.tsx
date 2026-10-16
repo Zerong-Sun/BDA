@@ -15,7 +15,7 @@ import { decisionReadiness } from './decisionReadiness'
 import { relationLabel } from './evidenceNotes'
 import { ResearchDecisionEditor } from './ResearchDecisionEditor'
 
-export function ResearchDecisionCenter({ projectId }: { projectId: string }) {
+export function ResearchDecisionCenter({ projectId, retrospective = false }: { projectId: string; retrospective?: boolean }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const [params, setParams] = useSearchParams()
@@ -45,8 +45,8 @@ export function ResearchDecisionCenter({ projectId }: { projectId: string }) {
     review: zh ? '关联论据均已复核且原文匹配' : 'Linked evidence reviewed and source-matched',
   }
   return <section data-testid="research-decision-center" aria-label={zh ? '研究决策中心' : 'Research decision center'} className="research-decision-center mb-5 grid min-w-0 gap-5 border bg-background p-4 sm:p-5">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-wide text-muted-foreground">Decision workspace</p><h2 className="mt-1 text-xl font-semibold">{zh ? '下一步为什么值得做' : 'Why this next step is worth taking'}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{zh ? '把问题、备选方案、正反论据和决策标准放在一起。缺少记录代表未知，不代表假设被否定；材料完整也不代表实验已成功。' : 'Read the question, alternatives, counterevidence and decision criteria together. Missing records mean unknown, not false; complete documentation does not mean an experiment succeeded.'}</p></div>
-      <div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" render={<Link to={url('references')} />}>{zh ? '文献论据' : 'Literature evidence'}</Button><Button type="button" size="sm" variant="outline" render={<Link to={`/learning?project=${encodeURIComponent(projectId)}`} />}>{zh ? '学习与下一轮实验' : 'Learning & next experiments'}</Button></div>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">{retrospective ? (zh ? '问题与决策回顾' : 'Questions and decision review') : (zh ? '下一步为什么值得做' : 'Why this next step is worth taking')}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{zh ? '核对问题、正反论据与决策标准。记录完整性与科研结论分别判断。' : 'Review the question, evidence and decision criteria. Documentation completeness and scientific conclusions are assessed separately.'}</p></div>
+      <div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" render={<Link to={url('references')} />}>{zh ? '文献论据' : 'Literature evidence'}</Button>{!retrospective ? <Button type="button" size="sm" variant="outline" render={<Link to={`/learning?project=${encodeURIComponent(projectId)}`} />}>{zh ? '学习与下一轮实验' : 'Learning & next experiments'}</Button> : null}</div>
     </header>
     {goals.isPending ? <p role="status">{zh ? '正在读取问题与决策定义…' : 'Loading questions and decision definitions…'}</p> : null}
     {goals.isError ? <p role="alert">{zh ? '目标读取失败，无法判断决策状态。' : 'Goals could not be loaded; decision status is unknown.'}<Button type="button" variant="link" onClick={() => goals.refetch()}>{zh ? '重试' : 'Retry'}</Button></p> : null}

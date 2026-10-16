@@ -21,16 +21,17 @@ export function PipelineRail() {
   const location = useLocation()
   const navigate = useNavigate()
   const { projectId, activeProject, hasProject } = useProjectContext()
+  const reviewingHistory = location.pathname === '/research' && ['archived', 'completed'].includes(activeProject?.status ?? '')
   const { data: overview } = useQuery({
     queryKey: ['project-overview', projectId],
     queryFn: () => getProjectOverview(projectId),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && !reviewingHistory,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchInterval: 15_000,
   })
 
-  if (!hasProject) return null
+  if (!hasProject || reviewingHistory) return null
 
   const { stages, currentIndex: progressIndex } = derivePipeline(hasProject, overview)
   const query = projectId ? `?project=${encodeURIComponent(projectId)}` : ''

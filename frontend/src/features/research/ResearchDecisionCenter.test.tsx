@@ -86,6 +86,14 @@ describe('research decision center', () => {
     expect(screen.getByRole('link', { name: 'Learning & next experiments' })).toHaveAttribute('href', '#/learning?project=project-one')
   })
 
+  it('presents archived decisions as a review without a next-experiment call to action', async () => {
+    renderWithProviders(<ResearchDecisionCenter projectId="project-one" retrospective />)
+    expect(screen.getByRole('heading', { name: 'Questions and decision review' })).toBeVisible()
+    expect(await screen.findByText(note.quote)).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Learning & next experiments' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Documentation ready · a researcher must decide/)).toBeVisible()
+  })
+
   it('preserves explicit criteria and the displayed version when saving human edits', async () => {
     renderWithProviders(<ResearchDecisionCenter projectId="project-one" />)
     fireEvent.click(await screen.findByRole('button', { name: 'Edit decision definition' }))
