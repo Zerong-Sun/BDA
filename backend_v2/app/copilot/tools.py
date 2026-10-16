@@ -15,6 +15,7 @@ of the loop that only just arrived.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any
 
@@ -1680,8 +1681,33 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
     Tool output lives in turn.content; turn.tool_calls only identifies its call.
     """
     from . import agent_runs
+    from .models import CopilotAgentRun
 
-    run = agent_runs.require_run(ctx.session, uuid.UUID(_arg_str(args, "run_id")))
+    requested_run_id = _arg_str(args, "run_id")
+    prefix_resolution = False
+    try:
+        exact_id = uuid.UUID(requested_run_id)
+    except ValueError:
+        if re.fullmatch(r"[0-9a-fA-F]{8,31}", requested_run_id) is None:
+            raise ValueError("copilot_agent_run_id_invalid_use_full_uuid_or_at_least_8_hex_prefix") from None
+        # UUID bounds are portable to PostgreSQL UUID and SQLite's canonical
+        # hex storage. Keep the indexed ID column intact, and scope the query
+        # before resolving; another project's match must never influence it.
+        lower = uuid.UUID(hex=requested_run_id.ljust(32, "0"))
+        upper = uuid.UUID(hex=requested_run_id.ljust(32, "f"))
+        matches = list(ctx.session.scalars(select(CopilotAgentRun).where(
+            CopilotAgentRun.project_id == _project_of(ctx),
+            CopilotAgentRun.id >= lower,
+            CopilotAgentRun.id <= upper,
+        ).limit(2)))
+        if not matches:
+            raise ValueError("copilot_agent_run_not_found") from None
+        if len(matches) != 1:
+            raise ValueError("copilot_agent_run_prefix_ambiguous_use_full_uuid") from None
+        run = matches[0]
+        prefix_resolution = True
+    else:
+        run = agent_runs.require_run(ctx.session, exact_id)
     if run.project_id != _project_of(ctx):
         # Same shape as a missing run: whether a run exists in another project
         # is not this project's to learn.
@@ -1724,6 +1750,8 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
     outcome_truncated = len(outcome_text) > _REVIEW_TOOL_RESULTS_CHARS
     return {
         "run_id": str(run.id),
+        **({"requested_run_id": requested_run_id, "run_id_resolution": "unique_project_prefix"}
+           if prefix_resolution else {}),
         "bot": run.bot,
         "goal": run.goal,
         "status": run.status,
@@ -1769,7 +1797,9 @@ _register(
         ),
         parameters={
             "type": "object",
-            "properties": {"run_id": {"type": "string"}, "limit": _limit(100, 40)},
+            "properties": {"run_id": {"type": "string", "description":
+                "Use the full run UUID. A hex prefix of at least 8 characters is accepted only when unique in this project; the response returns its full UUID."},
+                "limit": _limit(100, 40)},
             "required": ["run_id"],
             "additionalProperties": False,
         },

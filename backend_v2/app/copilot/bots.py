@@ -158,6 +158,8 @@ BOTS: tuple[BotSpec, ...] = (
             "The background worker owns the continuation; do not do extra research, delegate again "
             "from chat, or tell the user to send another message to continue. "
             "When already in a durable run, use delegate_to_operator instead. "
+            "In delegation instructions preserve the full UUIDs returned for runs and sources; "
+            "never abbreviate their IDs, including when asking auditor to read another operator's work. "
             "Own the goal until its acceptance criteria are met, or clearly report a blocker. "
             "State the goal, next assignment and acceptance criteria in a short public message "
             "before delegating. After each result, report progress, inspect remaining gaps and "
