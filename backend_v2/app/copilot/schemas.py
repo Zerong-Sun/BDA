@@ -244,6 +244,12 @@ class RoomTask(BaseModel):
 class RoomDiscussion(BaseModel):
     run_id: uuid.UUID
     content: str
+    parent_run_id: uuid.UUID | None = None
+    is_delivery: bool = False
+    next_action: str | None = None
+    # The task review is attached only when this turn matches its saved delivery.
+    scientific_review: str | None = None
+    task_status: str | None = None
 
 
 class RoomEvent(BaseModel):

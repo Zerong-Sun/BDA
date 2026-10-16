@@ -17190,10 +17190,60 @@
             "title": "Content",
             "type": "string"
           },
+          "is_delivery": {
+            "default": false,
+            "title": "Is Delivery",
+            "type": "boolean"
+          },
+          "next_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action"
+          },
+          "parent_run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Run Id"
+          },
           "run_id": {
             "format": "uuid",
             "title": "Run Id",
             "type": "string"
+          },
+          "scientific_review": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scientific Review"
+          },
+          "task_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Status"
           }
         },
         "required": [

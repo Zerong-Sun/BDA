@@ -84,6 +84,7 @@ describe('Room', () => {
       discussion: { run_id: 'run-1', content: 'PD-L1 route comparison is ready for review.' } }])
     const onOpenRun = vi.fn()
     renderWithProviders(<Room onOpenRun={onOpenRun} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
     expect(await screen.findByText('PD-L1 route comparison is ready for review.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Open task and evidence' }))
     expect(onOpenRun).toHaveBeenCalledWith('run-1')
@@ -93,6 +94,7 @@ describe('Room', () => {
     stub([{ kind: 'task', id: 'child-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
       task: task({ id: 'child-1', parent_run_id: 'older-parent', goal: 'Check PD-L1 geometry' }) }])
     renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
     expect(await screen.findByText('Check PD-L1 geometry')).toBeInTheDocument()
   })
 
@@ -254,6 +256,7 @@ describe('Room', () => {
       },
     ])
     renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
 
     expect(await screen.findByText('Draft is ready.')).toBeInTheDocument()
     expect(screen.getByText('The queue forces a GPU')).toBeInTheDocument()
@@ -401,6 +404,7 @@ describe('Room decisions', () => {
   it('shows what was decided and offers no further choice once it is settled', async () => {
     stub([decisionEntry({ status: 'answered', answer: 'hot3', version: 2 })])
     renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
 
     expect(await screen.findByText('Decided: Target I126/L128/A132')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Choose:/ })).not.toBeInTheDocument()
@@ -478,9 +482,34 @@ it('keeps cleaned messages out by default and provides a labelled audit view', a
   renderWithProviders(<Room />)
   await waitFor(() => expect(requests).toContain('false'))
   expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Show archived messages' }))
   expect(await screen.findByText('Old launch notice')).toBeInTheDocument()
   expect(screen.getByText(/archived history/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Hide archived messages' }))
   await waitFor(() => expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument())
+})
+
+
+it('opens only the newest conclusion with next step, leaving revisions and notices in history', async () => {
+  stub([
+    { kind: 'task', id: 'run-1', occurred_at: '2026-09-14T08:30:00Z', task: task({ status: 'failed', delivery_state: 'blocked' }) },
+    { kind: 'discussion', id: 'final', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'Latest evidence remains a draft.\n\nCheck the missing sequence.', is_delivery: true, next_action: 'Check the missing sequence.', scientific_review: null } },
+    { kind: 'discussion', id: 'revision', occurred_at: '2026-09-14T08:15:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'Earlier repeated revision.', is_delivery: true } },
+    { kind: 'message', id: 'notice', occurred_at: '2026-09-14T08:10:00Z', message: message({ id: 'notice', content: 'Task has started.', tool_calls: [{ name: 'start_team_task', status: 'completed' }] }) },
+  ])
+  const onOpenRun = vi.fn()
+  renderWithProviders(<Room onOpenRun={onOpenRun} />)
+  expect(await screen.findByText('Latest evidence remains a draft.')).toBeInTheDocument()
+  expect(screen.getAllByText('Check the missing sequence.')).toHaveLength(1)
+  expect(screen.getByText(/Automated review of this reply: No completion recorded/)).toBeInTheDocument()
+  expect(screen.queryByText('Earlier repeated revision.')).not.toBeInTheDocument()
+  expect(screen.queryByText('Task has started.')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Latest task and review.*Blocked/ }))
+  expect(onOpenRun).toHaveBeenCalledWith('run-1')
+  fireEvent.click(screen.getByRole('button', { name: /Discussion and process history/ }))
+  expect(await screen.findByText('Earlier repeated revision.')).toBeInTheDocument()
+  expect(screen.getByText('Task has started.')).toBeInTheDocument()
 })

@@ -341,3 +341,24 @@ def test_archived_chat_is_filtered_before_paging_and_remains_readable(session: S
     session.flush()
     restored, _ = room.events(session, project_id=project.id)
     assert [item["id"] for item in restored] == [latest.id, archived.id, older.id]
+
+
+def test_discussion_review_only_attaches_to_the_matching_delivery(session: Session):
+    import json
+
+    from backend_v2.app.copilot.models import CopilotAgentTurn
+
+    project, user = _project(session)
+    delivery = {"summary": "Latest draft", "sections": {}, "missing": ["sample mapping"], "next_action": "Read mapping"}
+    run = _run(session, project, user, outcome={**delivery, "scientific_review": "automated_review_completed"})
+    turn = CopilotAgentTurn(run_id=run.id, sequence=1, role="assistant", content=json.dumps(delivery))
+    session.add(turn)
+    session.flush()
+    projected = room._discussion_entry(turn, run)
+    assert projected["is_delivery"] is True
+    assert projected["next_action"] == "Read mapping"
+    assert projected["scientific_review"] == "automated_review_completed"
+    turn.content = json.dumps({**delivery, "missing": ["different unresolved evidence"]})
+    assert room._discussion_entry(turn, run)["scientific_review"] is None
+    turn.content = "Starting another tool call"
+    assert room._discussion_entry(turn, run)["is_delivery"] is False

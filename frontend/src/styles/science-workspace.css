@@ -647,3 +647,16 @@ body { line-height: 1.6; }
   .task-report-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
   .task-report-meta > div { flex-wrap: wrap; justify-content: flex-start; gap: .25rem .75rem; }
 }
+
+/* The reading default is the latest result; the transcript opens on demand. */
+.room-scroll--focus { height: auto; }
+.room-latest { min-width: 0; }
+.room-latest-heading, .room-result-links { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
+.room-latest-heading { justify-content: space-between; }
+.room-latest-heading h3 { font-size: 1rem; font-weight: 650; }
+.room-latest-heading time, .room-review-state { font-size: .75rem; color: var(--text-secondary); }
+.room-review-state { margin-bottom: .5rem; }
+.room-result-links a { font-size: .8125rem; color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.room-history { border-top: 1px solid var(--border-soft); }
+.room-history-feed { display: grid; gap: .75rem; max-height: 60vh; overflow-y: auto; padding-right: .25rem; margin-top: .5rem; }
+.room-next-action { margin-top: .5rem; border-left: 2px solid var(--accent-border); padding-left: .65rem; font-size: .875rem; }

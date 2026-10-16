@@ -130,6 +130,25 @@ def _discussion_text(content: str) -> str:
     return "\n\n".join(parts)
 
 
+def _discussion_entry(turn: CopilotAgentTurn, run: CopilotAgentRun) -> dict[str, Any]:
+    try:
+        parsed = json.loads(turn.content.removeprefix("```json").removesuffix("```").strip())
+    except (ValueError, TypeError):
+        parsed = None
+    delivery = parsed if isinstance(parsed, dict) and isinstance(parsed.get("summary"), str) else {}
+    outcome = run.outcome if isinstance(run.outcome, dict) else {}
+    # A review on a different revision must never certify this saved draft.
+    matches = bool(delivery) and all(delivery.get(key) == outcome.get(key) for key in
+                                    ("summary", "sections", "missing", "next_action"))
+    return {
+        "run_id": turn.run_id, "content": _discussion_text(turn.content),
+        "parent_run_id": run.parent_run_id, "is_delivery": bool(delivery.get("summary", "").strip()),
+        "next_action": delivery.get("next_action") if isinstance(delivery.get("next_action"), str) else None,
+        "scientific_review": outcome.get("scientific_review") if matches and isinstance(outcome.get("scientific_review"), str) else None,
+        "task_status": run.status,
+    }
+
+
 def events(
     session: Session,
     *,
@@ -188,7 +207,7 @@ def events(
     # Public messages from durable work belong in the same room. Reasoning,
     # system prompts and raw tool output stay out of this conversational feed.
     discussion_query = _keyset(
-        select(CopilotAgentTurn, CopilotAgentRun.bot).join(
+        select(CopilotAgentTurn, CopilotAgentRun).join(
             CopilotAgentRun, CopilotAgentRun.id == CopilotAgentTurn.run_id,
         ).where(
             CopilotAgentRun.project_id == project_id,
@@ -196,10 +215,10 @@ def events(
             CopilotAgentTurn.content != "",
         ), CopilotAgentTurn.created_at, CopilotAgentTurn.id, after,
     ).order_by(CopilotAgentTurn.created_at.desc(), CopilotAgentTurn.id.desc()).limit(size + 1)
-    for turn, bot in session.execute(discussion_query):
+    for turn, run in session.execute(discussion_query):
         entries.append({
             "kind": "discussion", "id": turn.id, "occurred_at": turn.created_at,
-            "bot": bot, "discussion": {"run_id": turn.run_id, "content": _discussion_text(turn.content)},
+            "bot": run.bot, "discussion": _discussion_entry(turn, run),
         })
     for message in session.scalars(message_query):
         entries.append(

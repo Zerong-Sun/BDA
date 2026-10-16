@@ -10157,9 +10157,29 @@ export type RoomDiscussion = {
      */
     content: string;
     /**
+     * Is Delivery
+     */
+    is_delivery?: boolean;
+    /**
+     * Next Action
+     */
+    next_action?: string | null;
+    /**
+     * Parent Run Id
+     */
+    parent_run_id?: string | null;
+    /**
      * Run Id
      */
     run_id: string;
+    /**
+     * Scientific Review
+     */
+    scientific_review?: string | null;
+    /**
+     * Task Status
+     */
+    task_status?: string | null;
 };
 
 /**

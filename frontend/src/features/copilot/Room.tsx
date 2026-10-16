@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+import { focusRoom, conclusionReview } from './roomFocus'
 import { chatFailureMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useEffect, useRef, useState } from 'react'
@@ -68,6 +70,8 @@ export function Room({
   const readOnly = useCopilotReadOnly()
   const bots = useCopilotBots()
   const roster = bots.data ?? []
+  const [historyProject, setHistoryProject] = useState<string | null>(null)
+  const historyOpen = historyProject === projectId
   const [archiveProject, setArchiveProject] = useState<string | null>(null)
   const showArchived = archiveProject === projectId
   const feed = useCopilotRoom(projectId || null, 100, showArchived)
@@ -108,10 +112,13 @@ export function Room({
 
   const entries = inReadingOrder(feed.data ?? [])
   const children = childTasksByParent(entries)
-  const visible = topLevelEntries(entries)
+  const focus = focusRoom(entries)
+  const visible = topLevelEntries(focus.current)
+  const history = topLevelEntries(focus.history)
+  const review = conclusionReview(focus.conclusion)
   useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [visible.length, loading])
+    if (loading) endRef.current?.scrollIntoView?.({ block: 'end' })
+  }, [loading])
 
   // Project events can refresh the feed before the reply arrives. Replace
   // local echoes by persisted message id, never by text (two "hi"s are valid).
@@ -149,11 +156,6 @@ export function Room({
           setNewConversationProject(projectId)
         }}>{zh ? '新建对话' : 'New conversation'}</Button>
       </div>
-      <Button type="button" variant="ghost" size="sm" aria-pressed={showArchived}
-        onClick={() => setArchiveProject(showArchived ? null : projectId)}>
-        {showArchived ? (zh ? '隐藏已清理对话' : 'Hide archived messages') : (zh ? '显示已清理对话' : 'Show archived messages')}
-      </Button>
-      {showArchived ? <p role="status" className="text-xs text-text-secondary">{zh ? '已清理消息仅供追溯，不代表当前进展，也不会自动加入后续聊天上下文。' : 'Archived messages are retained for audit, not current progress or future chat context.'}</p> : null}
       {newConversationProject === projectId ? <p role="status" className="mt-2 text-xs text-text-secondary">{zh ? '新对话已准备，发送下一条消息后开始。历史记录仍保留在研究室中。' : 'A new conversation is ready for your next message. Earlier records remain in this room.'}</p> : null}
       <ApiState
         isLoading={feed.isLoading}
@@ -161,11 +163,23 @@ export function Room({
         error={feed.error}
         onRetry={() => void feed.refetch()}
       >
-        <ScrollArea className="room-scroll">
+        <ScrollArea className="room-scroll room-scroll--focus">
           <div className="room-feed">
-            {feed.hasNextPage ? <Button type="button" variant="ghost" disabled={feed.isFetchingNextPage}
-              onClick={() => void feed.fetchNextPage()}>{zh ? '查看更早的讨论' : 'Earlier discussion'}</Button> : null}
-            {visible.length === 0 && !loading ? (
+            <section className="room-latest" aria-label={zh ? '最新结论与交付' : 'Latest conclusion and delivery'}>
+              <div className="room-latest-heading">
+                <h3>{zh ? '最新结论' : 'Latest conclusion'}</h3>
+                {focus.conclusion ? <time dateTime={focus.conclusion.occurred_at}>{new Date(focus.conclusion.occurred_at).toLocaleString(zh ? 'zh-CN' : 'en-GB')}</time> : null}
+              </div>
+              <div className="room-result-links">
+                <Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'goals', brief: '1' })}`}>{zh ? '项目结果与报告' : 'Project results and reports'}</Link>
+                {focus.latestTask?.task && onOpenRun ? <Button type="button" size="sm" variant="outline" onClick={() => onOpenRun(focus.latestTask!.task!.id)}>{zh ? '最近任务与复核' : 'Latest task and review'} · {roomTaskLabel(focus.latestTask.task, zh)}</Button> : null}
+              </div>
+              {focus.conclusion ? <>
+                <p className="room-review-state">{zh ? '本条答复自动复核：' : 'Automated review of this reply: '}{review === 'completed' ? (zh ? '已完成（不等于人工批准）' : 'Completed (not human approval)') : review === 'incomplete' ? (zh ? '未完成' : 'Incomplete') : (zh ? '未记录完成' : 'No completion recorded')}</p>
+                <RoomEntry entry={focus.conclusion} roster={roster} projectId={projectId} zh={zh} childTasks={[]} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />
+              </> : <p className="text-sm text-text-secondary">{zh ? '暂无已保存的结论。可先查看项目报告；运行中状态见下方。' : 'No saved conclusion yet. Open project reports; current activity is shown below.'}</p>}
+            </section>
+            {entries.length === 0 && !loading ? (
               <p className="room-empty" role="status">
                 {zh
                   ? '把目标告诉项目负责人，团队会分工推进。这里显示成员的讨论、任务进度与待你决定的选项，也可以 @ 任一成员。'
@@ -179,7 +193,7 @@ export function Room({
                 roster={roster}
                 projectId={projectId}
                 zh={zh}
-                childTasks={entry.task ? children.get(entry.task.id) ?? [] : []}
+                childTasks={entry.task ? (children.get(entry.task.id) ?? []).filter((child) => focus.current.includes(child)) : []}
                 onOpenRun={onOpenRun}
                 onOpenBot={onOpenBot}
               />
@@ -203,6 +217,25 @@ export function Room({
               </article>
             ))}
             <div ref={endRef} />
+            <section className="room-history">
+              <Button type="button" variant="ghost" className="w-full justify-between" disabled={!projectId || projectsLoading} aria-expanded={historyOpen} aria-controls={`room-history-${projectId}`} onClick={() => setHistoryProject(historyOpen ? null : projectId)}>
+                {`${zh ? '历史讨论与过程记录' : 'Discussion and process history'} (${history.length}${feed.hasNextPage ? '+' : ''})`}<span aria-hidden="true">{historyOpen ? '−' : '+'}</span>
+              </Button>
+              {historyOpen ? <div id={`room-history-${projectId}`}>
+
+              <p className="text-xs text-text-secondary">{zh ? '旧任务通知、成员过程记录和历次改稿。原文按时间保留。' : 'Earlier task notices, member activity and revisions, preserved in chronological order.'}</p>
+      <Button type="button" variant="ghost" size="sm" aria-pressed={showArchived}
+        onClick={() => setArchiveProject(showArchived ? null : projectId)}>
+        {showArchived ? (zh ? '隐藏已清理对话' : 'Hide archived messages') : (zh ? '显示已清理对话' : 'Show archived messages')}
+      </Button>
+      {showArchived ? <p role="status" className="text-xs text-text-secondary">{zh ? '已清理消息仅供追溯，不代表当前进展，也不会自动加入后续聊天上下文。' : 'Archived messages are retained for audit, not current progress or future chat context.'}</p> : null}
+
+              {feed.hasNextPage ? <Button type="button" variant="ghost" disabled={feed.isFetchingNextPage} onClick={() => void feed.fetchNextPage()}>{zh ? '查看更早的讨论' : 'Earlier discussion'}</Button> : null}
+              <div className="room-history-feed">
+                {history.map((entry) => <RoomEntry key={`${entry.kind}-${entry.id}`} entry={entry} roster={roster} projectId={projectId} zh={zh} childTasks={entry.task ? (children.get(entry.task.id) ?? []).filter((child) => focus.history.includes(child)) : []} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />)}
+              </div>
+              </div> : null}
+            </section>
           </div>
         </ScrollArea>
       </ApiState>
@@ -340,11 +373,14 @@ function RoomEntry({
 }) {
   if (entry.kind === 'discussion' && entry.discussion) {
     const speaker = resolveBot(entry.bot, roster)
+    const nextAction = entry.discussion.next_action
+    const content = nextAction && entry.discussion.content.endsWith(`\n\n${nextAction}`) ? entry.discussion.content.slice(0, -(nextAction.length + 2)) : entry.discussion.content
     return <article className="room-entry">
       {speaker ? <BotAvatar id={speaker.id} stance={speaker.stance} /> : null}
       <div className="room-entry-body">
         <p className="room-speaker">{speakerName(entry.bot, roster, zh)}</p>
-        <div className="room-text"><ReviewMarkdown presentation="chat" projectId={projectId}>{entry.discussion.content}</ReviewMarkdown></div>
+        <div className="room-text"><ReviewMarkdown presentation="chat" projectId={projectId}>{content}</ReviewMarkdown></div>
+        {nextAction ? <div className="room-next-action"><strong>{zh ? '下一步' : 'Next step'}</strong><ReviewMarkdown presentation="chat" projectId={projectId}>{nextAction}</ReviewMarkdown></div> : null}
         {onOpenRun ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenRun(entry.discussion!.run_id)}>
           {zh ? '查看任务与证据' : 'Open task and evidence'}
         </Button> : null}
