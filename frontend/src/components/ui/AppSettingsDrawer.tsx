@@ -107,7 +107,7 @@ export function AppSettingsDrawer() {
             type="button"
             variant={appMode === 'application' ? 'secondary' : 'outline'}
             className={clsx(
-              'h-auto flex-col items-start p-3 text-left',
+              'h-auto min-w-0 whitespace-normal break-words flex-col items-start p-3 text-left',
             )}
             onClick={() => setAppMode('application')}
           >
@@ -119,7 +119,7 @@ export function AppSettingsDrawer() {
             variant={appMode === 'demo' ? 'secondary' : 'outline'}
             disabled={!findDemoProject(projects)}
             className={clsx(
-              'h-auto flex-col items-start p-3 text-left',
+              'h-auto min-w-0 whitespace-normal break-words flex-col items-start p-3 text-left',
             )}
             onClick={() => {
               const preferred = findDemoProject(projects)
@@ -153,7 +153,7 @@ export function AppSettingsDrawer() {
         </div>
         <ConnectionRow
           label={t.settingsExt.connections.backend}
-          connected={backend.isSuccess}
+          connected={backend.data?.status === 'ok'}
           detail={backend.data ? Object.entries(backend.data.checks ?? {}).map(([name, status]) => `${name}: ${status}`).join(' · ') || backend.data.service || backend.data.status : backend.error instanceof Error ? backend.error.message : t.settingsExt.connections.awaitingValidation}
         />
         {!guest ? <ConnectionRow
@@ -162,7 +162,7 @@ export function AppSettingsDrawer() {
           detail={
             cluster.data?.connected
               ? format(t.settingsExt.connections.queueHost, {
-                  host: cluster.data.host ?? 'qm',
+                  host: cluster.data.host ?? 'LSF',
                   count: cluster.data.queues.length,
                 })
               : cluster.data?.reason ?? t.settingsExt.connections.awaitingValidation
@@ -170,7 +170,8 @@ export function AppSettingsDrawer() {
         /> : null}
         {canManage ? <ConnectionRow
           label={t.settingsExt.connections.openai}
-          connected={copilotConfig.data?.api_key_configured === true}
+          connected={false}
+          configured={copilotConfig.data?.api_key_configured === true}
           detail={
             copilotConfig.data?.api_key_configured
               ? `${copilotConfig.data.llm_model} · ${t.settingsExt.connections.configured}`
@@ -223,7 +224,7 @@ export function AppSettingsDrawer() {
   )
 }
 
-function ConnectionRow({ label, connected, detail }: { label: string; connected: boolean; detail: string }) {
+function ConnectionRow({ label, connected, configured = false, detail }: { label: string; connected: boolean; configured?: boolean; detail: string }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const isLongError = !connected && detail.length > 48
@@ -233,8 +234,8 @@ function ConnectionRow({ label, connected, detail }: { label: string; connected:
       <div className="flex items-center justify-between gap-3">
         <strong className="text-sm text-text-primary">{label}</strong>
         <StatusBadge
-          status={connected ? 'success' : 'danger'}
-          label={connected ? t.shared.status.connected : t.shared.status.disconnected}
+          status={connected ? 'success' : configured ? 'info' : 'warning'}
+          label={connected ? t.shared.status.connected : configured ? t.settingsExt.connections.configured : t.shared.status.disconnected}
         />
       </div>
       {isLongError ? (
@@ -242,14 +243,14 @@ function ConnectionRow({ label, connected, detail }: { label: string; connected:
           type="button"
           variant="ghost"
           size="sm"
-          className="mt-1"
+          className="mt-1 h-auto whitespace-normal break-words text-left"
           onClick={() => setExpanded((v) => !v)}
         >
           {expanded ? <CaretDownIcon className="h-3 w-3" /> : <CaretRightIcon className="h-3 w-3" />}
           {expanded ? detail : t.settingsExt.connectionRow.showDetails}
         </Button>
       ) : (
-        <p className="mt-1 text-xs text-text-secondary">{detail}</p>
+        <p className="mt-1 break-words text-xs text-text-secondary">{detail}</p>
       )}
     </div>
   )

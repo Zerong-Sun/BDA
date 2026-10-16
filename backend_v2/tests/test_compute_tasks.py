@@ -1309,7 +1309,8 @@ def test_target_structure_import_and_prepare(task_database, monkeypatch) -> None
     assert targets_tasks.target_structure_import.run(str(uuid.uuid4()), {"source": "artifact"})["status"] == "missing"
 
 
-def test_campaign_literature_and_registry_workers(task_database) -> None:
+def test_campaign_literature_and_registry_workers(task_database, monkeypatch) -> None:
+    monkeypatch.setattr("backend_v2.app.registry.health.probe_compute_node", lambda **_: ("healthy", None))
     factory, ids = task_database
     with factory() as session:
         campaign = Campaign(project_id=ids["project"], name="Loop", created_by=ids["user"])
@@ -1354,7 +1355,7 @@ def test_campaign_literature_and_registry_workers(task_database) -> None:
     assert registry_tasks.registry_model_plugin_validate.run(str(object_ids[2]))["status"] == "valid"
     assert registry_tasks.registry_model_plugin_validate.run(str(object_ids[3]))["status"] == "invalid"
     assert registry_tasks.registry_model_plugin_validate.run(str(uuid.uuid4()))["status"] == "missing"
-    assert registry_tasks.registry_compute_node_health.run(str(object_ids[5]))["status"] == "configured"
+    assert registry_tasks.registry_compute_node_health.run(str(object_ids[5]))["status"] == "healthy"
     assert registry_tasks.registry_compute_node_health.run(str(uuid.uuid4()))["status"] == "missing"
     assert registry_tasks.registry_server_test.run(str(object_ids[4]))["status"] == "configured"
     assert registry_tasks.registry_server_test.run(str(uuid.uuid4()))["status"] == "missing"

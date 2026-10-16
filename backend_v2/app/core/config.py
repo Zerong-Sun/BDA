@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     compute_backend: str = "docker"
     # Production always requires proof; development can opt in for acceptance runs.
     compute_require_runtime_proof: bool = False
+    registry_task_queue: str = "maintenance"
     docker_host: str = "tcp://localhost:2376"
     docker_tls_ca: str | None = None
     docker_tls_cert: str | None = None

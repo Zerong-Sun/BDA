@@ -101,12 +101,17 @@ def order_pair_blockers(node: Any, plugin: Any) -> list[dict]:
     return blockers
 
 
+def workflow_backend(workflow: WorkflowRun, override: str | None = None) -> str:
+    """A saved route's host/container choice also governs previews and submission."""
+    return override or (workflow.graph or {}).get("compute_backend") or get_settings().compute_backend
+
+
 def evaluate_preflight(
     session: Session, workflow: WorkflowRun, *, compute_backend: str | None = None
 ) -> tuple[list[dict], list[dict], dict]:
     """Returns (blockers, warnings, checks)."""
     settings = get_settings()
-    backend = compute_backend or settings.compute_backend
+    backend = workflow_backend(workflow, compute_backend)
     strict = settings.is_production or settings.compute_require_runtime_proof
     nodes = WorkflowRepository(session).nodes(workflow.id)
     blockers: list[dict] = []
@@ -303,6 +308,11 @@ def evaluate_preflight(
                 }
             )
             continue
+        if backend == "docker" and plugin.runtime_mode != "container":
+            blockers.append({
+                "code": "plugin_backend_incompatible", "node_key": node.node_key,
+                "message": f"Plugin '{plugin.plugin_key}' uses a host runtime; select the LSF backend for this workflow",
+            })
         if not plugin.enabled:
             blockers.append(
                 {

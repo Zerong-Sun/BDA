@@ -1,3 +1,5 @@
+import type { ModelPlugin } from '../../lib/schemas/registry'
+import { gateContext } from './gateContext'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { Input } from '../../components/ui/Input'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -23,6 +25,8 @@ import { GateEvidencePanel } from './GateEvidencePanel'
 
 export function GateInspector({
   workflowId,
+  sourcePlugin,
+  targetPlugin,
   edge,
   runs,
   readOnly,
@@ -35,6 +39,8 @@ export function GateInspector({
   onDelete,
 }: {
   workflowId: string
+  sourcePlugin?: ModelPlugin
+  targetPlugin?: ModelPlugin
   edge: WorkflowEdge
   runs: GateSummary[]
   readOnly: boolean
@@ -49,6 +55,7 @@ export function GateInspector({
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
+  const context = gateContext(edge, sourcePlugin, targetPlugin)
   const [policy, setPolicy] = useState<GatePolicy>((edge.gate as GatePolicy) ?? emptyPolicy())
   const [previewArtifactId, setPreviewArtifactId] = useState('')
   const artifactPreview = useQuery({
@@ -164,6 +171,19 @@ export function GateInspector({
           </Button>
         </div>
       )}
+      <div className="my-3 grid gap-2 rounded border border-border-soft p-2 text-xs" aria-label={zh ? '模型输入输出与推进条件' : 'Model contract and progression'}>
+        <strong>{sourcePlugin?.name ?? edge.source} → {targetPlugin?.name ?? edge.target}</strong>
+        <p>{zh ? '传递内容：' : 'Transfer: '}{context.output ? `${context.output.name} · ${context.output.artifact_type}` : (edge.gate?.mode === 'dependency' ? (zh ? '仅完成依赖，不传递文件' : 'Completion dependency; no files') : (zh ? '未解析到输出端口，请检查模型与端口绑定' : 'Output port unresolved; check the model and mapping'))} → {context.input?.name ?? '—'}</p>
+        {context.input?.description && <p>{context.input.description}</p>}
+        {context.sequence && <p>{zh ? '按候选序列筛选，放行后只把所选 FASTA 记录绑定到下游。序列不包含骨架坐标；需要 initial guess 的模型必须另行提供结构。' : 'Screen candidate sequences and bind only selected FASTA records downstream. Sequences contain no coordinates; initial-guess models also need a structure.'}</p>}
+        {context.structure && <p>{zh ? '按结构及其关联指标筛选，放行后将保留的结构文件绑定到下游。DSSP 需指定实际设计链。' : 'Screen structures with their associated metrics; bind retained structures downstream. DSSP requires the actual design chain.'}</p>}
+        {context.metrics.length > 0 && <p>{zh ? '上游解析器指标：' : 'Upstream parser metrics: '}{context.metrics.join(' · ')}</p>}
+        <p>{policy.mode === 'dependency'
+          ? (zh ? '上游成功后继续；此连线不满足下游文件输入。' : 'Continue after upstream succeeds; this edge does not supply a file input.')
+          : policy.mode === 'manual' || policy.mode === 'review'
+            ? (zh ? '上游完成后等待人工放行；确认后自动准备下游输入，全部必需输入就绪再推进。' : 'Wait for review after upstream completion, then automatically prepare downstream inputs and advance once all required inputs are ready.')
+            : (zh ? '上游完成后自动筛选并准备输入；所有必需输入就绪才推进。必需输入无合格结果则跳过下游，筛选错误会阻止推进。' : 'Automatically screen and prepare inputs after upstream completes. Advance once all required inputs are ready; an empty required input skips downstream, and screening errors block progression.')}</p>
+      </div>
       <p className="my-2 text-accent">{gateLabel(edge.gate as GatePolicy, gate, zh)}</p>
       <Button type="button" size="sm" variant="outline" onClick={onSource}>
         {zh ? '上游输出标准（所有出边共用）' : 'Upstream output standard (shared)'}
@@ -173,7 +193,7 @@ export function GateInspector({
         title={<> {zh ? '本分支筛选规则' : 'Branch screening policy'} </>}
       >
         <div className="mt-2">
-          <GatePolicyEditor value={policy} onChange={setPolicy} disabled={!canOperate || readOnly || action.isPending} />
+          <GatePolicyEditor metrics={context.metrics} allowStructure={context.structure || !!policy.structure} value={policy} onChange={setPolicy} disabled={!canOperate || readOnly || action.isPending} />
         </div>
       </WorkflowSection>
       {edge.id ? <GateEvidencePanel workflowId={workflowId} edgeId={edge.id} canWrite={canOperate} readOnly={readOnly} /> : null}

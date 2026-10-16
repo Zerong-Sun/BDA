@@ -1,3 +1,4 @@
+import { policyForConnection } from '../features/workflow/gateContext'
 import { Disclosure } from '../components/ui/Disclosure'
 import type { Connection } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -8,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkle, SpinnerGap } from '@phosphor-icons/react'
 import { Link } from 'react-router'
 import { WorkflowCanvas, type WorkflowCanvasHandle } from '../features/workflow/WorkflowCanvas'
+import { WorkflowPanelLayout } from '../features/workflow/WorkflowPanelLayout'
 import { NodeBuilder } from '../features/workflow/NodeBuilder'
 import { mapApiGraphToGraph } from '../features/workflow/workflowMapper'
 import { WorkflowResourceSidebar } from '../features/workflow/WorkflowResourceSidebar'
@@ -35,7 +37,7 @@ import type { WorkflowEdge } from '../lib/schemas/workflow'
 import { saveConnections, listGates } from '../lib/api/workflowGates'
 import { GateInspector } from '../features/workflow/GateInspector'
 import { ConnectionPicker } from '../features/workflow/ConnectionPicker'
-import { gateLabel, emptyPolicy, type GatePolicy } from '../features/workflow/gates'
+import { gateLabel, type GatePolicy } from '../features/workflow/gates'
 import { applyRoutePlan, planRoute, type RoutePlan } from '../lib/api/copilot'
 import { listProjectArtifacts } from '../lib/api/artifacts'
 import { listModelPlugins, validateModelPlugin } from '../lib/api/registry'
@@ -440,7 +442,7 @@ function WorkflowWorkspace() {
   const gateQuery = useQuery({ queryKey: ['workflow-gates', workflowRunId], queryFn: () => listGates(workflowRunId!), enabled: !!workflowRunId && !isDemoMode, refetchInterval: 3000 })
   const graph = useMemo(() => {
     if (!workflowNodes.length) return null
-    const mapped = mapApiGraphToGraph(workflowNodes, workflowGraph?.edges ?? [])
+    const mapped = mapApiGraphToGraph(workflowNodes, workflowGraph?.edges ?? [], workflowGraph?.layout)
     mapped.nodes = mapped.nodes.map(n => {
       const apiNode = workflowNodes.find(item => item.id === n.id)
       const plugin = modelPlugins.find(p => p.id === apiNode?.model_plugin_id)
@@ -448,6 +450,8 @@ function WorkflowWorkspace() {
         ...n,
         data: {
           ...n.data,
+          label: typeof apiNode?.parameters.display_name === 'string' ? n.data.label : plugin?.name ?? n.data.label,
+          resource: apiNode?.execution_mode === 'manual' ? 'manual' as const : plugin ? (plugin.resources.gpu ? 'gpu' as const : 'cpu' as const) : n.data.resource,
           inputPorts: plugin?.input_ports.map(p => p.name),
           outputPorts: plugin?.output_ports.map(p => p.name),
           requiredPorts: plugin?.input_ports.filter(p => p.required).map(p => p.name),
@@ -457,7 +461,7 @@ function WorkflowWorkspace() {
     })
     mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { if (!setSelectedNodeId(null)) return; setSelectedEdgeId(e.id); setSelectedArtifactId(undefined) } } }))
     return mapped
-  }, [workflowNodes, workflowGraph?.edges, modelPlugins, gateQuery.data, language, setSelectedEdgeId, setSelectedNodeId, setSelectedArtifactId])
+  }, [workflowNodes, workflowGraph?.edges, workflowGraph?.layout, modelPlugins, gateQuery.data, language, setSelectedEdgeId, setSelectedNodeId, setSelectedArtifactId])
   const selectedEdge = workflowGraph?.edges.find(e => e.id === selectedEdgeId)
   const persistConnections = async (edges: WorkflowEdge[]) => {
     if (!canEdit) throw new Error(accessMessage)
@@ -480,9 +484,7 @@ function WorkflowWorkspace() {
       target,
       source_port: ordering ? null : from,
       target_port: ordering ? null : to,
-      gate: ordering
-        ? { ...emptyPolicy(), mode: 'dependency' as const, configured: true }
-        : existing?.gate ?? emptyPolicy(),
+      gate: policyForConnection(existing, { source, target, source_port: ordering ? null : from, target_port: ordering ? null : to }),
     }
     await persistConnections([...(workflowGraph?.edges ?? []).filter(e => e.id !== existing?.id), edge])
     setSelectedEdgeId(edge.id)
@@ -1093,8 +1095,8 @@ function WorkflowWorkspace() {
 
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
-        <div className={`grid min-h-0 gap-4 xl:h-[calc(100vh-24rem)] xl:min-h-[34rem] ${focusCanvas ? 'grid-cols-1' : 'xl:grid-cols-[260px_minmax(0,1fr)_300px]'}`}>
-          <div className={`order-3 min-h-0 xl:order-1${focusCanvas ? ' hidden' : ''}`}>
+        <WorkflowPanelLayout overview={focusCanvas}>
+          <div data-workflow-panel="resources">
             <WorkflowResourceSidebar
               projectId={projectId}
               artifacts={visibleArtifacts}
@@ -1117,7 +1119,7 @@ function WorkflowWorkspace() {
             />
           </div>
 
-          <main className="relative order-1 min-w-0 xl:order-2" data-tour-id="workflow-canvas">
+          <main className="relative" data-workflow-panel="canvas" data-tour-id="workflow-canvas">
             {gateQuery.isError && <Alert variant="warning" className="mb-2">
               <AlertDescription>{language === 'zh' ? '门控状态加载失败。' : 'Gate status could not be loaded.'} {gateQuery.error.message}</AlertDescription>
               <Button type="button" size="sm" variant="outline" onClick={() => void gateQuery.refetch()}>{language === 'zh' ? '重新加载门控' : 'Reload gates'}</Button>
@@ -1211,12 +1213,12 @@ function WorkflowWorkspace() {
             )}
           </main>
 
-          <div className={`order-2 min-h-0 xl:order-3${focusCanvas ? ' hidden' : ''}`} data-tour-id="workflow-inspector">
+          <div data-workflow-panel="inspector" data-tour-id="workflow-inspector">
             {isDemoMode && !selectedArtifact ? <DemoWorkflowInspector
               selectedStep={demoWorkflow.steps.find(step => step.node.id === selectedNodeId)}
               stepCount={demoWorkflow.steps.length}
             /> : (
-            selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}`} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} canOperate={canEdit} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
+            selectedEdge && workflowRunId ? <GateInspector key={`${workflowRunId}:${selectedEdge.id}:${selectedEdge.source_port}:${selectedEdge.target_port}:${workflowNodes.find(n => n.node_key === selectedEdge.source)?.model_plugin_id}:${workflowNodes.find(n => n.node_key === selectedEdge.target)?.model_plugin_id}`} sourcePlugin={modelPlugins.find(p => p.id === workflowNodes.find(n => n.node_key === selectedEdge.source)?.model_plugin_id)} targetPlugin={modelPlugins.find(p => p.id === workflowNodes.find(n => n.node_key === selectedEdge.target)?.model_plugin_id)} workflowId={workflowRunId} edge={selectedEdge} onEditMapping={() => setConnectionPicker({ source: workflowNodes.find(n => n.node_key === selectedEdge.source)?.id, target: workflowNodes.find(n => n.node_key === selectedEdge.target)?.id, edgeId: selectedEdge.id })} onDelete={async () => { await persistConnections((workflowGraph?.edges ?? []).filter(e => e.id !== selectedEdge.id)); setSelectedEdgeId(null) }} runs={gateQuery.data?.items.filter(r => r.edge_id === selectedEdge.id) ?? []} readOnly={readOnly} canOperate={canEdit} onSave={async edge => persistConnections((workflowGraph?.edges ?? []).map(e => e.id === edge.id ? edge : e))} onClose={() => setSelectedEdgeId(null)} onSource={() => { setSelectedNodeId(workflowNodes.find(n => n.node_key === selectedEdge.source)?.id ?? null); setSelectedEdgeId(null) }} onArtifact={id => { setSelectedArtifactId(id); setSelectedNodeId(null); setSelectedEdgeId(null) }} /> : <WorkflowInspector
               workflowRunId={workflowRunId}
               workflowVersion={workflowGraph?.workflow.version}
               readOnly={readOnly}
@@ -1228,7 +1230,7 @@ function WorkflowWorkspace() {
               onDirtyChange={setUnsavedNodeChanges}
             />)}
           </div>
-        </div>
+        </WorkflowPanelLayout>
       </ApiState>
 
       {!isDemoMode && workflowRun?.status === 'succeeded' ? <NextStep stage="workflow" /> : null}

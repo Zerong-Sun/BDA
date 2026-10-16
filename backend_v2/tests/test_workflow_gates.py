@@ -189,9 +189,12 @@ def test_layout_cannot_rewire_execution(env):
     from backend_v2.app.workflows.schemas import WorkflowLayoutUpdate
     from backend_v2.app.workflows.service import update_layout
 
-    w = WorkflowRun(version=1, graph={"edges": [{"source": "a", "target": "b"}]})
-    update_layout(w, WorkflowLayoutUpdate(nodes=[], edges=[{"source": "b", "target": "a"}]), 1)
+    w = WorkflowRun(version=1, graph={"nodes": [{"key": "a"}], "edges": [{"source": "a", "target": "b"}]})
+    layout_nodes = [{"id": "a", "position": {"x": 10, "y": 20}, "width": 360}]
+    update_layout(w, WorkflowLayoutUpdate(nodes=layout_nodes, edges=[{"source": "b", "target": "a"}]), 1)
     assert w.graph["edges"] == [{"source": "a", "target": "b"}]
+    assert w.graph["layout"]["nodes"] == layout_nodes
+    assert w.graph["nodes"][0]["position"] == {"x": 10, "y": 20}
 
 
 def test_repair_draft_repeatable_and_rollback(env):
@@ -773,3 +776,30 @@ def test_preflight_warns_when_a_queue_contradicts_the_plugin(env):
 
     # A queue nobody registered says nothing, rather than guessing from its name.
     assert queue_capability_warnings(s, [_node("v3-64")], {"design": plugin}) == []
+
+
+def test_model_change_invalidates_adjacent_data_gate_approval_but_preserves_review(env):
+    from backend_v2.app.workflows.models import WorkflowRun
+    from backend_v2.app.workflows.schemas import WorkflowNodeUpdate
+    from backend_v2.app.workflows.service import update_node
+
+    s = env['session']
+    policy = {'mode': 'automatic', 'configured': True, 'rules': {'conditions': [{'metric': 'score', 'op': 'lt', 'value': 1}]}, 'script_preview_id': str(uuid.uuid4())}
+    workflow = WorkflowRun(project_id=env['project'].id, name='model change', created_by=env['user'].id,
+                           graph={'nodes': [{'key': 'a'}], 'edges': [
+                               {'source': 'a', 'target': 'b', 'gate': policy},
+                               {'source': 'a', 'target': 'c', 'gate': {'mode': 'dependency', 'configured': True}},
+                               {'source': 'b', 'target': 'c', 'gate': policy}]})
+    s.add(workflow)
+    s.flush()
+    node = _node(workflow, 'a', env['producer'], [])
+    s.add(node)
+    s.flush()
+    update_node(workflow, node, WorkflowNodeUpdate(parameters={'x': 1}), workflow.version)
+    assert workflow.graph['edges'][0]['gate']['configured']
+    update_node(workflow, node, WorkflowNodeUpdate(model_plugin_id=env['consumer'].id), workflow.version)
+    changed, ordering, unrelated = workflow.graph['edges']
+    assert changed['gate']['configured'] is False
+    assert changed['gate']['script_preview_id'] is None
+    assert changed['gate']['rules'] == policy['rules']
+    assert ordering['gate']['configured'] and unrelated['gate']['configured']

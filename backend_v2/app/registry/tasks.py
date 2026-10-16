@@ -100,16 +100,29 @@ def _model_plugin_errors(plugin) -> list[str]:
 @celery_app.task(name="bda_v2.registry_compute_node_health")
 def registry_compute_node_health(node_id: str) -> dict:
     from ..registry.models import ComputeNode
+    from .health import probe_compute_node
 
     parsed = uuid.UUID(node_id)
     with session_scope() as session:
         node = session.get(ComputeNode, parsed)
         if node is None:
             return {"node_id": node_id, "status": "missing"}
-        configured = node.backend in {"docker", "lsf"} and node.enabled
-        node.labels = {**node.labels, "health": "configured" if configured else "disabled"}
+        version = node.version
+        enabled = node.enabled
+        config = {"backend": node.backend, "queue": node.queue, "server_id": node.server_id, "labels": dict(node.labels)}
+    status, error = probe_compute_node(**config) if enabled else ("disabled", None)
+    with session_scope() as session:
+        node = session.get(ComputeNode, parsed, with_for_update=True)
+        if node is None:
+            return {"node_id": node_id, "status": "missing"}
+        if node.version != version:
+            return {"node_id": node_id, "status": "stale", "message": "Target changed during the check; check it again."}
+        node.health_status = status
+        node.health_error = error
+        node.health_checked_at = datetime.now(UTC)
+        node.labels = {**node.labels, "health": status}
         node.version += 1
-    return {"node_id": node_id, "status": "configured" if configured else "disabled"}
+    return {"node_id": node_id, "status": status, "message": error}
 
 
 @celery_app.task(name="bda_v2.registry_server_test")

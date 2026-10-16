@@ -36,4 +36,10 @@ describe('Workflow overview', () => {
     const shuffled = workflowOverview([nodes[3], nodes[1], nodes[2], nodes[0]], [])
     expect(shuffled.nodes.find(node => node.id === nodes[0].id)?.data.overviewLabel).toBe('01')
   })
+
+  it('keeps overview dimensions separate from saved workbench card widths', () => {
+    const resized = [{ ...nodes[0], width: 420 }]
+    expect(workflowOverview(resized, []).nodes[0].width).toBe(300)
+    expect(resized[0].width).toBe(420)
+  })
 })

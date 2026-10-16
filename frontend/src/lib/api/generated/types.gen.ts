@@ -12115,6 +12115,10 @@ export type UserResponse = {
  */
 export type WorkflowCreate = {
     /**
+     * Compute Backend
+     */
+    compute_backend?: 'docker' | 'lsf' | null;
+    /**
      * Derived From Id
      */
     derived_from_id?: string | null;

@@ -1,10 +1,13 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, NodeResizeControl, Position, type NodeProps } from '@xyflow/react'
+import { ArrowsHorizontal } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { StatusPill } from '../../components/ui/StatusPill'
+import { Button } from '../../components/ui/Button'
 import { statusTone } from '../../components/ui/statusTone'
 import { useI18n } from '../../lib/i18n'
 import { DefaultNodeIcon, nodeIconMap, type NodeIconName } from './nodeIcons'
 import { ORDER_SOURCE_HANDLE, ORDER_TARGET_HANDLE, type WorkflowNodeData } from './workflowTypes'
+import { MAX_NODE_WIDTH, MIN_NODE_WIDTH } from './workflowNodeLayout'
 
 const topBorderByStatus: Record<string, string> = {
   queued: 'border-t-accent-2',
@@ -25,7 +28,7 @@ const statusKeyMap = {
   skipped: 'skipped',
 } as const
 
-export function WorkflowNodeCard({ data, selected }: NodeProps) {
+export function WorkflowNodeCard({ data, selected, draggable, width }: NodeProps) {
   const { t, language } = useI18n()
   const nodeData = data as WorkflowNodeData
   const Icon = nodeIconMap[nodeData.icon as NodeIconName] ?? DefaultNodeIcon
@@ -64,13 +67,31 @@ export function WorkflowNodeCard({ data, selected }: NodeProps) {
   return (
     <article
       className={clsx(
-        'group min-h-[4.5rem] w-[12.5rem] max-w-[13.75rem] rounded-xl border border-border-default bg-surface-1 px-3 py-2.5 text-sm shadow-soft',
+        'group relative min-h-[4.5rem] rounded-xl border border-border-default bg-surface-1 px-3 py-2.5 text-sm shadow-soft',
         'border-t-2',
         topBorderByStatus[statusKey] ?? 'border-t-border-soft',
         selected && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-canvas',
         statusKey === 'running' && 'animate-pulse',
       )}
+      style={{ width: '100%', minWidth: MIN_NODE_WIDTH }}
     >
+      {selected && draggable ? <NodeResizeControl
+        position="bottom-right" resizeDirection="horizontal"
+        minWidth={MIN_NODE_WIDTH} maxWidth={MAX_NODE_WIDTH}
+        style={{ width: 22, height: 22, border: 0, background: 'transparent' }}
+      >
+        <Button type="button" variant="outline" size="icon-sm" className="nodrag nopan h-full w-full min-w-0 cursor-ew-resize rounded border-accent bg-surface-1 p-0 text-accent shadow-sm"
+          aria-label={zh ? '调整节点卡片宽度' : 'Resize node card width'}
+          title={zh ? '拖动调整宽度；方向键微调' : 'Drag to resize; use arrow keys to adjust'}
+          onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            event.preventDefault()
+            event.stopPropagation()
+            const step = event.shiftKey ? 40 : 20
+            nodeData.onWidthChange?.(event.key === 'Home' ? MIN_NODE_WIDTH : event.key === 'End' ? MAX_NODE_WIDTH : (width ?? MIN_NODE_WIDTH) + (event.key === 'ArrowRight' ? step : -step))
+          }}
+        ><ArrowsHorizontal className="h-4 w-4" aria-hidden="true" /></Button>
+      </NodeResizeControl> : null}
       <header className="relative flex min-w-0 items-center gap-2">
         {/* Ordering, not data: present on every card so a stage with no compatible port
             can still be sequenced, and so a portless legacy edge has somewhere to land.

@@ -5,6 +5,7 @@ import type {
   WorkflowNodeStatus as ApiWorkflowNodeStatus,
 } from '../../lib/schemas/workflow'
 import { themeColor } from '../../lib/theme/themeColor'
+import { workflowNodeWidth } from './workflowNodeLayout'
 import {
   ORDER_SOURCE_HANDLE,
   ORDER_TARGET_HANDLE,
@@ -169,13 +170,27 @@ export function mapApiNodesToGraph(apiNodes: WorkflowNode[]): BdaWorkflowNode[] 
   return nodes
 }
 
-export function mapApiGraphToGraph(apiNodes: WorkflowNode[], apiEdges: WorkflowEdge[]): {
+export function mapApiGraphToGraph(apiNodes: WorkflowNode[], apiEdges: WorkflowEdge[], layout?: Record<string, unknown>): {
   nodes: BdaWorkflowNode[]
   edges: BdaWorkflowEdge[]
 } {
   // Imported graphs often have no layout. Derive columns from their dependencies,
   // rather than response order, and give parallel stages separate rows.
   const nodes = mapApiNodesToGraph(apiNodes)
+  // The layout endpoint stores dimensions alongside positions and normalizes IDs
+  // to node keys. Accept either spelling for older/exported layout records.
+  const widths = new Map<string, number>()
+  if (Array.isArray(layout?.nodes)) {
+    for (const item of layout.nodes) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string') continue
+      const width = workflowNodeWidth(item.width)
+      if (width !== undefined) widths.set(item.id, width)
+    }
+  }
+  for (const [index, node] of nodes.entries()) {
+    const width = widths.get(node.id) ?? widths.get(apiNodes[index].node_key)
+    if (width !== undefined) node.width = width
+  }
   const byKey = new Map(apiNodes.flatMap((node) => [[node.id, node.id], [node.node_key, node.id]]))
   const incoming = new Map(apiNodes.map((node) => [node.id, 0]))
   const outgoing = new Map(apiNodes.map((node) => [node.id, [] as string[]]))

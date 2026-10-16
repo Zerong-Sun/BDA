@@ -88,9 +88,9 @@ celery_app.conf.update(
         "bda_v2.campaign_advance": {"queue": "research"},
         "bda_v2.campaign_evaluate": {"queue": "research"},
         "bda_v2.literature_relations_detect": {"queue": "research"},
-        "bda_v2.registry_model_plugin_validate": {"queue": "maintenance"},
-        "bda_v2.registry_compute_node_health": {"queue": "maintenance"},
-        "bda_v2.registry_server_test": {"queue": "maintenance"},
+        "bda_v2.registry_model_plugin_validate": {"queue": settings.registry_task_queue},
+        "bda_v2.registry_compute_node_health": {"queue": settings.registry_task_queue},
+        "bda_v2.registry_server_test": {"queue": settings.registry_task_queue},
         "bda_v2.*": {"queue": "maintenance"},
     },
     beat_schedule={

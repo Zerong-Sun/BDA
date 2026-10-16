@@ -20610,6 +20610,21 @@
       },
       "WorkflowCreate": {
         "properties": {
+          "compute_backend": {
+            "anyOf": [
+              {
+                "enum": [
+                  "docker",
+                  "lsf"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Backend"
+          },
           "derived_from_id": {
             "anyOf": [
               {

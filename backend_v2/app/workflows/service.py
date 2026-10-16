@@ -52,6 +52,8 @@ def create_workflow(session: Session, project: Project, payload: WorkflowCreate,
         "nodes": [node.model_dump(mode="json") for node in payload.nodes],
         "edges": [edge.model_dump(mode="json") for edge in payload.edges],
     }
+    if payload.compute_backend is not None:
+        graph["compute_backend"] = payload.compute_backend
     if payload.derived_from_id is not None:
         ancestor = session.get(WorkflowRun, payload.derived_from_id)
         if ancestor is None or ancestor.project_id != project.id:
@@ -116,11 +118,14 @@ def replace_workflow_graph(
     if "route_presentation" in display and payload.name.strip() != workflow.name:
         raise DomainError("workflow_presentation_rename_required", "Rename an organized route through its presentation endpoint", status_code=409)
     workflow.name = payload.name.strip()
+    backend = payload.compute_backend or workflow.graph.get("compute_backend")
     workflow.graph = {
         **display,
         "nodes": [node.model_dump(mode="json") for node in payload.nodes],
         "edges": [edge.model_dump(mode="json") for edge in payload.edges],
     }
+    if backend:
+        workflow.graph = {**workflow.graph, "compute_backend": backend}
     for node in WorkflowRepository(session).nodes(workflow.id):
         session.delete(node)
     session.flush()
@@ -203,6 +208,7 @@ def update_node(
         from .assistance import validate_configuration
 
         validate_configuration(payload.configuration)
+    plugin_changed = "model_plugin_id" in payload.model_fields_set and payload.model_plugin_id != node.model_plugin_id
     values = payload.model_dump(exclude_unset=True, exclude={"position"})
     # The graph is a JSON column, so it needs JSON-safe values (UUIDs as strings);
     # the ORM attributes want native types. Dump twice rather than coercing.
@@ -219,6 +225,16 @@ def update_node(
                 item["position"] = payload.position
         graph_nodes.append(item)
     graph["nodes"] = graph_nodes
+    if plugin_changed:
+        # Keep authored thresholds for review, but never reuse their approval against
+        # a different model's metrics/ports. Ordering-only edges have no data contract.
+        graph["edges"] = [
+            {**edge, "gate": {**(edge.get("gate") or {}), "configured": False, "script_preview_id": None}}
+            if node.node_key in (edge.get("source"), edge.get("target"))
+            and (edge.get("gate") or {}).get("mode") != "dependency"
+            else edge
+            for edge in graph.get("edges", [])
+        ]
     workflow.graph = graph
     workflow.version += 1
     return node

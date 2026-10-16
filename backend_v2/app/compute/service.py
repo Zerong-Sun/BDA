@@ -206,7 +206,9 @@ def create_submission(
             raise DomainError("preview_incomplete", "Review every executable node before submitting", status_code=412)
     _record_lineage(session, workflow, nodes)
     settings = get_settings()
-    backend = payload.compute_backend or settings.compute_backend
+    from ..workflows.preflight import workflow_backend
+
+    backend = workflow_backend(workflow, payload.compute_backend)
     if settings.is_production and backend == "demo":
         raise DomainError("demo_compute_forbidden", "Demo compute cannot run in production", status_code=409)
     # Refuse LSF before doing any work when no cluster is configured; the deployment

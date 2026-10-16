@@ -278,3 +278,9 @@ describe('workflow gates', () => {
     expect(screen.getByTestId('source-sequences')).toBeVisible()
   })
 })
+
+it('offers parser metrics without structure-only controls for a sequence gate', () => {
+  render(<GatePolicyEditor value={emptyPolicy()} onChange={vi.fn()} metrics={['score', 'seq_recovery']} allowStructure={false} />)
+  expect(screen.getByText('添加上游模型指标')).toBeInTheDocument()
+  expect(screen.queryByText('结构质量标准（DSSP）')).not.toBeInTheDocument()
+})

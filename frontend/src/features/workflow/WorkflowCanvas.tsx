@@ -5,6 +5,7 @@ import {
   Controls,
   MiniMap,
   applyEdgeChanges,
+  applyNodeChanges,
   useEdgesState,
   useNodesState,
   type Connection,
@@ -33,6 +34,7 @@ import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
 import { useI18n } from '../../lib/i18n'
 import { workflowOverview } from './workflowOverview'
+import { MIN_NODE_WIDTH, workflowNodeWidth } from './workflowNodeLayout'
 
 const nodeTypes: NodeTypes = { workflowNode: WorkflowNodeCard }
 const edgeTypes: EdgeTypes = { workflowEdge: WorkflowEdge }
@@ -93,7 +95,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     },
     ref,
   ) {
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes ?? [])
+    const [nodes, setNodes] = useNodesState(initialNodes ?? [])
     const [edges, setEdges] = useEdgesState(initialEdges ?? [])
     const showToast = useToastStore(s => s.show)
     const [addingNode, setAddingNode] = useState(false)
@@ -144,6 +146,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           return {
             ...node,
             position: existingPositions.get(node.id) ?? node.position,
+            width: existing?.width ?? node.width,
+            measured: existing?.measured,
+            resizing: existing?.resizing,
+            dragging: existing?.dragging,
             selected: existing?.selected,
           }
         })
@@ -178,21 +184,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       })
     }, [nodeCount, selectedNodeId, setNodes])
 
-    // Keyboard selection. React Flow selects a focused node on Enter or Space
-    // inside its own store and never calls `onNodeClick`, so a keyboard user
-    // could highlight a node without the inspector or the URL ever hearing of
-    // it. Only selections are forwarded: deselection also happens as a side
-    // effect of clicking an edge, and forwarding that would clear the edge the
-    // person just chose. Clearing is the pane click and Escape, below.
-    const handleNodesChange = useCallback(
-      (changes: NodeChange<BdaWorkflowNode>[]) => {
-        onNodesChange(changes)
-        const picked = changes.find((change) => change.type === 'select' && change.selected)
-        if (picked && picked.type === 'select') onNodeSelected?.(picked.id)
-      },
-      [onNodeSelected, onNodesChange],
-    )
-
     const persistLayout = useCallback(
       (currentNodes: Node[], currentEdges: BdaWorkflowEdge[]) => {
         if (!workflowRunId || readOnly) return
@@ -203,6 +194,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             nodes: currentNodes.map((node) => ({
               id: node.id,
               position: node.position,
+              ...(node.width !== undefined ? { width: node.width } : {}),
             })),
             edges: currentEdges.map((edge) => ({
               source: edge.source,
@@ -215,6 +207,34 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       },
       [workflowRunId, readOnly, onLayoutSaved, showToast],
     )
+
+    const handleNodesChange = useCallback(
+      (changes: NodeChange<BdaWorkflowNode>[]) => {
+        // Keep the ref current in the same event as the final resize/drag. Saving
+        // from the previous render can otherwise miss the last pointer movement.
+        const next = applyNodeChanges(changes, nodesRef.current)
+        nodesRef.current = next
+        setNodes(next)
+        if (!overview && changes.some(change => change.type === 'dimensions' && change.resizing === false)) {
+          persistLayout(next, edgesRef.current)
+        }
+        // Keyboard selection must reach the inspector too. Deselection is handled
+        // by the pane/Escape, so picking an edge does not immediately clear it.
+        const picked = changes.find(change => change.type === 'select' && change.selected)
+        if (picked && picked.type === 'select') onNodeSelected?.(picked.id)
+      },
+      [onNodeSelected, setNodes, persistLayout, overview],
+    )
+
+    const resizeNode = useCallback((id: string, requestedWidth: number) => {
+      if (readOnly || overview) return
+      const width = workflowNodeWidth(requestedWidth)
+      if (width === undefined) return
+      const next = nodesRef.current.map(node => node.id === id ? { ...node, width } : node)
+      nodesRef.current = next
+      setNodes(next)
+      persistLayout(next, edgesRef.current)
+    }, [readOnly, overview, setNodes, persistLayout])
 
     const onEdgesChange = useCallback(
       (changes: EdgeChange<BdaWorkflowEdge>[]) => {
@@ -418,7 +438,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     // Node deletion has no canvas persistence handler. React Flow's default
     // Backspace removal would only hide server nodes locally (even read-only
     // ones) and can also remove their connections. Keep those nodes inspectable.
-    const renderedNodes = useMemo(() => nodes.map(node => ({ ...node, deletable: false })), [nodes])
+    const renderedNodes = useMemo(() => nodes.map(node => ({
+      ...node,
+      width: node.width ?? MIN_NODE_WIDTH,
+      deletable: false,
+      data: { ...node.data, onWidthChange: (width: number) => resizeNode(node.id, width) },
+    })), [nodes, resizeNode])
     const overviewGraph = useMemo(() => workflowOverview(renderedNodes, edges), [renderedNodes, edges])
     const completedCount = nodes.filter(node => node.data.status === 'completed').length
     const activeStatuses = [...new Set(nodes.map(node => node.data.status))]
@@ -432,7 +457,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     // graph zoomed further out than it needed to be. The min-height still applies on
     // narrow layouts, where the column is not height-constrained.
     return (
-      <Frame variant="inverse" spacing="xs" className="h-full min-h-[34rem]">
+      <Frame variant="inverse" spacing="xs" className="h-full min-h-[34rem] min-w-0 flex-1 xl:min-h-0">
         <FramePanel className="relative flex h-full flex-col overflow-hidden bg-bg-canvas p-0">
         {/* Banner and legend sit above the graph rather than floating on it. As overlays
             they covered the top-left corner of the route permanently, and with both

@@ -49,6 +49,8 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   boundPorts?: string[]
   methods?: string[]
   parameters?: Record<string, unknown>
+  /** Keyboard equivalent of the selected card's horizontal resize handle. */
+  onWidthChange?: (width: number) => void
 }
 
 export type BdaWorkflowNode = Node<WorkflowNodeData>

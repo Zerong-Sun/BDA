@@ -194,7 +194,7 @@ export const WorkflowPreflightSchema = z.object({
 export type WorkflowPreflight = z.infer<typeof WorkflowPreflightSchema>
 
 export const WorkflowLayoutSchema = z.object({
-  nodes: z.array(z.object({ id: z.string(), position: PositionSchema })),
+  nodes: z.array(z.object({ id: z.string(), position: PositionSchema, width: z.number().positive().optional() })),
   edges: z.array(WorkflowEdgeSchema),
 })
 

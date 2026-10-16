@@ -260,7 +260,7 @@ function WorkflowInspectorContent({
   }
 
   return (
-    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-[340px] shrink-0 2xl:min-h-0">
+    <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] min-w-0 w-full xl:min-h-0">
       <FrameHeader>
         <FrameTitle>
           {selectedNode

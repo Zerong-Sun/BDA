@@ -38,6 +38,10 @@ export function workflowOverview(nodes: BdaWorkflowNode[], edges: BdaWorkflowEdg
     nodes: nodes.map(node => {
       return {
         ...node,
+        // Overview uses its own uniform cards, never the editable card dimensions.
+        width: 300,
+        height: 232,
+        measured: undefined,
         // Cyclic routes keep their positions; the overview must not invent order.
         position: edges.length && !hasTopology ? node.position : layout.get(node.id)!,
         data: { ...node.data, overview: true, overviewLabel: String((linear ? depth.get(node.id)! : displayIndex.get(node.id)!) + 1).padStart(2, '0') },

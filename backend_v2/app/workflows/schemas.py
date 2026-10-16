@@ -70,6 +70,7 @@ class WorkflowEdgeInput(BaseModel):
 
 
 class WorkflowCreate(BaseModel):
+    compute_backend: Literal["docker", "lsf"] | None = None
     name: str = Field(min_length=1, max_length=200)
     nodes: list[WorkflowNodeInput] = Field(default_factory=list, max_length=200)
     edges: list[WorkflowEdgeInput] = Field(default_factory=list, max_length=500)
