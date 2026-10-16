@@ -1,4 +1,6 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
+import { flushSync } from 'react-dom'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useI18n } from '../../lib/i18n'
@@ -62,8 +64,9 @@ function headingText(node: React.ReactNode): string {
   return ''
 }
 
-export function ReviewMarkdown({ children, citations = [], projectId }: { children: string; citations?: readonly CitationRecord[]; projectId?: string }) {
+export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = false }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean }) {
   const { language } = useI18n()
+  const [sourcesOpen, setSourcesOpen] = useState(false)
   const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const headings = sectionHeadings(children)
   const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
@@ -98,6 +101,9 @@ export function ReviewMarkdown({ children, citations = [], projectId }: { childr
             const id = `${prefix}-source-${index}`
             return <sup><a href={`#${id}`} aria-label={`${language === 'zh' ? '查看来源' : 'View source'} ${index}`} onClick={(event) => {
               event.preventDefault()
+              // Mount the compact source list before locating the exact source.
+              // The source's own disclosure can then open without changing the app hash.
+              if (compactCitations && !sourcesOpen) flushSync(() => setSourcesOpen(true))
               const detail = document.getElementById(id)
               const trigger = detail?.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')
               if (trigger?.getAttribute('aria-expanded') === 'false') trigger.click()
@@ -113,7 +119,14 @@ export function ReviewMarkdown({ children, citations = [], projectId }: { childr
       >
         {children}
       </ReactMarkdown>
-      <CitationDetails citations={citations} prefix={prefix} projectId={projectId} />
+      {compactCitations && citations.length ? (
+        <Accordion className="mt-2" value={sourcesOpen ? ['sources'] : []} onValueChange={value => setSourcesOpen(value.includes('sources'))}>
+          <AccordionItem value="sources" className="border-0">
+            <AccordionTrigger>{language === 'zh' ? `来源（${citations.length}）` : `Sources (${citations.length})`}</AccordionTrigger>
+            <AccordionContent><CitationDetails citations={citations} prefix={prefix} projectId={projectId} /></AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : <CitationDetails citations={citations} prefix={prefix} projectId={projectId} />}
     </div>
   )
 }

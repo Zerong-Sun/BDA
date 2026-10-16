@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
@@ -48,7 +50,7 @@ def update_presentation(
 
 
 def create_workflow(session: Session, project: Project, payload: WorkflowCreate, user: User) -> WorkflowRun:
-    graph = {
+    graph: dict[str, Any] = {
         "nodes": [node.model_dump(mode="json") for node in payload.nodes],
         "edges": [edge.model_dump(mode="json") for edge in payload.edges],
     }

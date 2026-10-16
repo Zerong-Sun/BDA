@@ -109,8 +109,11 @@ def registry_compute_node_health(node_id: str) -> dict:
             return {"node_id": node_id, "status": "missing"}
         version = node.version
         enabled = node.enabled
-        config = {"backend": node.backend, "queue": node.queue, "server_id": node.server_id, "labels": dict(node.labels)}
-    status, error = probe_compute_node(**config) if enabled else ("disabled", None)
+        backend, queue, server_id, labels = node.backend, node.queue, node.server_id, dict(node.labels)
+    status, error = (
+        probe_compute_node(backend=backend, queue=queue, server_id=server_id, labels=labels)
+        if enabled else ("disabled", None)
+    )
     with session_scope() as session:
         node = session.get(ComputeNode, parsed, with_for_update=True)
         if node is None:

@@ -77,6 +77,24 @@ describe('ResearchPage', () => {
     expect(screen.getAllByRole('region', { name: 'Project brief' })).toHaveLength(1)
   })
 
+  it('prioritizes the saved research summary for archived projects and folds planning controls', async () => {
+    server.use(
+      http.get('/api/v2/projects', () => HttpResponse.json({ items: [{ ...project, status: 'archived' }], next_cursor: null })),
+      http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+        project: { id: project.id },
+        review_document: { id: 'saved-report', title: { en: 'Saved study' }, content: { en: '## Research objective\nThe historical research question.\n## Findings\nThe historical result.' }, status: 'accepted', version: 1 },
+      })),
+    )
+    renderWithProviders(<ResearchPage />)
+    expect(await screen.findByText('The historical research question.')).toBeVisible()
+    expect(screen.getByText('The historical result.')).toBeVisible()
+    expect(within(nav()).getByRole('tab', { name: 'Project summary' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('decision-center')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('next-step')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Structured questions and decision definitions' }))
+    expect(await screen.findByTestId('decision-center')).toBeVisible()
+  })
+
   it('defaults to goals and presents four stages with accessible controls', () => {
     renderWithProviders(<ResearchPage />)
     expect(within(nav()).getAllByRole('tab')).toHaveLength(4)

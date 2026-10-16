@@ -57,21 +57,25 @@ describe('ProjectReviewPanel', () => {
     renderWithProviders(<ProjectReviewPanel workspace={workspace} showDocument={false} />)
 
     expect(await screen.findByTestId('research-finding')).toHaveAttribute('data-finding-id', 'finding-one')
-    expect(screen.getByRole('link', { name: 'PMID 12345678' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: 'Sources (2)' }))
+    fireEvent.click(screen.getByRole('button', { name: '[1] PMID 12345678' }))
+    fireEvent.click(screen.getByRole('button', { name: '[2] DOI 10.1000/example' }))
+    expect(screen.getByRole('link', { name: 'Open original source · PMID 12345678' })).toHaveAttribute(
       'href',
       'https://pubmed.ncbi.nlm.nih.gov/12345678/',
     )
-    expect(screen.getByRole('link', { name: 'DOI 10.1000/example' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open original source · DOI 10.1000/example' })).toHaveAttribute(
       'href',
       'https://doi.org/10.1000/example',
     )
-    expect(screen.getByTestId('finding-citations').children).toHaveLength(3)
+    expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
+    expect(screen.getAllByRole('link', { name: /Open original source/ })).toHaveLength(2)
   })
 
-  it('uses registry review surfaces and opens the controlled note editor', async () => {
+  it('uses a flat evidence article and opens the controlled note editor', async () => {
     renderWithProviders(<ProjectReviewPanel workspace={workspace} showDocument={false} />)
 
-    expect(await screen.findByTestId('research-finding')).toHaveAttribute('data-slot', 'frame-panel')
+    expect((await screen.findByTestId('research-finding')).tagName).toBe('ARTICLE')
     expect(screen.getByRole('combobox', { name: 'Choose a project section' })).toHaveAttribute(
       'data-slot',
       'select-trigger',
@@ -83,6 +87,45 @@ describe('ProjectReviewPanel', () => {
 
     expect(await screen.findByRole('dialog')).toHaveAttribute('data-slot', 'dialog-content')
     expect(screen.getByRole('textbox', { name: 'Short title' })).toHaveFocus()
+  })
+
+
+  it('shows a repeated opening conclusion once and preserves the actual review state', async () => {
+    const finding = workspace.review_sections[0]?.items?.[0]
+    if (!finding) throw new Error('Expected the seeded research finding')
+    const conclusion = 'The result still needs validation.'
+    const reviewedWorkspace = { ...workspace, review_sections: [{ ...workspace.review_sections[0], items: [{
+      ...finding, title: localized(conclusion), content: localized(`${conclusion} Additional limits remain.`),
+      evidence: { evidence_level: 'research_seed', review_status: 'pending_review', sources: ['PMID:12345678'] },
+    }] }] }
+    const { container } = renderWithProviders(<ProjectReviewPanel workspace={reviewedWorkspace} showDocument={false} />)
+    const article = await screen.findByTestId('research-finding')
+    expect(article.querySelector('h4')).toBeNull()
+    expect(article).toHaveTextContent(`${conclusion} Additional limits remain.`)
+    expect(article).toHaveTextContent('Pending review')
+    expect(article).toHaveTextContent('Research seed')
+    expect(article).not.toHaveTextContent('Reviewed evidence')
+    expect(container.querySelector('[data-slot="timeline"]')).toBeNull()
+    expect(container.querySelector('[data-slot="frame"]')).toBeNull()
+    expect(screen.queryByText(/Record updated:/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Record information' }))
+    expect(screen.getByText(/Record updated:/)).toHaveTextContent(finding.updated_at)
+    expect(screen.getByRole('button', { name: 'Sources (1)' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
+  })
+
+  it('keeps a duplicate Markdown heading with its citation in the source prose', async () => {
+    const finding = workspace.review_sections[0]?.items?.[0]
+    if (!finding) throw new Error('Expected the seeded research finding')
+    const sample = { ...workspace, review_sections: [{ ...workspace.review_sections[0], items: [{
+      ...finding, title: localized('Original claim [cite:1]'), content: localized('# Original claim [cite:1]\n\nLimits are unchanged.'),
+      evidence: { sources: ['PMID:12345678'] },
+    }] }] }
+    renderWithProviders(<ProjectReviewPanel workspace={sample} showDocument={false} />)
+    expect((await screen.findByTestId('research-finding')).querySelector('h4')).toBeNull()
+    expect(screen.getByRole('link', { name: 'View source 1' })).toBeInTheDocument()
+    expect(screen.getByText('Limits are unchanged.')).toBeInTheDocument()
+    expect(screen.getByText('Review status not recorded')).toBeInTheDocument()
   })
 
   it('lets readers focus a missing stage and recover the complete record', async () => {

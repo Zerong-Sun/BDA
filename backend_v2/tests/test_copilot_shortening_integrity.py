@@ -141,3 +141,38 @@ def test_dropped_successful_call_id_cannot_pass_either_pure_shortening_path(sess
     key = "format_repair_rejections" if stage == "initial" else "scientific_review_rejections"
     assert "shortening_evidence_lost" in run.outcome[key][-1]["validation_errors"]
     assert run.outcome["evidence_call_ids"] == ["read-1"]
+
+
+@pytest.mark.parametrize("stage", ["initial", "review"])
+@pytest.mark.parametrize("original_status", ["blocked", "needs_input"])
+@pytest.mark.parametrize("changed_status", ["partial", "completed"])
+def test_shortening_cannot_promote_declared_task_state(session, monkeypatch, stage, original_status, changed_status):
+    run = _setup(session)
+    long = {**_draft(True), "status": original_status}
+    original_short = {**_draft(), "status": original_status}
+    changed = {**_draft(), "status": changed_status}
+    values = [long, changed] if stage == "initial" else [original_short, long, changed]
+    seen = _script(monkeypatch, [{"content": json.dumps(value)} for value in values])
+    agent_loop.step(session, run, _provider(session))
+    assert len(seen) == len(values)
+    assert run.outcome.get("scientific_review") != "automated_review_completed"
+    key = "format_repair_rejections" if stage == "initial" else "scientific_review_rejections"
+    assert "shortening_status_changed" in run.outcome[key][-1]["validation_errors"]
+    assert json.loads(agent_runs.transcript(session, run)[-1].content) == changed
+    assert run.outcome["summary"] == long["summary"]
+
+
+@pytest.mark.parametrize("stage", ["initial", "review"])
+@pytest.mark.parametrize("status", ["blocked", "needs_input", "partial", "completed", "review_required"])
+def test_shortening_preserves_declared_state_despite_length_validation_override(session, monkeypatch, stage, status):
+    run = _setup(session)
+    long, short = {**_draft(True), "status": status}, {**_draft(), "status": status}
+    values = [long, short, short] if stage == "initial" else [short, long, short]
+    seen = _script(monkeypatch, [{"content": json.dumps(value)} for value in values])
+    agent_loop.step(session, run, _provider(session))
+    assert run.outcome["scientific_review"] == "automated_review_completed"
+    packet = json.loads(seen[1 if stage == "initial" else 2][1]["content"])
+    assert packet["target_template"]["status"] == status
+    assert packet["draft"]["status"] == status
+    # The unchanged scientific gap still downgrades a declared completion.
+    assert run.outcome["status"] == ("partial" if status == "completed" else status)

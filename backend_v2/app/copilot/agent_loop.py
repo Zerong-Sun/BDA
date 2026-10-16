@@ -53,6 +53,7 @@ from .provider import completion_message, structured_retry_provider
 from .registry import REGISTRY, ToolContext
 from .task_contracts import (
     FINAL_INSTRUCTION,
+    _delivery_json,
     available_step_tools,
     evaluate_delivery,
     pending_source_coverage,
@@ -133,7 +134,14 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                              + json.dumps(constraints, ensure_ascii=False)})
     if run.task_contract:
         conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**{key: value for key, value in run.task_contract.items() if key != "procedural_skills"}, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})
-    for turn in turns:
+    # A user continuation starts a new reasoning turn. Keep the complete
+    # answers/tool protocol/evidence, but do not replay private reasoning from
+    # earlier user turns. Current-turn tool reasoning remains protocol state.
+    last_user_index = max((index for index, turn in enumerate(turns) if turn.role == "user"), default=-1)
+    for index, turn in enumerate(turns):
+        reasoning = ({"reasoning_content": turn.reasoning_content}
+                     if index > last_user_index and turn.role == "assistant"
+                     and isinstance(getattr(turn, "reasoning_content", None), str) else {})
         if turn.role == "tool":
             meta = (turn.tool_calls or [{}])[0]
             tool_content = turn.content
@@ -156,12 +164,11 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
                     "role": "assistant",
                     "content": turn.content or None,
                     "tool_calls": list(turn.tool_calls),
-                    **({"reasoning_content": turn.reasoning_content} if isinstance(getattr(turn, "reasoning_content", None), str) else {}),
+                    **reasoning,
                 }
             )
         else:
-            conversation.append({"role": turn.role, "content": turn.content,
-                **({"reasoning_content": turn.reasoning_content} if turn.role == "assistant" and isinstance(getattr(turn, "reasoning_content", None), str) else {})})
+            conversation.append({"role": turn.role, "content": turn.content, **reasoning})
     conversation.append({"role": "system", "content":
         "Verified tool-call index for this run; copy exact call_id values into evidence_call_ids. "
         "Tool names, artifact IDs and invented aliases are not call IDs. "
@@ -462,8 +469,22 @@ def _locked_identity_sections(draft: dict) -> dict[str, str]:
             and re.search(r"子任务|身份|标识|(?:task|run|agent).*\bid\b", key, re.IGNORECASE)}
 
 
-def _shortening_content_errors(original: dict, shortened: dict, required_sections: list[str]) -> list[str]:
+def _declared_delivery_status(answer: str) -> str | None:
+    try:
+        data = _delivery_json(answer)
+    except (ValueError, TypeError):
+        return None
+    return data.get("status") if isinstance(data, dict) and isinstance(data.get("status"), str) else None
+
+
+def _shortening_content_errors(original: dict, shortened: dict, required_sections: list[str], *,
+                               original_status: str | None = None, shortened_status: str | None = None) -> list[str]:
     errors = []
+    # Evaluate_delivery turns every overlong status into review_required. Use
+    # the declared JSON status when supplied, so formatting cannot change a
+    # blocked factual verdict or reject an unchanged, now-short partial report.
+    if (original_status or original.get("status")) != (shortened_status or shortened.get("status")):
+        errors.append("shortening_status_changed")
     sections = shortened.get("sections", {})
     if any(not isinstance(sections.get(key), str) or not sections[key].strip() for key in required_sections):
         errors.append("shortening_sections_lost")
@@ -491,12 +512,15 @@ def _shortening_content_errors(original: dict, shortened: dict, required_section
     return errors
 
 
-def _length_repair_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn], draft: dict) -> list[dict]:
+def _length_repair_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn], draft: dict, *,
+                            declared_status: str | None = None) -> list[dict]:
     # Pure shortening works from the already evaluated draft. Replaying the
     # entire task can induce another full report instead of a compact rewrite.
     # Mixed format/evidence repairs retain their original receipt-rich packet.
     normalized = {**draft, "missing": [item for item in draft.get("missing", [])
                                       if item != "delivery_length_exceeded"]}
+    if declared_status is not None:
+        normalized["status"] = declared_status
     packet = _length_repair_packet(run, turns, normalized)
     packet.pop("goal")
     packet.pop("user_followups")
@@ -576,7 +600,7 @@ def _review_validation_errors(outcome: dict) -> list[str]:
              "delivery_length_exceeded", "invalid_skill_outputs", "unexpected_skill_outputs",
              "shortening_sections_lost", "shortening_scientific_gaps_lost", "shortening_identity_changed",
              "shortening_identifiers_lost", "shortening_roles_lost", "shortening_options_lost",
-             "shortening_evidence_lost", "shortening_skill_outputs_changed"}
+             "shortening_evidence_lost", "shortening_skill_outputs_changed", "shortening_status_changed"}
     errors = {item for item in outcome.get("missing", []) if item in codes}
     for prefix in ("skill_output_invalid", "skill_evidence_unverified"):
         if any(item.startswith(prefix + ":") for item in outcome.get("missing", [])):
@@ -695,7 +719,8 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                     # The validated draft already has exact evidence IDs. A
                     # pure shortening needs no duplicated receipts; the factual
                     # pass below still receives the original bounded records.
-                    repair_messages = _length_repair_messages(run, turns, run.outcome)
+                    repair_messages = _length_repair_messages(run, turns, run.outcome,
+                                                              declared_status=_declared_delivery_status(answer))
                     correction_provider = structured_retry_provider(provider) or provider
                     reserve_model_call(session, run, correction_provider, repair_messages)
                     repaired_message = completion_message(correction_provider, repair_messages)
@@ -712,7 +737,9 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                 repaired = str(repaired_message.get("content") or "")
                 repaired_outcome = evaluate_delivery(run, repaired, turns)
                 if repair_reasons == {"delivery_length_exceeded"}:
-                    content_errors = _shortening_content_errors(run.outcome, repaired_outcome, _shortening_sections(run, run.outcome))
+                    content_errors = _shortening_content_errors(
+                        run.outcome, repaired_outcome, _shortening_sections(run, run.outcome),
+                        original_status=_declared_delivery_status(answer), shortened_status=_declared_delivery_status(repaired))
                     if content_errors:
                         rejected = _save_rejected_review(session, run, repaired_message,
                                                         {"missing": content_errors}, "initial_length_repair")
@@ -748,7 +775,9 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                     original_review_outcome = reviewed_outcome
                     # One bounded correction of the reviewed delivery. Preserve
                     # its claims/qualifications and the same exact receipts.
-                    short_conversation = _length_repair_messages(run, turns, reviewed_outcome)
+                    declared_review_status = _declared_delivery_status(reviewed)
+                    short_conversation = _length_repair_messages(run, turns, reviewed_outcome,
+                                                                declared_status=declared_review_status)
                     # This correction only formats the preceding factual pass;
                     # its saved attempt above consumes a transcript slot.
                     correction_provider = structured_retry_provider(provider) or provider
@@ -758,7 +787,8 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                     reviewed = str(corrected.get("content") or "")
                     reviewed_outcome = evaluate_delivery(run, reviewed, turns)
                     review_content_errors = _shortening_content_errors(
-                        original_review_outcome, reviewed_outcome, _shortening_sections(run, original_review_outcome))
+                        original_review_outcome, reviewed_outcome, _shortening_sections(run, original_review_outcome),
+                        original_status=declared_review_status, shortened_status=_declared_delivery_status(reviewed))
                     if review_content_errors:
                         reviewed_outcome = {**reviewed_outcome,
                                             "missing": [*reviewed_outcome.get("missing", []), *review_content_errors]}

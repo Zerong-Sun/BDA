@@ -1,5 +1,11 @@
 # BDA Copilot Bot Roster
 
+状态：有效。
+最后核验：2026-10-16（合入前代码与本地回归）。
+权威范围：Bot 角色、任务授权边界与团队调度行为；不证明模型输出的科学正确性。
+数据来源：backend_v2/app/copilot/ 与对应本地回归测试。
+替代关系：维护当前文件；不替代原始研究记录。
+
 ## Team chat coordination (2026-10-16)
 
 The project room defaults to **Project Lead / 项目负责人**. Its specialists are

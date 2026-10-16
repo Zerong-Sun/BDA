@@ -50,7 +50,7 @@ export function CitationDetails({ citations, prefix, projectId }: { citations: r
         [zh ? '检索记录 ID' : 'Retrieval trace ID', citation.retrieval_trace_id],
         [zh ? '获取时间' : 'Retrieved at', citation.retrieved_at],
       ].filter(([, value]) => value !== undefined && value !== null && value !== '')
-      return <div key={index} id={`${prefix}-source-${index + 1}`} className="mt-2 rounded border border-border-soft p-2"><Disclosure title={`[${index + 1}] ${label}`}>
+      return <div key={index} id={`${prefix}-source-${index + 1}`} className="mt-1"><Disclosure title={`[${index + 1}] ${label}`}>
         {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">{zh ? '打开原始来源' : 'Open original source'} · {label}</a> : null}
         {projectHref ? <Link to={projectHref} className="mt-2 block">{zh ? '查看项目资料' : 'View project material'}</Link> : null}
         {citationText(citation.project_argument) ? <p className="mt-3"><strong>{zh ? '项目论点：' : 'Project argument: '}</strong>{citationText(citation.project_argument)}</p> : null}

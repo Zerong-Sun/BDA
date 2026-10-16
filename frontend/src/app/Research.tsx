@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '../components/reui/alert'
 import { Frame, FramePanel } from '../components/reui/frame'
 import { ResearchWorkspacePanel } from '../features/research/ResearchWorkspacePanel'
 import { ResearchGoalsPanel } from '../features/research/ResearchGoalsPanel'
+import { ProjectResearchOverview } from '../features/research/ProjectResearchOverview'
 import { ResearchDecisionCenter } from '../features/research/ResearchDecisionCenter'
 import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
 import { ProjectTimeline } from '../features/timeline/ProjectTimeline'
@@ -23,6 +24,7 @@ export function ResearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')
   const { projectId, activeProject } = useProjectContext()
+  const retrospective = ['archived', 'completed'].includes(activeProject?.status ?? '')
   const isPd1Demo = Boolean(activeProject && isDemoProject(activeProject))
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
@@ -30,7 +32,7 @@ export function ResearchPage() {
   const tab = rawTab ? normalizeResearchTab(rawTab) : 'goals'
   const group = tab === 'references' || tab === 'structures' || tab === 'data' ? 'evidence' : tab
   const groups = [
-    { key: 'goals', label: language === 'zh' ? '目标与问题' : 'Goals & questions' },
+    { key: 'goals', label: retrospective ? (language === 'zh' ? '项目总结' : 'Project summary') : (language === 'zh' ? '目标与问题' : 'Goals & questions') },
     { key: 'evidence', label: language === 'zh' ? '文献与证据' : 'Literature & evidence' },
     { key: 'methods', label: language === 'zh' ? '实验方案' : 'Experiment plan' },
     { key: 'timeline', label: language === 'zh' ? '决策记录' : 'Decision record' },
@@ -51,7 +53,7 @@ export function ResearchPage() {
     setSearchParams(next)
   }
   const tabConfig: Record<ResearchTab, { label: string }> = {
-    goals: { label: t.research.goals.title },
+    goals: { label: groups[0].label },
     evidence: { label: t.research.workspace.tabEvidence },
     references: { label: t.research.workspace.tabReferences },
     structures: { label: t.research.workspace.tabStructures },
@@ -114,7 +116,7 @@ export function ResearchPage() {
             <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
           ))}
         </nav> : null}
-        {projectId && (group === 'methods' || tab === 'evidence' || tab === 'references') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {projectId && !retrospective && (group === 'methods' || tab === 'evidence' || tab === 'references') ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {group === 'methods' ? <Button type="button" render={<Link to={`/workflow?project=${encodeURIComponent(projectId)}`} />}>{language === 'zh' ? '准备计算方案' : 'Prepare workflow'}</Button> : null}
           {group === 'evidence' ? <Button type="button" render={<Link to={literatureTaskLink(projectId, tab, language)} />}>{language === 'zh' ? '准备 AI 文献调研任务' : 'Prepare AI literature task'}</Button> : null}
         </div> : null}
@@ -129,10 +131,10 @@ export function ResearchPage() {
             </Frame>
           ) : tab === 'goals' ? (
             <>
-            {activeProject ? <Disclosure key={`brief-${projectId}-${searchParams.get('brief')}`} title={language === 'zh' ? '研究背景与任务书' : 'Research context'} defaultOpen={searchParams.get('brief') === '1'}>
+            {activeProject && retrospective ? <ProjectResearchOverview key={projectId} project={activeProject} /> : activeProject ? <Disclosure key={`brief-${projectId}-${searchParams.get('brief')}`} title={language === 'zh' ? '研究背景与任务书' : 'Research context'} defaultOpen={searchParams.get('brief') === '1'}>
               <ProjectBriefPanel project={activeProject} />
             </Disclosure> : null}
-            <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />
+            {retrospective ? <Disclosure title={language === 'zh' ? '结构化问题与决策定义' : 'Structured questions and decision definitions'}><ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} /></Disclosure> : <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />}
             <Frame>
               <FramePanel>
                 <div data-tour-id="research-goals"><Disclosure key={projectId} title={language === 'zh' ? '管理问题与目标树' : 'Manage questions and goal tree'}><ResearchGoalsPanel key={projectId} projectId={projectId} /></Disclosure></div>
@@ -144,7 +146,7 @@ export function ResearchPage() {
           ) : <div data-tour-id="research-workspace"><ResearchWorkspacePanel view={tab} /></div>}
         </TabsContent>
       </Tabs>
-      {projectId ? <NextStep stage="research" /> : null}
+      {projectId && !retrospective ? <NextStep stage="research" /> : null}
     </div>
   )
 }

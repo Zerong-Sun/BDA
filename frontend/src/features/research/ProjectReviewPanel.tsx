@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowSquareOutIcon,
   ChatCircleDotsIcon,
   PlusIcon,
   Network,
@@ -11,23 +10,6 @@ import {
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
-import {
-  Frame,
-  FrameDescription,
-  FrameHeader,
-  FramePanel,
-  FrameTitle,
-} from '../../components/reui/frame'
-import {
-  Timeline,
-  TimelineContent,
-  TimelineDate,
-  TimelineHeader,
-  TimelineIndicator,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineTitle,
-} from '../../components/reui/timeline'
 import { Button } from '../../components/ui/Button'
 import {
   Dialog,
@@ -57,9 +39,7 @@ import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
 import { useAppStore } from '../../lib/store/appStore'
 import { findingCitationRecords, findingCitationSources, workspaceCitationRecords } from './findingCitations'
-import { formatCitation } from './formatCitation'
 import { text } from './jsonHelpers'
-import { firstSentenceForTitle } from './parseReviewFinding'
 import { ReviewMarkdown } from './ReviewMarkdown'
 import { isReviewTrack, REVIEW_SECTION_ORDER, reviewSectionLabel } from './reviewTracks'
 import { localizeToken, shouldTruncateReviewStatement } from './researchUi'
@@ -93,46 +73,21 @@ function latestUpdated(sections: ProjectReviewSection[]): string {
     .at(-1) || '—'
 }
 
-function evidenceLabel(level: string, fallback: string, reviewed: string): string {
-  if (!level) return fallback
-  if (level === 'curated_review' || level === 'research_seed') return reviewed
-  return level.replaceAll('_', ' ')
+// Evidence provenance is not a review decision. Only the recorded review_status
+// may say that a person or process reviewed this finding.
+function evidenceLabel(level: string, fallback: string, zh: boolean): string {
+  if (level === 'research_seed') return zh ? '初始研究资料' : 'Research seed'
+  if (level === 'curated_review') return zh ? '整理的综述资料' : 'Curated review material'
+  return level ? level.replaceAll('_', ' ') : fallback
 }
 
-function formatFindingDate(value: string): string {
-  return value ? value.replace('T', ' ').replace('Z', ' UTC') : ''
-}
-
-function findingTitle(section: ProjectReviewSection, statement: string, rawTitle: string, fallback: string): string {
-  if (rawTitle && rawTitle !== section.label && rawTitle !== section.track) return rawTitle
-  return firstSentenceForTitle(statement) || fallback
-}
-
-function CitationList({ sources, collapsedLabel }: { sources: string[]; collapsedLabel: string }) {
-  return (
-    <div data-testid="finding-citations" className="mt-3 flex flex-wrap gap-2">
-      {sources.map((source) => {
-        const citation = formatCitation(source)
-        return citation.href ? (
-          <a
-            key={source}
-            className="inline-flex items-center gap-1 rounded border border-border-soft bg-bg-app px-2 py-1 text-xs text-accent hover:border-accent/50"
-            href={citation.href}
-            title={citation.title}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <ArrowSquareOutIcon aria-hidden="true" />{citation.label}
-          </a>
-        ) : (
-          <span key={source} className="rounded border border-border-soft bg-bg-app px-2 py-1 text-xs text-text-secondary" title={citation.title}>
-            {citation.label}
-          </span>
-        )
-      })}
-      <span className="sr-only">{collapsedLabel}</span>
-    </div>
-  )
+function findingHeading(section: ProjectReviewSection, statement: string, rawTitle: string): string {
+  const title = rawTitle.trim()
+  if (!title || title === section.label || title === section.track) return ''
+  // Keep source prose intact. Suppress only a presentation title already present
+  // as the opening paragraph or Markdown heading, never remove evidence text.
+  const opening = statement.trim().replace(/^#{1,6}[ \t]+/, '')
+  return opening === title || (opening.startsWith(title) && /^[\s.!?。！？]/.test(opening.slice(title.length))) ? '' : title
 }
 
 export function ProjectReviewPanel({
@@ -265,8 +220,7 @@ export function ProjectReviewPanel({
         if (!open) setNote(emptyNote())
       }}
     >
-      <Frame spacing="lg">
-        <FramePanel>
+      <section className="min-w-0">
       <section className="mb-5 border-b border-border-soft pb-5" aria-label={zh ? '研究阅读导览' : 'Research reading guide'}>
         <p className="text-xs uppercase tracking-wide text-accent">{zh ? '理解研究，再作判断' : 'From question to decision'}</p>
         <h3 className="mt-1 text-lg font-semibold">{zh ? '这项研究为什么做，下一步凭什么继续？' : 'Why this research, and what would justify the next step?'}</h3>
@@ -333,71 +287,53 @@ export function ProjectReviewPanel({
       </div>
 
       {visibleSections.length ? (
-        <div className="mt-5 grid gap-4">
+        <div className="mt-6 space-y-7">
           {visibleSections.map((section) => (
-            <Frame key={section.track} spacing="sm">
-              <FramePanel>
-                <FrameHeader className="flex-row items-center justify-between">
-                  <FrameTitle>{section.label}</FrameTitle>
-                  <FrameDescription>{format(r.itemsCount, { count: section.items.length })}</FrameDescription>
-                </FrameHeader>
-                <Timeline value={section.items.length}>
+            <section key={section.track} aria-label={section.label}>
+              <header className="mb-1 flex items-baseline justify-between gap-3 border-b border-border-soft pb-2">
+                <h3 className="font-semibold text-text-primary">{section.label}</h3>
+                <span className="text-xs text-text-muted">{format(r.itemsCount, { count: section.items.length })}</span>
+              </header>
+              <div className="divide-y divide-border-soft">
                 {section.items.map((item, index) => {
-                  const itemSources = findingCitationSources(item.evidence)
                   const statement = item.content
+                  const title = findingHeading(section, statement, item.title)
+                  const long = shouldTruncateReviewStatement(statement)
+                  const reviewStatus = text(item.evidence.review_status)
                   return (
-                    <TimelineItem key={item.id} step={index + 1}>
-                      <TimelineHeader>
-                        <TimelineDate>{formatFindingDate(text(item.updated_at) || text(item.created_at))}</TimelineDate>
-                        <TimelineTitle>{findingTitle(section, statement, item.title, format(r.findingFallbackTitle, { number: index + 1 }))}</TimelineTitle>
-                      </TimelineHeader>
-                      <TimelineIndicator />
-                      {index < section.items.length - 1 ? <TimelineSeparator /> : null}
-                      <TimelineContent>
-                        <Frame spacing="xs">
-                          <FramePanel data-testid="research-finding" data-finding-id={item.id}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" size="xs">
-                          {evidenceLabel(text(item.evidence.evidence_level), r.evidence, r.reviewedEvidence)}
-                        </Badge>
-                        {text(item.evidence.review_status) ? <Badge variant="secondary" size="xs">{localizeToken(text(item.evidence.review_status), t.research.enums)}</Badge> : null}
+                    <article key={item.id} className="min-w-0 py-4" data-testid="research-finding" data-finding-id={item.id}>
+                      {title || long ? <h4 className="mb-2 text-sm font-semibold text-text-primary">{title || format(r.findingFallbackTitle, { number: index + 1 })}</h4> : null}
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant="secondary" size="xs">{reviewStatus ? localizeToken(reviewStatus, t.research.enums) : (zh ? '审阅状态未记录' : 'Review status not recorded')}</Badge>
+                        <span className="text-text-muted">{evidenceLabel(text(item.evidence.evidence_level), r.evidence, zh)}</span>
                       </div>
-                      {/* A few findings run to thousands of characters and bury the short,
-                          decisive ones under them. `shouldTruncateReviewStatement` already
-                          encoded where that line falls (720 characters or 12 lines) and was
-                          tested but never wired to anything; this is the surface it was
-                          written for. Collapsed, never truncated - the whole statement is
-                          one click away, because a review finding cut off mid-sentence is
-                          worse than a long one. */}
-                      {shouldTruncateReviewStatement(statement) ? (
-                        <Disclosure className="mt-2" title={format(r.longStatement, { count: statement.length })}>
-                          <ReviewMarkdown citations={findingCitationRecords(item.evidence)}>{statement}</ReviewMarkdown>
+                      {long ? (
+                        <Disclosure title={format(r.longStatement, { count: Array.from(statement).length })}>
+                          <ReviewMarkdown compactCitations citations={findingCitationRecords(item.evidence)} projectId={projectId}>{statement}</ReviewMarkdown>
                         </Disclosure>
                       ) : (
-                        <div className="mt-2"><ReviewMarkdown citations={findingCitationRecords(item.evidence)}>{statement}</ReviewMarkdown></div>
+                        <ReviewMarkdown compactCitations citations={findingCitationRecords(item.evidence)} projectId={projectId}>{statement}</ReviewMarkdown>
                       )}
                       {text(item.evidence.uncertainty) ? (
-                        <Alert className="mt-2" variant="warning">
+                        <Alert className="mt-3" variant="warning">
                           <WarningIcon aria-hidden="true" />
                           <AlertTitle>{r.uncertainty}</AlertTitle>
                           <AlertDescription>{text(item.evidence.uncertainty)}</AlertDescription>
                         </Alert>
                       ) : null}
-                      {itemSources.length ? <CitationList sources={itemSources} collapsedLabel={format(r.sourcesCollapsed, { count: itemSources.length })} /> : null}
-                          </FramePanel>
-                        </Frame>
-                      </TimelineContent>
-                    </TimelineItem>
+                      <Disclosure className="mt-2 text-xs text-text-muted" title={zh ? '记录信息' : 'Record information'}>
+                        <p>{zh ? '记录 ID：' : 'Record ID: '}{item.id}</p>
+                        <p>{zh ? '记录更新时间：' : 'Record updated: '}{text(item.updated_at) || text(item.created_at) || '—'}</p>
+                      </Disclosure>
+                    </article>
                   )
                 })}
-                </Timeline>
-              </FramePanel>
-            </Frame>
+              </div>
+            </section>
           ))}
         </div>
       ) : <Alert className="mt-5"><AlertDescription>{readingQuery || readingStage !== 'all' ? (zh ? '当前筛选下没有记录。可清除筛选，或为所选环节补充依据；缺少记录不等于研究失败。' : 'No records match this view. Clear the filters or add evidence for this stage; missing documentation is not a failed study.') : r.notesEmpty}</AlertDescription></Alert>}
-        </FramePanel>
-      </Frame>
+      </section>
 
       {note.track ? (
         <DialogContent showCloseButton={false} className="sm:max-w-2xl">

@@ -92,7 +92,7 @@ export function ComputeTargetsSection() {
         {copy.title}
       </div>
 
-      {nodes.isError ? <p role="alert" className="text-xs text-red-600">{nodes.error.message}</p> : null}
+      {nodes.isError ? <p role="alert" className="text-xs text-danger">{nodes.error.message}</p> : null}
       {nodes.isPending ? <p role="status" className="text-xs text-text-secondary">{language === 'zh' ? '正在加载计算目标…' : 'Loading compute targets…'}</p> : nodes.data?.length ? (
         <ul className="grid gap-2">
           {nodes.data.map((node) => (

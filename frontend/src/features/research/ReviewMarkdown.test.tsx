@@ -95,6 +95,32 @@ describe('traceable inline citations', () => {
     expect(container.querySelectorAll('sup')).toHaveLength(1)
   })
 
+  it('opens a compact source group and its exact source from an inline citation', () => {
+    const scroll = vi.fn()
+    const previousScroll = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scroll
+    try {
+      render(<ReviewMarkdown compactCitations citations={[citation, { ...citation, entity_id: 'second', label: 'Second paper' }]}>{'Supported result.[cite:2]'}</ReviewMarkdown>)
+      expect(screen.getByRole('button', { name: 'Sources (2)' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
+      const hash = window.location.hash
+      const marker = screen.getByRole('link', { name: 'View source 2' })
+      fireEvent.click(marker)
+      expect(screen.getByRole('button', { name: 'Sources (2)' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: '[1] Saved paper' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByText('The measured result.')).toBeInTheDocument()
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
+      expect(scroll.mock.contexts[0]).toBe(document.getElementById(marker.getAttribute('href')!.slice(1)))
+      expect(window.location.hash).toBe(hash)
+      fireEvent.click(screen.getByRole('button', { name: 'Sources (2)' }))
+      fireEvent.click(screen.getByRole('link', { name: 'View source 2' }))
+      expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
+    } finally {
+      HTMLElement.prototype.scrollIntoView = previousScroll
+    }
+  })
+
   it('never assigns consulted sources to unmarked sentences or invents missing references', () => {
     const { container } = render(<ReviewMarkdown citations={[citation]}>{'No mapping. Unknown [cite:9]. Code `[cite:1]`.'}</ReviewMarkdown>)
     expect(container.querySelector('sup')).toBeNull()
