@@ -126,6 +126,35 @@ describe('GateEvidencePanel scientific evidence workflow', () => {
     expect(await screen.findByText('Automatic gate is held at execution')).toBeInTheDocument()
   })
 
+  it('hides cached approval and review controls when a background refresh fails', async () => {
+    api.gates.mockResolvedValueOnce({ workflow_version: 3, items: [gate({ allowed: true,
+      blockers: [], items: [{ ...evidence, approved: true }] })] })
+    const { client } = setup()
+    expect(await screen.findByText('Automatic gate has a current approval')).toBeInTheDocument()
+    api.gates.mockRejectedValueOnce(new Error('Current gate state unavailable'))
+    await act(async () => { await client.invalidateQueries({ queryKey: ['scientific-gates', 'workflow-1'] }) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('approval cannot be assumed')
+    expect(screen.queryByText('Automatic gate has a current approval')).not.toBeInTheDocument()
+    expect(screen.queryByText('Current approval')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Administrator approval' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save candidate evidence' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reload evidence' }))
+    expect(await screen.findByText('Automatic gate is held at execution')).toBeInTheDocument()
+  })
+
+  it('retries the same imported-source query after a transient failure', async () => {
+    api.sources.mockRejectedValueOnce(new Error('Source service unavailable'))
+    setup()
+    fireEvent.change(await screen.findByLabelText('Paper search query'), { target: { value: 'same query' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search imported sources' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Source service unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'Search imported sources' }))
+    expect(await screen.findByText(source.title)).toBeInTheDocument()
+    expect(api.sources).toHaveBeenCalledTimes(2)
+    expect(api.sources).toHaveBeenLastCalledWith('workflow-1', 'edge-1', 'same query')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('shows source and save API errors explicitly without claiming a successful save', async () => {
     api.sources.mockRejectedValueOnce(new Error('Source service unavailable'))
     setup()

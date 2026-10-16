@@ -36,7 +36,7 @@ export function GateEvidencePanel({ workflowId, edgeId, canWrite, readOnly }: {
     <h3 className="font-semibold">{zh ? '文献与参数依据' : 'Scientific parameter evidence'}</h3>
     {data.isPending ? <p>{zh ? '正在读取门控证据…' : 'Loading gate evidence…'}</p> : null}
     {data.isError ? <div role="alert">{zh ? '无法读取依据，不能据此判断已通过。' : 'Evidence unavailable; approval cannot be assumed.'}<Button type="button" size="sm" onClick={() => data.refetch()}>{zh ? '重新读取依据' : 'Reload evidence'}</Button></div> : null}
-    {gate ? <EvidenceForm key={`${workflowId}:${gate.binding.project_id}:${edgeId}:${gate.binding.workflow_version}:${gate.binding.parameter_hash}`} gate={gate} workflowId={workflowId} canWrite={canWrite && !readOnly} /> : !data.isPending && !data.isError ? <p>{zh ? '请先保存连线，才能绑定参数依据。' : 'Save the connection before binding evidence.'}</p> : null}
+    {gate && !data.isError ? <EvidenceForm key={`${workflowId}:${gate.binding.project_id}:${edgeId}:${gate.binding.workflow_version}:${gate.binding.parameter_hash}`} gate={gate} workflowId={workflowId} canWrite={canWrite && !readOnly} /> : !data.isPending && !data.isError ? <p>{zh ? '请先保存连线，才能绑定参数依据。' : 'Save the connection before binding evidence.'}</p> : null}
   </section>
 }
 function EvidenceForm({ gate, workflowId, canWrite }: { gate: ScientificGate; workflowId: string; canWrite: boolean }) {
@@ -99,7 +99,7 @@ function EvidenceForm({ gate, workflowId, canWrite }: { gate: ScientificGate; wo
     </AccordionContent></AccordionItem></Accordion>
     <label className="grid gap-1 text-xs">{zh ? '论文检索词' : 'Paper search query'}<Input aria-label={zh ? '论文检索词' : 'Paper search query'} value={query} onChange={e => setQuery(e.target.value)} placeholder="RFdiffusion interaction PAE" /></label>
     <div className="flex flex-wrap gap-2">
-      <Button size="sm" variant="outline" onClick={() => setSourceQuery(query)}>{zh ? '查找项目原文' : 'Search imported sources'}</Button>
+      <Button size="sm" variant="outline" disabled={sources.isFetching} onClick={() => { if (sourceQuery === query) void sources.refetch(); else setSourceQuery(query) }}>{zh ? '查找项目原文' : 'Search imported sources'}</Button>
       <Button size="sm" variant="outline" disabled={!canWrite || query.trim().length < 3 || search.isPending || ['pending', 'running'].includes(retrievalStatus ?? '')} onClick={() => search.mutate()}>{zh ? '检索论文并获取原文' : 'Find papers and retrieve text'}</Button>
     </div>
     {retrieval.data ? <p className="text-xs">{zh ? '论文检索' : 'Literature search'}: {retrievalStatus} · {retrieval.data.search.result_count} {retrieval.data.search.error || ''}</p> : null}

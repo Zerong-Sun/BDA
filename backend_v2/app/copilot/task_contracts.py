@@ -87,6 +87,12 @@ its own purpose, preserving the source IDs, units, analysis versions and limitat
 needed to review its claims. Do not repeat complete tool payloads or the same content
 across the summary and sections. State a shared limitation once unless its effect
 differs for a particular result.
+The user's explicit length limit applies to ALL user-facing text across summary,
+sections, missing and next_action together. JSON formatting and review do not exempt
+you from that limit. For a short report use only required sections, avoid repeating
+IDs and keep tool-call IDs in evidence_call_ids unless the user requests them in prose.
+Do not expand a bounded evidence review into solving the entire research project:
+an identified scientific gap can be the requested output, not unfinished execution.
 """
 
 

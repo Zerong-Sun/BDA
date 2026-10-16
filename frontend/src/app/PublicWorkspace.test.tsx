@@ -40,7 +40,7 @@ describe('Public opens the complete workspace', () => {
   })
   it('keeps Private deep links protected and preserves their destination', async () => {
     window.location.hash = '#/workflow?project=private-project'; setup()
-    server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json({...config, deployment_kind:'private', public_workspace_enabled:false})))
+    server.use(http.get('*/api/v2/auth/config', () => HttpResponse.json({...config, deployment_kind:'private', public_workspace_enabled:false})), http.post('*/api/v2/auth/refresh', () => new HttpResponse(null, { status: 401 })))
     expect(await screen.findByRole('heading', {name:'Private login'})).toBeVisible()
     expect(window.location.hash).toBe('#/login?returnTo=%2Fworkflow%3Fproject%3Dprivate-project')
     expect(isPublicVisitor()).toBe(false)

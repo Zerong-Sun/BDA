@@ -155,3 +155,22 @@ def test_generic_knowledge_search_keeps_science_and_legacy_notes(session):
     assert [row.id for row in repo.search(project.id, "")] == [legacy.id]
     assert [row.id for row in repo.list_project(project.id, None, 100)] == [legacy.id]
     assert len(repo.list_project(project.id, None, 100, entry_type=KIND)) == 6
+
+
+def test_projection_lock_is_scoped_to_project_and_bot_not_project_rows():
+    from types import SimpleNamespace
+
+    from backend_v2.app.copilot.records import _lock_record, _record_lock_key
+
+    project_id = uuid.uuid4()
+    assert _record_lock_key(project_id, "runner") == _record_lock_key(project_id, "runner")
+    assert _record_lock_key(project_id, "runner") != _record_lock_key(project_id, "conductor")
+    assert _record_lock_key(project_id, "runner") != _record_lock_key(uuid.uuid4(), "runner")
+    calls = []
+    session = SimpleNamespace(
+        get_bind=lambda: SimpleNamespace(dialect=SimpleNamespace(name="postgresql")),
+        execute=lambda stmt, params: calls.append((str(stmt), params)),
+    )
+    _lock_record(session, project_id, "runner")
+    assert calls == [("SELECT pg_advisory_xact_lock(:key)", {"key": _record_lock_key(project_id, "runner")})]
+    assert "projects" not in calls[0][0]

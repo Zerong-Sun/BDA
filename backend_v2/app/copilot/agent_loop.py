@@ -42,6 +42,7 @@ from .agent_review import (
     operator_routing,
     review_messages,
     reviewable_delivery,
+    runtime_context,
 )
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
@@ -122,6 +123,8 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
         conversation.append({"role": "system", "content": "Registered operator routing: "
                              + json.dumps(operator_routing(), ensure_ascii=False)})
     conversation.append({"role": "user", "content": run.goal})
+    conversation.append({"role": "system", "content": "Current run and finalization: "
+                         + json.dumps(runtime_context(run), ensure_ascii=False)})
     if run.task_contract:
         conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**{key: value for key, value in run.task_contract.items() if key != "procedural_skills"}, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})
     for turn in turns:
@@ -458,6 +461,7 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                        "do not copy excerpts. Do not claim to have read beyond the returned source window. "
                        "If a source/action is unverified, say so rather than inventing it."},
                     {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
+                     "runtime": runtime_context(run),
                      "repair_reasons": sorted(repair_reasons), "draft": answer,
                      "tool_records": tool_records(turns)}, ensure_ascii=False)},
                 ]

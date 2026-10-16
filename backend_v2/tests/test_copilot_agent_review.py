@@ -167,3 +167,34 @@ def test_actor_and_reviewer_receive_the_recipients_own_roster_routes(session: Se
     supplied = [json.loads(item["content"][len(prefix):]) for item in conversation
                 if item["role"] == "system" and item["content"].startswith(prefix)]
     assert supplied == [routing]
+
+
+def test_self_running_snapshot_does_not_lose_run_identity_in_repair_or_review(session: Session, monkeypatch):
+    project, user = _project(session)
+    run = _run(session, project, user, bot="conductor", goal="最终中文汇报不超过600字",
+               task_contract=build_contract("custom", []))
+    _receipt(session, run, {"current_run": {"run_id": str(run.id), "status": "running"}})
+    seen = _script(monkeypatch, [
+        {"content": "Malformed draft: this run is still running."},
+        {"content": _delivery(summary="已核对记录，本条为最终汇报。")},
+        {"content": _delivery(summary="已核对记录，科学结论仍待验证。")},
+    ])
+    agent_loop.step(session, run, _provider(session))
+    assert len(seen) == 3
+    prefix = "Current run and finalization: "
+    actor = next(json.loads(item["content"][len(prefix):]) for item in seen[0]
+                 if item["content"].startswith(prefix))
+    repair = json.loads(seen[1][1]["content"])
+    review = json.loads(seen[2][1]["content"])
+    assert actor == repair["runtime"] == review["runtime"]
+    assert actor["run_id"] == str(run.id)
+    assert actor["parent_run_id"] is None
+    assert actor["status_at_generation"] == "running"
+    assert "not a missing deliverable" in actor["finalization"]
+    assert "other runs, jobs" in actor["finalization"]
+    assert repair["goal"] == review["goal"] == run.goal
+    # The earlier snapshot remains evidence; no prompt rewrites it as succeeded.
+    assert review["tool_records"][0]["result"]["current_run"]["status"] == "running"
+    assert all("length limit applies to ALL" in conversation[0]["content"] for conversation in seen)
+    assert run.status == "succeeded"
+    assert run.outcome["scientific_review"] == "automated_review_completed"

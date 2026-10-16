@@ -53,6 +53,23 @@ A recorded handoff alone does not start the recipient's run.
 """
 
 
+def runtime_context(run: CopilotAgentRun) -> dict[str, Any]:
+    """Identify this delivery's owner without claiming a future database transition."""
+    return {
+        "run_id": str(run.id) if getattr(run, "id", None) else None,
+        "parent_run_id": str(run.parent_run_id) if getattr(run, "parent_run_id", None) else None,
+        "status_at_generation": getattr(run, "status", None),
+        "finalization": (
+            "Your final delivery is this run's report. The server records the terminal "
+            "execution status after this delivery returns. An earlier running/awaiting_tasks "
+            "snapshot of this same run is expected, not a missing deliverable or a reason to "
+            "wait for yourself. Report completed child work from its settled receipts. Do not "
+            "claim this run's terminal state is already persisted or extend this rule to other "
+            "runs, jobs, scientific validation or unresolved user decisions."
+        ),
+    }
+
+
 def operator_routing() -> dict[str, Any]:
     return {"mandatory_sequence": False, "authorizes_actions": False,
             "operators": [{"id": bot.id, "summary": bot.summary, "expected_handoff": list(bot.handoff)}
@@ -87,7 +104,8 @@ def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list
         {"role": "user", "content": json.dumps({
             "goal": run.goal, "contract": run.task_contract,
             "bot": {"id": charter.id, "charter": charter.charter} if charter else None,
-            "operator_routing": operator_routing(), "draft": run.outcome, "tool_records": receipts,
+            "operator_routing": operator_routing(), "runtime": runtime_context(run),
+            "draft": run.outcome, "tool_records": receipts,
         }, ensure_ascii=False)},
     ]
 

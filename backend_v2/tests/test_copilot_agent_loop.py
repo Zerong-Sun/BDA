@@ -186,8 +186,10 @@ def test_the_conversation_is_rebuilt_from_rows_and_nothing_else(
 
     assert conversation[0]["role"] == "system"
     assert conversation[1] == {"role": "user", "content": "quantify the eluate"}
-    assert conversation[2]["content"] == "I checked the library."
-    assert conversation[3] == {
+    assert conversation[2]["role"] == "system"
+    assert conversation[2]["content"].startswith("Current run and finalization: ")
+    assert conversation[3]["content"] == "I checked the library."
+    assert conversation[4] == {
         "role": "tool",
         "tool_call_id": "call_a",
         "name": "list_proteins",

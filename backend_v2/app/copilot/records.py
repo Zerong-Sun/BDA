@@ -11,7 +11,7 @@ import hashlib
 import json
 import uuid
 
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
 from ..knowledge.models import KnowledgeEntry
@@ -141,14 +141,28 @@ def markdown(project_id, bot_id, items):
     return "\n".join(lines)
 
 
+def _record_lock_key(project_id, bot_id):
+    # A stable namespace-qualified signed bigint: different operators never lock
+    # a shared Project row, including while a provider holds its run transaction.
+    value = hashlib.sha256(f"{NAMESPACE}:{project_id}:{bot_id}".encode()).digest()[:8]
+    return int.from_bytes(value, byteorder="big", signed=True)
+
+
+def _lock_record(session, project_id, bot_id):
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _record_lock_key(project_id, bot_id)})
+    # SQLite serializes writers itself; no synthetic row lock is needed.
+
+
 def refresh_record(session, project_id, bot_id, actor_id):
-    from ..projects.models import Project
     from .bots import bot_ids
 
     if bot_id not in bot_ids():
         return None
-    # Serialize concurrent sources before calculating their current snapshot.
-    session.scalar(select(Project).where(Project.id == project_id).with_for_update(key_share=True))
+    # Serialize only this operator's projections. Never lock Project: a worker
+    # may keep its transaction open across provider calls, which would otherwise
+    # block unrelated operators and ordinary project writes for minutes.
+    _lock_record(session, project_id, bot_id)
     items = source_items(session, project_id, bot_id)
     content = markdown(project_id, bot_id, items)
     digest = hashlib.sha256(content.encode()).hexdigest()
