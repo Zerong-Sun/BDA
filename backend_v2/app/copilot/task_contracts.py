@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .delivery_context import delivery_constraints, visible_characters
 from .models import CopilotAgentRun, CopilotAgentTurn
 
 
@@ -74,7 +75,7 @@ DELIVERY_SECTIONS = {
 
 FINAL_INSTRUCTION = """
 Return your final delivery as JSON (no markdown fence):
-{"status":"completed|partial|blocked|needs_input", "summary":"the deliverable, with source IDs and limitations",
+{"status":"completed|partial|blocked|needs_input|review_required", "summary":"the deliverable, with source IDs and limitations",
  "sections":{"each required_sections key":"nonempty content, with sources or an explicit unknown"},
  "evidence_call_ids":["successful tool_call_id used"], "missing":["remaining item"], "next_action":"specific next action"}.
 A completed delivery must satisfy every contract step and cite the successful tool calls
@@ -311,7 +312,7 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     steps = progress(run.task_contract or {}, turns)
     try:
         data = _delivery_json(answer)
-        if not isinstance(data, dict) or data.get("status") not in {"completed", "partial", "blocked", "needs_input"}:
+        if not isinstance(data, dict) or data.get("status") not in {"completed", "partial", "blocked", "needs_input", "review_required"}:
             raise ValueError("invalid delivery status")
         if not isinstance(data.get("summary"), str) or not data["summary"].strip():
             raise ValueError("missing summary")
@@ -326,6 +327,10 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     except (ValueError, TypeError):
         return {"status": "review_required", "summary": answer, "missing": ["structured_delivery_required"],
                 "next_action": "Review the answer or continue with a specific request.", "steps": steps, "evidence_call_ids": []}
+    # This diagnostic is recomputed, not a scientific gap for a model to carry
+    # forward after it has actually shortened the draft.
+    missing = [item for item in missing if item != "delivery_length_exceeded"]
+    data["missing"] = missing
     successful = {r["call_id"] for r in tool_records(turns) if r["successful"]}
     invalid = set(refs) - successful
     gaps = [s["id"] for s in steps if s["status"] != "completed"]
@@ -364,9 +369,17 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     skill_outputs, skill_checks = evaluate_outputs(run.task_contract or {}, data, successful)
     if skill_checks:
         status = "review_required" if any("invalid" in check or "unverified" in check or "unexpected" in check for check in skill_checks) else ("partial" if status == "completed" else status)
-    return {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks + skill_checks)),
+    result: dict[str, Any] = {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks + skill_checks)),
             **({"skill_outputs": skill_outputs} if (run.task_contract or {}).get("procedural_skills") else {}),
             "next_action": data["next_action"], "evidence_call_ids": [ref for ref in refs if ref in successful], "steps": steps}
+    # Server-derived gaps are visible too. Check the actual delivery after all
+    # contract/skill diagnostics are assembled, before adding this diagnostic
+    # itself; a failed length check must never be accepted by factual review.
+    limit = delivery_constraints(run, turns)["max_visible_characters"]
+    if limit and visible_characters(result) > limit:
+        result["status"] = "review_required"
+        result["missing"].append("delivery_length_exceeded")
+    return result
 
 
 def task_view(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> dict:

@@ -59,6 +59,39 @@ afterEach(() => cleanup())
 beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'application', language: 'en' }) })
 
 describe('agent run panel', () => {
+  it.each([
+    ['en', 'Automated factual review completed. This does not constitute scientific validation or human approval.'],
+    ['zh', '自动事实复核已完成；这不代表科研验证或人工批准。'],
+  ] as const)('shows the completed factual pass without claiming approval in %s', async (language, label) => {
+    useAppStore.setState({ language })
+    runReturns({ ...RUN, status: 'succeeded', outcome: {
+      status: 'review_required', summary: 'Saved draft', scientific_review: 'automated_review_completed',
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText(label)).toBeInTheDocument()
+    expect(screen.getAllByText(language === 'zh' ? '需要审核' : 'Needs review').length).toBeGreaterThan(0)
+  })
+
+  it.each([undefined, 'unavailable', 'unknown'])('does not claim a completed factual pass for %s', async (scientific_review) => {
+    runReturns({ ...RUN, status: 'succeeded', outcome: {
+      status: 'review_required', summary: 'Saved draft', scientific_review,
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText('Saved draft')).toBeInTheDocument()
+    expect(screen.queryByText(/Automated factual review completed/)).not.toBeInTheDocument()
+  })
+
+  it('shows actionable output-limit and delivery-length failures without claiming scientific approval', async () => {
+    runReturns({ ...RUN, status: 'succeeded', outcome: {
+      status: 'review_required', summary: 'Saved draft', scientific_review_error: 'llm_output_truncated',
+      missing: ['scientific_review_unavailable', 'delivery_length_exceeded'],
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText('Saved draft')).toBeInTheDocument()
+    expect(screen.getByText('Review exceeded the model output limit. Shorten the scope or adjust the model limit and retry.')).toBeInTheDocument()
+    expect(screen.getByText('The delivery exceeds the requested character limit and needs shortening.')).toBeInTheDocument()
+  })
+
   it.each(['viewer', 'demo'])('keeps live runs inspectable but prevents cancellation in %s mode', async (mode) => {
     if (mode === 'viewer') sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
     else useAppStore.setState({ appMode: 'demo' })

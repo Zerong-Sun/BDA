@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from . import bots
+from .delivery_context import delivery_constraints, prompt_records, visible_characters
 from .models import CopilotAgentRun, CopilotAgentTurn
 from .policy import SCIENTIFIC_POLICY
 from .task_contracts import FINAL_INSTRUCTION, tool_records
@@ -96,7 +97,7 @@ def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list
                     pass  # Preserve the raw request rather than invent valid parameters.
             arguments[(str(call.get("id") or ""), str(function.get("name") or ""))] = value
     receipts = [{**record, "arguments": arguments.get((record["call_id"], record["tool"]))}
-                for record in tool_records(turns)]
+                for record in prompt_records(tool_records(turns))]
     charter = bots.get(run.bot) if run.bot else None
     return [
         {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + REVIEW_INSTRUCTION
@@ -105,6 +106,9 @@ def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list
             "goal": run.goal, "contract": run.task_contract,
             "bot": {"id": charter.id, "charter": charter.charter} if charter else None,
             "operator_routing": operator_routing(), "runtime": runtime_context(run),
+            "user_followups": [turn.content for turn in turns if turn.role == "user"],
+            "delivery_constraints": delivery_constraints(run, turns),
+            "draft_visible_characters": visible_characters(run.outcome or {}),
             "draft": run.outcome, "tool_records": receipts,
         }, ensure_ascii=False)},
     ]
@@ -113,14 +117,18 @@ def review_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list
 def reviewable_delivery(run: CopilotAgentRun, outcome: dict[str, Any]) -> bool:
     if outcome.get("status") in {"completed", "partial", "blocked", "needs_input"}:
         return True
-    # evaluate_delivery deliberately marks an otherwise valid completed custom
-    # task review_required. It still needs the factual pass, which must not turn
-    # that machine-verification boundary into scientific approval.
-    invalid = {"structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values"}
+    # Human review can remain necessary for either custom or guided tasks.
+    # That state must not skip the factual pass, but invalid delivery data and
+    # unverifiable citations must still be repaired before factual review.
+    invalid = {"structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values", "delivery_length_exceeded"}
+    missing = outcome.get("missing", [])
+    invalid_skills = any(item in {"invalid_skill_outputs", "unexpected_skill_outputs"}
+                         or item.startswith(("skill_output_invalid:", "skill_evidence_unverified:"))
+                         for item in missing)
     return (outcome.get("status") == "review_required"
-            and not (run.task_contract or {}).get("steps")
             and isinstance(outcome.get("sections"), dict)
-            and not invalid.intersection(outcome.get("missing", [])))
+            and not invalid.intersection(missing)
+            and not invalid_skills)
 
 
 def needs_review(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> bool:

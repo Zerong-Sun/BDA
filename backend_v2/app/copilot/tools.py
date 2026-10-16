@@ -1877,6 +1877,7 @@ _register(ToolSpec(
 
 def _read_team_progress(ctx: ToolContext, args: dict[str, Any]) -> Any:
     from . import room
+    from .delivery_context import room_preview
     from .models import CopilotAgentRun
     from .schemas import RoomEvent
 
@@ -1884,13 +1885,14 @@ def _read_team_progress(ctx: ToolContext, args: dict[str, Any]) -> Any:
     active = ctx.session.scalars(select(CopilotAgentRun).where(
         CopilotAgentRun.project_id == project_id,
         CopilotAgentRun.status.in_(("running", "awaiting_tasks")),
-    ).order_by(CopilotAgentRun.created_at.desc()).limit(30))
-    entries, _ = room.events(ctx.session, project_id=project_id, limit=30)
-    return {
+    ).order_by(CopilotAgentRun.created_at.desc()).limit(31))
+    entries, next_cursor = room.events(ctx.session, project_id=project_id, limit=30)
+    return room_preview({
         "active_tasks": [{"run_id": str(run.id), "bot": run.bot, "goal": run.goal,
                           "status": run.status} for run in active],
         "recent_activity": [RoomEvent.model_validate(entry).model_dump(mode="json") for entry in entries],
-    }
+        "recent_activity_truncated": next_cursor is not None,
+    })
 
 
 _register(ToolSpec(

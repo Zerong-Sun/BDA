@@ -44,10 +44,11 @@ from .agent_review import (
     reviewable_delivery,
     runtime_context,
 )
+from .delivery_context import delivery_constraints, prompt_records, room_preview
 from .models import CopilotAgentRun, CopilotAgentTask, CopilotAgentTurn
 from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
 from .procedural_skills import prompt_for
-from .provider import completion_message
+from .provider import completion_message, structured_retry_provider
 from .registry import REGISTRY, ToolContext
 from .task_contracts import (
     FINAL_INSTRUCTION,
@@ -125,17 +126,27 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     conversation.append({"role": "user", "content": run.goal})
     conversation.append({"role": "system", "content": "Current run and finalization: "
                          + json.dumps(runtime_context(run), ensure_ascii=False)})
+    constraints = delivery_constraints(run, turns)
+    if constraints["max_visible_characters"]:
+        conversation.append({"role": "system", "content": "Final delivery constraints: "
+                             + json.dumps(constraints, ensure_ascii=False)})
     if run.task_contract:
         conversation.append({"role": "system", "content": "Server task contract and verified progress: " + json.dumps({**{key: value for key, value in run.task_contract.items() if key != "procedural_skills"}, "steps": progress(run.task_contract, turns)}, ensure_ascii=False)})
     for turn in turns:
         if turn.role == "tool":
             meta = (turn.tool_calls or [{}])[0]
+            tool_content = turn.content
+            if meta.get("name") == "read_team_progress":
+                try:
+                    tool_content = json.dumps(room_preview(json.loads(tool_content)), ensure_ascii=False)
+                except (ValueError, TypeError):
+                    pass
             conversation.append(
                 {
                     "role": "tool",
                     "tool_call_id": str(meta.get("tool_call_id") or ""),
                     "name": str(meta.get("name") or ""),
-                    "content": turn.content,
+                    "content": tool_content,
                 }
             )
         elif turn.role == "assistant" and turn.tool_calls:
@@ -369,6 +380,31 @@ def _finish_coverage_limited(session: Session, run: CopilotAgentRun, reason: str
     return run.status
 
 
+def _delivery_error_code(exc: Exception) -> str:
+    """Expose an actionable category without copying provider bodies or secrets."""
+    if isinstance(exc, DomainError):
+        return exc.error_code
+    if isinstance(exc, ValueError) and str(exc) == "invalid_review_delivery":
+        return "invalid_review_delivery"
+    return type(exc).__name__
+
+
+def _delivery_completion(session: Session, run: CopilotAgentRun, provider: LLMProvider,
+                         messages: list[dict]) -> tuple[dict, str | None]:
+    from .task_budget import reserve_model_call
+    reserve_model_call(session, run, provider, messages)
+    try:
+        return completion_message(provider, messages), None
+    except DomainError as exc:
+        retry = structured_retry_provider(provider) if exc.error_code == "llm_output_truncated" else None
+        if retry is None:
+            raise
+        # Exactly one retry, with the same budget checks. No actor/tool call is
+        # retried and the configured output limit is never raised implicitly.
+        reserve_model_call(session, run, retry, messages)
+        return completion_message(retry, messages), "truncated_output_json_retry"
+
+
 def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
     """Advance the run by one provider call. Returns the resulting status."""
     if run.status != "running":
@@ -446,7 +482,7 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
             # failed reservation preserves this draft without a provider call.
             return run.status
         repair_reasons = set(run.outcome.get("missing", [])) & {
-            "structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values",
+            "structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values", "delivery_length_exceeded",
             *(run.task_contract or {}).get("required_sections", []),
         }
         if repair_reasons:
@@ -462,36 +498,74 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                        "If a source/action is unverified, say so rather than inventing it."},
                     {"role": "user", "content": json.dumps({"goal": run.goal, "contract": run.task_contract,
                      "runtime": runtime_context(run),
+                     "user_followups": [turn.content for turn in turns if turn.role == "user"],
+                     "delivery_constraints": delivery_constraints(run, turns),
                      "repair_reasons": sorted(repair_reasons), "draft": answer,
-                     "tool_records": tool_records(turns)}, ensure_ascii=False)},
+                     "tool_records": prompt_records(tool_records(turns))}, ensure_ascii=False)},
                 ]
-                reserve_model_call(session, run, provider, repair_messages)
-                repaired_message = completion_message(provider, repair_messages)
+                repaired_message, recovery = _delivery_completion(session, run, provider, repair_messages)
                 repaired = str(repaired_message.get("content") or "")
                 repaired_outcome = evaluate_delivery(run, repaired, turns)
                 agent_runs.append_turn(session, run, role="assistant", content=repaired,
                                        reasoning_content=repaired_message.get("reasoning_content") if isinstance(repaired_message.get("reasoning_content"), str) else None)
-                run.outcome = {**repaired_outcome, "format_repair": "attempted_once"}
-            except Exception:
-                run.outcome = {**run.outcome, "format_repair": "unavailable"}
+                run.outcome = {**repaired_outcome, "format_repair": "attempted_once",
+                               **({"format_repair_recovery": recovery} if recovery else {})}
+            except Exception as exc:
+                run.outcome = {**run.outcome, "format_repair": "unavailable",
+                               "format_repair_error": _delivery_error_code(exc)}
         if needs_review(run, turns):
             try:
                 review_conversation = review_messages(run, turns)
-                reserve_model_call(session, run, provider, review_conversation)
-                review_message = completion_message(provider, review_conversation)
+                review_message, recovery = _delivery_completion(session, run, provider, review_conversation)
                 reviewed = str(review_message.get("content") or "")
                 reviewed_outcome = evaluate_delivery(run, reviewed, turns)
+                length_repair = "delivery_length_exceeded" in reviewed_outcome.get("missing", [])
+                if length_repair:
+                    agent_runs.append_turn(session, run, role="assistant", content=reviewed)
+                    # One bounded correction of the reviewed delivery. Preserve
+                    # its claims/qualifications and the same exact receipts.
+                    constraints = delivery_constraints(run, turns)
+                    limit = constraints["max_visible_characters"]
+                    has_sections = bool((run.task_contract or {}).get("required_sections"))
+                    packet = {"goal": run.goal, "contract": run.task_contract,
+                              "user_followups": [turn.content for turn in turns if turn.role == "user"],
+                              "draft": reviewed_outcome, "delivery_constraints": constraints,
+                              "field_budgets": {"summary": int(limit * (.1 if has_sections else .6)),
+                                                "sections_combined_including_titles": int(limit * .5) if has_sections else 0,
+                                                "missing_combined": int(limit * .1), "next_action": int(limit * .1)}}
+                    short_conversation = [
+                        {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
+                         + "\nShorten the supplied reviewed draft once. This is formatting, not another scientific task. "
+                           "Follow the field character budgets. Keep only details needed for the user's goal; "
+                           "surplus examples remain in saved receipts. Only contract required_sections keys may appear "
+                           "in sections; otherwise return sections={} and put the requested content in summary. "
+                           "Preserve necessary qualifications and exact source IDs. Do not add facts, claims, actions "
+                           "or evidence IDs. Do not copy server diagnostic delivery_length_exceeded into missing. "
+                           "Return only the shortened delivery JSON."},
+                        {"role": "user", "content": json.dumps(packet, ensure_ascii=False)},
+                    ]
+                    # This correction only formats the preceding factual pass;
+                    # its saved attempt above consumes a transcript slot.
+                    correction_provider = structured_retry_provider(provider) or provider
+                    reserve_model_call(session, run, correction_provider, short_conversation)
+                    corrected = completion_message(correction_provider, short_conversation)
+                    review_message = corrected
+                    reviewed = str(corrected.get("content") or "")
+                    reviewed_outcome = evaluate_delivery(run, reviewed, turns)
                 if not reviewable_delivery(run, reviewed_outcome):
                     raise ValueError("invalid_review_delivery")
                 agent_runs.append_turn(session, run, role="assistant", content=reviewed,
                                        reasoning_content=review_message.get("reasoning_content") if isinstance(review_message.get("reasoning_content"), str) else None)
-                run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed"}
-            except Exception:
+                run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed",
+                               **({"scientific_review_length_repair": "attempted_once"} if length_repair else {}),
+                               **({"scientific_review_recovery": recovery} if recovery else {})}
+            except Exception as exc:
                 # Preserve an honest stop and its saved draft when the review
                 # cannot fit the remaining budget or fails. No extra call can
                 # bypass reserve_model_call's turn/cost ceiling.
                 status = run.outcome["status"] if run.outcome["status"] in {"blocked", "needs_input"} else "review_required"
                 run.outcome = {**run.outcome, "status": status, "scientific_review": "unavailable",
+                               "scientific_review_error": _delivery_error_code(exc),
                                "missing": [*run.outcome.get("missing", []), "scientific_review_unavailable"]}
         if (run.task_contract or {}).get("service_kind") == "literature":
             run.outcome = {**run.outcome, "source_coverage": source_coverage(turns),

@@ -53,8 +53,8 @@ export function BotRecords({ projectId, botId }: { projectId: string; botId: str
           <Disclosure title={zh ? '来源、工作流与证据引用' : 'Sources, workflows and evidence references'}><pre className="overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify({ references: item.references, citations: item.citations, turn_ids: item.turn_ids, outcome: item.outcome }, null, 2)}</pre></Disclosure>
         </article>)}
         <div className="flex gap-2">
-          <Button variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</Button>
-          <Button variant="outline" disabled={offset + records.data.items.length >= records.data.matched} onClick={() => setOffset(offset + 50)}>{zh ? '下一页' : 'Next'}</Button>
+          <Button type="button" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</Button>
+          <Button type="button" variant="outline" disabled={offset + records.data.items.length >= records.data.matched} onClick={() => setOffset(offset + 50)}>{zh ? '下一页' : 'Next'}</Button>
         </div>
       </> : null}
     </ApiState>

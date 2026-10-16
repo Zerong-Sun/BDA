@@ -4,6 +4,7 @@ import asyncio
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -16,6 +17,24 @@ LLM_MAX_ATTEMPTS = 3
 # One deadline includes connection, response body, retries and backoff; a provider
 # sending keepalive bytes must not hold a durable run's transaction indefinitely.
 LLM_COMPLETION_DEADLINE_SECONDS = 180.0
+
+
+def structured_retry_provider(provider: LLMProvider) -> LLMProvider | None:
+    """One same-model JSON retry after truncation, only for the documented API.
+
+    DeepSeek thinking tokens share the output budget. A format/factual pass may
+    exhaust that budget before returning JSON. Preserve the configured ceiling
+    and credentials; do not change saved settings or guess third-party support.
+    """
+    if (urlparse(provider.endpoint or "").hostname != "api.deepseek.com"
+            or provider.model not in {"deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"}):
+        return None
+    config = {key: value for key, value in (provider.config or {}).items()
+              if key not in {"thinking", "reasoning", "reasoning_effort"}}
+    config.update({"thinking": {"type": "disabled"}, "response_format": {"type": "json_object"}})
+    return LLMProvider(id=provider.id, name=provider.name, model=provider.model,
+                       provider_type=provider.provider_type, endpoint=provider.endpoint,
+                       credential_ref=provider.credential_ref, config=config)
 
 
 async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) -> httpx.Response:

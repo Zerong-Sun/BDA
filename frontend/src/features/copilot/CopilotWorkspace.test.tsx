@@ -26,6 +26,7 @@ const run = { id: 'task-1', project_id: 'project-task', goal: 'Research PD1', bo
   task_contract: { version: 1, service_kind: 'literature' }, outcome: { status: 'needs_input', summary: 'Target identity is missing.', missing: ['Target identity'], next_action: 'Provide an identifier.', steps: [] } }
 function handlers(eligible: string[] = ['literature']) {
   server.use(
+    http.get('/api/v2/copilot/procedural-skills', () => HttpResponse.json([])),
     http.get('/api/v2/copilot/task-services', () => HttpResponse.json([service, planningService])),
     http.get('/api/v2/copilot/bots', () => HttpResponse.json(roster)),
     http.get('/api/v2/copilot/projects/:projectId/task-readiness', () => HttpResponse.json({ model: 'test-model', checks: {}, eligible_services: eligible })),

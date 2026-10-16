@@ -14,6 +14,8 @@ import { deliveryLabel } from './taskPresentation'
 
 const Outcome = z.object({
   decision_record_id: z.string().optional(),
+  scientific_review: z.string().optional(),
+  scientific_review_error: z.string().optional(),
   sections: z.record(z.string(), z.string()).optional(),
   summary: z.string().optional(), missing: z.array(z.string()).optional(), next_action: z.string().optional(),
   steps: z.array(z.object({ id: z.string(), title: z.string(), title_zh: z.string(), status: z.string() })).optional(),
@@ -61,9 +63,20 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   const issueLabels: Record<string, string> = zh
     ? { structured_delivery_required: '答复缺少所需章节，请审核或补充要求。', unverified_evidence_call_ids: '部分引用没有对应的成功工具记录。', scientific_review_unavailable: '自动科学复核未完成，请人工审核。' }
     : { structured_delivery_required: 'Required delivery sections are missing. Review the answer or add instructions.', unverified_evidence_call_ids: 'Some citations have no matching successful tool record.', scientific_review_unavailable: 'Scientific review did not complete. Review the answer manually.' }
+  issueLabels.delivery_length_exceeded = zh ? '交付超过本次要求的字数限制，需要精简。' : 'The delivery exceeds the requested character limit and needs shortening.'
+  const reviewErrors: Record<string, [string, string]> = {
+    llm_output_truncated: ['Review exceeded the model output limit. Shorten the scope or adjust the model limit and retry.', '复核达到模型输出上限。可缩小范围，或调整模型上限后重试。'],
+    llm_completion_deadline_exceeded: ['Review timed out. Retry after the model service recovers.', '复核请求超时，可在模型服务恢复后重试。'],
+    copilot_turn_limit_reached: ['Review reached the task turn limit. Continue with a sufficient budget.', '复核达到任务轮次上限，可补充预算后继续。'],
+    invalid_review_delivery: ['Review returned an invalid format or unverifiable citations. The saved draft still needs review.', '复核返回的格式或引用未通过校验，已保存的草稿仍需审核。'],
+  }
+  if (outcome.scientific_review_error && reviewErrors[outcome.scientific_review_error]) {
+    issueLabels.scientific_review_unavailable = reviewErrors[outcome.scientific_review_error][zh ? 1 : 0]
+  }
   const missingLabel = (item: string) => issueLabels[item] ?? outcome.steps?.find((step) => step.id === item)?.[zh ? 'title_zh' : 'title'] ?? SECTION_LABELS[item]?.[zh ? 1 : 0] ?? item
   return <section className="space-y-3 rounded-lg border border-border p-3" aria-label={zh ? '任务交付' : 'Task delivery'}>
     <h4 className="font-semibold">{deliveryLabel(run, zh)}</h4>
+    {outcome.scientific_review === 'automated_review_completed' ? <p className="text-xs text-text-secondary">{zh ? '自动事实复核已完成；这不代表科研验证或人工批准。' : 'Automated factual review completed. This does not constitute scientific validation or human approval.'}</p> : null}
     {outcome.steps?.length ? <ol className="space-y-2">{outcome.steps.map((step) => <li key={step.id} className="rounded border border-border-soft p-2 text-sm"><span className="mr-2">{step.status === 'completed' ? '✓' : '○'}</span>{zh ? step.title_zh : step.title}<span className="ml-2 text-xs text-text-secondary">{step.status === 'completed' ? (zh ? '已核对记录' : 'Records checked') : (zh ? '待完成' : 'Pending')}</span></li>)}</ol> : null}
     {outcome.summary ? <div><p className="text-xs text-text-secondary">{zh ? '交付内容与依据' : 'Deliverable and basis'}</p><p className="whitespace-pre-wrap break-words text-sm">{outcome.summary}</p></div> : null}
     {outcome.sections && Object.keys(outcome.sections).length ? <Disclosure title={zh ? '查看完整交付内容' : 'Full deliverable'}><dl className="space-y-3">{Object.entries(outcome.sections).map(([key, value]) => <div key={key}><dt className="text-xs font-semibold">{sectionLabel(key)}</dt><dd className="whitespace-pre-wrap text-sm">{value}</dd></div>)}</dl></Disclosure> : null}

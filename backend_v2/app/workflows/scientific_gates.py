@@ -376,7 +376,7 @@ def approval_status(session, workflow, edge, *, current=None, events=None):
             and review.actor_id is not None
             and review.payload.get("binding_hash") == current["parameter_hash"]
         )
-        accepted = trusted and review.payload.get("decision") == "approve" and not issues
+        accepted = trusted and review is not None and review.payload.get("decision") == "approve" and not issues
         if accepted and approved is None:
             approved = evidence_id
         items.append(

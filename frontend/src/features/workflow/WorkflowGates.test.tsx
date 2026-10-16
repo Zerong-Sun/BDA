@@ -21,6 +21,9 @@ vi.mock('../../lib/api/workflowGates', () => ({
 vi.mock('../../lib/api/artifacts', () => ({
   getArtifact: vi.fn().mockRejectedValue(new Error('Synthetic preview error')),
 }))
+vi.mock('../../lib/api/scientificGates', () => ({
+  scientificGates: vi.fn().mockResolvedValue({ workflow_version: 1, items: [] }),
+}))
 vi.mock('@xyflow/react', () => ({
   Handle: ({ id, type }: { id: string; type: string }) => (
     <span data-testid={`${type}-${id}`}>{id}</span>
