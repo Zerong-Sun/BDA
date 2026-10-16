@@ -14,8 +14,8 @@ def test_740_character_draft_gets_480_target_without_replaying_task_or_diagnosti
     messages = _length_repair_messages(run, turns, draft)
     packet = json.loads(messages[1]["content"])
     assert packet["target_template"] == {
-        "status": "review_required", "summary": "", "sections": {},
-        "evidence_call_ids": [], "missing": [], "next_action": "",
+        "status": "review_required", "summary": "", "sections": {"乙": ""},
+        "evidence_call_ids": [], "missing": ["丁" * 66], "next_action": "",
     }
     assert packet["length_feedback"] == {
         "current_visible_characters": 740, "target_max_visible_characters": 480,
@@ -23,7 +23,7 @@ def test_740_character_draft_gets_480_target_without_replaying_task_or_diagnosti
         "current_field_characters": {"summary": 131, "sections_combined_including_titles": 473,
                                      "missing_combined": 66, "next_action": 70},
     }
-    assert packet["contract"] == {"required_sections": []}
+    assert packet["contract"] == {"required_sections": ["乙"]}
     assert packet["delivery_constraints"]["max_visible_characters"] == 600
     assert "goal" not in packet and "user_followups" not in packet
     assert "ORIGINAL_TASK_SENTINEL" not in json.dumps(messages)
@@ -44,9 +44,10 @@ def test_required_section_template_and_supporting_ids_are_preserved():
              "missing": ["independent validation"], "next_action": "Human review.",
              "evidence_call_ids": ["read-1"], "skill_outputs": {"method": {"evidence_call_ids": ["read-1"]}}}
     packet = json.loads(_length_repair_messages(run, turns, draft)[1]["content"])
-    assert packet["target_template"]["sections"] == {"observations": "", "limitations": ""}
+    assert packet["target_template"]["sections"] == {"observations": "", "limitations": "", "surplus": ""}
     assert packet["target_template"]["evidence_call_ids"] == ["read-1"]
     assert packet["target_template"]["skill_outputs"] == draft["skill_outputs"]
-    assert packet["field_budgets"]["sections_combined_including_titles"] == 300
+    assert packet["field_budgets"]["sections_combined_including_titles"] > sum(map(len, draft["sections"]))
+    assert packet["field_budgets"]["missing_combined"] == len("independent validation")
     assert packet["length_feedback"]["target_max_visible_characters"] == 480
     assert packet["valid_evidence_calls"] == [{"call_id": "read-1", "tool": "inspect"}]

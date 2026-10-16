@@ -74,7 +74,7 @@ def test_failed_post_review_shortening_keeps_both_replies_and_does_not_add_forma
     failures = run.outcome["scientific_review_rejections"]
     assert [x["stage"] for x in failures] == ["factual_review", "length_repair"]
     assert failures[0]["validation_errors"] == ["delivery_length_exceeded"]
-    assert failures[1]["validation_errors"] == ["unverified_evidence_call_ids"]
+    assert failures[1]["validation_errors"] == ["shortening_evidence_lost", "unverified_evidence_call_ids"]
     assert [_saved(session, x).content for x in failures] == [long_review, bad_short]
     assert run.outcome["scientific_review"] == "unavailable"
     assert "scientific_review_format_repair" not in run.outcome

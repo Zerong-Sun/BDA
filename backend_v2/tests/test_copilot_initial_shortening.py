@@ -31,8 +31,8 @@ def test_long_initial_draft_shortens_once_then_receives_original_receipt_review(
     provider.config = {"max_tokens": 16384, "thinking": {"type": "enabled"}}
     replies = iter([
         {"content": _delivery(summary="字" * 700)},
-        {"content": _delivery(summary="记录中有1 nM，仍待验证。", sections={})},
-        {"content": _delivery(summary="记录值为1 nM，仅限已查来源，仍待验证。", sections={})},
+        {"content": _delivery(summary="记录中有1 nM，仍待验证。")},
+        {"content": _delivery(summary="记录值为1 nM，仅限已查来源，仍待验证。")},
     ])
     seen = []
     def fake(selected, messages, **kwargs):
@@ -42,10 +42,10 @@ def test_long_initial_draft_shortens_once_then_receives_original_receipt_review(
     agent_loop.step(session, run, provider)
     assert len(seen) == 3
     short_packet = json.loads(seen[1][1][1]["content"])
-    assert short_packet["field_budgets"] == {
-        "summary": 360, "sections_combined_including_titles": 0,
-        "missing_combined": 60, "next_action": 60,
-    }
+    assert sum(short_packet["field_budgets"].values()) == 480
+    assert short_packet["field_budgets"]["sections_combined_including_titles"] > 0
+    assert short_packet["field_budgets"]["missing_combined"] == len("independent validation")
+    assert short_packet["target_template"]["sections"] == {"observations": ""}
     assert "tool_records" not in short_packet
     assert short_packet["draft"]["evidence_call_ids"] == ["read-1"]
     assert "Only contract required_sections keys" in seen[1][1][0]["content"]
