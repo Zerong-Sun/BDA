@@ -65,17 +65,24 @@ function headingText(node: React.ReactNode): string {
   return ''
 }
 
-export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = true }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean }) {
+export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = true, presentation = 'document' }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean; presentation?: 'document' | 'chat' }) {
   const { language } = useI18n()
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const sourceGroups = groupCitations(citations)
   const headings = sectionHeadings(children)
   const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
-  const showToc = headings.length >= TOC_THRESHOLD
+  const showToc = presentation !== 'chat' && headings.length >= TOC_THRESHOLD
+  const emphasis = (content: React.ReactNode) => {
+    if (presentation !== 'chat') return undefined
+    const text = headingText(content).replace(/^[\d\s.、:：()（）-]+/, '')
+    if (/^(?:结论|当前进展|一句话结论|Conclusion\b|Summary\b)/i.test(text)) return 'conclusion'
+    if (/^(?:下一步|下一个|建议下一步|Next steps?\b|Next action\b)/i.test(text)) return 'next-step'
+    return undefined
+  }
 
   return (
-    <div className={PROSE}>
+    <div className={`${PROSE}${presentation === 'chat' ? ' review-markdown--chat' : ''}`}>
       {showToc ? (
         <nav aria-label={language === 'zh' ? '章节' : 'Sections'} className="mb-4 border border-border-soft bg-surface-2 p-3">
           <ol className="!ml-4 grid gap-0.5 text-xs sm:grid-cols-2">
@@ -96,6 +103,9 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkCitationMarkers, { citations }]]}
         components={{
+          p: ({ children: content }) => <p data-chat-emphasis={emphasis(content)}>{content}</p>,
+          h1: ({ children: content }) => <h1 data-chat-emphasis={emphasis(content)}>{content}</h1>,
+          h3: ({ children: content }) => <h3 data-chat-emphasis={emphasis(content)}>{content}</h3>,
           a: ({ href, children: content, node }) => {
             const match = node?.properties['data-bda-citation'] === true ? href?.match(/^#bda-citation-(\d+)$/) : null
             if (!match || !citations[Number(match[1]) - 1]) return <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{content}</a>
@@ -114,7 +124,7 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
             }}>{content}</a></sup>
           },
           h2: ({ children: content, ...props }) => (
-            <h2 {...props} id={idByHeading.get(headingText(content))}>
+            <h2 {...props} id={idByHeading.get(headingText(content))} data-chat-emphasis={emphasis(content)}>
               {content}
             </h2>
           ),

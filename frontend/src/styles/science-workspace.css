@@ -488,6 +488,19 @@ body { line-height: 1.6; }
 .room-entry-kind { font-family: var(--font-mono); font-size: .6875rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: .35rem; }
 .room-speaker { font-size: .8125rem; font-weight: 550; margin-bottom: .25rem; }
 .room-text { font-size: .875rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-secondary); }
+/* Markdown already represents paragraph breaks as elements. Inheriting pre-wrap
+   also renders its separator text nodes as blank lines between those elements. */
+.review-markdown--chat { white-space: normal; line-height: 1.55; }
+.review-markdown--chat > p { margin-block: .35rem; }
+.review-markdown--chat :is(h1, h2, h3, h4) { margin-block: .75rem .25rem; font-size: .875rem; line-height: 1.45; }
+.review-markdown--chat :is(ul, ol) { margin-block: .25rem .5rem; }
+.review-markdown--chat li { margin-block: .15rem; }
+.review-markdown--chat li > p { margin-block: .15rem; }
+.review-markdown--chat :is(blockquote, hr) { margin-block: .5rem; }
+.review-markdown--chat > [data-chat-emphasis] { border-left: 2px solid var(--accent); padding-left: .6rem; color: var(--text-primary); font-weight: 550; }
+.review-markdown--chat > :first-child { margin-top: 0; }
+.review-markdown--chat > :last-child { margin-bottom: 0; }
+.review-markdown--chat pre { white-space: pre; }
 .room-task { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .75rem; align-items: start; }
 .room-task-goal { font-size: .875rem; overflow-wrap: anywhere; }
 .room-children { list-style: none; margin: .75rem 0 0; padding: 0 0 0 .875rem; border-left: 2px solid var(--border-soft); display: grid; gap: .5rem; }

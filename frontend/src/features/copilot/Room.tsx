@@ -337,7 +337,7 @@ function RoomEntry({
       {speaker ? <BotAvatar id={speaker.id} stance={speaker.stance} /> : null}
       <div className="room-entry-body">
         <p className="room-speaker">{speakerName(entry.bot, roster, zh)}</p>
-        <div className="room-text"><ReviewMarkdown projectId={projectId}>{entry.discussion.content}</ReviewMarkdown></div>
+        <div className="room-text"><ReviewMarkdown presentation="chat" projectId={projectId}>{entry.discussion.content}</ReviewMarkdown></div>
         {onOpenRun ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenRun(entry.discussion!.run_id)}>
           {zh ? '查看任务与证据' : 'Open task and evidence'}
         </Button> : null}
@@ -408,7 +408,7 @@ function RoomEntry({
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
-        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
         {!mine ? <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>

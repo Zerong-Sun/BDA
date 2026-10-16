@@ -347,7 +347,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                 className={message.role === 'user' ? 'ml-8' : 'mr-8'}
               >
                 <FramePanel className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                  {(message.content ? message.role === 'assistant' ? <ReviewMarkdown citations={message.meta?.citations} projectId={projectId}>{message.content}</ReviewMarkdown> : message.content : null) ||
+                  {(message.content ? message.role === 'assistant' ? <ReviewMarkdown presentation="chat" citations={message.meta?.citations} projectId={projectId}>{message.content}</ReviewMarkdown> : message.content : null) ||
                     (loading && message.role === 'assistant' ? (
                       <CopilotLoadingBubble
                         stage={activeLoadingStage}
