@@ -19,7 +19,12 @@ export async function listAllResearchBriefs(projectId: string): Promise<BriefRes
   return [...briefs.values()]
 }
 
+/** Legacy maintenance imports use this exact title for navigation, not research output. */
+export function isProjectIndex(title: string) {
+  return ['项目条目索引', 'project entry index'].includes(title.trim().toLowerCase())
+}
+
 export function latestProgressBrief(briefs: readonly BriefResponse[]) {
-  return briefs.filter(brief => brief.status === 'progress_note' && brief.content?.trim())
+  return briefs.filter(brief => brief.status === 'progress_note' && brief.content?.trim() && !isProjectIndex(brief.title))
     .sort((a, b) => (Date.parse(b.updated_at) || Date.parse(b.created_at) || 0) - (Date.parse(a.updated_at) || Date.parse(a.created_at) || 0) || b.id.localeCompare(a.id))[0]
 }

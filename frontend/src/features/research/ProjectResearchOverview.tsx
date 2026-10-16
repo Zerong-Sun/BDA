@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
 import type { Project } from '../../lib/api/projects'
-import { listAllResearchBriefs, latestProgressBrief } from '../../lib/api/researchBriefs'
+import { isProjectIndex, listAllResearchBriefs, latestProgressBrief } from '../../lib/api/researchBriefs'
 import { getResearchWorkspace, workspaceText } from '../../lib/api/researchWorkspace'
 import { useI18n } from '../../lib/i18n'
 import { projectBrief } from '../projects/projectBrief'
@@ -27,7 +27,9 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
   const progressSections = reviewOverview(progress?.content ?? '')
   const query = useQuery({ queryKey: ['research-workspace', project.id], queryFn: () => getResearchWorkspace(project.id) })
   const workspace = query.data
-  const report = workspace?.review_document
+  const savedDocument = workspace?.review_document
+  const indexDocument = savedDocument && Object.values(savedDocument.title).some(title => typeof title === 'string' && isProjectIndex(title)) ? savedDocument : undefined
+  const report = indexDocument ? undefined : savedDocument
   const content = report ? workspaceText(report.content, language) : ''
   const { objectives, findings, unresolved } = reviewOverview(content)
   const preferProgress = Boolean(progress && (!report || isNewerSavedRecord(progress.updated_at, report.updated_at)))
@@ -67,7 +69,7 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
         <section aria-label={zh ? '项目结果' : 'Project results'} className="min-w-0 space-y-3 rounded-lg border border-border-soft p-4">
           <h2 className="text-base font-semibold">{zh ? '项目结果' : 'Project results'}</h2>
           {progressFindings.length && progress ? <p className="text-xs text-text-secondary">{zh ? '来源：最新已保存进展' : 'Source: latest saved progress'} · {progress.title} · {dateLabel(progress.updated_at)} · {statusLabel(progress.status)}</p> : null}
-          {displayedFindings.length ? displayedFindings.map(section => <div key={section.title} className="space-y-2">{progressFindings.length ? <p className="text-xs text-text-muted">{section.title}</p> : source(section.title)}{progressFindings.length ? <ReviewMarkdown>{section.body}</ReviewMarkdown> : prose(section.body)}</div>) : <p className="text-sm text-text-secondary">{zh ? '已保存报告未单列结果章节，请阅读原报告及研究发现。' : 'No separate results section is recorded. Read the saved report and research findings.'}</p>}
+          {displayedFindings.length ? displayedFindings.map(section => <div key={section.title} className="space-y-2">{progressFindings.length ? <p className="text-xs text-text-muted">{section.title}</p> : source(section.title)}{progressFindings.length ? <ReviewMarkdown>{section.body}</ReviewMarkdown> : prose(section.body)}</div>) : <p className="text-sm text-text-secondary">{indexDocument ? (zh ? '当前仅有归档索引，尚未找到独立结果报告；可查看下方研究发现与来源索引。' : 'Only an archive index is recorded; no standalone results report is available. Inspect the findings and source index below.') : report ? (zh ? '已保存报告未单列结果章节，请阅读原报告及研究发现。' : 'No separate results section is recorded. Read the saved report and research findings.') : (zh ? '尚未找到结果报告，可查看下方已有研究发现。' : 'No results report is recorded. Inspect the saved findings below.')}</p>}
         </section>
         <aside aria-label={zh ? '报告与复核' : 'Report and review'} className="min-w-0 space-y-3 rounded-lg bg-surface-2 p-4">
           <h2 className="font-semibold">{zh ? '报告与复核' : 'Report and review'}</h2>
@@ -97,6 +99,7 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
       </section>
       {progress ? <div ref={progressRef} className="scroll-mt-24 border-t border-border-soft"><Accordion value={progressOpen} onValueChange={setProgressOpen}><AccordionItem value="progress"><AccordionTrigger>{zh ? '完整进展与来源' : 'Full progress and sources'}</AccordionTrigger><AccordionContent><p className="mb-3 text-xs text-text-secondary">{progress.title} · {statusLabel(progress.status)} · {dateLabel(progress.updated_at)}</p><ReviewMarkdown>{progress.content ?? ''}</ReviewMarkdown></AccordionContent></AccordionItem></Accordion></div> : null}
       {report && content.trim() ? <div ref={reportRef} className="scroll-mt-24 border-t border-border-soft"><Accordion value={reportOpen} onValueChange={setReportOpen}><AccordionItem value="report"><AccordionTrigger>{zh ? '完整综述与引用来源' : 'Full report and cited sources'}</AccordionTrigger><AccordionContent><p className="mb-3 text-xs text-text-secondary">{workspaceText(report.title, language)} · {zh ? '原记录状态' : 'Recorded status'}: {report.status} · {dateLabel(report.updated_at)}</p><ReviewMarkdown compactCitations citations={citations} projectId={project.id}>{content}</ReviewMarkdown></AccordionContent></AccordionItem></Accordion></div> : null}
+      {indexDocument ? <Accordion key={project.id} className="border-t border-border-soft"><AccordionItem value="source-index"><AccordionTrigger>{zh ? '归档来源索引' : 'Archive source index'}</AccordionTrigger><AccordionContent><ReviewMarkdown>{workspaceText(indexDocument.content, language)}</ReviewMarkdown></AccordionContent></AccordionItem></Accordion> : null}
       <p className="border-t border-border-soft pt-3 text-xs text-text-muted">{zh ? '目标、问题和结果来自已有报告与项目任务书。结构化目标树未建立时，仍保留这些原始研究记录；不自动推断问题已回答或复核已完成。' : 'Objectives, questions and results come from saved reports and project briefs. An absent structured goal tree does not erase those records or imply questions are answered or reviews complete.'}</p>
     </> : null}
   </section>

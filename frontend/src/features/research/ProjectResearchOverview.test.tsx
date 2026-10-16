@@ -20,6 +20,22 @@ function respond(content: string | null = report, references: Record<string, unk
 beforeEach(() => { useAppStore.setState({ language: 'en' }); respond() })
 afterEach(cleanup)
 describe('archived research overview', () => {
+  it('keeps an index-only archive accessible without presenting it as a results report', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+      project: { id: project.id },
+      review_document: { id: 'index', title: { zh: '项目条目索引', en: 'Project entry index' }, content: { en: 'Retained migration source index.' }, status: 'progress_note', version: 1, updated_at: '2026-10-16T00:00:00Z' },
+      review_sections: [], references: [], structures: [],
+    })))
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    expect(await screen.findByText(/Only an archive index is recorded/)).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Read full report' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Recorded report status/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Archive source index' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Retained migration source index.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Archive source index' }))
+    expect(await screen.findByText('Retained migration source index.')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View Bot review records →' })).toHaveAttribute('href', '#/bots/auditor?project=archived&view=records')
+  })
   it('reads existing objectives, findings and open questions even without structured goals', async () => {
     renderWithProviders(<ProjectResearchOverview project={project} />)
     expect(await screen.findByText('Which interactions are supported?')).toBeVisible()

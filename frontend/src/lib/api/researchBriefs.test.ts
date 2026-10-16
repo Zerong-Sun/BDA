@@ -7,6 +7,13 @@ import type { BriefResponse } from './generated/types.gen'
 const brief = (id: string, updated_at: string, status = 'progress_note') => ({ id, title: id, content: 'Saved progress', status, updated_at, created_at: updated_at }) as BriefResponse
 
 describe('complete research brief reading', () => {
+  it('does not let a newer maintenance index replace research progress', () => {
+    const progress = brief('research', '2026-09-01T00:00:00Z')
+    const index = { ...brief('index', '2026-10-17T00:00:00Z'), title: '项目条目索引' }
+    expect(latestProgressBrief([progress, index])?.id).toBe('research')
+    expect(latestProgressBrief([index])).toBeUndefined()
+    expect(latestProgressBrief([{ ...index, title: 'Results from index-guided design' }])?.id).toBe('index')
+  })
   it('selects latest progress after all UUID-ordered pages, ignoring newer drafts', async () => {
     const cursors: (string | null)[] = []
     server.use(http.get('/api/v2/projects/:id/research-briefs', ({ request }) => {
