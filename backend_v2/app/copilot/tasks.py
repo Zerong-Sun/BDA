@@ -19,8 +19,10 @@ from ..core.metrics import (
     COPILOT_CITATION_COVERAGE,
     COPILOT_UNSUPPORTED_CLAIMS,
 )
+from ..core.problem import DomainError
 from ..projects.models import Project
 from .call_guard import call_scope
+from .chat_context import compact_research_context, history_citations, select_chat_history
 from .citations import dedupe as dedupe_citations
 from .citations import rebase_history_markers
 from .models import CopilotAgentRun, CopilotAgentTurn
@@ -138,7 +140,7 @@ def copilot_respond(message_id: str) -> dict:
                 allowed_kinds=allowed_kinds,
             )
             citations = research.citations
-            history = list(
+            stored_history = list(
                 session.scalars(
                     select(CopilotMessage)
                     .where(
@@ -150,15 +152,19 @@ def copilot_respond(message_id: str) -> dict:
                     .limit(40)
                 )
             )
-            history.reverse()
+            stored_history.reverse()
+            history = select_chat_history(stored_history)
             # Follow-up edits can cite earlier answers. Preserve their actual
             # source records, then rebase answer-local numbers for this request.
             citations = dedupe_citations([
                 *citations,
-                *(citation for item in history if item.role == "assistant" for citation in item.citations or []),
+                *history_citations(history),
             ])
             reasoning_content = None
             delivery_context: dict = {}
+            answer = ""
+            draft_ready = False
+            tool_calls = list(research.tool_calls)
             try:
                 if provider and provider.enabled:
                     configured_prompt = (
@@ -205,7 +211,7 @@ def copilot_respond(message_id: str) -> dict:
                                 f"Enabled skills: {skills}. Active turn capability: {active_skills}. "
                                 "A skill hint narrows this turn and never grants a disabled capability. Turn context: "
                                 f"{json.dumps({key: value for key, value in turn_context.items() if not key.startswith('_')}, ensure_ascii=False)}.\n"
-                                f"Retrieved Research workspace evidence:\n{research.context}\n"
+                                f"Retrieved Research workspace evidence:\n{compact_research_context(research.context)}\n"
                                 f"Operational project context:\n{project_context.overview_packet()}"
                             ),
                         }
@@ -215,8 +221,6 @@ def copilot_respond(message_id: str) -> dict:
                             "role": item.role,
                             "content": rebase_history_markers(item.content, item.citations or [], citations)
                             if item.role == "assistant" else item.content,
-                            **({"reasoning_content": item.reasoning_content}
-                               if item.role == "assistant" and isinstance(item.reasoning_content, str) else {}),
                         }
                         for item in history
                         if item.role in {"user", "assistant"} and item.content.strip()
@@ -241,6 +245,7 @@ def copilot_respond(message_id: str) -> dict:
                         if turn_capabilities == {"wetlab-read"} else None,
                     )
                     answer = agent_result.content
+                    draft_ready = bool(answer.strip())
                     if agent_result.calculator_delivery:
                         delivery_context = {"calculator_delivery": True,
                                             "delivery_status": "partial" if agent_result.delivery_incomplete else "complete"}
@@ -332,6 +337,27 @@ def copilot_respond(message_id: str) -> dict:
                     )
                 )
             except Exception as exc:
+                error_code = exc.error_code if isinstance(exc, DomainError) else "copilot_provider_failed"
+                if draft_ready and error_code in {"llm_budget_exhausted", "llm_call_limit", "llm_duplicate_call"}:
+                    # A stopped review cannot erase an already generated answer,
+                    # nor may the draft masquerade as a fully reviewed delivery.
+                    source.status = "completed"
+                    source.version += 1
+                    zh = turn_context.get("language", "en") == "zh"
+                    notice = (
+                        "本轮已达到调用限制，最终复核未完成。以下保留已生成草稿，不代表复核通过。你可以继续提问或新建对话。"
+                        if zh else
+                        "This turn reached its request limit before final review completed. The generated draft is retained below; it has not passed final review. You can continue chatting or start a new conversation."
+                    )
+                    session.add(CopilotMessage(
+                        conversation_id=source.conversation_id, role="assistant",
+                        bot=active_bot.id if active_bot else None, status="completed",
+                        content=f"> {notice}\n\n{answer}", citations=citations,
+                        tool_calls=[*tool_calls, {"name": "final_review", "status": "blocked", "error": error_code}],
+                        context={**delivery_context, "delivery_status": "partial",
+                                 "review_status": "not_completed", "stop_reason": error_code},
+                    ))
+                    return {"message_id": message_id, "status": "completed"}
                 source.status = "failed"
                 source.error = str(exc)[:2000]
                 source.version += 1
@@ -346,6 +372,7 @@ def copilot_respond(message_id: str) -> dict:
                         status="failed",
                         content="Copilot provider failed; no scientific conclusion was generated.",
                         error=str(exc)[:2000],
+                        context={"error_code": error_code},
                     )
                 )
     return {"message_id": message_id, "status": "completed"}

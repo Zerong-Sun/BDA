@@ -94,7 +94,7 @@ def test_server_calculator_delivery_is_not_rewritten_by_prose_review(wired, monk
 
 
 @pytest.mark.parametrize("mode", ["plain", "null", "empty", "review", "grounded", "repair"])
-def test_chat_replays_final_response_reasoning_after_new_worker_session(wired, monkeypatch, mode):
+def test_chat_keeps_final_reasoning_private_without_replaying_it_in_new_requests(wired, monkeypatch, mode):
     factory, _ = wired
     conversation_id, source_id = _conversation(factory)
     citations = ([{"source_type": "scientific_literature", "chunk_id": "synthetic-chunk",
@@ -144,10 +144,7 @@ def test_chat_replays_final_response_reasoning_after_new_worker_session(wired, m
     previous = [item for item in requests[-1] if item["role"] == "assistant"]
     assert len(previous) == 1
     assert previous[0]["content"] == public_first_answer
-    if final_marker is None:
-        assert "reasoning_content" not in previous[0]
-    else:
-        assert previous[0]["reasoning_content"] == final_marker
+    assert "reasoning_content" not in previous[0]
     assert not replies
 
 

@@ -1,4 +1,4 @@
-import { taskErrorMessage } from './deliveryDisplay'
+import { chatFailureMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
@@ -69,11 +69,12 @@ export function Room({
   const bots = useCopilotBots()
   const roster = bots.data ?? []
   const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode, bot: selectedBot } = useCopilotChat(
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode, bot: selectedBot, setBot, resetMessages } = useCopilotChat(
     projectId,
     pageContext,
     language,
   )
+  const [newConversationProject, setNewConversationProject] = useState<string | null>(null)
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
   const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
   const draft = useAppStore((state) => state.copilotDraft)
@@ -129,13 +130,24 @@ export function Room({
     // person believes they addressed someone, and sending it elsewhere without
     // saying so is the failure this check exists for.
     if (!trimmed || loading || readOnly || unknownHandle) return
+    setNewConversationProject(null)
     setSessionInput(projectId, '')
     await send(trimmed, addressee ? { bot: addressee.id } : undefined)
   }
 
   return (
     <div className="room" data-tour-id="research-room">
-      <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
+        <Button type="button" variant="outline" size="sm" disabled={readOnly || loading || !projectId} onClick={() => {
+          resetMessages()
+          setBot(selectedBot)
+          setMode(mode)
+          setSessionInput(projectId, input)
+          setNewConversationProject(projectId)
+        }}>{zh ? '新建对话' : 'New conversation'}</Button>
+      </div>
+      {newConversationProject === projectId ? <p role="status" className="mt-2 text-xs text-text-secondary">{zh ? '新对话已准备，发送下一条消息后开始。历史记录仍保留在研究室中。' : 'A new conversation is ready for your next message. Earlier records remain in this room.'}</p> : null}
       <ApiState
         isLoading={feed.isLoading}
         isError={feed.isError}
@@ -189,7 +201,7 @@ export function Room({
       </ApiState>
       {error ? (
         <Alert variant="destructive" className="mt-2">
-          <AlertDescription>{taskErrorMessage(error, language === 'zh')}</AlertDescription>
+          <AlertDescription>{chatFailureMessage(error, language === 'zh')}</AlertDescription>
         </Alert>
       ) : null}
       {recipient || unknownHandle ? (
@@ -394,9 +406,9 @@ function RoomEntry({
       <div className="room-entry-body">
         <p className="room-speaker">
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
-          {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : ''}
+          {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
-        <div className="room-text">{mine ? message.content : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : <ReviewMarkdown citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
         {!mine ? <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>

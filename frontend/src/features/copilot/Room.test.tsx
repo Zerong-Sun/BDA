@@ -149,6 +149,60 @@ describe('Room', () => {
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('My revised question, still unsent.'))
   })
 
+  it.each([
+    ['en', 'This turn reached its call limit'],
+    ['zh', '本轮已达到调用限制'],
+  ] as const)('explains a stored allowance failure in %s and allows a new question', async (language, explanation) => {
+    useAppStore.setState({ language })
+    stub([{ kind: 'message', id: 'failure', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      status: 'failed', content: 'Copilot provider failed; no scientific conclusion was generated.',
+      error: 'The task allowance cannot cover another request.',
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText(new RegExp(explanation))).toBeInTheDocument()
+    expect(screen.queryByText(/Copilot provider failed/)).not.toBeInTheDocument()
+    expect(screen.queryByText('The task allowance cannot cover another request.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry|重试/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: language === 'zh' ? '在研究室里发言' : 'Say something in the room' })).toBeEnabled()
+    useAppStore.setState({ language: 'en' })
+  })
+
+  it('uses stored error codes while keeping raw exceptions out of the room', async () => {
+    stub([{ kind: 'message', id: 'failure', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      status: 'failed', content: 'Raw exception at https://private.invalid',
+      error: 'Authentication failed: token=private-token at https://private.invalid', context: { error_code: 'llm_budget_exhausted' },
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText(/This turn reached its call limit/)).toBeInTheDocument()
+    expect(screen.queryByText(/private-token|private.invalid|Raw exception/)).not.toBeInTheDocument()
+  })
+
+  it('retains a partial draft and distinguishes its incomplete review from a failed reply', async () => {
+    stub([{ kind: 'message', id: 'partial', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      content: 'Saved draft with evidence; final review is incomplete.',
+      context: { delivery_status: 'partial', review_status: 'not_completed', stop_reason: 'llm_budget_exhausted' },
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Saved draft with evidence; final review is incomplete.')).toBeVisible()
+    expect(screen.getByText(/partially completed · review incomplete/)).toBeVisible()
+    expect(screen.queryByText(/could not answer/)).not.toBeInTheDocument()
+  })
+
+  it('prepares a fresh conversation without resending or removing server history', async () => {
+    stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message() }])
+    useAppStore.setState({ copilotSessions: { proj_test: { conversationId: 'old-conversation', messages: [], bot: 'planner', input: 'A narrower question', mode: 'bench' } } })
+    renderWithProviders(<Room />)
+    await screen.findByText('Two routes fit.')
+    fireEvent.click(screen.getByRole('button', { name: 'New conversation' }))
+    expect(useAppStore.getState().copilotSessions.proj_test.conversationId).toBeNull()
+    expect(useAppStore.getState().copilotSessions.proj_test.pending).toBeUndefined()
+    expect(useAppStore.getState().copilotSessions.proj_test.mode).toBe('bench')
+    expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('A narrower question')
+    expect(screen.getByText('Two routes fit.')).toBeVisible()
+    expect(screen.getByText(/Earlier records remain in this room/)).toBeVisible()
+    useAppStore.setState({ copilotSessions: {} })
+  })
+
   it('names the operator that produced a message', async () => {
     stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message() }])
     renderWithProviders(<Room />)

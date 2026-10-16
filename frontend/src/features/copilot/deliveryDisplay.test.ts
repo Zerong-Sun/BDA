@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../lib/api/client'
-import { deliveryMessage, taskErrorMessage } from './deliveryDisplay'
+import { chatFailureMessage, deliveryMessage, taskErrorMessage } from './deliveryDisplay'
 
 describe('task allowance messages', () => {
   it.each([
@@ -24,5 +24,32 @@ describe('task allowance messages', () => {
   it('preserves unrelated failures and scientific cost statements', () => {
     expect(taskErrorMessage(new Error('Storage unavailable'), false)).toBe('Storage unavailable')
     expect(deliveryMessage('The assay cost was compared across protocols.', true)).toBe('The assay cost was compared across protocols.')
+  })
+})
+
+
+describe('safe chat failure messages', () => {
+  it.each([
+    ['The task allowance cannot cover another request.', '本轮已达到调用限制', 'This turn reached its call limit'],
+    ['llm_call_limit: The task call limit has been reached.', '本轮已达到调用限制', 'This turn reached its call limit'],
+    ['This request was already attempted; automatic replay is blocked.', '重复调用已阻止', 'duplicate call was blocked'],
+    ['Current model prices are not configured; no request was sent.', '模型调用配置尚未就绪', 'not configured correctly'],
+    ['Configured credential reference is unavailable', '模型调用配置尚未就绪', 'not configured correctly'],
+    ['Model completion exceeded the 180-second total deadline; no response was accepted.', '本次回复超时', 'reply timed out'],
+    ['llm_output_truncated', '未得到完整回答', 'no complete answer'],
+    ['The provider filtered this response; partial output was not accepted.', '未通过模型服务检查', 'did not accept this response'],
+  ])('classifies stored diagnostic %s without exposing it', (diagnostic, chinese, english) => {
+    const error = `${diagnostic} Internal endpoint https://secret.invalid?token=example-private-token; 100 cents`
+    expect(chatFailureMessage(error, true)).toContain(chinese)
+    expect(chatFailureMessage(error, false)).toContain(english)
+    for (const zh of [true, false]) expect(chatFailureMessage(error, zh)).not.toMatch(/secret|token|100|cents|https:|¥|计费/)
+  })
+
+  it('uses structured codes and safely replaces unknown or missing diagnostics', () => {
+    expect(chatFailureMessage(new ApiError('https://secret.invalid', 409, { error_code: 'llm_budget_exhausted' }), true)).toContain('本轮已达到调用限制')
+    for (const diagnostic of ['Traceback: auth sk-private at https://secret.invalid', null, undefined]) {
+      expect(chatFailureMessage(diagnostic, false)).toBe('No usable answer was generated. Check saved reports first; ask an administrator to inspect the task record if needed.')
+      expect(chatFailureMessage(diagnostic, true)).not.toMatch(/Traceback|private|https:/)
+    }
   })
 })
