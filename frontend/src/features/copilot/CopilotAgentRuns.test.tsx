@@ -60,6 +60,21 @@ beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'appl
 
 describe('agent run panel', () => {
   it.each([
+    ['en', 'The review result failed delivery validation. The saved draft still needs review.'],
+    ['zh', '复核结果未通过交付校验，已保存的草稿仍需审核。'],
+  ] as const)('describes rejected review delivery without assuming a format or citation error in %s', async (language, label) => {
+    useAppStore.setState({ language })
+    runReturns({ ...RUN, status: 'succeeded', outcome: {
+      status: 'review_required', summary: 'Saved draft', scientific_review: 'unavailable',
+      scientific_review_error: 'invalid_review_delivery', missing: ['scientific_review_unavailable'],
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText(label)).toBeInTheDocument()
+    expect(screen.getByText('Saved draft')).toBeInTheDocument()
+    expect(screen.queryByText(/Automated factual review completed|自动事实复核已完成/)).not.toBeInTheDocument()
+  })
+
+  it.each([
     ['en', 'Automated factual review completed. This does not constitute scientific validation or human approval.'],
     ['zh', '自动事实复核已完成；这不代表科研验证或人工批准。'],
   ] as const)('shows the completed factual pass without claiming approval in %s', async (language, label) => {

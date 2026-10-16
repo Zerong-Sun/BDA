@@ -68,7 +68,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
     llm_output_truncated: ['Review exceeded the model output limit. Shorten the scope or adjust the model limit and retry.', '复核达到模型输出上限。可缩小范围，或调整模型上限后重试。'],
     llm_completion_deadline_exceeded: ['Review timed out. Retry after the model service recovers.', '复核请求超时，可在模型服务恢复后重试。'],
     copilot_turn_limit_reached: ['Review reached the task turn limit. Continue with a sufficient budget.', '复核达到任务轮次上限，可补充预算后继续。'],
-    invalid_review_delivery: ['Review returned an invalid format or unverifiable citations. The saved draft still needs review.', '复核返回的格式或引用未通过校验，已保存的草稿仍需审核。'],
+    invalid_review_delivery: ['The review result failed delivery validation. The saved draft still needs review.', '复核结果未通过交付校验，已保存的草稿仍需审核。'],
   }
   if (outcome.scientific_review_error && reviewErrors[outcome.scientific_review_error]) {
     issueLabels.scientific_review_unavailable = reviewErrors[outcome.scientific_review_error][zh ? 1 : 0]
