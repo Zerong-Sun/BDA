@@ -381,3 +381,7 @@ class CopilotDecisionRequest(UUIDVersionMixin, Base):
     #: The person the asking operator was working for. Who answered is a
     #: separate column, because they are often not the same person.
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+
+# Register transactional journal projections in HTTP and worker processes alike.
+from . import records as _records  # noqa: E402,F401

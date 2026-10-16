@@ -19,6 +19,7 @@ import { emptyPolicy, gateLabel, type GatePolicy, type GateSummary } from './gat
 import { getArtifact } from '../../lib/api/artifacts'
 import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
 import { GatePolicyEditor } from './GatePolicyEditor'
+import { GateEvidencePanel } from './GateEvidencePanel'
 
 export function GateInspector({
   workflowId,
@@ -129,6 +130,7 @@ export function GateInspector({
       if (kind === 'save') toast(zh ? '门控规则已保存' : 'Gate rules saved', 'success')
       if (kind === 'release') toast(zh ? '已提交放行，正在准备下游输入' : 'Release submitted; preparing downstream inputs', 'success')
       await cache.invalidateQueries({ queryKey: ['workflow-gates', workflowId] })
+      await cache.invalidateQueries({ queryKey: ['scientific-gates', workflowId] })
       await cache.invalidateQueries({ queryKey: ['gate-results', workflowId] })
     },
     onError: (e) => toast(e.message, 'error'),
@@ -174,6 +176,7 @@ export function GateInspector({
           <GatePolicyEditor value={policy} onChange={setPolicy} disabled={!canOperate || readOnly || action.isPending} />
         </div>
       </WorkflowSection>
+      {edge.id ? <GateEvidencePanel workflowId={workflowId} edgeId={edge.id} canWrite={canOperate} readOnly={readOnly} /> : null}
       <label className="mb-2 block text-xs">
         {zh ? '试运行数据（同项目、同插件）' : 'Preview data (same project and plugin)'}
         <WorkflowSelect

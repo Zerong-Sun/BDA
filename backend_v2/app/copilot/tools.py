@@ -2536,3 +2536,20 @@ _register(
         handler=_triage_candidates,
     )
 )
+
+
+_register(
+    ToolSpec(
+        id="search_bot_records",
+        description="Read a named Bot's persistent work journal in this project. Use for what-you-did / workflow-history questions. Source bot identity and status are authoritative; workflow references do not prove execution. Paginate with offset when matched exceeds returned items.",
+        parameters={"type": "object", "properties": {
+            "bot_id": {"type": "string"}, "query": {"type": "string"},
+            "limit": _limit(50, 20), "offset": {"type": "integer", "minimum": 0},
+        }, "required": ["bot_id"], "additionalProperties": False},
+        capability="project-read", execution_mode="read", requires="project",
+        handler=lambda ctx, args: ctx.project.search_bot_records(
+            _arg_str(args, "bot_id"), _arg_str(args, "query"),
+            limit=_arg_int(args, "limit", 20), offset=_arg_int(args, "offset", 0),
+        ),
+    )
+)

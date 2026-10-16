@@ -870,3 +870,30 @@ def save_task_decision_record(
         raise DomainError("version_conflict", "Reload the task before saving its delivery.", status_code=412)
     save_task_record(session, run, user)
     return _run_response(session, run)
+
+
+@router.get("/projects/{project_id}/bots/{bot_id}/records")
+def get_bot_records(
+    project_id: uuid.UUID, bot_id: str, query: str = Query("", max_length=500),
+    limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> dict:
+    from .records import read_record
+    require_project(session, project_id, user)
+    result = read_record(session, project_id, bot_id, query, limit, offset)
+    result.pop("markdown")
+    return result
+
+
+@router.get("/projects/{project_id}/bots/{bot_id}/records.md")
+def download_bot_records(
+    project_id: uuid.UUID, bot_id: str,
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> Response:
+    from .records import read_record
+    require_project(session, project_id, user)
+    record = read_record(session, project_id, bot_id)
+    return Response(record["markdown"], media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="{bot_id}-{project_id}.md"',
+        "Cache-Control": "private, no-store",
+    })

@@ -27,6 +27,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
             "list_experiment_results",
             "get_workflow_status",
             "get_compute_status",
+            "search_bot_records",
         ],
     },
     {

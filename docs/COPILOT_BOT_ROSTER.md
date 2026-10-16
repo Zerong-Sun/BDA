@@ -643,3 +643,28 @@ API 只对外给 sha256，一个把明文回传给模型的工具会一行之内
 另外两条：判据会带上**是哪一行指标定的**（method 与 assessor），所以"设计模型给自己打的分"
 不会被洗成独立验证；一条不声明任何 tier 的路线（比如 structure-acquisition，它约束的是
 ensemble 大小而不是 binder 质量）会被明确拒绝，而不是返回一个读起来像"全过"的空结论。
+
+## Persistent work records
+
+All six operators can use the read-only `search_bot_records` tool through
+`project-read`. Queries require a named bot and are confined to the current
+project; `query`, `limit` and `offset` support workflow IDs, evidence IDs and text.
+The Bot responsibility page has a **Work records** tab with search and a full
+Markdown download. The endpoints are
+`GET /api/v2/copilot/projects/{project_id}/bots/{bot_id}/records` and
+`GET /api/v2/copilot/projects/{project_id}/bots/{bot_id}/records.md`.
+Both require project access. Reading never invokes a provider or rewrites history.
+
+Assistant messages and durable agent run/turn changes create transactional,
+content-addressed Markdown revisions in existing `KnowledgeEntry` rows of type
+`bot_work_record`. Failures, source IDs, timestamps, explicit workflow/evidence
+references and run outcomes are retained; private reasoning and raw tool results
+are not copied. Only the exact recorded bot owns an entry. A workflow reference
+is a reference, not proof that the bot executed or completed it. Existing imported
+Markdown notes remain historical knowledge and are not journal input.
+
+For existing installations, an authorized maintenance transaction may call
+`copilot.records.refresh_project_records(session, project_id, actor_id)` for each
+accessible project and commit. Repeating this with unchanged sources creates no
+new revision. No database migration is required. New events update records in the
+source transaction, so an uncommitted or rolled-back source has no journal entry.

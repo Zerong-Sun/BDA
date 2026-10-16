@@ -127,3 +127,22 @@ describe('Bot responsibility page', () => {
     expect(screen.getByRole('link', { name: 'Back to the research team' })).toHaveAttribute('href', '#/bots?project=project-bot')
   })
 })
+
+it('opens persisted work records, searches with project and bot scope, and shows source status', async () => {
+  const requests: string[] = []
+  server.use(http.get('/api/v2/copilot/projects/:projectId/bots/:botId/records', ({ request, params }) => {
+    const url = new URL(request.url)
+    requests.push(`${params.projectId}:${params.botId}:${url.searchParams.get('query')}`)
+    return HttpResponse.json({ project_id: params.projectId, bot_id: params.botId, record_id: 'journal-1', sha256: 'source-sha', updated_at: '2026-10-16T00:00:00Z', total: 1, matched: 1, offset: 0, items: [{ id: 'message-1', kind: 'message', bot: 'researcher', status: 'failed', source_version: 2, created_at: '2026-10-16T00:00:00Z', content: 'Reviewed evidence for workflow-123', conversation_id: 'conversation-1', references: [['workflow_id', 'workflow-123']], error: 'Source provider disconnected' }] })
+  }))
+  renderAt('/bots/researcher?project=project-bot&view=records')
+  expect(await screen.findByText('Reviewed evidence for workflow-123')).toBeInTheDocument()
+  expect(screen.getByText('researcher · message · failed')).toBeInTheDocument()
+  expect(screen.getByText('Source provider disconnected')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Download full MD' })).toBeEnabled()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search work records' }), { target: { value: 'workflow-123' } })
+  fireEvent.click(screen.getByRole('button', { name: /^Search$/ }))
+  await vi.waitFor(() => expect(requests).toContain('project-bot:researcher:workflow-123'))
+  fireEvent.click(screen.getByText('Sources, workflows and evidence references'))
+  expect(screen.getByText(/"workflow_id"/)).toBeInTheDocument()
+})

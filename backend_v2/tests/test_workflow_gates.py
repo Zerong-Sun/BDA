@@ -223,7 +223,7 @@ class MemoryStorage:
         self.files[key] = body
 
 
-def runtime_fixture(env, mode="automatic", threshold=80, optional=False):
+def runtime_fixture(env, mode="automatic", threshold=80, optional=False, target_configuration=None, target_schema=None):
     from backend_v2.app.artifacts.models import Artifact
     from backend_v2.app.compute.models import JobEvent
     from backend_v2.app.compute.parsers.base import ParsedOutputs
@@ -274,6 +274,18 @@ def runtime_fixture(env, mode="automatic", threshold=80, optional=False):
         ]
     )
     s.flush()
+    if target_configuration:
+        from backend_v2.app.workflows.repository import WorkflowRepository
+
+        target_node = next(n for n in WorkflowRepository(s).nodes(w.id) if n.node_key == "b")
+        target_node.configuration = target_configuration
+    if target_schema:
+        consumer.parameter_schema = target_schema
+    s.flush()
+    if mode == "automatic":
+        from backend_v2.tests.scientific_gate_helpers import approve_test_gate
+
+        approve_test_gate(env, w)
     submission, jobs = create_submission(
         s,
         workflow=w,
@@ -450,6 +462,7 @@ def test_inherited_standard_precedes_branch_top_n(env):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, w, _, source, target, gate, storage = runtime_fixture(env, threshold=0)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "output_policy": {"configured": True, "rules": {"conditions": [{"metric": "score", "op": "gte", "value": 80}]}},
@@ -459,7 +472,8 @@ def test_inherited_standard_precedes_branch_top_n(env):
         },
     }
     run_gate(s, gate, storage)
-    assert len(gate.selected_ids) == 1
+    assert sum(d["passed"] for d in gate.decisions) == 1
+    assert not gate.selected_ids
     assert next(d for d in gate.decisions if d["passed"])["metrics"]["score"] == 90
 
 
@@ -467,6 +481,7 @@ def test_gate_script_failure_is_not_empty_result(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     _, _, _, _, _, gate, storage = runtime_fixture(env)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "edge": {**gate.snapshot["edge"], "gate": {"configured": True, "script": "raise RuntimeError('broken')"}},
@@ -500,6 +515,7 @@ def test_script_screening_happens_before_top_n(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, _, _, _, _, gate, storage = runtime_fixture(env, threshold=0)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "edge": {
@@ -514,7 +530,8 @@ def test_script_screening_happens_before_top_n(env, monkeypatch):
         ],
     )
     run_gate(s, gate, storage)
-    assert len(gate.selected_ids) == 1
+    assert sum(d["passed"] for d in gate.decisions) == 1
+    assert not gate.selected_ids
     assert next(d for d in gate.decisions if d["passed"])["metrics"]["score"] == 40
 
 
@@ -597,6 +614,7 @@ def test_empty_inherited_standard_does_not_run_branch_script(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, _, _, _, _, gate, storage = runtime_fixture(env)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "output_policy": {"configured": True, "rules": {"conditions": [{"metric": "score", "value": 999}]}},
@@ -607,7 +625,7 @@ def test_empty_inherited_standard_does_not_run_branch_script(env, monkeypatch):
         lambda *args: pytest.fail("Empty branch must not execute a script"),
     )
     run_gate(s, gate, storage)
-    assert gate.status == "empty"
+    assert gate.status == "previewed" and not any(d["passed"] for d in gate.decisions)
 
 
 def test_incomplete_coordinates_are_pending_data_not_zero_helices(monkeypatch):

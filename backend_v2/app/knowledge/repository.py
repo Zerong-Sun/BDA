@@ -19,6 +19,8 @@ class KnowledgeRepository:
         statement = select(KnowledgeEntry).where(KnowledgeEntry.project_id == project_id)
         if entry_type:
             statement = statement.where(KnowledgeEntry.entry_type == entry_type)
+        else:
+            statement = statement.where(KnowledgeEntry.entry_type != "bot_work_record")
         term = query.strip()
         if term:
             # Search decoded tag values, not serialized JSON: a Unicode tag may

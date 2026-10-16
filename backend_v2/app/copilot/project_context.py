@@ -120,6 +120,12 @@ class ProjectContextService:
         self.project = project
         self.project_id = project.id
 
+    def search_bot_records(self, bot_id: str, query: str = "", *, limit: int = 20, offset: int = 0):
+        from .records import read_record
+        result = read_record(self.session, self.project_id, bot_id, query, max(1, min(limit, 50)), max(0, offset))
+        result.pop("markdown")
+        return result
+
     def list_targets(self, *, limit: int = 20) -> list[dict[str, Any]]:
         rows = self.session.scalars(
             select(Target)

@@ -250,6 +250,15 @@ def gate_inputs(session, job, parents, by_key):
             return "waiting"
         if gate.status == "empty":
             empty_ports.add(edge.get("target_port"))
+        from .scientific_gates import assert_runtime_approval
+
+        try:
+            assert_runtime_approval(session, gate)
+        except ValueError as exc:
+            gate.status = "error"
+            gate.error_message = str(exc)
+            gate.version += 1
+            return "waiting"
         inputs.extend(gate.inputs)
         selected.extend(gate.selected_ids)
         counts.setdefault(edge["source"], set()).update(gate.selected_ids)
@@ -363,6 +372,9 @@ def run_gate(session, gate, storage=None):
     storage = storage or ObjectStorage()
     if gate.status in {"released", "empty", "awaiting_review", "previewed", "superseded", "error"}:
         return
+    from .scientific_gates import assert_runtime_approval
+
+    assert_runtime_approval(session, gate)
     source_id = uuid.UUID(gate.snapshot["source_job_id"])
     policy = GatePolicy.model_validate(gate.snapshot["edge"]["gate"])
     rows = list(session.scalars(select(WorkflowResult).where(WorkflowResult.job_id == source_id)))

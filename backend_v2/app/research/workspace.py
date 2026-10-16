@@ -465,6 +465,8 @@ def _knowledge(rows: list[KnowledgeEntry]) -> tuple[list[ResearchWorkspaceKnowle
     methods: list[ResearchWorkspaceKnowledge] = []
     datasets: list[ResearchWorkspaceKnowledge] = []
     for row in rows:
+        if row.entry_type == "bot_work_record":
+            continue  # System journal revisions have a dedicated reader, never scientific methods.
         source = row.source or {}
         localized = source.get("localized_content", {})
         key = _text(source.get("entry_key") or row.entry_type)
@@ -561,7 +563,7 @@ def build_research_workspace(session: Session, project: Project) -> ResearchWork
     )
     knowledge = list(
         session.scalars(
-            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id).order_by(KnowledgeEntry.created_at)
+            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id, KnowledgeEntry.entry_type != "bot_work_record").order_by(KnowledgeEntry.created_at)
         )
     )
     target = session.get(Target, project.primary_target_id) if project.primary_target_id else None

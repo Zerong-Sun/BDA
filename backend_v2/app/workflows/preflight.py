@@ -238,6 +238,24 @@ def evaluate_preflight(
                 }
             )
 
+    # Scientific authorization is independent of ordinary port/configuration validation.
+    # This path is also called by real compute submission, not just the UI preview.
+    from .scientific_gates import approval_status
+
+    for edge in workflow.graph.get("edges", []):
+        if getattr(by_key.get(edge.get("target")), "execution_mode", "dispatch") == "manual":
+            continue
+        if (edge.get("gate") or {}).get("mode", "automatic") == "automatic":
+            try:
+                status = approval_status(session, workflow, edge)
+                for code in status["blockers"]:
+                    blockers.append({"code": code, "edge_id": edge.get("id"), "node_key": edge.get("target"),
+                                     "message": "Scientific automatic gate requires a reviewed source, parameter and local calibration contract"})
+            except ValueError:
+                blockers.append({"code": "scientific_evidence_invalid", "edge_id": edge.get("id"),
+                                 "node_key": edge.get("target"),
+                                 "message": "Scientific policy or parameter binding is invalid; review this connection"})
+
     # Route authors use this flag for a stronger, project-specific readiness gate:
     # inputs may be described in the method yet not be present as immutable artifacts.
     # It must be enforced by the same preflight used by submission; leaving it as canvas
