@@ -10,6 +10,7 @@ import { z } from 'zod'
 import type { AgentRun } from '../../lib/api/agentRuns'
 import { useI18n } from '../../lib/i18n'
 import { Disclosure } from '../../components/ui/Disclosure'
+import { deliveryLabel, deliveryState } from './taskPresentation'
 import { deliveryMessage, executionLabel, reportCharacters } from './deliveryDisplay'
 
 const Outcome = z.object({
@@ -46,6 +47,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   const client = useQueryClient()
   const [brief, setBrief] = useState<{ text: string; version: number } | null>(null)
   const [reason, setReason] = useState('')
+  const [copyState, setCopyState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
   const record = useMutation({ mutationFn: () => { requireCopilotWrite(); return saveTaskDecisionRecord(run.id, run.version) }, onSuccess: (data) => {
     client.setQueryData(['agent-run', run.project_id, run.id], data)
     void client.invalidateQueries({ queryKey: ['timeline', run.project_id] })
@@ -86,8 +88,31 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   }
   const missingLabel = (item: string) => issueLabels[item] ?? outcome.steps?.find((step) => step.id === item)?.[zh ? 'title_zh' : 'title'] ?? SECTION_LABELS[item]?.[zh ? 1 : 0] ?? deliveryMessage(item, zh)
   const remaining = (outcome.missing ?? []).filter((item) => item !== run.error)
+  const copyReport = async () => {
+    setCopyState('pending')
+    const text = [
+      `${zh ? '任务' : 'Task'}: ${run.id}`,
+      `${zh ? '任务执行' : 'Execution'}: ${executionLabel(run.status, zh)}`,
+      `${zh ? '交付状态' : 'Delivery status'}: ${deliveryLabel(run, zh)} (${deliveryState(run)})`,
+      `${zh ? '自动事实复核' : 'Automated factual review'}: ${reviewLabel}`,
+      zh ? '自动事实复核不代表科研验证或人工批准。' : 'Automated factual review does not constitute scientific validation or human approval.',
+      outcome.scientific_review_error,
+      run.error,
+      outcome.summary,
+      ...Object.entries(outcome.sections ?? {}).map(([key, value]) => `${sectionLabel(key)} (${key})\n${value}`),
+      outcome.missing?.length ? `${zh ? '尚未完成或需要核对' : 'Remaining work or checks'}\n${outcome.missing.map((item) => `- ${missingLabel(item)}`).join('\n')}` : '',
+      outcome.next_action ? `${zh ? '下一步' : 'Next action'}\n${outcome.next_action}` : '',
+      ...((outcome.steps ?? []).map((step) => `${zh ? step.title_zh : step.title}: ${step.status}`)),
+      ...((outcome.evidence ?? []).map((item) => `${item.successful ? '✓' : '×'} ${item.tool} · ${item.call_id}`)),
+      ...((outcome.deliverables ?? []).map((item) => `${item.kind}: ${item.id}`)),
+    ].filter(Boolean).join('\n\n')
+    try { await navigator.clipboard.writeText(text); setCopyState('success') }
+    catch { setCopyState('error') }
+  }
   return <section className="task-report space-y-5 border-t border-border pt-4" aria-label={zh ? '任务交付' : 'Task delivery'}>
-    <h4 className="text-base font-semibold">{hasReport ? (zh ? '交付报告' : 'Delivery report') : (zh ? '本次结果' : 'Current result')}</h4>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-base font-semibold">{hasReport ? (zh ? '交付报告' : 'Delivery report') : (zh ? '本次结果' : 'Current result')}</h4>{hasReport ? <Button type="button" variant="outline" size="sm" disabled={copyState === 'pending'} onClick={() => { void copyReport() }}>{copyState === 'pending' ? (zh ? '复制中…' : 'Copying…') : (zh ? '复制完整报告' : 'Copy full report')}</Button> : null}</div>
+    {copyState === 'success' ? <p role="status" className="text-xs text-text-secondary">{zh ? '已复制完整报告，包含待补事项与复核说明。' : 'Full report copied, including remaining work and review notes.'}</p> : null}
+    {copyState === 'error' ? <p role="alert" className="text-sm text-destructive">{zh ? '无法访问剪贴板，请展开报告后手动选择复制。' : 'Clipboard unavailable. Expand the report to select and copy it manually.'}</p> : null}
     <dl className="task-report-meta">
       <div><dt className="text-xs text-text-secondary">{zh ? '任务执行' : 'Execution'}</dt><dd className="font-medium">{executionLabel(run.status, zh)}</dd></div>
       <div><dt className="text-xs text-text-secondary">{zh ? '自动事实复核' : 'Automated factual review'}</dt><dd className="font-medium">{reviewLabel}</dd></div>

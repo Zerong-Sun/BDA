@@ -351,8 +351,9 @@ body { line-height: 1.6; }
 .task-service-arrow { opacity: .5; flex-shrink: 0; }
 .bot-main form .task-service[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent-border); }
 .bot-main form .task-service:hover { border-color: var(--border-strong); background: var(--bg-surface-2); }
-.task-deliveries { border-top: 1px solid var(--border-soft); padding-top: 1.5rem; margin-top: 1.5rem; }
-.task-deliveries h4 { font-size: 1rem; margin-bottom: 1rem; font-weight: 550; }
+.task-deliveries { padding-bottom: 1rem; }
+.task-deliveries + .task-introduction { border-top: 1px solid var(--border-soft); padding-top: 1.5rem; }
+.task-deliveries h4 { font-size: 1rem; font-weight: 550; }
 .task-delivery { padding: 1rem; gap: .75rem; background: var(--bg-surface-3); }
 .task-delivery-status { display: inline-flex; border: 1px solid var(--border-soft); border-radius: 4px; padding: .2rem .45rem; font-size: .75rem; color: var(--text-secondary); }
 .research-page .project-brief:not(.project-brief--compact) > div:first-child { padding: 1.5rem; background: var(--bg-surface-1); border: 1px solid var(--border-soft); border-left: 3px solid var(--accent-border); border-radius: 8px; }

@@ -55,10 +55,41 @@ function runReturns(run: Record<string, unknown>, turns: Record<string, unknown>
   )
 }
 
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'application', language: 'en' }) })
 
 describe('agent run panel', () => {
+  it('copies collapsed sections with remaining work and incomplete review, and reports clipboard failure', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const section = 'Evidence requiring verification. '.repeat(50)
+    runReturns({ ...RUN, status: 'succeeded', outcome: { summary: 'Draft', status: 'partial', sections: { limitations: section }, missing: ['Sample mapping absent'], next_action: 'Find original records', scientific_review: 'unavailable' } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy full report' }))
+    await screen.findByText('Full report copied, including remaining work and review notes.')
+    const copied = writeText.mock.calls[0][0]
+    for (const expected of [section, 'Delivery status: Partially delivered (partial)', 'Sample mapping absent', 'Find original records', 'Automated factual review: Incomplete', 'does not constitute scientific validation or human approval']) expect(copied).toContain(expected)
+    writeText.mockRejectedValueOnce(new Error('denied'))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy full report' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Clipboard unavailable')
+  })
+
+  it('refreshes saved records without submitting or discarding the follow-up draft', async () => {
+    let reads = 0
+    let writes = 0
+    runReturns({ ...RUN, status: 'failed' })
+    server.use(http.get('/api/v2/copilot/agent-runs/:runId', () => { reads++; return HttpResponse.json({ ...RUN, status: 'failed' }) }), http.post('/api/v2/copilot/agent-runs/:runId/continuations', () => { writes++; return HttpResponse.json({}) }))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const field = await screen.findByLabelText('Add information or revise the request')
+    fireEvent.change(field, { target: { value: 'Keep this draft' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh records' })).toBeEnabled())
+    const before = reads
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh records' }))
+    await waitFor(() => expect(reads).toBeGreaterThan(before))
+    expect(field).toHaveValue('Keep this draft')
+    expect(writes).toBe(0)
+  })
+
   it('separates execution, review and report count without hiding a short report', async () => {
     useAppStore.setState({ language: 'zh' })
     runReturns({ ...RUN, status: 'succeeded', outcome: {

@@ -39,6 +39,25 @@ beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ language: 'en'
 afterEach(cleanup)
 
 describe('task-centered Copilot', () => {
+  it('searches legacy owners and combines status filters, clears an empty result and focuses the task composer', async () => {
+    server.use(http.get('/api/v2/copilot/bots', () => HttpResponse.json(roster.map((item) => item.id === 'researcher' ? { ...item, id: 'evidence-owner', title: 'Researcher' } : item))), http.get('/api/v2/copilot/projects/:projectId/agent-runs', () => HttpResponse.json({ items: [run, { ...run, id: 'active-2', bot: 'planner', goal: 'Prepare active plan', status: 'running', outcome: null }, { ...run, id: 'child-3', parent_run_id: 'task-1', goal: 'Child work' }] })))
+    renderWithProviders(<CopilotWorkspace />)
+    const search = await screen.findByRole('textbox', { name: 'Search loaded tasks' })
+    fireEvent.change(search, { target: { value: 'evidence-owner' } })
+    expect(screen.getByRole('button', { name: /Research PD1/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Prepare active plan/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }))
+    expect(screen.getByText('No loaded tasks match.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(search).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Prepare active plan/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Child work/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Needs attention' }))
+    expect(screen.queryByRole('button', { name: /Prepare active plan/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }))
+    expect(screen.getByLabelText('Task goal')).toHaveFocus()
+  })
+
   it('does not navigate back when task startup completes after leaving the workspace', async () => {
     let release!: () => void
     const responseReady = new Promise<void>((resolve) => { release = resolve })

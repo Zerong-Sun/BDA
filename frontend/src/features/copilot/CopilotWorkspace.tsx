@@ -5,9 +5,9 @@ import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
 import { Textarea } from '../../components/ui/textarea'
 import { Checkbox } from '../../components/ui/checkbox'
-import { Input } from '../../components/ui/Input'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
@@ -17,9 +17,9 @@ import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
 import { ProceduralSkillSelector } from './ProceduralSkills'
 import { BotAvatar } from './BotAvatar'
-import { reviewersOf, useCopilotBots, type CopilotBot } from './bots/registry'
+import { resolveBot, reviewersOf, useCopilotBots, type CopilotBot } from './bots/registry'
 import { botHref } from './bots/workbenches'
-import { deliveryLabel, groupRunsByOwner, isQuestion, ownerOf, suggestAssignee, taskOwners, type ServiceKind } from './taskPresentation'
+import { deliveryLabel, deliveryState, groupRunsByOwner, isQuestion, ownerOf, suggestAssignee, taskOwners, type ServiceKind } from './taskPresentation'
 
 interface WorkspaceProps {
   pageContext?: string
@@ -57,6 +57,10 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       state.setCopilotTaskDraft(projectId, { ...(state.copilotTaskDrafts[projectId] ?? localDraft), ...patch })
     } else setLocalDraft((current) => ({ ...current, ...patch }))
   }
+  const goalInput = useRef<HTMLTextAreaElement>(null)
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskFilter, setTaskFilter] = useState('all')
+  const [visibleCount, setVisibleCount] = useState(8)
   const [localRunId, setLocalRunId] = useState<string | null>(null)
   const runId = onRunChange ? openRunId : localRunId
   const setRunId = onRunChange ?? setLocalRunId
@@ -97,6 +101,14 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
     },
   })
+  const rootRuns = (runs.data ?? []).filter((item) => !item.parent_run_id)
+  const filteredRuns = rootRuns.filter((item) => {
+    const owner = resolveBot(item.bot, bots.data ?? [])
+    const text = [item.goal, item.id, item.bot, owner?.id, ...(owner?.absorbs ?? []), owner?.title, owner?.title_zh].join(' ').toLocaleLowerCase()
+    const matchesState = taskFilter === 'all' || (taskFilter === 'active' ? isLive(item)
+      : !isLive(item) && (item.status === 'failed' || ['blocked', 'needs_input', 'review_required', 'partial', 'completed'].includes(deliveryState(item))))
+    return matchesState && text.includes(taskSearch.trim().toLocaleLowerCase())
+  }).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
   const error = start.error ?? assess.error ?? services.error ?? readiness.error ?? runs.error
   const requestTask = (text: string) => { { const suggested = suggestAssignee(text, owners); updateDraft({ goal: text, bot: suggested?.bot.id ?? null, service: suggested?.service ?? null, writes: [], preview: true }) }; setChat(false); setQuestion(null) }
   if (!projectId) return <div className="space-y-3 p-4"><p>{zh ? '先创建或选择项目，助手就能围绕你的目标开展工作。' : 'Create or choose a project to work toward a research goal.'}</p>
@@ -106,10 +118,28 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   if (chat || draft) return <div className="flex min-h-0 flex-1 flex-col"><Button type="button" variant="ghost" onClick={() => { useAppStore.getState().setCopilotDraft(''); setChat(false); setQuestion(null) }}>{zh ? '返回当前任务' : 'Back to tasks'}</Button><CopilotChat pageContext={pageContext} initialQuestion={question ?? undefined} onTaskRequested={requestTask} /></div>
   return <div className="task-workspace space-y-4 overflow-y-auto p-4">
     {readOnly ? <p role="status" className="text-sm text-text-secondary">{zh ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
+    <section className="task-deliveries space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">{zh ? '任务与交付物（按负责人）' : 'Tasks and deliverables by owner'}</h4><Button type="button" variant="outline" size="sm" onClick={() => goalInput.current?.focus()}>{zh ? '新建任务' : 'New task'}</Button></div>
+      {rootRuns.length ? <div className="space-y-2">
+        <Input aria-label={zh ? '搜索已加载任务' : 'Search loaded tasks'} placeholder={zh ? '搜索任务内容、负责人或任务 ID' : 'Search request, owner or task ID'} value={taskSearch} onChange={(event) => { setTaskSearch(event.target.value); setVisibleCount(8) }} />
+        <div role="group" aria-label={zh ? '筛选任务状态' : 'Filter task status'} className="flex flex-wrap gap-2">{[['all', zh ? '全部' : 'All'], ['active', zh ? '进行中' : 'Active'], ['attention', zh ? '待处理' : 'Needs attention']].map(([value, label]) => <Button key={value} type="button" size="sm" variant={taskFilter === value ? 'secondary' : 'outline'} aria-pressed={taskFilter === value} onClick={() => { setTaskFilter(value); setVisibleCount(8) }}>{label}</Button>)}</div>
+        <p role="status" className="text-xs text-text-secondary">{zh ? `已加载 ${rootRuns.length} 个任务，匹配 ${filteredRuns.length} 个；每位负责人下按创建时间从新到旧。` : `${rootRuns.length} tasks loaded, ${filteredRuns.length} matching; newest first within each owner.`}</p>
+      </div> : null}
+      {runs.isLoading ? <p role="status">{zh ? '加载任务…' : 'Loading tasks…'}</p> : null}
+      {groupRunsByOwner(filteredRuns.slice(0, visibleCount), bots.data ?? []).map((group) => {
+        const label = group.bot ? name(group.bot) : group.botId ?? (zh ? '未指定负责人' : 'No assigned owner')
+        return <div key={group.key} role="group" aria-label={label} className="space-y-2">
+          <p className="task-owner-heading">{group.bot ? <BotAvatar id={group.bot.id} stance={group.bot.stance} /> : null}{group.bot ? <Link to={botHref(group.bot.id, projectId)}>{label}</Link> : <span>{label}</span>}<span className="text-text-muted">{group.runs.length}</span></p>
+          {group.runs.map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span className="line-clamp-2 break-words text-sm leading-6">{run.goal}</span><span className="text-xs text-text-secondary">{run.id.slice(0, 8)} · {run.turn_count} {zh ? '轮' : 'turns'} · {zh ? '查看交付 →' : 'View delivery →'}</span></Button>)}
+        </div>
+      })}
+      {filteredRuns.length > visibleCount ? <Button type="button" variant="outline" onClick={() => setVisibleCount((count) => count + 8)}>{zh ? '显示更多任务' : 'Show more tasks'}</Button> : null}
+      {rootRuns.length > 0 && filteredRuns.length === 0 ? <div className="space-y-2 py-3"><p className="text-sm">{zh ? '没有匹配的已加载任务。' : 'No loaded tasks match.'}</p><Button type="button" variant="ghost" onClick={() => { setTaskSearch(''); setTaskFilter('all'); setVisibleCount(8) }}>{zh ? '清除筛选' : 'Clear filters'}</Button></div> : null}
+      {runs.data && rootRuns.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '启动后，进度和产物会保存在这里。' : 'Task progress and deliverables will stay here.'}</p> : null}
+    </section>
     <div className="task-introduction"><span className="task-introduction-icon" aria-hidden="true"><SparkleIcon weight="duotone" /></span><h3 className="font-semibold">{zh ? '你希望完成什么？' : 'What would you like to accomplish?'}</h3>
       <p className="mt-1 text-sm text-text-secondary">{zh ? '说明目标，助手会准备步骤、跟进结果，并在需要你判断时停下来。' : 'Describe your goal. The assistant prepares steps, tracks results and pauses for your input.'}</p></div>
     <form className="task-composer space-y-3" onSubmit={(e) => { e.preventDefault(); if (!chosenBot && !initialService && isQuestion(goal)) { setQuestion(goal); setChat(true) } else { updateDraft({ preview: true }) } }}>
-      <div className="task-input-surface"><Textarea aria-label={zh ? '希望完成的工作' : 'Task goal'} value={goal} onChange={(e) => { updateDraft({ goal: e.target.value, preview: false, writes: [] }) }} placeholder={zh ? '例如：调研这个靶点的证据，比较方法并准备下一步方案' : 'For example: research this target and compare the available methods'} />
+      <div className="task-input-surface"><Textarea ref={goalInput} aria-label={zh ? '希望完成的工作' : 'Task goal'} value={goal} onChange={(e) => { updateDraft({ goal: e.target.value, preview: false, writes: [] }) }} placeholder={zh ? '例如：调研这个靶点的证据，比较方法并准备下一步方案' : 'For example: research this target and compare the available methods'} />
       <div className="task-input-footer"><span>{zh ? '先查看计划，再决定开始。' : 'Review the plan before starting.'}</span>{!preview ? <Button type="submit" disabled={!goal.trim()}>{zh ? '继续' : 'Continue'}<ArrowRightIcon aria-hidden="true" /></Button> : null}</div></div>
       <p className="task-services-label">{zh ? '交给谁负责' : 'Who should own this?'}</p>
       <div className="task-services" role="group" aria-label={zh ? '任务负责人' : 'Task owner'}>
@@ -152,16 +182,6 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     {services.isError || bots.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (bots.isError) void bots.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p> : null}
     <Button type="button" variant="ghost" onClick={() => setChat(true)}>{zh ? '询问或解释一个问题' : 'Ask or explain a question'}</Button>
-    <section className="task-deliveries space-y-2"><h4 className="font-semibold">{zh ? '任务与交付物（按负责人）' : 'Tasks and deliverables by owner'}</h4>
-      {runs.isLoading ? <p role="status">{zh ? '加载任务…' : 'Loading tasks…'}</p> : null}
-      {groupRunsByOwner(runs.data?.filter((r) => !r.parent_run_id) ?? [], bots.data ?? []).map((group) => {
-        const label = group.bot ? name(group.bot) : group.botId ?? (zh ? '未指定负责人' : 'No assigned owner')
-        return <div key={group.key} role="group" aria-label={label} className="space-y-2">
-          <p className="task-owner-heading">{group.bot ? <BotAvatar id={group.bot.id} stance={group.bot.stance} /> : null}{group.bot ? <Link to={botHref(group.bot.id, projectId)}>{label}</Link> : <span>{label}</span>}<span className="text-text-muted">{group.runs.length}</span></p>
-          {group.runs.map((run) => <Button key={run.id} type="button" variant="outline" className="task-delivery h-auto w-full flex-col items-start whitespace-normal text-left" onClick={() => setRunId(run.id)}><span className="task-delivery-status">{deliveryLabel(run, zh)}</span><span>{run.goal}</span></Button>)}
-        </div>
-      })}
-      {runs.data?.length === 0 ? <p className="text-sm text-text-secondary">{zh ? '启动后，进度和产物会保存在这里。' : 'Task progress and deliverables will stay here.'}</p> : null}
-    </section>
+
   </div>
 }

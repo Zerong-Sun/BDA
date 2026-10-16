@@ -298,10 +298,11 @@ export function AgentRunDetail({
 
   return (
     <div className="space-y-3 px-3 py-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeftIcon aria-hidden="true" /> {copy.close}
         </Button>
+        <Button type="button" variant="outline" size="sm" disabled={run.isFetching || turns.isFetching} onClick={() => { void run.refetch(); if (run.data && !run.isError) void turns.refetch() }}>{run.isFetching || turns.isFetching ? (language === 'zh' ? '刷新中…' : 'Refreshing…') : (language === 'zh' ? '刷新记录' : 'Refresh records')}</Button>
         {run.data && isLive(run.data) ? (
           <Button
             type="button"
@@ -348,11 +349,12 @@ export function AgentRunDetail({
       {run.data ? <AppliedProceduralSkills contract={run.data.task_contract ?? {}} outcome={run.data.outcome ?? {}} /> : null}
       {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
       {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
-      {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
-        <label className="text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea disabled={readOnly} value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
+      {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-3 rounded-lg border border-border bg-surface-2 p-3" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
+        <h4 className="text-sm font-semibold">{language === 'zh' ? '继续处理此任务' : 'Continue working on this task'}</h4>
+        <label className="block text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea placeholder={language === 'zh' ? '说明要补充的证据、修改的范围或已修正的问题' : 'Describe new evidence, scope changes or the issue you corrected'} disabled={readOnly || continuation.isPending} value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
         {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
         <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用或缩小本任务的写入范围和费用上限，增加最多 12 轮处理。' : 'Keeps the same write scope and cost ceiling, with up to 12 more turns.'}</p>
-        <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{language === 'zh' ? '继续此任务' : 'Continue this task'}</Button>
+        <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{continuation.isPending ? (language === 'zh' ? '提交中…' : 'Submitting…') : (language === 'zh' ? '继续此任务' : 'Continue this task')}</Button>
         {continuation.error ? <p role="alert">{continuation.error instanceof Error ? continuation.error.message : String(continuation.error)}</p> : null}
       </form> : null}
       <Disclosure key={runId} title={copy.transcript}>
