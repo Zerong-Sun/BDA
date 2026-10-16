@@ -69,6 +69,11 @@ def source_items(session, project_id, bot_id):
                 "source_version": message.version,
                 "content": message.content or "",
                 "error": message.error,
+                "archive": {
+                    key: value
+                    for key, value in ((message.context or {}).get("chat_archive") or {}).items()
+                    if key in {"archived", "reason", "archived_at"}
+                },
                 "citations": _sanitize(message.citations or []),
                 "references": _refs([message.context, message.tool_calls, message.citations]),
             }
@@ -132,6 +137,8 @@ def markdown(project_id, bot_id, items):
             item["content"],
             "",
         ]
+        if item.get("archive", {}).get("archived"):
+            lines += [f"Archived history (excluded from current work): {item['archive'].get('reason', '')}", ""]
         for key in ("conversation_id", "parent_run_id", "error"):
             if item.get(key):
                 lines += [f"{key}: {item[key]}", ""]
@@ -210,7 +217,10 @@ def read_record(session, project_id, bot_id, query="", limit=100, offset=0):
     all_items = list((latest.source or {}).get("items", [])) if latest else []
     needle = query.strip().casefold()
     matching = [
-        item for item in reversed(all_items) if not needle or needle in json.dumps(item, ensure_ascii=False).casefold()
+        item
+        for item in reversed(all_items)
+        if not item.get("archive", {}).get("archived")
+        and (not needle or needle in json.dumps(item, ensure_ascii=False).casefold())
     ]
     return {
         "project_id": str(project_id),

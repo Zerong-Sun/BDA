@@ -54,6 +54,24 @@ def test_exact_bot_and_project_isolation_and_authorized_download(session):
     assert "attachment" in response.headers["content-disposition"]
 
 
+def test_archived_answer_is_not_current_or_searchable_but_remains_in_download(session):
+    project, user = _project(session)
+    conversation = _conversation(session, project, user)
+    message = _message(session, conversation, bot="analyst", content="Old mixed-topic answer")
+    _message(session, conversation, bot="analyst", content="Current project answer")
+    session.commit()
+    message.context = {"chat_archive": {"archived": True, "reason": "cross_project_topic", "token": "PRIVATE"}}
+    session.commit()
+    record = read_record(session, project.id, "analyst")
+    assert record["total"] == 2
+    assert record["matched"] == 1
+    assert record["items"][0]["content"] == "Current project answer"
+    assert read_record(session, project.id, "analyst", "mixed-topic")["matched"] == 0
+    assert "Old mixed-topic answer" in record["markdown"]
+    assert "Archived history (excluded from current work): cross_project_topic" in record["markdown"]
+    assert "PRIVATE" not in record["markdown"]
+
+
 def test_run_status_turn_and_explicit_workflow_refs_are_sources(session):
     project, user = _project(session)
     workflow = str(uuid.uuid4())

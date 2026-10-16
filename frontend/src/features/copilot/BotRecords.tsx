@@ -33,7 +33,7 @@ export function BotRecords({ projectId, botId }: { projectId: string; botId: str
     finally { setDownloading(false) }
   }
   return <section aria-label={zh ? 'Bot 工作记录' : 'Bot work records'} className="space-y-4">
-    <p className="text-sm text-text-secondary">{zh ? '由平台消息和任务自动保存。来源身份与状态保留；工作流引用不代表执行完成，任务成功不等同于科学验证通过。' : 'Saved automatically from platform messages and tasks. Source identity and status are preserved. Workflow references do not establish execution, and task success is not scientific validation.'}</p>
+    <p className="text-sm text-text-secondary">{zh ? '由平台消息和任务自动保存。已清理的旧答复不列入当前记录，完整 MD 保留其原文与标记。工作流引用不代表执行完成，任务成功不等同于科学验证通过。' : 'Saved automatically from platform messages and tasks. Archived answers are excluded from current records; the full MD retains their original text and archive labels. Workflow references do not establish execution, and task success is not scientific validation.'}</p>
     <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); setQuery(input); setOffset(0) }}>
       <Input className="min-w-0 flex-1 rounded border p-2" aria-label={zh ? '搜索工作记录' : 'Search work records'} value={input} maxLength={500} onChange={(event) => setInput(event.target.value)} placeholder={zh ? '工作流 ID、引用、关键词…' : 'Workflow ID, reference, keyword…'} />
       <Button type="submit">{zh ? '搜索' : 'Search'}</Button>
