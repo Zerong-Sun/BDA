@@ -1651,6 +1651,20 @@ async function assertScenarioState(page, testCase, diagnostics) {
   }
 }
 
+async function openResearchDecisionDefinitions(page) {
+  // The populated fixture has a saved report. Wait for the results overview,
+  // not the transient decision center shown before that async report arrives.
+  await expectVisible(page.getByRole('region', { name: /^(Project research summary|项目研究总结)$/ }),
+    'saved research report overview before opening decision definitions')
+  const definitions = page.getByRole('button', { name: /^(Structured questions and decision definitions|结构化问题与决策定义)$/ })
+  await expectVisible(definitions, 'structured research decision disclosure')
+  if (await definitions.getAttribute('aria-expanded') !== 'true') await definitions.click()
+  if (await definitions.getAttribute('aria-expanded') !== 'true') {
+    throw new Error('Structured research decision disclosure did not expand.')
+  }
+  await expectVisible(page.getByTestId('research-decision-center'), 'expanded research decision center')
+}
+
 async function navigateCase(page, testCase, caseDirectory) {
   const url = `${BASE_URL}/#${testCase.routePath}`
   const navigation = page.goto(url, { waitUntil: 'domcontentloaded', timeout: CASE_TIMEOUT_MS })
@@ -1666,6 +1680,9 @@ async function navigateCase(page, testCase, caseDirectory) {
     })
   }
   await navigation
+  if (testCase.routeId === 'research-goals' && testCase.scenario === 'populated') {
+    await openResearchDecisionDefinitions(page)
+  }
   await expectVisible(page.locator(ROUTE_SURFACES[testCase.routeId]).first(), `${testCase.routeId} route surface`)
   if (testCase.routeId === 'login') {
     // The initial form precedes auth/config; wait for the intended private realm
