@@ -414,6 +414,18 @@ _LENGTH_REPAIR_INSTRUCTION = (
     "Return only the shortened delivery JSON."
 )
 
+_REVIEW_CITATION_INSTRUCTION = (
+    "\nIn evidence_call_ids use only exact call_id values in valid_evidence_calls for this run. "
+    "Nested child-run call IDs, run IDs, document IDs and artifact IDs are not this run's tool calls. "
+    "Keep those source identities in the prose where needed. Never substitute an unrelated successful "
+    "call ID for an unsupported claim; qualify or remove unsupported claims."
+)
+
+
+def _valid_evidence_calls(turns: list[CopilotAgentTurn]) -> list[dict]:
+    return [{"call_id": record["call_id"], "tool": record["tool"]}
+            for record in tool_records(turns) if record["successful"]]
+
 
 def _length_repair_packet(run: CopilotAgentRun, turns: list[CopilotAgentTurn], draft: Any) -> dict:
     constraints = delivery_constraints(run, turns)
@@ -422,6 +434,7 @@ def _length_repair_packet(run: CopilotAgentRun, turns: list[CopilotAgentTurn], d
     return {"goal": run.goal, "contract": run.task_contract,
             "user_followups": [turn.content for turn in turns if turn.role == "user"],
             "draft": draft, "delivery_constraints": constraints,
+            "valid_evidence_calls": _valid_evidence_calls(turns),
             "field_budgets": {"summary": int(limit * (.1 if has_sections else .6)),
                               "sections_combined_including_titles": int(limit * .5) if has_sections else 0,
                               "missing_combined": int(limit * .1), "next_action": int(limit * .1)}}
@@ -433,9 +446,29 @@ def _length_repair_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn],
     return [
         {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
          + "\nShorten the supplied draft once. This is formatting, not a factual review or another scientific task. "
-         + _LENGTH_REPAIR_INSTRUCTION},
+         + _LENGTH_REPAIR_INSTRUCTION + _REVIEW_CITATION_INSTRUCTION},
         {"role": "user", "content": json.dumps(packet, ensure_ascii=False)},
     ]
+
+
+def _review_validation_errors(outcome: dict) -> list[str]:
+    """Return only known validation categories, never arbitrary provider text."""
+    codes = {"structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values",
+             "delivery_length_exceeded", "invalid_skill_outputs", "unexpected_skill_outputs"}
+    errors = {item for item in outcome.get("missing", []) if item in codes}
+    for prefix in ("skill_output_invalid", "skill_evidence_unverified"):
+        if any(item.startswith(prefix + ":") for item in outcome.get("missing", [])):
+            errors.add(prefix)
+    return sorted(errors) or ["invalid_review_delivery"]
+
+
+def _save_rejected_review(session: Session, run: CopilotAgentRun, message: dict,
+                          outcome: dict, stage: str) -> dict:
+    turn = agent_runs.append_turn(
+        session, run, role="assistant", content=str(message.get("content") or ""),
+        reasoning_content=message.get("reasoning_content") if isinstance(message.get("reasoning_content"), str) else None,
+    )
+    return {"turn_id": str(turn.id), "stage": stage, "validation_errors": _review_validation_errors(outcome)}
 
 
 def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
@@ -564,14 +597,24 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                 run.outcome = {**run.outcome, "format_repair": "unavailable",
                                "format_repair_error": _delivery_error_code(exc)}
         if needs_review(run, turns):
+            review_rejections: list[dict] = []
+            review_format_repair = False
             try:
                 review_conversation = review_messages(run, turns)
+                review_packet = json.loads(review_conversation[1]["content"])
+                review_packet["valid_evidence_calls"] = _valid_evidence_calls(turns)
+                review_conversation[0]["content"] += _REVIEW_CITATION_INSTRUCTION
+                review_conversation[1]["content"] = json.dumps(review_packet, ensure_ascii=False)
                 review_message, recovery = _delivery_completion(session, run, provider, review_conversation)
                 reviewed = str(review_message.get("content") or "")
                 reviewed_outcome = evaluate_delivery(run, reviewed, turns)
-                length_repair = "delivery_length_exceeded" in reviewed_outcome.get("missing", [])
+                # Only a pure length error can use the receipt-free shortening
+                # packet. Mixed citation/shape errors need the original evidence
+                # in the single format correction below, with field budgets.
+                length_repair = _review_validation_errors(reviewed_outcome) == ["delivery_length_exceeded"]
+                if not reviewable_delivery(run, reviewed_outcome):
+                    review_rejections.append(_save_rejected_review(session, run, review_message, reviewed_outcome, "factual_review"))
                 if length_repair:
-                    agent_runs.append_turn(session, run, role="assistant", content=reviewed)
                     # One bounded correction of the reviewed delivery. Preserve
                     # its claims/qualifications and the same exact receipts.
                     short_conversation = _length_repair_messages(run, turns, reviewed_outcome)
@@ -583,11 +626,45 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                     review_message = corrected
                     reviewed = str(corrected.get("content") or "")
                     reviewed_outcome = evaluate_delivery(run, reviewed, turns)
+                elif reviewed.strip() and review_rejections and set(review_rejections[-1]["validation_errors"]) & {
+                    "structured_delivery_required", "unverified_evidence_call_ids", "invalid_section_values",
+                }:
+                    # One format correction of the factual review, sharing the
+                    # same allowance as length correction. Keep its rejected
+                    # original and do not run a second factual task or tools.
+                    repair_packet = {**review_packet, "draft": reviewed,
+                                     "validation_errors": review_rejections[-1]["validation_errors"]}
+                    repair_instruction = (
+                        "\nRepair only the supplied factual review's delivery JSON and citation format once. "
+                        "Preserve its factual conclusions, scientific gaps, qualifications and source identities. "
+                        "Do not add claims or actions, manufacture supporting evidence, or mark unresolved gaps resolved. "
+                        "Return a delivery object with string section values and exact supported evidence_call_ids."
+                    )
+                    if delivery_constraints(run, turns)["max_visible_characters"]:
+                        repair_packet.update(_length_repair_packet(run, turns, reviewed))
+                        repair_instruction += "\n" + _LENGTH_REPAIR_INSTRUCTION
+                    repair_conversation = [
+                        {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
+                         + repair_instruction + _REVIEW_CITATION_INSTRUCTION},
+                        {"role": "user", "content": json.dumps(repair_packet, ensure_ascii=False)},
+                    ]
+                    correction_provider = structured_retry_provider(provider) or provider
+                    reserve_model_call(session, run, correction_provider, repair_conversation)
+                    review_format_repair = True
+                    review_message = completion_message(correction_provider, repair_conversation)
+                    reviewed = str(review_message.get("content") or "")
+                    reviewed_outcome = evaluate_delivery(run, reviewed, turns)
                 if not reviewable_delivery(run, reviewed_outcome):
+                    if length_repair or review_format_repair:
+                        review_rejections.append(_save_rejected_review(
+                            session, run, review_message, reviewed_outcome,
+                            "length_repair" if length_repair else "format_repair"))
                     raise ValueError("invalid_review_delivery")
                 agent_runs.append_turn(session, run, role="assistant", content=reviewed,
                                        reasoning_content=review_message.get("reasoning_content") if isinstance(review_message.get("reasoning_content"), str) else None)
                 run.outcome = {**reviewed_outcome, "scientific_review": "automated_review_completed",
+                               **({"scientific_review_rejections": review_rejections} if review_rejections else {}),
+                               **({"scientific_review_format_repair": "attempted_once"} if review_format_repair else {}),
                                **({"scientific_review_length_repair": "attempted_once"} if length_repair else {}),
                                **({"scientific_review_recovery": recovery} if recovery else {})}
             except Exception as exc:
@@ -596,6 +673,8 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                 # bypass reserve_model_call's turn/cost ceiling.
                 status = run.outcome["status"] if run.outcome["status"] in {"blocked", "needs_input"} else "review_required"
                 run.outcome = {**run.outcome, "status": status, "scientific_review": "unavailable",
+                               **({"scientific_review_rejections": review_rejections} if review_rejections else {}),
+                               **({"scientific_review_format_repair": "attempted_once"} if review_format_repair else {}),
                                "scientific_review_error": _delivery_error_code(exc),
                                "missing": [*run.outcome.get("missing", []), "scientific_review_unavailable"]}
         if (run.task_contract or {}).get("service_kind") == "literature":

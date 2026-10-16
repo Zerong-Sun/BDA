@@ -135,13 +135,17 @@ def test_custom_review_rejects_bad_evidence_or_structure_and_keeps_the_original(
     run = _run(session, project, user, bot="auditor", task_contract=build_contract("custom", []))
     _receipt(session, run)
     draft = _delivery("completed", missing=[])
-    seen = _script(monkeypatch, [{"content": draft}, {"content": _delivery("completed", missing=[], **invalid)}])
+    rejected = _delivery("completed", missing=[], **invalid)
+    seen = _script(monkeypatch, [{"content": draft}, {"content": rejected}, {"content": rejected}])
     agent_loop.step(session, run, _provider(session))
-    assert len(seen) == 2
+    assert len(seen) == 3  # Exactly one correction; never a fourth model call.
     assert run.outcome["status"] == "review_required"
     assert run.outcome["scientific_review"] == "unavailable"
+    assert run.outcome["scientific_review_error"] == "invalid_review_delivery"
     assert run.outcome["summary"] == json.loads(draft)["summary"]
-    assert agent_runs.transcript(session, run)[-1].content == draft
+    turns = agent_runs.transcript(session, run)
+    assert [turn.content for turn in turns[-3:]] == [draft, rejected, rejected]
+    assert [item["stage"] for item in run.outcome["scientific_review_rejections"]] == ["factual_review", "format_repair"]
 
 
 def test_actor_and_reviewer_receive_the_recipients_own_roster_routes(session: Session):
