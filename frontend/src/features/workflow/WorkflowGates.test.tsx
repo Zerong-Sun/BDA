@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GateInspector } from './GateInspector'
 import { GatePolicyEditor } from './GatePolicyEditor'
 import { emptyPolicy, gateLabel, type GateSummary } from './gates'
-import { releaseGate, gateResults, retryGate } from '../../lib/api/workflowGates'
+import { releaseGate, gateResults, retryGate, previewSources } from '../../lib/api/workflowGates'
 import { WorkflowNodeCard } from './WorkflowNode'
 
 vi.mock('../../lib/i18n', () => ({
@@ -78,7 +78,7 @@ beforeEach(() => {
   })
 })
 
-function inspector(runs: GateSummary[] = [gate], canOperate = true) {
+function inspector(runs: GateSummary[] = [gate], canOperate = true, historical = false) {
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={cache}>
@@ -86,6 +86,7 @@ function inspector(runs: GateSummary[] = [gate], canOperate = true) {
         workflowId="wf"
         edge={{
           id: 'edge',
+          legacy_connection: historical,
           source: 'mpnn',
           target: 'af2',
           source_port: 'sequences',
@@ -107,6 +108,15 @@ function inspector(runs: GateSummary[] = [gate], canOperate = true) {
 }
 
 describe('workflow gates', () => {
+  it('shows historical dependencies without querying nonexistent gate records or offering execution', async () => {
+    inspector([], true, true)
+    expect(screen.getByText('历史依赖')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '查看上游步骤' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '试运行' })).not.toBeInTheDocument()
+    expect(previewSources).not.toHaveBeenCalled()
+    expect(gateResults).not.toHaveBeenCalled()
+  })
+
   it('lets viewers inspect results while disabling previews and release', async () => {
     inspector([gate], false)
     await screen.findByText('keep')

@@ -499,7 +499,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
         ) : !overview ? (
           <div className="shrink-0 border-b border-border-soft px-3 py-1.5 text-[11px] text-text-secondary">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>{t.workflowExt.canvas.connectHint}</span>
+              <span>{readOnly ? (language === 'zh' ? '切换步骤查看结果；选择连线检查门控。' : 'Switch steps to inspect results; select a connection to review gates.') : t.workflowExt.canvas.connectHint}</span>
               <span
                 className="flex flex-wrap items-center gap-x-3 gap-y-1"
                 aria-label={t.workflowExt.canvas.statusLegendAria}

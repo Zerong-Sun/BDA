@@ -203,7 +203,7 @@ export function ScriptAssetManager() {
                 >
                   <DotsSixVertical className="h-4 w-4" />
                 </SortableItemHandle>
-                <strong className="truncate text-xs">{script.name}</strong>
+                <strong className="min-w-0 break-all text-xs">{script.name}</strong>
               </div>
               <Badge variant="outline">{script.runtime}</Badge>
             </div>

@@ -55,6 +55,7 @@ export function GateInspector({
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
+  const historical = edge.legacy_connection === true
   const context = gateContext(edge, sourcePlugin, targetPlugin)
   const [policy, setPolicy] = useState<GatePolicy>((edge.gate as GatePolicy) ?? emptyPolicy())
   const [previewArtifactId, setPreviewArtifactId] = useState('')
@@ -69,7 +70,7 @@ export function GateInspector({
   const sources = useQuery({
     queryKey: ['gate-preview-sources', workflowId, edge.id],
     queryFn: () => previewSources(workflowId, edge.id!),
-    enabled: !!edge.id,
+    enabled: !!edge.id && !historical,
   })
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
@@ -145,6 +146,12 @@ export function GateInspector({
   const reviewable = gate?.status === 'awaiting_review' && !gate.preview
   const canSelect = canOperate && reviewable && !action.isPending && !results.isFetching && !results.isError
     && results.data?.gate.version === gate.version && releasedVersion !== selectionKey
+  if (historical) return <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
+    <div className="flex items-center justify-between"><strong>{zh ? '历史依赖' : 'Historical dependency'}</strong><Button type="button" size="sm" variant="ghost" aria-label={zh ? '关闭门控' : 'Close gate'} onClick={onClose}>×</Button></div>
+    <p className="my-3 break-words">{sourcePlugin?.name ?? edge.source} → {targetPlugin?.name ?? edge.target}</p>
+    <p className="text-text-secondary">{zh ? '这条历史连线只记录了步骤依赖，没有保存门控规则或复核记录，不能据此判断筛选已通过。如需重新执行，请新建路线并配置门控。' : 'This historical connection records a step dependency, with no saved gate policy or review record. It does not establish that screening passed. Create a new route with gates before executing again.'}</p>
+    <Button type="button" className="mt-3" variant="outline" size="sm" onClick={onSource}>{zh ? '查看上游步骤' : 'Inspect upstream step'}</Button>
+  </aside>
   return (
     <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
       <div className="flex items-center justify-between">

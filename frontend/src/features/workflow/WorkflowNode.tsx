@@ -71,7 +71,6 @@ export function WorkflowNodeCard({ data, selected, draggable, width }: NodeProps
         'border-t-2',
         topBorderByStatus[statusKey] ?? 'border-t-border-soft',
         selected && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-canvas',
-        statusKey === 'running' && 'animate-pulse',
       )}
       style={{ width: '100%', minWidth: MIN_NODE_WIDTH }}
     >
@@ -105,7 +104,7 @@ export function WorkflowNodeCard({ data, selected, draggable, width }: NodeProps
           className="!h-3 !w-3 !border-2 !border-accent !bg-bg-canvas"
         />
         <Icon className="h-4 w-4 shrink-0 text-accent" />
-        <span className="truncate text-card-title font-semibold text-text-primary">
+        <span className="min-w-0 break-words text-card-title font-semibold text-text-primary">
           {nodeData.label}
         </span>
         <Handle
@@ -117,7 +116,7 @@ export function WorkflowNodeCard({ data, selected, draggable, width }: NodeProps
           className="!h-3 !w-3 !border-2 !border-accent !bg-bg-canvas"
         />
       </header>
-      <p className="mt-0.5 truncate text-xs text-text-secondary">
+      <p className="mt-0.5 break-words text-xs leading-4 text-text-secondary">
         {nodeData.footer || nodeData.description}
       </p>
       <div className="mt-2 flex items-center justify-between gap-2">

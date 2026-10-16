@@ -471,7 +471,7 @@ function WorkflowWorkspace() {
         },
       }
     })
-    mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { if (!setSelectedNodeId(null)) return; setSelectedEdgeId(e.id); setSelectedArtifactId(undefined) } } }))
+    mapped.edges = mapped.edges.map(e => ({ ...e, data: { ...e.data, gateLabel: workflowGraph?.edges.find(edge => edge.id === e.id)?.legacy_connection ? (language === 'zh' ? '历史依赖' : 'Historical dependency') : gateLabel(e.data?.gate as GatePolicy | undefined, gateQuery.data?.items.find(g => g.edge_id === e.id && !g.preview), language === 'zh'), onSelect: () => { if (!setSelectedNodeId(null)) return; setSelectedEdgeId(e.id); setSelectedArtifactId(undefined) } } }))
     return mapped
   }, [workflowNodes, workflowGraph?.edges, workflowGraph?.layout, modelPlugins, gateQuery.data, language, setSelectedEdgeId, setSelectedNodeId, setSelectedArtifactId])
   const selectedEdge = workflowGraph?.edges.find(e => e.id === selectedEdgeId)

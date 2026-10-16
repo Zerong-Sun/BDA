@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 import { server } from '../../test/mocks/handlers'
-import { addWorkflowNode, previewWorkflowNodeScript, submitWorkflowRun } from './workflow'
+import { getWorkflowGraph, addWorkflowNode, previewWorkflowNodeScript, submitWorkflowRun } from './workflow'
 
 describe('workflow submission backend selection', () => {
   it('submits the reviewed backend, workflow version and every node fingerprint', async () => {
@@ -66,4 +66,21 @@ it('preserves manual execution mode and optimistic version through the generated
   expect(node.execution_mode).toBe('manual')
   expect(node.status).toBe('draft')
   expect(body).not.toHaveProperty('status')
+})
+
+
+it('keeps imported dependency identities stable across polling without inventing saved gates', async () => {
+  let reads = 0
+  const legacy = { source: 'input', target: 'fold' }
+  const saved = { id: 'saved-gate', source: 'fold', target: 'review', gate: { mode: 'review', configured: true } }
+  server.use(http.get('/api/v2/workflow-runs/history/graph', () => HttpResponse.json({
+    workflow: { id: 'history', project_id: 'project-a', name: 'History', status: 'succeeded', graph: { edges: [legacy, saved] }, version: 1, created_by: 'user', created_at: '', updated_at: '' },
+    nodes: [], edges: [{ ...legacy, id: `generated-${++reads}`, gate: { mode: 'automatic', configured: false } }, saved], layout: {},
+  })))
+  const first = await getWorkflowGraph('history')
+  const second = await getWorkflowGraph('history')
+  expect(first.edges).toEqual(second.edges)
+  expect(first.edges[0]).toMatchObject({ legacy_connection: true })
+  expect(first.edges[0].gate).toBeUndefined()
+  expect(first.edges[1]).toEqual(saved)
 })
