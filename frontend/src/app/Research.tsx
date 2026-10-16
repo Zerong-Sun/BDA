@@ -69,21 +69,13 @@ export function ResearchPage() {
         data-tour-id="research-tabs"
       >
         <header className="research-page-heading mb-5 border-b border-border-soft pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p>
-            <h1 className="mt-2 text-3xl font-medium text-text-primary">{t.research.page.title}</h1>
+            {!retrospective ? <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p> : null}
+            <h1 className="mt-2 text-3xl font-medium text-text-primary">{retrospective ? (language === 'zh' ? '研究总结与遗留问题' : 'Research summary and open questions') : t.research.page.title}</h1>
           </div>
-          {isPd1Demo ? (
-            <Alert className="mt-3" variant="warning">
-              <AlertDescription>
-                {language === 'zh'
-                  ? '公开演示项目 · 候选指标为合成数据，文献与结构保留来源。'
-                  : 'Public demo · Candidate metrics are synthetic; literature and structures retain their sources.'}
-              </AlertDescription>
-            </Alert>
-          ) : null}
           {projectId ? (
-            <div className="science-route-links">
+            <div className="shrink-0">
             <Button
               type="button"
               variant="outline"
@@ -98,6 +90,16 @@ export function ResearchPage() {
               {language === 'zh' ? `就「${tabConfig[tab].label}」提问` : `Ask about ${tabConfig[tab].label}`}
             </Button>
             </div>
+          ) : null}
+          </div>
+          {isPd1Demo ? (
+            <Alert className="mt-3" variant="warning">
+              <AlertDescription>
+                {language === 'zh'
+                  ? '公开演示项目 · 候选指标为合成数据，文献与结构保留来源。'
+                  : 'Public demo · Candidate metrics are synthetic; literature and structures retain their sources.'}
+              </AlertDescription>
+            </Alert>
           ) : null}
           <TabsList
             aria-label={t.research.page.tabsLabel}

@@ -1560,6 +1560,19 @@ async function assertScenarioState(page, testCase, diagnostics) {
       'populated research content before focus audit')
   }
   if (['populated', 'auth-retry', 'loading'].includes(testCase.scenario)) return
+  if (testCase.routeId === 'experiments' && ['blocked', 'read-only'].includes(testCase.scenario)) {
+    // Target preparation now lives behind the project-details disclosure. Reach
+    // it as a user would; retain all exact readiness and mutation-lock checks.
+    const details = page.locator('.projects-page').getByRole('button', {
+      name: testCase.language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation', exact: true,
+    })
+    await expectVisible(details, 'project target preparation disclosure')
+    if (await details.getAttribute('aria-expanded') !== 'true') await details.click()
+    if (await details.getAttribute('aria-expanded') !== 'true') {
+      throw new Error('Project target preparation disclosure did not expand.')
+    }
+    diagnostics.interactions.targetPreparation = 'Opened project details before readiness and read-only assertions'
+  }
   const contract = SCENARIO_CONTRACTS[`${testCase.routeId}:${testCase.scenario}`]
   if (!contract) {
     throw new Error(`${testCase.routeId}:${testCase.scenario} has no route-scoped state contract.`)
@@ -1643,6 +1656,12 @@ async function navigateCase(page, testCase, caseDirectory) {
   }
   await navigation
   await expectVisible(page.locator(ROUTE_SURFACES[testCase.routeId]).first(), `${testCase.routeId} route surface`)
+  if (testCase.routeId === 'login') {
+    // The initial form precedes auth/config; wait for the intended private realm
+    // before auditing focus or submitting credentials, rather than that transient UI.
+    await expectVisible(page.locator('[data-tour-id="auth-page"]').getByText('Private', { exact: true }), 'private credential realm')
+    await expectVisible(page.locator('form #login-username'), 'private login username')
+  }
   if (testCase.routeId === 'learning') {
     // The route header precedes the project-scoped async data. Audit controls
     // only after the actual workbench, rather than its loading header, exists.
@@ -1770,6 +1789,9 @@ async function runCase(browser, testCase) {
     await diagnosticController?.quiesce().catch((quiesceError) => {
       diagnostics.failures.push(`Diagnostic quiescence failed: ${asError(quiesceError).message}`)
     })
+    // CI must expose the cause even if artifact upload is unavailable or fails.
+    console.error(`[FAIL] ${testCase.id}\n${failure.stack ?? failure.message}`)
+    if (diagnostics.failures.length) console.error(`Diagnostic failures: ${diagnostics.failures.join('\n')}`)
     if (page) {
       await page.screenshot({
         path: path.join(failureDirectory, `${safeFilePart(testCase.id)}.png`),

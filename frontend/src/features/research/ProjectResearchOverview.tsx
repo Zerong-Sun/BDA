@@ -25,7 +25,7 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
   const unresolved = sections.filter((section) => /uncertainty|conflict|limitation|gate|next|争议|矛盾|局限|下一步|闸门|待验证/i.test(section.title))
   const url = (tab: string) => `/research?project=${encodeURIComponent(project.id)}&tab=${tab}`
   return <section aria-label={zh ? '项目研究总结' : 'Project research summary'} className="space-y-6 pb-6">
-    <header className="space-y-2"><p className="text-xs text-text-secondary">{archived ? (zh ? '已归档项目 · 已保存的研究成果' : 'Archived project · saved research record') : (zh ? '已完成项目 · 已保存的研究成果' : 'Completed project · saved research record')}</p><h2 className="text-2xl font-semibold">{zh ? '研究总结与遗留问题' : 'Research summary and open questions'}</h2><p className="text-sm text-text-secondary">{zh ? '回顾项目目标、报告结论及来源；归档不会改变证据的审阅状态。' : 'Review the objectives, report findings and sources. Archiving does not change evidence review status.'}</p></header>
+    <header className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-text-secondary">{archived ? (zh ? '已归档项目 · 已保存的研究成果' : 'Archived project · saved research record') : (zh ? '已完成项目 · 已保存的研究成果' : 'Completed project · saved research record')}</p><p className="text-xs text-text-secondary">{zh ? '归档不会改变证据的审阅状态。' : 'Archiving does not change evidence review status.'}</p></header>
     {query.isPending ? <p role="status">{zh ? '正在读取项目研究记录…' : 'Loading the research record…'}</p> : null}
     {query.isError ? <div role="alert">{zh ? '研究记录读取失败。' : 'Could not load the research record.'}<Button type="button" variant="link" onClick={() => { void query.refetch() }}>{zh ? '重试' : 'Retry'}</Button></div> : null}
     {workspace ? <>

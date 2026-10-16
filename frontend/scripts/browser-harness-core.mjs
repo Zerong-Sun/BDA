@@ -1542,7 +1542,13 @@ function createStrictRoutes({ scenario, routeId }) {
     next_cursor: null,
   }))
 
-  add('GET', '/api/v2/auth/config', {}, () => ok({ deployment_kind: 'public', registration_mode: 'open', realm: 'browser-public', public_portal_url: '', private_portal_url: '' }))
+  // Credential and retry cases exercise the private account form. Public portals
+  // intentionally replace that form with links to a private workspace.
+  add('GET', '/api/v2/auth/config', {}, () => ok({
+    deployment_kind: routeId === 'login' ? 'private' : 'public',
+    registration_mode: 'open', realm: routeId === 'login' ? 'browser-private' : 'browser-public',
+    public_portal_url: '', private_portal_url: '',
+  }))
   add('POST', '/api/v2/auth/logout', {}, () => routeResponse(204, null))
   add('POST', '/api/v2/auth/token', {}, ({ count }) => {
     if (scenario === 'auth-retry' && count === 1) {
