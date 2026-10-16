@@ -48,7 +48,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
  * it, and the research record. The stage workbenches follow behind one menu on
  * desktop; on small screens every route stays a link for reachability.
  */
-export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research', '/tools']
+export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research', '/tools', '/workflow']
 
 /** Routes that sit behind the Workbenches menu rather than in the primary bar. */
 export function workbenchRoutes(): AppRoute[] {
@@ -61,7 +61,7 @@ export function workbenchGroups(zh: boolean) {
     { key: 'design', label: zh ? '计算设计' : 'Computational design', paths: ['/workflow', '/candidates'] },
     { key: 'learning', label: zh ? '实验学习' : 'Experimental learning', paths: ['/lab', '/learning', '/results'] },
     { key: 'platform', label: zh ? '平台' : 'Platform', paths: ['/extensions'] },
-  ].map(({ paths, ...group }) => ({ ...group, routes: paths.flatMap((path) => APP_ROUTES.filter((route) => route.to === path)) }))
+  ].map(({ paths, ...group }) => ({ ...group, routes: paths.flatMap((path) => APP_ROUTES.filter((route) => route.to === path && !PRIMARY_ROUTES.includes(path))) }))
 }
 
 /**

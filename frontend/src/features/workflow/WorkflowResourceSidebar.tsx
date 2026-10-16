@@ -16,6 +16,8 @@ import type { WorkflowNode } from '../../lib/schemas/workflow'
 import { useI18n } from '../../lib/i18n'
 
 interface WorkflowResourceSidebarProps {
+  activeTab?: string
+  onTabChange?: (tab: string) => void
   projectId?: string
   artifacts: Artifact[]
   selectedNode?: WorkflowNode | null
@@ -29,6 +31,8 @@ interface WorkflowResourceSidebarProps {
 
 export function WorkflowResourceSidebar({
   projectId,
+  activeTab,
+  onTabChange,
   artifacts,
   selectedNode,
   selectedArtifactId,
@@ -38,8 +42,10 @@ export function WorkflowResourceSidebar({
   readOnly = false,
   artifactReadOnly = readOnly,
 }: WorkflowResourceSidebarProps) {
-  const { t, format } = useI18n()
-  const [tab, setTab] = useState('artifacts')
+  const { t, format, language } = useI18n()
+  const [localTab, setLocalTab] = useState('artifacts')
+  const tab = activeTab ?? localTab
+  const setTab = onTabChange ?? setLocalTab
   const { data: plugins = [] } = useQuery({
     queryKey: ['model-plugins'],
     queryFn: listModelPlugins,
@@ -53,9 +59,10 @@ export function WorkflowResourceSidebar({
     <Frame variant="inverse" spacing="xs" className="h-full min-h-[32rem] w-full shrink-0 2xl:min-h-0">
       <FramePanel className="min-h-0 overflow-hidden p-0">
       <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="h-full min-h-0">
-        <TabsList variant="line" className="mx-3 mt-2">
+        <TabsList variant="line" className="mx-2 mt-2 flex-wrap">
           <TabsTrigger value="artifacts">{t.workflowExt.resourceSidebar.artifacts}</TabsTrigger>
-          <TabsTrigger value="plugins">{t.workflowExt.resourceSidebar.plugins}</TabsTrigger>
+          <TabsTrigger value="plugins">{language === 'zh' ? '模型插件' : 'Models'}</TabsTrigger>
+          <TabsTrigger value="scripts">{t.workflowExt.scriptAssets.eyebrow}</TabsTrigger>
         </TabsList>
       <ScrollArea className="min-h-0 flex-1 p-3">
         <TabsContent value="artifacts">
@@ -133,9 +140,9 @@ export function WorkflowResourceSidebar({
             )}
           </div>
         </TabsContent>
-        <div className="mt-4">
+        <TabsContent value="scripts">
           <ScriptAssetManager />
-        </div>
+        </TabsContent>
       </ScrollArea>
       </Tabs>
       </FramePanel>

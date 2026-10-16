@@ -266,6 +266,13 @@ function WorkflowWorkspace() {
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
   const [focusCanvas, setFocusCanvas] = useState(false)
+  const [resourceTab, setResourceTab] = useState('artifacts')
+  const resourcePanelRef = useRef<HTMLDivElement>(null)
+  const openResources = (tab: string) => {
+    setFocusCanvas(false)
+    setResourceTab(tab)
+    requestAnimationFrame(() => resourcePanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  }
   const [preflightExpanded, setPreflightExpanded] = useState(false)
   const [goal, setGoal] = useState(() =>
     workflowSeed?.projectId === projectId && workflowSeed.goal.trim() ? workflowSeed.goal : '',
@@ -817,7 +824,7 @@ function WorkflowWorkspace() {
         onAddNode={() => setBuilderOpen((v) => !v)}
         onStart={() => { if (!unsavedNodeChanges) setConfirmRun(true) }}
       /> : null}
-      {workflowRunId ? <div className="mb-3"><Button type="button" variant="outline" size="sm" aria-pressed={focusCanvas} onClick={() => setFocusCanvas((focused) => !focused)}>{language === 'zh' ? (focusCanvas ? '打开流程工作台' : '流程总览') : (focusCanvas ? 'Open workflow workbench' : 'Workflow overview')}</Button></div> : null}
+      {workflowRunId ? <div className="mb-3 flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" aria-pressed={focusCanvas} onClick={() => setFocusCanvas((focused) => !focused)}>{language === 'zh' ? (focusCanvas ? '打开流程工作台' : '流程总览') : (focusCanvas ? 'Open workflow workbench' : 'Workflow overview')}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('plugins')}>{language === 'zh' ? '模型与插件' : 'Models & plugins'}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('scripts')}>{language === 'zh' ? '脚本' : 'Scripts'}</Button></div> : null}
 
       <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
@@ -1096,8 +1103,10 @@ function WorkflowWorkspace() {
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
         <WorkflowPanelLayout overview={focusCanvas}>
-          <div data-workflow-panel="resources">
+          <div ref={resourcePanelRef} data-workflow-panel="resources">
             <WorkflowResourceSidebar
+              activeTab={resourceTab}
+              onTabChange={setResourceTab}
               projectId={projectId}
               artifacts={visibleArtifacts}
               selectedNode={selectedNode}

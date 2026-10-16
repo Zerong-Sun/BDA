@@ -24,7 +24,7 @@ describe('route registry', () => {
     for (const route of PRIMARY_ROUTES) {
       expect(behind).not.toContain(route)
     }
-    expect(behind).toContain('/workflow')
+    expect(PRIMARY_ROUTES).toContain('/workflow')
     expect(behind).toContain('/results')
   })
 
@@ -39,7 +39,7 @@ describe('route registry', () => {
     expect(APP_ROUTES.map((route) => route.to)).not.toContain('/timeline')
     expect(APP_ROUTES.map((route) => route.to)).not.toContain('/faq')
     expect(workbenchGroups(false).map((group) => [group.label, group.routes.map((route) => route.to)])).toEqual([
-      ['Computational design', ['/workflow', '/candidates']],
+      ['Computational design', ['/candidates']],
       ['Experimental learning', ['/lab', '/learning', '/results']],
       ['Platform', ['/extensions']],
     ])
