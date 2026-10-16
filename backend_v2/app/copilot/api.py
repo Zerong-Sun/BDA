@@ -369,6 +369,7 @@ def read_room(
     project_id: uuid.UUID,
     cursor: str | None = Query(default=None),
     limit: int = Query(default=room.DEFAULT_LIMIT, ge=1, le=room.MAX_LIMIT),
+    include_archived: bool = Query(default=False),
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> RoomPage:
@@ -384,7 +385,9 @@ def read_room(
     instant, and a conversation that reorders is not readable.
     """
     require_project(session, project_id, user)
-    entries, next_cursor = room.events(session, project_id=project_id, limit=limit, cursor=cursor)
+    entries, next_cursor = room.events(
+        session, project_id=project_id, limit=limit, cursor=cursor, include_archived=include_archived,
+    )
     return RoomPage(
         items=[RoomEvent.model_validate(entry) for entry in entries],
         next_cursor=next_cursor,

@@ -316,3 +316,28 @@ def test_a_question_put_to_a_person_appears_as_its_own_kind(session: Session) ->
     assert entry["bot"] == "planner"
     assert [option["key"] for option in entry["decision"]["options"]] == ["a", "b"]
     assert entry["decision"]["status"] == "open"
+
+
+def test_archived_chat_is_filtered_before_paging_and_remains_readable(session: Session):
+    project, user = _project(session)
+    conversation = _conversation(session, project, user)
+    older = _message(session, conversation, content="Useful report", at=START)
+    archived = _message(session, conversation, content="Obsolete launch notice", at=START + timedelta(seconds=1))
+    archived.context = {"chat_archive": {"archived": True, "reason": "terminal_run_notice"}}
+    latest = _message(session, conversation, content="Current result", at=START + timedelta(seconds=2))
+    other, other_user = _project(session)
+    foreign = _message(session, _conversation(session, other, other_user), content="Other project")
+    foreign.context = {"chat_archive": {"archived": True}}
+    session.flush()
+    page, cursor = room.events(session, project_id=project.id, limit=2)
+    assert [item["id"] for item in page] == [latest.id, older.id]
+    assert cursor is None
+    page, cursor = room.events(session, project_id=project.id, limit=2, include_archived=True)
+    assert [item["id"] for item in page] == [latest.id, archived.id]
+    tail, _ = room.events(session, project_id=project.id, limit=2, cursor=cursor, include_archived=True)
+    assert [item["id"] for item in tail] == [older.id]
+    assert session.get(CopilotMessage, archived.id).content == "Obsolete launch notice"
+    archived.context = {"chat_archive": {"archived": False}}
+    session.flush()
+    restored, _ = room.events(session, project_id=project.id)
+    assert [item["id"] for item in restored] == [latest.id, archived.id, older.id]

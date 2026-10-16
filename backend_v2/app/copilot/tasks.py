@@ -147,6 +147,7 @@ def copilot_respond(message_id: str) -> dict:
                         CopilotMessage.conversation_id == conversation.id,
                         CopilotMessage.id != source.id,
                         CopilotMessage.status.in_(["completed", "pending"]),
+                        CopilotMessage.context["chat_archive"]["archived"].as_boolean().is_not(True),
                     )
                     .order_by(CopilotMessage.created_at.desc())
                     .limit(40)

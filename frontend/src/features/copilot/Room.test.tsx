@@ -462,3 +462,25 @@ describe('Room attachments', () => {
     expect(screen.queryByRole('group', { name: 'Attached to your next message' })).not.toBeInTheDocument()
   })
 })
+
+
+it('keeps cleaned messages out by default and provides a labelled audit view', async () => {
+  stub([])
+  const requests: string[] = []
+  server.use(http.get('/api/v2/copilot/projects/:projectId/room', ({ request }) => {
+    const includeArchived = new URL(request.url).searchParams.get('include_archived')
+    requests.push(includeArchived ?? '')
+    return HttpResponse.json({ items: includeArchived === 'true' ? [{
+      kind: 'message', id: 'old-launch', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner',
+      message: message({ id: 'old-launch', content: 'Old launch notice', context: { chat_archive: { archived: true } } }),
+    }] : [], next_cursor: null })
+  }))
+  renderWithProviders(<Room />)
+  await waitFor(() => expect(requests).toContain('false'))
+  expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show archived messages' }))
+  expect(await screen.findByText('Old launch notice')).toBeInTheDocument()
+  expect(screen.getByText(/archived history/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Hide archived messages' }))
+  await waitFor(() => expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument())
+})

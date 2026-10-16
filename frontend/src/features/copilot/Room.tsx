@@ -68,7 +68,9 @@ export function Room({
   const readOnly = useCopilotReadOnly()
   const bots = useCopilotBots()
   const roster = bots.data ?? []
-  const feed = useCopilotRoom(projectId || null)
+  const [archiveProject, setArchiveProject] = useState<string | null>(null)
+  const showArchived = archiveProject === projectId
+  const feed = useCopilotRoom(projectId || null, 100, showArchived)
   const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode, bot: selectedBot, setBot, resetMessages } = useCopilotChat(
     projectId,
     pageContext,
@@ -147,6 +149,11 @@ export function Room({
           setNewConversationProject(projectId)
         }}>{zh ? '新建对话' : 'New conversation'}</Button>
       </div>
+      <Button type="button" variant="ghost" size="sm" aria-pressed={showArchived}
+        onClick={() => setArchiveProject(showArchived ? null : projectId)}>
+        {showArchived ? (zh ? '隐藏已清理对话' : 'Hide archived messages') : (zh ? '显示已清理对话' : 'Show archived messages')}
+      </Button>
+      {showArchived ? <p role="status" className="text-xs text-text-secondary">{zh ? '已清理消息仅供追溯，不代表当前进展，也不会自动加入后续聊天上下文。' : 'Archived messages are retained for audit, not current progress or future chat context.'}</p> : null}
       {newConversationProject === projectId ? <p role="status" className="mt-2 text-xs text-text-secondary">{zh ? '新对话已准备，发送下一条消息后开始。历史记录仍保留在研究室中。' : 'A new conversation is ready for your next message. Earlier records remain in this room.'}</p> : null}
       <ApiState
         isLoading={feed.isLoading}
@@ -398,6 +405,8 @@ function RoomEntry({
 
   const message = entry.message
   if (!message) return null
+  const archive = message.context?.chat_archive
+  const archived = typeof archive === 'object' && archive !== null && 'archived' in archive && archive.archived === true
   const mine = message.role === 'user'
   const bot = resolveBot(message.bot, roster)
   return (
@@ -406,6 +415,7 @@ function RoomEntry({
       <div className="room-entry-body">
         <p className="room-speaker">
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
+          {archived ? ` · ${zh ? '已清理历史' : 'archived history'}` : ''}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
         <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>

@@ -39217,6 +39217,10 @@ export type ReadRoomApiV2CopilotProjectsProjectIdRoomGetData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Include Archived
+         */
+        include_archived?: boolean;
     };
     url: '/api/v2/copilot/projects/{project_id}/room';
 };

@@ -54,3 +54,32 @@ def test_limit_retains_draft_only_when_answer_exists_and_next_message_is_allowed
         assert session.get(CopilotMessage, next_id).status == 'completed'
         assert session.scalar(select(CopilotMessage).where(
             CopilotMessage.conversation_id == conversation_id, CopilotMessage.content == 'New answer')) is not None
+
+
+def test_archived_messages_are_not_replayed_to_provider(wired, monkeypatch):
+    factory, _ = wired
+    conversation_id, source_id = _conversation(factory)
+    with factory() as session:
+        session.add_all([
+            CopilotMessage(conversation_id=conversation_id, role='assistant', content='obsolete-marker',
+                           status='completed', context={'chat_archive': {'archived': True}}),
+            CopilotMessage(conversation_id=conversation_id, role='assistant', content='useful-marker', status='completed'),
+        ])
+        session.commit()
+    monkeypatch.setattr(provider_selection, 'select_provider', lambda *_, **__: SimpleNamespace(enabled=True))
+    monkeypatch.setattr(ResearchContextService, 'build_context', lambda *_, **__: SimpleNamespace(
+        citations=[], context='{"overview":{}}', tool_calls=[]))
+    monkeypatch.setattr(ResearchContextService, 'research_overview', lambda *_: {'available_kinds': ['project']})
+    monkeypatch.setattr(ProjectContextService, 'overview_packet', lambda *_: '{}')
+    captured = []
+
+    def reply(provider, messages, *args, **kwargs):
+        captured.extend(messages)
+        return research_agent.ResearchAgentResult('New answer', [], [])
+
+    monkeypatch.setattr(research_agent, 'complete_research_turn', reply)
+    monkeypatch.setattr(research_agent, 'review_scientific_answer_result', lambda *_, **__: (_ for _ in ()).throw(
+        DomainError('llm_budget_exhausted', 'test review stop', status_code=409)))
+    tasks.copilot_respond.run(str(source_id))
+    assert any(item['content'] == 'useful-marker' for item in captured)
+    assert all('obsolete-marker' not in item['content'] for item in captured)

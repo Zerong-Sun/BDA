@@ -26,18 +26,18 @@ function isLiveEntry(entry: RoomEvent): boolean {
     || Boolean(entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
 }
 
-export function useCopilotRoom(projectId: string | null, limit = 100) {
+export function useCopilotRoom(projectId: string | null, limit = 100, includeArchived = false) {
   const query = useInfiniteQuery({
     // The project id is part of the key because a room belongs to one project
     // and nothing else; a shared key would show one project's chain in another.
-    queryKey: copilotRoomQueryKey(projectId),
+    queryKey: [...copilotRoomQueryKey(projectId), { includeArchived }],
     enabled: Boolean(projectId),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       const { data } = await readRoomApiV2CopilotProjectsProjectIdRoomGet<true>({
         throwOnError: true,
         path: { project_id: projectId as string },
-        query: { limit, cursor: pageParam },
+        query: { limit, cursor: pageParam, include_archived: includeArchived },
       })
       return data
     },

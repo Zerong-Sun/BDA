@@ -136,6 +136,7 @@ def events(
     project_id: uuid.UUID,
     limit: int = DEFAULT_LIMIT,
     cursor: str | None = None,
+    include_archived: bool = False,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """The room's entries, newest first, with the cursor for the next page.
 
@@ -148,11 +149,15 @@ def events(
     after = decode_time_cursor(cursor)
 
     conversations = select(CopilotConversation.id).where(CopilotConversation.project_id == project_id)
+    messages = select(CopilotMessage).where(
+        CopilotMessage.conversation_id.in_(conversations),
+        CopilotMessage.role.in_(VISIBLE_ROLES),
+    )
+    if not include_archived:
+        # Filter before paging; original rows remain available for audit.
+        messages = messages.where(CopilotMessage.context["chat_archive"]["archived"].as_boolean().is_not(True))
     message_query = _keyset(
-        select(CopilotMessage).where(
-            CopilotMessage.conversation_id.in_(conversations),
-            CopilotMessage.role.in_(VISIBLE_ROLES),
-        ),
+        messages,
         CopilotMessage.created_at,
         CopilotMessage.id,
         after,
