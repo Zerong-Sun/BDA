@@ -1,13 +1,15 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { listProjects } from '../api/projects'
 import { useAppStore } from '../store/appStore'
+import { currentAuthGeneration } from '../api/client'
 
 // Keep view preferences, but never carry another project's evidence or draft.
 const PROJECT_SELECTION_PARAMS = ['run', 'node', 'candidate', 'dataset', 'structureA', 'structureB', 'compare', 'artifact', 'residues', 'knowledge', 'goal', 'draft', 'draft_project', 'service', 'from']
 
 export function useProjectContext() {
+  const sessionGeneration = useRef(currentAuthGeneration())
   const [searchParams, setSearchParams] = useSearchParams()
   const activeProjectId = useAppStore((state) => state.activeProjectId)
   const deletingProjectId = useAppStore((state) => state.deletingProjectId)
@@ -59,11 +61,14 @@ export function useProjectContext() {
   }, [activeProjectId, projectIds, urlProjectId])
 
   useEffect(() => {
+    // A still-mounted view must not restore its old URL selection after logout.
+    if (sessionGeneration.current !== currentAuthGeneration()) return
     if (projectsLoading || !projectId) return
     if (activeProjectId !== projectId) setActiveProjectId(projectId)
   }, [activeProjectId, projectId, projectsLoading, setActiveProjectId])
 
   useEffect(() => {
+    if (sessionGeneration.current !== currentAuthGeneration()) return
     if (!projectsReady) return
     if (!staleUrlProject && !staleActiveProject) return
     if (staleUrlProject || (staleActiveProject && !projectId)) setActiveProjectId('')

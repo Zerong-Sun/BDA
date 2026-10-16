@@ -4,6 +4,7 @@ import uuid
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
 from backend_v2.app.copilot import research_agent
 from backend_v2.app.core.problem import DomainError
 
@@ -448,6 +449,21 @@ def test_grounded_answer_quality_gate_detects_costs_and_incomplete_trace() -> No
 
     negated_delivery = complete + " 蛋白本身不直接激活嗅觉受体；只释放挥发性小分子。"
     assert "implausible_nonvolatile_receptor_delivery" not in research_agent.grounded_answer_issues(negated_delivery)
+
+
+@pytest.mark.parametrize("caveat", [
+    "不能推断不存在市场先例。", "无法据此声称“没有商业化产品”。",
+    "检索无命中不代表没有专利。", "不应断言未见商业化先例。",
+    "本次没有专利/商品库审计轨迹，不做市场空白判断。",
+    "没有可核验的商业数据库检索记录。",
+])
+def test_grounded_absence_gate_distinguishes_caveats_from_assertions(caveat) -> None:
+    issue = "unsupported_absence_or_novelty_claim"
+    assert issue not in research_agent.grounded_answer_issues(caveat)
+    # A caveat in a different clause cannot excuse an actual unsupported claim.
+    assert issue in research_agent.grounded_answer_issues(caveat + "目前没有商业化产品。")
+    assert issue in research_agent.grounded_answer_issues("不能确定盈利；目前没有商业化先例。")
+    assert issue in research_agent.grounded_answer_issues("本次没有专利，商业数据库检索记录另附。")
 
 
 def test_grounded_repair_receives_automated_failures(monkeypatch) -> None:

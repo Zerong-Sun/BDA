@@ -229,9 +229,7 @@ def test_a_turn_without_the_projects_capabilities_refuses_to_delegate(
 def test_a_director_may_only_delegate_to_operators_it_declares(session: Session) -> None:
     """Bounded by the roster rather than by "any bot".
 
-    `auditor` is not in `conductor.directs`: review is asked for, not ordered,
-    and a director able to open a review run of its own choosing would be
-    selecting its own reviewer.
+    The lead can schedule independent review, but never another director.
     """
     project, user = _project(session)
     run = _conductor_run(session, project, user, goal="Work out what to do")
@@ -240,7 +238,7 @@ def test_a_director_may_only_delegate_to_operators_it_declares(session: Session)
         REGISTRY.execute(
             "delegate_to_operator",
             _ctx(session, run),
-            {"bot": "auditor", "instruction": "Check the planner"},
+            {"bot": "conductor", "instruction": "Coordinate recursively"},
         )
 
 
@@ -597,7 +595,7 @@ def test_a_director_holds_nothing_that_could_do_the_work(session: Session) -> No
         # Asking a person to decide is the director's job rather than a breach
         # of it: escalation is the one thing a director may do that a producer
         # cannot, and it still performs none of the work.
-        assert (resolved & writes) <= {"post_handoff", "request_decision"}, sorted(resolved & writes)
+        assert (resolved & writes) <= {"post_handoff", "request_decision", "start_team_task"}, sorted(resolved & writes)
 
 
 # --- Resuming a delegated wait ----------------------------------------------

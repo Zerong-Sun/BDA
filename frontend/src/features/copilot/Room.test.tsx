@@ -79,6 +79,23 @@ function stub(items: unknown[]) {
 }
 
 describe('Room', () => {
+  it('shows real background discussion and opens its evidence', async () => {
+    stub([{ kind: 'discussion', id: 'turn-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'PD-L1 route comparison is ready for review.' } }])
+    const onOpenRun = vi.fn()
+    renderWithProviders(<Room onOpenRun={onOpenRun} />)
+    expect(await screen.findByText('PD-L1 route comparison is ready for review.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open task and evidence' }))
+    expect(onOpenRun).toHaveBeenCalledWith('run-1')
+  })
+
+  it('keeps a delegated task visible when its parent is on an older page', async () => {
+    stub([{ kind: 'task', id: 'child-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      task: task({ id: 'child-1', parent_run_id: 'older-parent', goal: 'Check PD-L1 geometry' }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Check PD-L1 geometry')).toBeInTheDocument()
+  })
+
   it('recovers a pending server reply after a reload without a local chat stream', async () => {
     stub([])
     useAppStore.setState({ copilotSessions: {}, copilotMessages: [] })
@@ -207,7 +224,7 @@ describe('Room', () => {
     stub([])
     renderWithProviders(<Room />)
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/appears here/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Tell the project lead/i)
   })
 
   it('offers a retry when the feed cannot be read', async () => {
@@ -238,7 +255,7 @@ describe('Room addressing', () => {
     // per project - typing first would write it under the empty project key and
     // lose it as soon as the real one arrives. Waiting for the loaded room is
     // how a person reaches the composer too.
-    await screen.findByText(/appears here/i)
+    await screen.findByText(/Tell the project lead/i)
     const input = await screen.findByLabelText('Say something in the room')
     fireEvent.change(input, { target: { value: text } })
     return { onAssign }

@@ -151,6 +151,48 @@ def test_chat_replays_final_response_reasoning_after_new_worker_session(wired, m
     assert not replies
 
 
+@pytest.mark.parametrize("bot", ["conductor", "researcher"])
+@pytest.mark.parametrize("repair", [False, True])
+def test_followup_review_preserves_original_user_goal(wired, monkeypatch, bot, repair):
+    factory, _ = wired
+    conversation_id, source_id = _conversation(factory)
+    original = "Report the completed route rename and current team progress."
+    with factory() as session:
+        source = session.get(CopilotMessage, source_id)
+        source.content, source.status = original, "completed"
+        followup = CopilotMessage(conversation_id=conversation_id, role="user", content="go on",
+            status="pending", context={"bot_hint": bot})
+        session.add(followup)
+        session.commit()
+        followup_id = followup.id
+    citations = [{"source_type": "scientific_literature", "chunk_id": "synthetic-chunk",
+                  "content_checksum_sha256": "synthetic-checksum", "retrieval_trace_id": "synthetic-trace"}]
+    monkeypatch.setattr(provider_selection, "select_provider", lambda *_, **__: SimpleNamespace(enabled=True))
+    monkeypatch.setattr(ResearchContextService, "build_context", lambda *_, **__: SimpleNamespace(
+        citations=citations, context="Synthetic current records", tool_calls=[]))
+    monkeypatch.setattr(ResearchContextService, "research_overview", lambda *_: {"available_kinds": ["research_target"]})
+    monkeypatch.setattr(ResearchContextService, "grounding_packet", lambda *_: '{"project_records":["Rename completed"]}')
+    monkeypatch.setattr(ProjectContextService, "overview_packet", lambda *_: "Synthetic overview")
+    monkeypatch.setattr(research_agent, "complete_research_turn", lambda *_, **__: research_agent.ResearchAgentResult(
+        "Draft progress report. " * 100, citations, []))
+    monkeypatch.setattr(research_agent, "grounded_answer_issues", lambda value: ["synthetic issue"] if value == "needs repair" else [])
+    requests = []
+
+    def complete(provider, messages, **kwargs):
+        requests.append(deepcopy(messages))
+        return {"content": "needs repair" if repair and len(requests) == 1 else "Rename completed; hypothesis unvalidated."}
+
+    monkeypatch.setattr(research_agent, "completion_message", complete)
+    assert tasks.copilot_respond.run(str(followup_id))["status"] == "completed"
+    assert len(requests) == (2 if repair else 1)
+    for request in requests:
+        assert "Current request:\ngo on" in request[1]["content"]
+        assert original in request[1]["content"]
+        assert '"project_records":["Rename completed"]' in request[1]["content"]
+        assert "Do not turn a" in request[0]["content"]
+        assert "Preserve three distinct routes" not in request[0]["content"]
+
+
 def test_chat_followup_rebases_history_without_rewriting_saved_answer(wired, monkeypatch):
     factory, _ = wired
     conversation_id, source_id = _conversation(factory)

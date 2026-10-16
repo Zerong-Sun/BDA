@@ -423,18 +423,7 @@ describe('CopilotChat', () => {
     expect(payload?.skill).toBeUndefined()
   })
 
-  it('sends unhinted when the roster is unavailable', async () => {
-    // The picker is absent and the chat still works. A roster that failed to
-    // load must not take the copilot down with it.
-    //
-    // It used to fall back to a client-side skill guess here. That is gone with
-    // the hand-written skill registry, and the change is a widening in this one
-    // failure mode: the turn now carries no hint and gets the project's
-    // configured set - the documented undifferentiated case, and the same thing
-    // a message matching no trigger has always got. It is not a permission
-    // change, because the server intersects whatever arrives with that set
-    // either way; it is the loss of an incidental narrowing that only ever
-    // applied when the roster request had failed.
+  it('keeps the project lead as default when the roster is unavailable', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
     fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
@@ -444,7 +433,7 @@ describe('CopilotChat', () => {
 
     await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
     const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
-    expect(payload?.bot).toBeUndefined()
+    expect(payload?.bot).toBe('conductor')
     expect(payload?.skill).toBeUndefined()
     expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
   })
@@ -512,7 +501,7 @@ describe('CopilotChat', () => {
     fireEvent.pointerUp(conductor, { button: 0 })
     fireEvent.click(conductor)
 
-    expect(await screen.findByText(/A recommendation does not start a run/)).toBeInTheDocument()
+    expect(await screen.findByText(/Start durable coordination from the team chat/)).toBeInTheDocument()
     expect(screen.getByText('May delegate to')).toBeInTheDocument()
     // ...and the named operator is a control, not prose: selecting it is the
     // action a reader wants next.

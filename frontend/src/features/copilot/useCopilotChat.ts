@@ -1,5 +1,5 @@
 import { getTranslations } from '../../lib/i18n'
-import { matchBot, useCopilotBots } from './bots/registry'
+import { useCopilotBots } from './bots/registry'
 import { copilotHandoffsQueryKey } from './handoffs'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
@@ -112,18 +112,10 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
       if (isCurrent()) setRequest(projectId, { id: requestId, stage, detail })
     }
 
-    // One narrowing hint, derived from the served roster. There used to be a
-    // second - a hand-written capability list in `skills/registry.ts` with its
-    // own bilingual triggers, consulted when no bot matched. It was a copy of
-    // the backend's capability ids maintained beside the roster that already
-    // describes the same routing, and a copy is what drifts: its `systemPrompt`
-    // field was populated for all nine entries and read by nothing. Its
-    // vocabulary now lives on the operators that own it.
-    // An address for this turn, then the operator the room is scoped to, then
-    // the served roster's own triggers. Each is a narrowing hint the server
-    // intersects with the project's capabilities; none of them can widen a turn.
+    // A direct address or selected member wins. Otherwise the project lead
+    // owns the group conversation, even while the roster is loading.
     const skill = mode === 'bench' ? 'wetlab-read' : undefined
-    const activeBot = skill ? undefined : options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
+    const activeBot = skill ? undefined : options?.bot ?? bot ?? 'conductor'
     const reviewIntent = !skill && detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,

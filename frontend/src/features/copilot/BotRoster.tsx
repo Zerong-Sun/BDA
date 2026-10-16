@@ -30,7 +30,7 @@ export function BotRoster({ projectId, activeBotId = null, autoActive = false, o
     <h2>{zh ? '团队成员' : 'Team members'}</h2>
     <p className="mb-4 text-xs text-text-muted">{zh ? '选择成员，查看职责与任务。' : 'Select a member to view their role and tasks.'}</p>
     <div className="bot-roster-scroll">
-      <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={autoActive} onClick={onAuto}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '自动匹配' : 'Auto-match'}</strong><small>{zh ? '根据问题选择 Bot' : 'Match the question to a Bot'}</small></span></Button>
+      <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={autoActive} onClick={onAuto}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '团队群聊' : 'Team chat'}</strong><small>{zh ? '项目负责人统筹推进' : 'Coordinated by the project lead'}</small></span></Button>
       <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>
         {byStance(bots.data ?? []).map((group) => <div className="bot-roster-group" key={group.stance}>
           <p className="bot-stance">{stanceLabel[group.stance]}</p>

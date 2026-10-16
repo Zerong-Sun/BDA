@@ -250,7 +250,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         ),
         "async_execution": False,
         "execution_mode": "draft",
-        "chat_tools": ["post_handoff", "read_handoffs", "request_decision"],
+        "chat_tools": ["post_handoff", "read_handoffs", "read_team_progress", "request_decision"],
     },
     {
         "id": "chain-orchestration",
@@ -262,8 +262,8 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
             "director never executes them."
         ),
         "async_execution": True,
-        "execution_mode": "read",
-        "chat_tools": ["list_operators", "delegate_to_operator"],
+        "execution_mode": "draft",
+        "chat_tools": ["list_operators", "start_team_task", "delegate_to_operator"],
     },
     {
         "id": "review-audit",

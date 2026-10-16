@@ -108,6 +108,7 @@ BOTS = [
     BotResponse(
         id=bot.id,
         title=bot.title,
+        aliases=list(bot.aliases),
         title_zh=bot.title_zh,
         phase=bot.phase,
         stance=bot.stance,

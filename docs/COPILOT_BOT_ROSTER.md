@@ -1,5 +1,41 @@
 # BDA Copilot Bot Roster
 
+## Team chat coordination (2026-10-16)
+
+The project room defaults to **Project Lead / 项目负责人**. Its specialists are
+Evidence Researcher / 文献研究员, Design Scientist / 方案设计师, Compute Engineer /
+计算工程师, Data Analyst / 数据分析师 and Scientific Reviewer / 科学审阅员.
+Stable bot IDs and historical records are preserved; previous display names remain
+valid mentions through the served `aliases` field, including multi-word English names.
+
+Following [Grok Bot's coordination design](https://x.ai/news/designing-grok-bot),
+the user gives a goal to the lead in the group, can address any specialist directly,
+and can inspect actual assignments, public discussion, outcomes and decision cards.
+`start_team_task` promotes an action request into one durable root per source message;
+advice and negated requests do not start it. The original user request remains the
+write mandate. Starting a task is an audited write, excluded from read-only transports;
+an existing task marker must match the source's project, actor, conversation and goal.
+Already authorized work proceeds without requesting the same permission again.
+All members can read the shared discussion with `read_team_progress`.
+The lead delegates to specialists and the
+fixed independent reviewer, and resumes when children finish. Reviewers still cannot
+repair research records or recursively delegate.
+After chat starts a task, the background worker continues automatically. Reviewers
+receive the final delivery separately from the recorded tool evidence, with explicit
+truncation markers if either exceeds its reading limit.
+
+`request_decision` now creates a durable `decision` wait when called by a run.
+Answering or withdrawing settles that wait and re-enqueues the run through the outbox.
+Cancellation prevents revival, and neither a choice nor a delegated instruction expands
+write authorization. Existing turn and cost limits still apply; reaching them is a
+reported stop, never a claim that the scientific objective has been achieved.
+
+The room projects assistant turns from durable runs as `discussion` events, excludes
+reasoning/system/tool internals, and renders structured deliveries as readable text.
+Older discussion is paginated, and children remain visible when their parent is on
+another page. The user can open the source task for evidence. No discussion is fabricated.
+
+
 状态：活跃
 
 最后核验：2026-10-14（核对当前六个 bot、结构/仪器工具与注册表数量；2026-09-14 的名册合并历史保留在下文，退役 id 仅用于读取历史）
@@ -62,12 +98,12 @@ stated in a charter; the argument and its rules are in
 
 | # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to | Absorbed |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
-| 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `patent-search`, `druggability-assessment`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
-| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `sequence-analysis`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
-| 3 | `runner` | 执行与排障 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
-| 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `sequence-analysis`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
-| — | `auditor` | 复核 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
+| — | `conductor` | 项目负责人 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
+| 1 | `researcher` | 文献研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `patent-search`, `druggability-assessment`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
+| 2 | `planner` | 方案设计师 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `sequence-analysis`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
+| 3 | `runner` | 计算工程师 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
+| 4 | `analyst` | 数据分析师 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `sequence-analysis`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
+| — | `auditor` | 科学审阅员 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
 
 Retired ids are listed in `bots.RETIRED`. Runs and handoffs recorded under them
 are history and are not rewritten: `bots.get` resolves a retired id to its
@@ -442,7 +478,7 @@ Each of these holds, and has a test that fails when it stops holding.
 | 13 | `diagnose_compute_failure` refuses a job id from another project | `test_compute_diagnosis.py` |
 | 14 | The new capabilities reach an external MCP client with no transport code of their own | `test_copilot_mcp.py` |
 | 15 | The chat sends a selected bot instead of a matched skill and never both; a roster that failed to load leaves the chat working, unhinted | `CopilotChat.test.tsx`, `bots/registry.test.ts` |
-| 16 | A `review` bot declaring a write capability, a `direct` bot declaring one, a stance-only capability on the wrong stance, and review or delegation aimed at a non-producer all fail at import | `test_copilot_bots.py` |
+| 16 | A `review` bot declaring a write capability, a `direct` bot declaring one, a stance-only capability on the wrong stance, and review aimed at a non-producer or delegation aimed at another director all fail at import | `test_copilot_bots.py` |
 | 17 | Every producer is reviewed by somebody, and no producer names its own reviewer | `test_copilot_bots.py` |
 | 18 | Every operator that hands off holds `chain-messaging`, so no charter names a step the platform cannot take | `test_copilot_bots.py` |
 | 19 | A delegated run is owned by the target operator and keeps the tools that define it; a subagent of the *same* operator is still bounded by its parent | `test_copilot_chain.py` |

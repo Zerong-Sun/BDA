@@ -1479,6 +1479,10 @@ export type BotResponse = {
      */
     absorbs?: Array<string>;
     /**
+     * Aliases
+     */
+    aliases?: Array<string>;
+    /**
      * Capabilities
      */
     capabilities?: Array<string>;
@@ -10047,6 +10051,20 @@ export type ReviewUpdate = {
 };
 
 /**
+ * RoomDiscussion
+ */
+export type RoomDiscussion = {
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Run Id
+     */
+    run_id: string;
+};
+
+/**
  * RoomEvent
  *
  * One entry in the room, carrying exactly the record it came from.
@@ -10062,6 +10080,7 @@ export type RoomEvent = {
      */
     bot?: string | null;
     decision?: DecisionRequestResponse | null;
+    discussion?: RoomDiscussion | null;
     handoff?: HandoffResponse | null;
     /**
      * Id
@@ -10070,7 +10089,7 @@ export type RoomEvent = {
     /**
      * Kind
      */
-    kind: 'message' | 'handoff' | 'task' | 'decision';
+    kind: 'message' | 'handoff' | 'task' | 'decision' | 'discussion';
     message?: MessageResponse | null;
     /**
      * Occurred At
@@ -10385,6 +10404,58 @@ export type RoutePlanResponse = {
     workflow_spec: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * RoutePresentation
+ *
+ * Display-only route identity; it cannot change execution or scientific status.
+ */
+export type RoutePresentation = {
+    /**
+     * Aliases
+     */
+    aliases?: Array<string>;
+    /**
+     * Category
+     */
+    category: 'design' | 'validation' | 'calibration' | 'overview' | 'history' | 'draft';
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Name En
+     */
+    name_en: string;
+    /**
+     * Next Step
+     */
+    next_step: string;
+    /**
+     * Objective
+     */
+    objective: string;
+    /**
+     * Record Role
+     */
+    record_role: 'current_plan' | 'execution_record' | 'historical_record' | 'placeholder';
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Variant
+     */
+    variant?: string;
 };
 
 /**
@@ -115543,6 +115614,325 @@ export type WorkflowPreflightApiV2WorkflowRunsWorkflowIdPreflightGetResponses = 
 };
 
 export type WorkflowPreflightApiV2WorkflowRunsWorkflowIdPreflightGetResponse = WorkflowPreflightApiV2WorkflowRunsWorkflowIdPreflightGetResponses[keyof WorkflowPreflightApiV2WorkflowRunsWorkflowIdPreflightGetResponses];
+
+export type PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchData = {
+    body: RoutePresentation;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'If-Match'?: string | null;
+    };
+    path: {
+        /**
+         * Workflow Id
+         */
+        workflow_id: string;
+    };
+    query?: never;
+    url: '/api/v2/workflow-runs/{workflow_id}/presentation';
+};
+
+export type PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchError = PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchErrors[keyof PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchErrors];
+
+export type PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkflowResponse;
+};
+
+export type PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchResponse = PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchResponses[keyof PatchWorkflowPresentationApiV2WorkflowRunsWorkflowIdPresentationPatchResponses];
 
 export type ImportNodeScriptApiV2WorkflowRunsWorkflowIdScriptImportsPostData = {
     body: ScriptImport;

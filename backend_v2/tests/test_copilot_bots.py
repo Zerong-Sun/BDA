@@ -236,12 +236,14 @@ def test_a_producer_does_not_choose_its_own_reviewer() -> None:
         assert bot.reviews == ()
 
 
-def test_review_and_delegation_terminate_on_producers() -> None:
+def test_review_and_delegation_cannot_recurse() -> None:
     """Otherwise there is no bottom: a reviewer reviewing a reviewer, or a
     director directing a director, never reaches the work."""
     for bot in bots.all_bots():
-        for target in bot.reviews + bot.directs:
+        for target in bot.reviews:
             assert bots.require(target).stance == "produce", (bot.id, target)
+        for target in bot.directs:
+            assert bots.require(target).stance != "direct", (bot.id, target)
 
 
 def test_no_reviewer_can_repair_what_it_finds() -> None:
@@ -259,7 +261,8 @@ def test_no_reviewer_can_repair_what_it_finds() -> None:
         writes = set(bot.capabilities) & granting
         # The handover channel is copilot bookkeeping, not a research write -
         # see `bots._INTERNAL_WRITE_CAPABILITIES`.
-        assert writes <= {"chain-messaging"}, (bot.id, sorted(writes))
+        allowed = {"chain-messaging", "chain-orchestration"} if bot.stance == "direct" else {"chain-messaging"}
+        assert writes <= allowed, (bot.id, sorted(writes))
 
 
 def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
@@ -276,9 +279,9 @@ def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
 
 def test_a_director_may_direct_only_what_it_declares() -> None:
     assert bots.may_direct("conductor", "planner") is True
-    # Review is asked for, not ordered: a director able to open a review run
-    # would be selecting its own reviewer.
-    assert bots.may_direct("conductor", "auditor") is False
+    # The declared independent reviewer can be scheduled, but cannot repair work.
+    assert bots.may_direct("conductor", "auditor") is True
+    assert bots.may_direct("conductor", "conductor") is False
     assert bots.may_direct("planner", "runner") is False
     assert bots.may_direct("ghost", "planner") is False
 

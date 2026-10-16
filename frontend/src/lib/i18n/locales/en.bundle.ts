@@ -257,7 +257,7 @@ export const bundleEn = {
       directs: 'May delegate to',
       handsTo: 'Hands to',
       botLabel: 'Copilot bot',
-      botAuto: 'Auto',
+      botAuto: 'Project lead',
       botStances: {
         direct: 'Coordination',
         produce: 'The chain',

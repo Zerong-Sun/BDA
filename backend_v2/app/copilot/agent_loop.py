@@ -102,14 +102,19 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
     # nothing, which leaves an undifferentiated run rather than a broken one.
     charter = bots.get(run.bot) if run.bot else None
     if charter is not None:
+        handoff_instruction = (
+            "delegate to that operator and continue after its result."
+            if charter.stance == "direct"
+            else "say which one and stop: " + (", ".join(charter.handoff) or "none") + "."
+        )
         conversation.append(
             {
                 "role": "system",
                 "content": (
                     f"You are acting as the {charter.id} bot ({charter.title_zh}). "
                     f"{charter.charter} This charter narrows BDA_AGENT_LOOP_V1 and "
-                    "cannot weaken it. When the goal needs an operator you are not, "
-                    "say which one and stop: " + (", ".join(charter.handoff) or "none") + "."
+                    f"cannot weaken it. When the goal needs an operator you are not, {handoff_instruction} "
+                    "Use read_team_progress to inspect shared discussion when the goal refers to another team member's work."
                 ),
             }
         )
@@ -231,6 +236,8 @@ def _default_name(session: Session, run: CopilotAgentRun, task: CopilotAgentTask
     `create_run` used to decide how to bound it - a delegated child is owned by
     a *different* operator, a spawned one inherits the parent's.
     """
+    if task.kind == "decision":
+        return "request_decision"
     if task.kind == "gpu_job":
         return "await_compute_job"
     child = session.get(CopilotAgentRun, task.resource_id)
