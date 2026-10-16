@@ -50,6 +50,8 @@ vi.mock('../features/timeline/ProjectTimeline', () => ({
 function installHandlers() {
   server.use(
     http.get('/api/v2/projects', () => HttpResponse.json({ items: [project], next_cursor: null })),
+    http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ project: { id: project.id }, review_document: null })),
+    http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [], next_cursor: null })),
   )
 }
 
@@ -103,6 +105,29 @@ describe('ResearchPage', () => {
     }
     expect(within(nav()).getByRole('tab', { name: englishGroups[0] })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('navigation', { name: 'Evidence categories' })).not.toBeInTheDocument()
+  })
+
+  it('shows saved outcomes for an active project without treating it as completed or hiding its goals', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+      project: { id: project.id },
+      review_document: { id: 'saved-report', title: { en: 'Stage report' }, content: { en: '## Research objective\nAn ongoing question.\n## Results\nA recorded stage result.' }, status: 'accepted', version: 1 },
+    })))
+    renderWithProviders(<ResearchPage />)
+    expect(await screen.findByText('A recorded stage result.')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Project results, reports & review')
+    expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('Completed project · saved research record')).not.toBeInTheDocument()
+    expect(screen.getByTestId('next-step')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage questions and goal tree' }))
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
+  })
+
+  it('keeps report load failures visible while allowing access to existing goals', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ detail: 'unavailable' }, { status: 503 })))
+    renderWithProviders(<ResearchPage />)
+    expect(await screen.findByText(/The project report could not be loaded/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage questions and goal tree' }))
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
   })
 
   it('supports keyboard navigation between stages and evidence subcategories', async () => {

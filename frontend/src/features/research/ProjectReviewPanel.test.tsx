@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { NormalizedResearchWorkspace } from '../../lib/api/researchWorkspace'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { ProjectReviewPanel } from './ProjectReviewPanel'
 
@@ -70,6 +71,17 @@ describe('ProjectReviewPanel', () => {
     )
     expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
     expect(screen.getAllByRole('link', { name: /Open original source/ })).toHaveLength(2)
+  })
+
+  it('keeps read-only note mutations disabled after readers expand the notes', async () => {
+    renderWithProviders(<Disclosure title="Research notes & review record 1 records"><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly /></Disclosure>)
+    expect(screen.queryByRole('button', { name: 'Add finding/source' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Research notes & review record 1 records' }))
+    const addFinding = await screen.findByRole('button', { name: 'Add finding/source' })
+    expect(addFinding).toBeDisabled()
+    fireEvent.click(addFinding)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('research-finding')).toBeVisible()
   })
 
   it('uses a flat evidence article and opens the controlled note editor', async () => {

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { ChatCircleIcon } from '@phosphor-icons/react'
 import { NextStep } from '../components/ui/NextStep'
@@ -15,6 +16,7 @@ import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
 import { ProjectTimeline } from '../features/timeline/ProjectTimeline'
 import { normalizeResearchTab, RESEARCH_TABS, type ResearchTab } from '../features/research/researchUi'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
+import { getResearchWorkspace, workspaceText } from '../lib/api/researchWorkspace'
 import { useI18n } from '../lib/i18n'
 import { useAppStore, type Language } from '../lib/store/appStore'
 import { isDemoProject } from '../features/tour'
@@ -25,6 +27,13 @@ export function ResearchPage() {
   const rawTab = searchParams.get('tab')
   const { projectId, activeProject } = useProjectContext()
   const retrospective = ['archived', 'completed'].includes(activeProject?.status ?? '')
+  const workspaceQuery = useQuery({
+    queryKey: ['research-workspace', projectId],
+    queryFn: () => getResearchWorkspace(projectId),
+    enabled: Boolean(projectId),
+  })
+  const savedReport = workspaceQuery.data?.review_document
+  const showResults = retrospective || Boolean(savedReport && workspaceText(savedReport.content, language).trim())
   const isPd1Demo = Boolean(activeProject && isDemoProject(activeProject))
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
@@ -32,7 +41,7 @@ export function ResearchPage() {
   const tab = rawTab ? normalizeResearchTab(rawTab) : 'goals'
   const group = tab === 'references' || tab === 'structures' || tab === 'data' ? 'evidence' : tab
   const groups = [
-    { key: 'goals', label: retrospective ? (language === 'zh' ? '结果与报告' : 'Results & reports') : (language === 'zh' ? '目标与问题' : 'Goals & questions') },
+    { key: 'goals', label: showResults ? (language === 'zh' ? '结果与报告' : 'Results & reports') : (language === 'zh' ? '目标与问题' : 'Goals & questions') },
     { key: 'evidence', label: language === 'zh' ? '文献与证据' : 'Literature & evidence' },
     { key: 'methods', label: retrospective ? (language === 'zh' ? '方法与设计记录' : 'Methods & design records') : (language === 'zh' ? '实验方案' : 'Experiment plan') },
     { key: 'timeline', label: language === 'zh' ? '决策记录' : 'Decision record' },
@@ -71,8 +80,8 @@ export function ResearchPage() {
         <header className="research-page-heading mb-5 border-b border-border-soft pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            {!retrospective ? <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p> : null}
-            <h1 className="mt-2 text-3xl font-medium text-text-primary">{retrospective ? (language === 'zh' ? '项目结果、报告与复核' : 'Project results, reports & review') : t.research.page.title}</h1>
+            {!showResults ? <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p> : null}
+            <h1 className="mt-2 text-3xl font-medium text-text-primary">{showResults ? (language === 'zh' ? '项目结果、报告与复核' : 'Project results, reports & review') : t.research.page.title}</h1>
           </div>
           {projectId ? (
             <div className="shrink-0">
@@ -133,10 +142,11 @@ export function ResearchPage() {
             </Frame>
           ) : tab === 'goals' ? (
             <>
-            {activeProject && retrospective ? <ProjectResearchOverview key={projectId} project={activeProject} /> : activeProject ? <Disclosure key={`brief-${projectId}-${searchParams.get('brief')}`} title={language === 'zh' ? '研究背景与任务书' : 'Research context'} defaultOpen={searchParams.get('brief') === '1'}>
+            {!showResults && workspaceQuery.isError ? <Alert variant="warning"><AlertDescription>{language === 'zh' ? '项目报告暂时无法读取，现有目标仍可查看。' : 'The project report could not be loaded; existing goals remain available.'}<Button type="button" variant="link" onClick={() => { void workspaceQuery.refetch() }}>{language === 'zh' ? '重试' : 'Retry'}</Button></AlertDescription></Alert> : null}
+            {activeProject && showResults ? <ProjectResearchOverview key={projectId} project={activeProject} /> : activeProject ? <Disclosure key={`brief-${projectId}-${searchParams.get('brief')}`} title={language === 'zh' ? '研究背景与任务书' : 'Research context'} defaultOpen={searchParams.get('brief') === '1'}>
               <ProjectBriefPanel project={activeProject} />
             </Disclosure> : null}
-            {retrospective ? <Disclosure title={language === 'zh' ? '结构化问题与决策定义' : 'Structured questions and decision definitions'}><ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} retrospective /></Disclosure> : <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />}
+            {showResults ? <Disclosure title={language === 'zh' ? '结构化问题与决策定义' : 'Structured questions and decision definitions'}><ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} retrospective={retrospective} /></Disclosure> : <ResearchDecisionCenter key={`decision-${projectId}`} projectId={projectId} />}
             <div className="border-t border-border-soft" data-tour-id="research-goals"><Disclosure key={projectId} title={language === 'zh' ? '管理问题与目标树' : 'Manage questions and goal tree'}><ResearchGoalsPanel key={projectId} projectId={projectId} /></Disclosure></div>
             </>
           ) : tab === 'timeline' ? (

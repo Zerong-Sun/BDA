@@ -10,10 +10,10 @@ import { reviewSections } from './reviewSections'
 
 const project: Project = { id: 'archived', organization_id: 'org', owner_id: 'owner', name: 'Saved study', project_type: 'research', status: 'archived', summary: 'Original scope', primary_target_id: null, version: 1, created_at: '', updated_at: '' }
 const report = '## Research objective\nWhich interactions are supported?\n\n## Structure and signaling\nA saved structural finding.\n\n## Uncertainty\nCellular context remains unresolved.\n\n## References\nA retained source.'
-function respond(content: string | null = report, references: Record<string, unknown>[] = []) {
+function respond(content: string | null = report, references: Record<string, unknown>[] = [], updatedAt: string | undefined = '2026-09-16T00:00:00Z') {
   server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
     project: { id: project.id },
-    review_document: content === null ? null : { id: 'review', title: { en: 'Saved report' }, content: { en: content }, status: 'accepted', version: 1 },
+    review_document: content === null ? null : { id: 'review', title: { en: 'Saved report' }, content: { en: content }, status: 'accepted', version: 1, updated_at: updatedAt },
     review_sections: [{ items: [{ id: 'finding', evidence: { review_status: 'pending_review' } }] }], references, structures: [],
   })))
 }
@@ -66,6 +66,46 @@ describe('archived research overview', () => {
     expect(screen.getByText('Source: project brief')).toBeVisible()
     expect(screen.getByText('Brief objective.[1]')).toBeVisible()
     expect(screen.queryByRole('link', { name: /View source/ })).not.toBeInTheDocument()
+  })
+  it('keeps an active project in progress and shows the latest progress separately from its accepted report', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Latest saved progress note', status: 'progress_note', updated_at: '2026-10-16T06:39:00Z', content: '## Results\nSaved computational output only.[1]\n## Next steps\nFunction remains untested.\n## Source details\nRetained progress source.' }], next_cursor: null })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByText('Saved computational output only.[1]')).toBeVisible()
+    expect(screen.getByText('In progress · saved research record')).toBeVisible()
+    expect(screen.queryByText('A saved structural finding.')).not.toBeInTheDocument()
+    expect(screen.getByText('Function remains untested.')).toBeVisible()
+    expect(screen.queryByRole('link', { name: /View source/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Read latest progress' }))
+    expect(await screen.findByText('Retained progress source.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Read full report' }))
+    expect(await screen.findByText('A retained source.')).toBeVisible()
+    expect(screen.getByText('Final review: not separately recorded in this research record')).toBeVisible()
+  })
+  it.each(['2026-09-01T00:00:00Z', 'invalid-date'])('does not overwrite a report with older or undated progress (%s)', async updatedAt => {
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Separate progress record', status: 'progress_note', updated_at: updatedAt, content: '## Results\nSeparate progress result.\n## Next steps\nSeparate progress condition.' }], next_cursor: null })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByRole('button', { name: 'Read latest progress' })).toBeVisible()
+    expect(screen.getByText('A saved structural finding.')).toBeVisible()
+    expect(screen.getByText('Cellular context remains unresolved.')).toBeVisible()
+    expect(screen.queryByText('Separate progress result.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Separate progress condition.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Read latest progress' }))
+    expect(await screen.findByText('Separate progress result.')).toBeVisible()
+  })
+  it('does not retain cached active progress after the project is archived', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Cached progress', status: 'progress_note', updated_at: '2026-10-16T00:00:00Z', content: '## Results\nCached progress result.' }], next_cursor: null })))
+    const { rerender } = renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByText('Cached progress result.')).toBeVisible()
+    rerender(<ProjectResearchOverview project={project} />)
+    expect(screen.queryByText('Cached progress result.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Read latest progress' })).not.toBeInTheDocument()
+    expect(screen.getByText('A saved structural finding.')).toBeVisible()
+  })
+  it('keeps the accepted report accessible when progress loading fails', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ detail: 'Unavailable' }, { status: 503 })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByText('A saved structural finding.')).toBeVisible()
+    expect(await screen.findByRole('alert')).toHaveTextContent('latest progress is not confirmed')
   })
   it('reports fetch failures with a retry rather than empty goals', async () => {
     server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ detail: 'unavailable' }, { status: 503 })))

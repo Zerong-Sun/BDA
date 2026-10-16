@@ -1563,12 +1563,12 @@ async function findContractControl(root, descriptor) {
 }
 
 async function assertScenarioState(page, testCase, diagnostics) {
-  if (testCase.routeId === 'research' && testCase.scenario === 'populated') {
-    // The tab shell mounts before its data. Auditing focus stops while the
-    // loading panel is replaced races the arrival of the real controls.
+  if (testCase.routeId === 'research' && ['populated', 'read-only'].includes(testCase.scenario)) {
+    // Notes are collapsed initially. Reach their controls as a reader would
+    // before auditing focus or asserting that note mutations are disabled.
     await openResearchNotes(page)
     await expectVisible(page.getByRole('region', { name: /^(Research reading guide|研究阅读导览)$/ }),
-      'populated research content before focus audit')
+      'expanded research notes before focus and permission audits')
   }
   if (['populated', 'auth-retry', 'loading'].includes(testCase.scenario)) return
   if (testCase.routeId === 'experiments' && ['blocked', 'read-only'].includes(testCase.scenario)) {

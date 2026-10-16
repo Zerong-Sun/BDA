@@ -141,6 +141,18 @@ test('fixtures provide two candidate cursor pages and explicit expected 404 resp
   assert.equal(missingTarget.expectedHttpFailure, true)
 })
 
+test('provides read-only saved progress briefs without assigning a review result', async () => {
+  const endpoint = 'http://app.test/api/v2/projects/proj_browser/research-briefs?limit=200'
+  const populated = createFixtureRouter({ scenario: 'populated', routeId: 'research-goals' })
+  const response = await populated.resolve('GET', endpoint)
+  assert.equal(response.body.items[0].status, 'progress_note')
+  assert.match(response.body.items[0].content, /Saved computational output only/)
+  assert.equal(response.body.next_cursor, null)
+  const empty = createFixtureRouter({ scenario: 'empty', routeId: 'research-goals' })
+  assert.deepEqual((await empty.resolve('GET', endpoint)).body, { items: [], next_cursor: null })
+  await assert.rejects(() => populated.resolve('POST', endpoint), /Unhandled browser API request: POST/)
+})
+
 test('login and recoverable-error scenarios advance only through intended retries', async () => {
   const loginRouter = createFixtureRouter({ scenario: 'auth-retry' })
   const rejected = await loginRouter.resolve('POST', 'http://app.test/api/v2/auth/token')

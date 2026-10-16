@@ -1084,6 +1084,20 @@ function createStrictRoutes({ scenario, routeId }) {
     intelligence_run_count: scenario === 'pending' ? 1 : 0,
     knowledge_entry_count: empty ? 0 : 1,
   }))
+  add('GET', `/api/v2/projects/${PROJECT_ID}/research-briefs`, { limit: '200' }, () => ok({
+    items: empty ? [] : [{
+      id: 'brief_progress_browser',
+      project_id: PROJECT_ID,
+      title: 'Saved research progress',
+      content: '## Results\nSaved computational output only',
+      scope: {},
+      status: 'progress_note',
+      version: 1,
+      created_at: NOW,
+      updated_at: NOW,
+    }],
+    next_cursor: null,
+  }))
   add('GET', `/api/v2/projects/${PROJECT_ID}/research-workspace`, {}, () =>
     ok(researchWorkspaceFixture(scenario)))
   add('GET', `/api/v2/projects/${PROJECT_ID}/timeline`, { limit: '100' }, () => ok({
