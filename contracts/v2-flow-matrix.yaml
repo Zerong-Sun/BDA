@@ -2,6 +2,8 @@
   "schema_version": 1,
   "direction": "page -> generated OpenAPI client -> permission dependency -> domain service/UoW -> repository/PostgreSQL; async command -> operation+outbox -> worker/provider -> MinIO -> domain transaction -> SSE/query",
   "resources": [
+    {"table":"copilot_call_budgets","domain":"copilot","visibility":"internal","producers":["model admission guard"],"consumers":["model admission guard"],"api_paths":[],"ui":[]},
+    {"table":"copilot_call_reservations","domain":"copilot","visibility":"internal","producers":["model admission guard"],"consumers":["model admission guard","internal usage audit"],"api_paths":[],"ui":[]},
     {"table":"learning_assays","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
     {"table":"learning_evidence","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},
     {"table":"learning_batches","domain":"learning","visibility":"business","producers":["learning commands"],"consumers":["project learning workbench","evidence export"],"api_paths":["/api/v2/projects/*/learning/*"],"ui":["learning"]},

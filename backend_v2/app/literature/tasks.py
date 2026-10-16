@@ -121,7 +121,9 @@ def literature_search(search_run_id: str) -> dict:
     from ..research.evidence_tools import EvidenceToolService, titles_match
 
     parsed = uuid.UUID(search_run_id)
-    with session_scope() as session:
+    from ..copilot.call_guard import call_scope
+
+    with call_scope(f"literature-search:{parsed}"), session_scope() as session:
         run = session.get(LiteratureSearchRun, parsed)
         if run is None:
             return {"search_run_id": search_run_id, "status": "missing"}

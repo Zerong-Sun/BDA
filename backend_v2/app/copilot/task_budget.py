@@ -1,7 +1,8 @@
-"""Conservative per-call reservations for providers with administrator-declared prices.
+"""Legacy optional USD sublimits and transcript-based early stopping.
 
 Unpriced calls must never appear as free. This is a platform estimate, not a
-replacement for the provider's billing limit; retry and protocol overhead are reserved.
+replacement for provider billing. The mandatory durable CNY/call admission guard
+in call_guard runs at the actual provider boundary, including non-agent callers.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from .provider import LLM_MAX_ATTEMPTS
 def reserve_model_call(session: Session, run: CopilotAgentRun, provider: LLMProvider, messages: list[dict], tools: list[dict] | None = None) -> None:
     # Repair/review calls occur inside a step after its initial budget check.
     # They still consume assistant turns and must obey the same hard ceiling.
-    if run.turn_count >= run.max_turns:
+    if agent_runs.assistant_calls(session, agent_runs.budget_root(session, run)) >= min(6, run.max_turns):
         raise DomainError("copilot_turn_limit_reached", "The transcript turn limit was reached. No model call was made.", status_code=409)
     root = agent_runs.budget_root(session, run)
     # Sibling subagents spend the same allowance; serialize before reserving.

@@ -19,6 +19,24 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..core.models import Base, UUIDVersionMixin
 
 
+class CopilotCallBudget(Base):
+    """Internal durable admission ledger; never stores prompts or credentials."""
+    __tablename__ = "copilot_call_budgets"
+    scope_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    reserved_cny_micros: Mapped[int] = mapped_column(Integer, default=0)
+    max_calls: Mapped[int] = mapped_column(Integer, default=6)
+
+
+class CopilotCallReservation(Base):
+    __tablename__ = "copilot_call_reservations"
+    scope_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reserved_cny_micros: Mapped[int] = mapped_column(Integer)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class CopilotConversation(UUIDVersionMixin, Base):
     __tablename__ = "copilot_conversations"
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
@@ -140,7 +158,7 @@ class CopilotAgentRun(UUIDVersionMixin, Base):
 
     #: Budget, checked before each provider call rather than after, so an
     #: overrun stops the run instead of being noticed once it is paid for.
-    max_turns: Mapped[int] = mapped_column(Integer, default=24)
+    max_turns: Mapped[int] = mapped_column(Integer, default=6)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd_cents: Mapped[int] = mapped_column(Integer, default=0)
     max_cost_usd_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -57,12 +57,12 @@ function BotProjectWorkspace() {
     setSearch(next, { replace: true })
   }
   const acceptIncomingDraft = () => {
-    setTaskDraft(projectId, { goal: incomingGoal, bot: null, service: 'literature', preview: true, writes: [], maxTurns: 24, maxCost: '' })
+    setTaskDraft(projectId, { goal: incomingGoal, bot: null, service: 'literature', preview: true, writes: [] })
     clearIncomingDraft()
   }
   useEffect(() => {
     if (!projectId || !incomingGoal || savedTaskDraft?.goal.trim()) return
-    setTaskDraft(projectId, { goal: incomingGoal, bot: null, service: 'literature', preview: true, writes: [], maxTurns: 24, maxCost: '' })
+    setTaskDraft(projectId, { goal: incomingGoal, bot: null, service: 'literature', preview: true, writes: [] })
     const next = new URLSearchParams(search)
     next.delete('draft')
     next.delete('draft_project')
@@ -87,14 +87,11 @@ function BotProjectWorkspace() {
   }
   const selectBot = (id: string | null) => { setBot(projectId, id); selectView('room') }
   // Addressing someone in the room can prepare a task for them. It prepares
-  // only: the composer still reviews the plan, the writes and the budget,
+  // only: the composer still reviews the plan and the writes,
   // which is where starting a run has always been approved.
   const assignFromRoom = (goal: string, bot: string, service: string) => {
-    const current = useAppStore.getState().copilotTaskDrafts[projectId]
     setTaskDraft(projectId, {
       goal,
-      maxTurns: current?.maxTurns ?? 24,
-      maxCost: current?.maxCost ?? '',
       writes: [],
       bot,
       service,

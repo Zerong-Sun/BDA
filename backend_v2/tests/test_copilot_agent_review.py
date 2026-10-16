@@ -70,7 +70,7 @@ def test_blocked_evidence_summary_is_reviewed_and_retains_its_task_state(session
 @pytest.mark.parametrize("status", ["blocked", "needs_input"])
 def test_final_budget_slot_preserves_honest_stop_without_an_extra_call_or_charge(session: Session, monkeypatch, status):
     project, user = _project(session)
-    run = _run(session, project, user, bot="conductor", max_turns=3,
+    run = _run(session, project, user, bot="conductor", max_turns=2,
                task_contract=build_contract("custom", []))
     _receipt(session, run)
     draft = _delivery(status)

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..registry.models import LLMProvider
+from .call_guard import call_scope
 from .models import CopilotConfig
 from .provider import completion_message
 from .provider_selection import select_provider
@@ -47,6 +48,11 @@ def assess(session: Session, project_id) -> dict:
     provider = select_provider(session, project_id=project_id)
     if not provider:
         return readiness(session, project_id)
+    with call_scope(f"provider-qualification:{project_id}:{fingerprint(provider)}"):
+        return _assess_provider(session, project_id, provider)
+
+
+def _assess_provider(session: Session, project_id, provider: LLMProvider) -> dict:
     checks = {"structured_output": False, "evidence": False, "routing": False, "tools": False}
     reason = None
     try:

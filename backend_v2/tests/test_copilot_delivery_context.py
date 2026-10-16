@@ -151,7 +151,7 @@ def test_third_party_provider_never_receives_guessed_deepseek_options(session, e
     assert structured_retry_provider(provider) is None
 
 
-@pytest.mark.parametrize("max_turns, expected_calls", [(10, 3), (4, 2)])
+@pytest.mark.parametrize("max_turns, expected_calls", [(6, 3), (3, 2)])
 def test_review_length_correction_is_bounded_and_cannot_bypass_turn_budget(session, monkeypatch, max_turns, expected_calls):
     project, user = _project(session)
     run = _run(session, project, user, bot="conductor", max_turns=max_turns,
@@ -161,7 +161,7 @@ def test_review_length_correction_is_bounded_and_cannot_bypass_turn_budget(sessi
     seen = _script(monkeypatch, [{"content": short}, {"content": _delivery(summary="字" * 301)}, {"content": short}])
     agent_loop.step(session, run, _provider(session))
     assert len(seen) == expected_calls
-    if max_turns == 4:
+    if max_turns == 3:
         assert run.outcome["scientific_review_error"] == "copilot_turn_limit_reached"
         assert run.outcome["scientific_review"] == "unavailable"
     else:

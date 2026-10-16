@@ -1,3 +1,4 @@
+import { taskErrorMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { botDisplayText } from './bots/displayText'
 import { useCallback, useEffect, useRef } from 'react'
@@ -272,7 +273,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
             <Alert variant="destructive">
               <WarningIcon aria-hidden="true" />
               <AlertTitle>{t.copilot.chat.failedTitle}</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{taskErrorMessage(error, language === 'zh')}</AlertDescription>
             </Alert>
           ) : null}
           {degradedMode ? (

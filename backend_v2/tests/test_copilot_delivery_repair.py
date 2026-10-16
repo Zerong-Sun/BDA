@@ -44,7 +44,7 @@ def test_model_sees_exact_evidence_ids_and_remaining_budget(session):
     messages = agent_loop.messages_for(run, agent_runs.transcript(session, run))
     assert '"call_id": "actual-empty-read"' in messages[-1]["content"]
     assert '"successful": true' in messages[-1]["content"]
-    assert "23 messages" in messages[-1]["content"]
+    assert "6 model calls remain" in messages[-1]["content"]
 
 
 def test_a_premature_answer_gets_only_two_chances_to_finish_required_reads(session, monkeypatch):
@@ -65,7 +65,7 @@ def test_a_premature_answer_gets_only_two_chances_to_finish_required_reads(sessi
 @pytest.mark.parametrize("kind", ["brief", "interpretation"])
 def test_optional_repair_and_review_cannot_call_after_the_turn_ceiling(session, monkeypatch, kind):
     project, user = _project(session)
-    run = _run(session, project, user, max_turns=2, task_contract=build_contract(kind, []))
+    run = _run(session, project, user, max_turns=1, task_contract=build_contract(kind, []))
     tool = "research_overview" if kind == "brief" else "list_project_candidates"
     agent_runs.append_turn(session, run, role="tool", content='[{"id":"synthetic"}]',
                           tool_calls=[{"name": tool, "tool_call_id": "real-call"}])
@@ -76,7 +76,7 @@ def test_optional_repair_and_review_cannot_call_after_the_turn_ceiling(session, 
     agent_loop.step(session, run, _provider(session))
 
     assert len(seen) == 1
-    assert run.turn_count == run.max_turns
+    assert agent_runs.assistant_calls(session, run) == run.max_turns
     assert run.outcome["status"] == "review_required"
     stage = "format_repair" if kind == "brief" else "scientific_review"
     assert run.outcome[stage] == "unavailable"

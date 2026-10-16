@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0076_account_audit_compat"
+    schema_revision: str = "0077_copilot_call_guard"
     worker_queues: str = ""
     required_worker_queues: str = ""
     scheduler_dispatch_paused: bool = False

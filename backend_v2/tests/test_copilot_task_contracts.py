@@ -288,3 +288,40 @@ def test_malformed_excerpt_provenance_is_pending_instead_of_crashing(provenance)
     result = {"chunk_id": "chunk", "content_provenance": provenance}
     rows = progress(build_contract("literature", []), [_turn("get_reference_content", result)])
     assert rows[1]["status"] == "pending"
+
+
+def test_identical_task_submission_is_blocked_without_a_second_run(session, monkeypatch):
+    from backend_v2.app.copilot.models import CopilotAgentRun
+    from sqlalchemy import func, select
+    project, user = _project(session)
+    payload = AgentRunCreate(project_id=project.id, goal='One bounded read-only task', authorized_writes=[])
+    first, _ = start_agent_run(session, project, user, payload)
+    assert first.max_turns == 6
+    # Runtime accounting metadata must not turn the same request into new work.
+    first.task_contract = {**first.task_contract, 'cost_mode': 'unavailable'}
+    session.flush()
+    with pytest.raises(DomainError) as exc:
+        start_agent_run(session, project, user, payload)
+    assert exc.value.error_code == 'copilot_duplicate_task'
+    assert session.scalar(select(func.count()).select_from(CopilotAgentRun)) == 1
+
+
+def test_continuation_never_replenishes_call_limit(session):
+    project, user = _project(session)
+    run = _run(session, project, user, max_turns=6)
+    agent_runs.append_turn(session, run, role='assistant', content='Need a target')
+    agent_runs.finish(session, run, status='succeeded')
+    continue_agent_run(session, run, user, 'Use the existing target')
+    assert run.max_turns == 6
+    for _ in range(5):
+        agent_runs.append_turn(session, run, role='assistant', content='Existing receipt')
+    agent_runs.finish(session, run, status='failed')
+    with pytest.raises(DomainError) as exc:
+        continue_agent_run(session, run, user, 'Try again')
+    assert exc.value.error_code == 'copilot_task_turn_limit'
+
+
+def test_task_request_cannot_raise_six_call_ceiling():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        AgentRunCreate(project_id='00000000-0000-0000-0000-000000000001', goal='A bounded request', max_turns=80)

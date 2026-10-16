@@ -1,3 +1,4 @@
+import { taskErrorMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
@@ -54,7 +55,7 @@ export function Room({
   onOpenBot?: (botId: string) => void
   /**
    * Hand this work to an operator as a guided task. The room prepares it and
-   * nothing more: the plan, the writes and the budget are still reviewed in the
+   * nothing more: the plan and the writes are still reviewed in the
    * composer, because starting a run spends money and a room message is not a
    * place to approve that.
    */
@@ -188,7 +189,7 @@ export function Room({
       </ApiState>
       {error ? (
         <Alert variant="destructive" className="mt-2">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{taskErrorMessage(error, language === 'zh')}</AlertDescription>
         </Alert>
       ) : null}
       {recipient || unknownHandle ? (

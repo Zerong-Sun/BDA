@@ -168,6 +168,6 @@ def test_missing_inputs_can_be_reported_without_claiming_completion():
 def test_skill_prompt_remains_inside_budget_gate(session, monkeypatch):
     project, user = _project(session)
     run = _run(session, project, user, task_contract={**build_contract("brief", []), "procedural_skills": [_snapshot()]}, max_turns=1)
-    run.turn_count = 1
+    agent_runs.append_turn(session, run, role="assistant", content="Existing model reply")
     monkeypatch.setattr(agent_loop, "completion_message", lambda *args, **kwargs: pytest.fail("Budget-exhausted run called provider"))
     assert agent_loop.step(session, run, _provider(session)) == "failed"

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.celery_app import celery_app
@@ -20,9 +20,10 @@ from ..core.metrics import (
     COPILOT_UNSUPPORTED_CLAIMS,
 )
 from ..projects.models import Project
+from .call_guard import call_scope
 from .citations import dedupe as dedupe_citations
 from .citations import rebase_history_markers
-from .models import CopilotAgentRun
+from .models import CopilotAgentRun, CopilotAgentTurn
 
 settings = get_settings()
 
@@ -67,7 +68,7 @@ def copilot_respond(message_id: str) -> dict:
     from ..identity.models import User
 
     parsed = uuid.UUID(message_id)
-    with session_scope() as session:
+    with call_scope(f"copilot-message:{parsed}"), session_scope() as session:
         # A Copilot operation may be delivered more than once. Lock the source
         # turn for the whole provider/tool transaction so actions and assistant
         # messages are emitted exactly once.
@@ -389,7 +390,17 @@ def copilot_agent_step(run_id: str) -> dict:
             return {"run_id": run_id, "status": run.status}
         try:
             provider = agent_loop.provider_for(session, run)
-            status = agent_loop.drive(session, run, provider)
+            root = agent_runs.budget_root(session, run)
+            prior_calls = session.scalar(
+                select(func.count(CopilotAgentTurn.id))
+                .join(CopilotAgentRun, CopilotAgentTurn.run_id == CopilotAgentRun.id)
+                .where(
+                    or_(CopilotAgentRun.id == root.id, CopilotAgentRun.parent_run_id == root.id),
+                    CopilotAgentTurn.role == "assistant",
+                )
+            ) or 0
+            with call_scope(f"copilot-agent:{root.id}", max_calls=root.max_turns, initial_calls=int(prior_calls)):
+                status = agent_loop.drive(session, run, provider)
         except Exception as exc:
             agent_runs.finish(session, run, status="failed", error=str(exc)[:2000])
             agent_loop.settle_parent(session, run)

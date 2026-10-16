@@ -46,7 +46,7 @@ def _chat(session, text="请安排团队研究 PD-L1 项目，分工分析现有
     return project, user, conversation, source, ctx
 
 
-def test_pd_l1_chat_delegates_reviews_waits_for_choice_and_reports(session, monkeypatch):
+def test_pd_l1_chat_delegates_reviews_waits_and_stops_before_unbudgeted_final_review(session, monkeypatch):
     project, user, conversation, source, ctx = _chat(session)
     started = REGISTRY.execute("start_team_task", ctx, {})
     assert started["continuation"] == "background_worker"
@@ -56,6 +56,7 @@ def test_pd_l1_chat_delegates_reviews_waits_for_choice_and_reports(session, monk
     assert audits[0].payload["source_message_id"] == str(source.id)
     lead = session.get(CopilotAgentRun, uuid.UUID(started["run_id"]))
     assert lead.goal == source.content
+    assert lead.max_turns == 6
     assert lead.conversation_id == conversation.id
     provider = _provider(session)
     seen = _script(monkeypatch, [
@@ -70,7 +71,6 @@ def test_pd_l1_chat_delegates_reviews_waits_for_choice_and_reports(session, monk
                 {"key": "evidence", "label": "补齐证据", "rationale": "先确定依据"},
                 {"key": "design", "label": "比较方案", "rationale": "先整理路线"}], "recommended": "evidence"})]},
         _delivery("已收到补齐证据的选择。本轮证据检查与复核完成，后续工作按该方向推进。"),
-        _delivery("本轮检查完成；缺少实验测量。"),
     ])
     assert agent_loop.step(session, lead, provider) == "awaiting_tasks"
     child = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.parent_run_id == lead.id))
@@ -92,11 +92,16 @@ def test_pd_l1_chat_delegates_reviews_waits_for_choice_and_reports(session, monk
     assert lead.status == "running"
     assert lead.allowed_tools == grants
     assert agent_loop.step(session, lead, provider) == "succeeded"
-    assert any('"answer": "evidence"' in msg.get("content", "") for msg in seen[-2])
+    assert any('"answer": "evidence"' in msg.get("content", "") for msg in seen[-1])
+    assert len(seen) == agent_runs.assistant_calls(session, lead) == 6
+    assert lead.outcome["status"] == "review_required"
+    assert lead.outcome["scientific_review"] == "unavailable"
+    assert lead.outcome["scientific_review_error"] == "copilot_turn_limit_reached"
+    assert "scientific_review_unavailable" in lead.outcome["missing"]
     entries, _ = room.events(session, project_id=project.id)
     speeches = [entry for entry in entries if entry["kind"] == "discussion"]
     assert {entry["bot"] for entry in speeches} == {"conductor", "researcher", "auditor"}
-    assert len(speeches) == 7
+    assert len(speeches) == 6
     assert any(entry["kind"] == "decision" and entry["decision"]["status"] == "answered" for entry in entries)
 
 
@@ -215,3 +220,24 @@ def test_review_receives_bounded_final_claims_separate_from_evidence(session, la
     else:
         assert result["outcome"] == run.outcome
         assert result["outcome_preview"] is None
+
+
+def test_default_room_task_starts_and_stops_after_six_shared_model_calls(session, monkeypatch):
+    *_, ctx = _chat(session)
+    started = REGISTRY.execute("start_team_task", ctx, {})
+    run = session.get(CopilotAgentRun, uuid.UUID(started["run_id"]))
+    assert run.status == "running" and run.max_turns == 6
+    provider = _provider(session)
+    seen = _script(monkeypatch, [
+        {"content": f"Inspect roster {index}", "tool_calls": [_call(f"roster-{index}", "list_operators", {})]}
+        for index in range(6)
+    ])
+    assert agent_loop.drive(session, run, provider) == "failed"
+    assert "model call limit reached (6)" in run.error
+    assert len(seen) == agent_runs.assistant_calls(session, run) == 6
+    # Neither a second worker stay nor viewing the room authorizes a seventh call.
+    assert agent_loop.drive(session, run, provider) == "failed"
+    room.events(session, project_id=ctx.project_id)
+    assert len(seen) == 6
+    for tool_id in ("delegate_to_operator", "spawn_subagent"):
+        assert REGISTRY.get(tool_id).parameters["properties"]["max_turns"]["maximum"] == 6

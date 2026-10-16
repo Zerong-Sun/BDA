@@ -131,11 +131,11 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   const sent = handoffs.data?.filter((handoff) => ids.has(handoff.from_bot)) ?? []
   const owned = bot.task_services ?? []
   // Assigning prepares the composer with this owner and opens it. Nothing
-  // starts here: the plan, writes and budget are still reviewed there.
+  // starts here: the plan and writes are still reviewed there.
   const assign = (kind: string) => {
     const store = useAppStore.getState()
     const current = store.copilotTaskDrafts[projectId]
-    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', maxTurns: current?.maxTurns ?? 24, maxCost: current?.maxCost ?? '', writes: [], bot: bot.id, service: kind, preview: true })
+    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', writes: [], bot: bot.id, service: kind, preview: true })
     navigate(`/bots?project=${encodeURIComponent(projectId)}&view=tasks`)
   }
   const handoffList = (label: string, items: HandoffResponse[], empty: string) => <div role="group" aria-label={label}>

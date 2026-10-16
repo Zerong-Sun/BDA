@@ -59,8 +59,6 @@ export interface CopilotTaskDraft {
   service: string | null
   preview: boolean
   writes: string[]
-  maxTurns: number
-  maxCost: string
 }
 
 export interface WorkflowSeed {

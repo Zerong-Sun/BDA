@@ -423,9 +423,9 @@ def test_the_budget_stops_the_run_before_the_call_it_could_not_afford(
     agent_loop.drive(session, run, _provider(session))
 
     assert run.status == "failed"
-    assert run.error is not None and "turn limit" in run.error
-    # One provider call spent two turns (assistant + tool); the second was never made.
-    assert len(calls) == 1
+    assert run.error is not None and "model call limit" in run.error
+    # Two provider calls are allowed; tool transcript rows do not consume model calls.
+    assert len(calls) == 2
 
 
 def test_a_run_only_offers_the_model_the_tools_it_may_use(session: Session) -> None:

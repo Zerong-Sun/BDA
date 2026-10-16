@@ -311,6 +311,9 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                     args.append(bool(event.payload.get("dry_run")))
                 names = (subscribers,) if isinstance(subscribers, str) else subscribers
                 message_headers = {"bda_project_id": str(project_id)} if project_id else None
+                scope_id = event.payload.get("_llm_call_scope")
+                if isinstance(scope_id, str) and scope_id:
+                    message_headers = {**(message_headers or {}), "bda_llm_call_scope": scope_id}
                 for index, task_name in enumerate(names):
                     # The first subscriber keeps the event id, because an Operation
                     # row is keyed on it. Any further subscriber gets a task id

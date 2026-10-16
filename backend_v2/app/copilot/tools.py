@@ -1194,7 +1194,7 @@ def _spawn_subagent(ctx: ToolContext, args: dict[str, Any]) -> Any:
         allowed_tools=requested or list(parent.allowed_tools or []),
         conversation_id=parent.conversation_id,
         parent_run_id=parent.id,
-        max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
+        max_turns=min(_arg_int(args, "max_turns", 6), parent.max_turns),
     )
     agent_runs.enqueue_first_step(ctx.session, child)
     return {
@@ -1239,7 +1239,7 @@ _register(
             "properties": {
                 "goal": {"type": "string"},
                 "tools": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
-                "max_turns": {"type": "integer", "minimum": 1, "maximum": 24},
+                "max_turns": {"type": "integer", "minimum": 1, "maximum": 6},
             },
             "required": ["goal"],
             "additionalProperties": False,
@@ -1879,7 +1879,7 @@ def _start_team_task(ctx: ToolContext, args: dict[str, Any]) -> Any:
     if run is None:
         run, _ = start_agent_run(ctx.session, actions.project, actions.user, AgentRunCreate(
             project_id=ctx.project_id, conversation_id=conversation.id,
-            goal=source.content, bot="conductor", max_turns=80,
+            goal=source.content, bot="conductor", max_turns=6,
         ))
         source.context = {**(source.context or {}), "team_run_id": str(run.id)}
         source.version += 1
@@ -1979,7 +1979,7 @@ def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
         allowed_tools=sorted(tools_for_capabilities(resolved)),
         conversation_id=parent.conversation_id,
         parent_run_id=parent.id,
-        max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
+        max_turns=min(_arg_int(args, "max_turns", 6), parent.max_turns),
         bot=target,
     )
     agent_runs.enqueue_first_step(ctx.session, child)
@@ -2026,7 +2026,7 @@ _register(
                     "type": "string",
                     "description": "What to produce, and what would make the step finished.",
                 },
-                "max_turns": {"type": "integer", "minimum": 1, "maximum": 24},
+                "max_turns": {"type": "integer", "minimum": 1, "maximum": 6},
             },
             "required": ["bot", "instruction"],
             "additionalProperties": False,

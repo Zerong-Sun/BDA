@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from contextvars import ContextVar, Token
 from datetime import UTC, datetime
 from os import getpid
@@ -43,6 +44,9 @@ settings = get_settings()
 # context that created it; a stack also restores nested eager task invocations.
 _worker_context_tokens: ContextVar[tuple[tuple[str, Token[str | None]], ...]] = ContextVar(
     "bda_worker_context_tokens", default=()
+)
+_worker_call_scopes: ContextVar[tuple[tuple[str, AbstractContextManager], ...]] = ContextVar(
+    "bda_worker_call_scopes", default=()
 )
 celery_app = Celery("bda-v2", broker=settings.celery_broker_url, backend=settings.redis_url)
 
@@ -186,6 +190,31 @@ def _reset_operation_project(task_id=None, **_kwargs) -> None:
         if identifier == str(task_id):
             reset_worker_project_context(token)
             _worker_context_tokens.set(tokens[:index] + tokens[index + 1:])
+            break
+
+
+@task_prerun.connect
+def _bind_operation_call_scope(sender=None, task_id=None, **_kwargs) -> None:
+    from ..copilot.call_guard import call_scope
+
+    headers = getattr(getattr(sender, "request", None), "headers", None) or {}
+    scope_id = headers.get("bda_llm_call_scope") if isinstance(headers, Mapping) else None
+    if task_id is not None and isinstance(scope_id, str) and scope_id:
+        scope = call_scope(scope_id)
+        scope.__enter__()
+        _worker_call_scopes.set((*_worker_call_scopes.get(), (str(task_id), scope)))
+
+
+@task_postrun.connect
+def _reset_operation_call_scope(task_id=None, **_kwargs) -> None:
+    scopes = _worker_call_scopes.get()
+    for index in range(len(scopes) - 1, -1, -1):
+        identifier, scope = scopes[index]
+        if identifier == str(task_id):
+            try:
+                scope.__exit__(None, None, None)
+            finally:
+                _worker_call_scopes.set(scopes[:index] + scopes[index + 1:])
             break
 
 

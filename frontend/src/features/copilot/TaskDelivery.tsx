@@ -11,7 +11,7 @@ import type { AgentRun } from '../../lib/api/agentRuns'
 import { useI18n } from '../../lib/i18n'
 import { Disclosure } from '../../components/ui/Disclosure'
 import { deliveryLabel, deliveryState } from './taskPresentation'
-import { deliveryMessage, executionLabel, reportCharacters } from './deliveryDisplay'
+import { taskAllowanceMessage, taskErrorMessage, deliveryMessage, executionLabel, reportCharacters } from './deliveryDisplay'
 
 const Outcome = z.object({
   decision_record_id: z.string().optional(),
@@ -36,7 +36,7 @@ const SECTION_LABELS: Record<string, [string, string]> = {
 }
 function ExecutionError({ error, zh }: { error?: string | null; zh: boolean }) {
   if (!error) return null
-  return <div className="space-y-2"><p role="alert" className="text-sm text-destructive break-words">{deliveryMessage(error, zh)}</p>{deliveryMessage(error, zh) !== error ? <Disclosure title={zh ? '查看原始错误' : 'Original error'}><p className="break-words text-xs">{error}</p></Disclosure> : null}</div>
+  return <div className="space-y-2"><p role="alert" className="text-sm text-destructive break-words">{deliveryMessage(error, zh)}</p>{!taskAllowanceMessage(error, zh) && deliveryMessage(error, zh) !== error ? <Disclosure title={zh ? '查看原始错误' : 'Original error'}><p className="break-words text-xs">{error}</p></Disclosure> : null}</div>
 }
 
 export function TaskDelivery({ run }: { run: AgentRun }) {
@@ -80,7 +80,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   const reviewErrors: Record<string, [string, string]> = {
     llm_output_truncated: ['Review exceeded the model output limit. Shorten the scope or adjust the model limit and retry.', '复核达到模型输出上限。可缩小范围，或调整模型上限后重试。'],
     llm_completion_deadline_exceeded: ['Review timed out. Retry after the model service recovers.', '复核请求超时，可在模型服务恢复后重试。'],
-    copilot_turn_limit_reached: ['Review reached the task turn limit. Continue with a sufficient budget.', '复核达到任务轮次上限，可补充预算后继续。'],
+    copilot_turn_limit_reached: ['Review reached the task model-call limit. The saved draft still needs review.', '复核达到任务调用上限，已保存的草稿仍需审核。'],
     invalid_review_delivery: ['The review result failed delivery validation. The saved draft still needs review.', '复核结果未通过交付校验，已保存的草稿仍需审核。'],
   }
   if (outcome.scientific_review_error && reviewErrors[outcome.scientific_review_error]) {
@@ -97,7 +97,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
       `${zh ? '自动事实复核' : 'Automated factual review'}: ${reviewLabel}`,
       zh ? '自动事实复核不代表科研验证或人工批准。' : 'Automated factual review does not constitute scientific validation or human approval.',
       outcome.scientific_review_error,
-      run.error,
+      run.error ? deliveryMessage(run.error, zh) : null,
       outcome.summary,
       ...Object.entries(outcome.sections ?? {}).map(([key, value]) => `${sectionLabel(key)} (${key})\n${value}`),
       outcome.missing?.length ? `${zh ? '尚未完成或需要核对' : 'Remaining work or checks'}\n${outcome.missing.map((item) => `- ${missingLabel(item)}`).join('\n')}` : '',
@@ -138,7 +138,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
       <Button type="submit" disabled={readOnly || !brief.text.trim() || !reason.trim() || applyBrief.isPending}>{zh ? '保存任务书' : 'Save project brief'}</Button>
       <Button type="button" variant="ghost" onClick={() => setBrief(null)}>{zh ? '取消编辑' : 'Cancel edit'}</Button>
     </form> : null}
-    {record.error || prepareBrief.error || applyBrief.error ? <p role="alert" className="text-sm text-destructive">{String(record.error ?? prepareBrief.error ?? applyBrief.error)}</p> : null}
+    {record.error || prepareBrief.error || applyBrief.error ? <p role="alert" className="text-sm text-destructive">{taskErrorMessage(record.error ?? prepareBrief.error ?? applyBrief.error, zh)}</p> : null}
     <Link className="block pt-1 text-sm text-primary" to={`${base}&tab=timeline`}>{zh ? '查看项目决策树' : 'Open the project decision tree'}</Link>
   </section>
 }

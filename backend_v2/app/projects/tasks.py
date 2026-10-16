@@ -12,6 +12,7 @@ import uuid
 import httpx
 from sqlalchemy.orm import Session
 
+from ..copilot.call_guard import call_scope
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
 from ..core.problem import DomainError
@@ -41,7 +42,7 @@ def project_prompt_generate(draft_id: str) -> dict:
     from .models import ProjectPromptDraft
 
     parsed = uuid.UUID(draft_id)
-    with session_scope() as session:
+    with call_scope(f"project-prompt:{parsed}"), session_scope() as session:
         row = session.get(ProjectPromptDraft, parsed)
         if row is None:
             return {"draft_id": draft_id, "status": "missing"}

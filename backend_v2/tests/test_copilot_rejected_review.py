@@ -84,7 +84,7 @@ def test_failed_post_review_shortening_keeps_both_replies_and_does_not_add_forma
 
 
 def test_rejected_review_consumes_turn_before_format_repair_budget_check(session, monkeypatch):
-    run = _setup(session, max_turns=4)
+    run = _setup(session, max_turns=3)
     rejected = _delivery(evidence_call_ids=["child-only"])
     seen = _script(monkeypatch, [{"content": _delivery()}, {"content": rejected}])
     agent_loop.step(session, run, _provider(session))

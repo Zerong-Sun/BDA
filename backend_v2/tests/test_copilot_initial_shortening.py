@@ -74,7 +74,7 @@ def test_still_oversized_initial_repair_stops_without_review_or_second_shortenin
 
 
 def test_initial_shortening_cannot_exceed_transcript_budget(session, monkeypatch):
-    run = _setup(session, max_turns=3)
+    run = _setup(session, max_turns=2)
     seen = _script(monkeypatch, [{"content": _delivery(summary="字" * 700)}])
     agent_loop.step(session, run, _provider(session))
     assert len(seen) == 1

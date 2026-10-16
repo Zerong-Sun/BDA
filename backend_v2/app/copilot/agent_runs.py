@@ -56,7 +56,7 @@ def create_run(
     conversation_id: uuid.UUID | None = None,
     parent_run_id: uuid.UUID | None = None,
     task_contract: dict | None = None,
-    max_turns: int = 24,
+    max_turns: int = 6,
     max_cost_usd_cents: int | None = None,
     bot: str | None = None,
 ) -> CopilotAgentRun:
@@ -113,7 +113,7 @@ def create_run(
         bot=bot,
         parent_run_id=parent_run_id,
         allowed_tools=sorted(set(allowed_tools)),
-        max_turns=max_turns,
+        max_turns=max(1, min(6, max_turns)),
         max_cost_usd_cents=max_cost_usd_cents,
     )
     session.add(run)
@@ -257,21 +257,27 @@ def tree_cost_usd_cents(session: Session, run: CopilotAgentRun) -> int:
 def within_budget(session: Session, run: CopilotAgentRun) -> tuple[bool, str]:
     """Whether the run may take another turn, and why not if it may not.
 
-    Turns are counted per run: they measure one agent's reasoning, and a parent
-    that spent its allowance thinking should not thereby silence a subagent that
-    has barely started. Cost is counted across the tree, because money is
-    fungible and a per-run ceiling is no ceiling at all once a run can spawn
-    children - five subagents at the parent's limit spend six times the limit.
+    Model calls and cost are shared across the root and its subagents. The
+    independent provider ledger also counts attempts without a saved reply.
     """
-    if run.turn_count >= run.max_turns:
-        return False, f"turn limit reached ({run.max_turns})"
     root = budget_root(session, run)
+    # Transcript rows also include user/tool records; they are not paid calls.
+    # The provider ledger additionally counts failed, truncated and hidden calls.
+    if assistant_calls(session, root) >= min(6, root.max_turns):
+        return False, f"model call limit reached ({min(6, root.max_turns)})"
     if root.max_cost_usd_cents is None:
         return True, ""
     spent = tree_cost_usd_cents(session, root)
     if spent >= root.max_cost_usd_cents:
         return False, f"cost limit reached ({root.max_cost_usd_cents} cents across the run tree)"
     return True, ""
+
+
+def assistant_calls(session: Session, root: CopilotAgentRun) -> int:
+    session.flush()
+    return int(session.scalar(select(func.count()).select_from(CopilotAgentTurn).join(
+        CopilotAgentRun, CopilotAgentRun.id == CopilotAgentTurn.run_id
+    ).where(CopilotAgentTurn.role == "assistant", (CopilotAgentRun.id == root.id) | (CopilotAgentRun.parent_run_id == root.id))) or 0)
 
 
 def suspend(

@@ -52,7 +52,7 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0076_account_audit_compat
+            BDA_SCHEMA_REVISION=0077_copilot_call_guard
           provenance: mode=max
           sbom: true
       - id: frontend

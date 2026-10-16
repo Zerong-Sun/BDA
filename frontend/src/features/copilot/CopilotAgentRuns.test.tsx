@@ -234,10 +234,11 @@ describe('agent run panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start run' }))
 
     await waitFor(() => expect(screen.getByText('Transcript')).toBeInTheDocument())
+    expect(bodies[0]).not.toHaveProperty('max_cost_usd_cents')
     expect(bodies[0]).toMatchObject({
       project_id: 'project-1',
       goal: 'Fold the top three candidates.',
-      max_turns: 12,
+      max_turns: 6,
     })
   })
 
@@ -247,18 +248,40 @@ describe('agent run panel', () => {
     expect(screen.getByRole('button', { name: 'Start run' })).toBeDisabled()
   })
 
-  it('shows the subagent total only when there are subagents', async () => {
+  it('keeps progress and blockers visible without exposing model billing', async () => {
     listReturns([
       { ...RUN, id: 'plain', cost_usd_cents: 4, subtree_cost_usd_cents: 4 },
-      { ...RUN, id: 'parent', cost_usd_cents: 4, subtree_cost_usd_cents: 19 },
+      { ...RUN, id: 'parent', cost_usd_cents: 4, subtree_cost_usd_cents: 19, task_contract: { cost_mode: 'unavailable' } },
     ])
-
     renderWithProviders(<CopilotAgentRuns />)
+    await waitFor(() => expect(screen.getAllByText('2 transcript records')).toHaveLength(2))
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.queryByText(/US cents|Cost not measured|cost ceiling|Estimated reserve/)).not.toBeInTheDocument()
+  })
 
-    await waitFor(() => expect(screen.getByText(/19 with subagents/)).toBeInTheDocument())
-    // The childless run says only its own cost: the longer label on equal
-    // numbers would imply subagents that do not exist.
-    expect(screen.getByText(/2 turns · 4 US cents$/)).toBeInTheDocument()
+  it('does not mistake transcript rows for model calls when continuing an old task', async () => {
+    runReturns({ ...RUN, status: 'failed', turn_count: 20, task_contract: { cost_mode: 'conservative_estimate' }, error: 'copilot_turn_limit_reached: The task model-call limit has been reached.' })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const followup = await screen.findByLabelText('Add information or revise the request')
+    fireEvent.change(followup, { target: { value: 'Review saved work' } })
+    expect(screen.getByRole('button', { name: 'Continue this task' })).toBeEnabled()
+    expect(screen.getByText('20 transcript records')).toBeVisible()
+    expect(screen.getByText('Uses this task’s remaining model calls and stops at its limit.')).toBeVisible()
+    expect(screen.queryByText(/US cents|Cost not measured|Estimated reserve/)).not.toBeInTheDocument()
+  })
+
+  it('retains a stopped task while hiding monetary failure details and translating continuation errors', async () => {
+    const error = 'budget: cost limit reached (100 cents across the run tree)'
+    runReturns({ ...RUN, status: 'failed', error })
+    server.use(http.post('/api/v2/copilot/agent-runs/:runId/continuations', () => HttpResponse.json({ error_code: 'copilot_task_budget_exhausted', detail: 'The approved budget is exhausted. Start a new task with a new budget.' }, { status: 409 })))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('This task’s model-call allowance is exhausted.')
+    expect(screen.queryByRole('button', { name: 'Original error' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Add information or revise the request'), { target: { value: 'Inspect the saved result' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue this task' }))
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2))
+    for (const alert of screen.getAllByRole('alert')) expect(alert).toHaveTextContent('This task’s model-call allowance is exhausted.')
+    expect(screen.queryByText(/100 cents|new budget/)).not.toBeInTheDocument()
   })
 
   it('renders a tool-only turn by naming what it called', async () => {

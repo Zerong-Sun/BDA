@@ -22,6 +22,13 @@ def enqueue_operation(
     organization_id: uuid.UUID | None = None,
     payload: dict | None = None,
 ) -> Operation:
+    from ..copilot.call_guard import current_scope_id
+
+    # This field is server-owned. Never let caller payloads choose a new budget.
+    event_payload = {key: value for key, value in (payload or {}).items() if key != "_llm_call_scope"}
+    scope_id = current_scope_id()
+    if scope_id is not None:
+        event_payload["_llm_call_scope"] = scope_id
     operation = Operation(
         project_id=project_id,
         organization_id=organization_id,
@@ -38,7 +45,7 @@ def enqueue_operation(
             topic=topic,
             aggregate_id=resource_id,
             payload={
-                **(payload or {}),
+                **event_payload,
                 "operation_id": str(operation.id),
                 **({"project_id": str(project_id)} if project_id else {}),
                 **({"organization_id": str(organization_id)} if organization_id else {}),

@@ -12,19 +12,20 @@ from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 
 LLM_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
-LLM_MAX_ATTEMPTS = 3
+LLM_MAX_ATTEMPTS = 1
 # HTTPX read timeouts bound inactivity between chunks, not the whole response.
-# One deadline includes connection, response body, retries and backoff; a provider
+# One deadline includes connection and response body; a provider
 # sending keepalive bytes must not hold a durable run's transaction indefinitely.
 LLM_COMPLETION_DEADLINE_SECONDS = 180.0
 
 
 def structured_retry_provider(provider: LLMProvider) -> LLMProvider | None:
-    """One same-model JSON retry after truncation, only for the documented API.
+    """Build JSON-only settings; the caller must reserve a separate model call.
 
     DeepSeek thinking tokens share the output budget. A format/factual pass may
     exhaust that budget before returning JSON. Preserve the configured ceiling
     and credentials; do not change saved settings or guess third-party support.
+    This helper never sends or retries a request itself.
     """
     if (urlparse(provider.endpoint or "").hostname != "api.deepseek.com"
             or provider.model not in {"deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro"}):
@@ -41,24 +42,18 @@ async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) 
     try:
         async with asyncio.timeout(LLM_COMPLETION_DEADLINE_SECONDS):
             async with httpx.AsyncClient() as client:
-                for attempt in range(LLM_MAX_ATTEMPTS):
-                    try:
-                        response = await client.post(
-                            endpoint,
-                            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                            json=body,
-                            timeout=LLM_TIMEOUT,
-                        )
-                        response.raise_for_status()
-                        return response
-                    except httpx.HTTPStatusError as exc:
-                        status = exc.response.status_code
-                        if (status != 429 and status < 500) or attempt == LLM_MAX_ATTEMPTS - 1:
-                            raise
-                    except httpx.RequestError:
-                        if attempt == LLM_MAX_ATTEMPTS - 1:
-                            raise
-                    await asyncio.sleep(0.25 * (2**attempt))
+                # A timeout/connection break/5xx can happen after generation
+                # was accepted and charged. Never replay an ambiguous POST.
+                # Even an apparently safe connection failure remains one
+                # accounted attempt; any recovery needs a fresh reservation.
+                response = await client.post(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json=body,
+                    timeout=LLM_TIMEOUT,
+                )
+                response.raise_for_status()
+                return response
     except TimeoutError as exc:
         # Cancellation closes the in-flight response and client before this
         # reaches the caller. No detached request thread is used for timeouts.
@@ -67,7 +62,6 @@ async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) 
             f"Model completion exceeded the {LLM_COMPLETION_DEADLINE_SECONDS:g}-second total deadline; no response was accepted.",
             status_code=504,
         ) from exc
-    raise RuntimeError("llm_request_failed")
 
 
 def credential_value(reference: str) -> str:
@@ -106,6 +100,8 @@ def completion_message(
             "LLM provider config cannot set reserved request fields: " + ", ".join(reserved),
             status_code=422,
         )
+    if "n" in provider.config and (type(provider.config["n"]) is not int or provider.config["n"] != 1):
+        raise DomainError("llm_multiple_completions_not_allowed", "Each model call must request exactly one completion.", status_code=422)
     token = credential_value(provider.credential_ref)
     endpoint = provider.endpoint.rstrip("/")
     if not endpoint.endswith("/chat/completions"):
@@ -123,8 +119,13 @@ def completion_message(
     # This API is synchronous: Celery workers and FastAPI's synchronous route
     # threadpool call it. Async callers must use a worker thread, just as for its
     # other synchronous domain/DB operations. The event loop lives only here.
+    from . import call_guard
+    receipt = call_guard.reserve_call(provider, body)
     response = asyncio.run(_completion_response(endpoint, token, body))
     payload = response.json()
+    # Account for returned usage even when the generated answer is rejected
+    # below. Failed HTTP/JSON responses retain their conservative reservation.
+    call_guard.record_usage(receipt, payload.get("usage") if isinstance(payload, dict) else None)
     try:
         choice = payload["choices"][0]
         message = choice["message"]

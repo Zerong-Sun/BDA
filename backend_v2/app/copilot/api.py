@@ -529,13 +529,17 @@ def test_config(
     if provider is None or not provider.enabled:
         return CopilotConfigTestResponse(connected=False, model="", reason="No enabled LLM provider is configured")
     try:
-        sample = complete_with_provider(
-            provider,
-            [
-                {"role": "system", "content": "Reply with exactly: BDA provider connected"},
-                {"role": "user", "content": "Connection test"},
-            ],
-        )
+        from .call_guard import call_scope
+        from .qualification import fingerprint
+
+        with call_scope(f"provider-test:{project_id}:{fingerprint(provider)}"):
+            sample = complete_with_provider(
+                provider,
+                [
+                    {"role": "system", "content": "Reply with exactly: BDA provider connected"},
+                    {"role": "user", "content": "Connection test"},
+                ],
+            )
     except Exception as exc:
         return CopilotConfigTestResponse(
             connected=False,

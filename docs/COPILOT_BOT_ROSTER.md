@@ -710,3 +710,22 @@ For existing installations, an authorized maintenance transaction may call
 accessible project and commit. Repeating this with unchanged sources creates no
 new revision. No database migration is required. New events update records in the
 source transaction, so an uncommitted or rolled-back source has no journal entry.
+
+## Model call admission
+
+Each root task and its child bots, queued research work, repairs and reviews share
+a hard maximum of six provider requests and CNY 1 of conservative reservations.
+Continuations do not replenish either allowance. Provider requests have a 4,096
+output-token ceiling and never automatically retry HTTP/network failures. A durable
+request fingerprint prevents replay after timeouts, crashes or transaction rollback.
+Identical recent task submissions are rejected before creating another task.
+
+The internal ledger commits before network I/O and stores only hashes, call counts,
+reservations and reported token usage. Missing usage is unknown; reservations are
+not refunded. Existing tasks without a reliable ledger cannot resume as if free.
+Prices must be administrator-verified CNY peak uncached rates for the exact model
+and endpoint, checked within 30 days, in `config.bda_pricing`: `model`, `endpoint`,
+`checked_at`, `input_cny_per_million`, `output_cny_per_million`. Missing/stale prices
+block calls. Limits apply before the request; this ledger is not a provider invoice.
+Bot screens show task results and process records, without billing displays or
+editable spending limits. Reading saved records never triggers a model request.

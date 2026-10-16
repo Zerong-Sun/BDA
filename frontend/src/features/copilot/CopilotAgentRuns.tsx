@@ -1,3 +1,4 @@
+import { taskErrorMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useState } from 'react'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
@@ -11,7 +12,6 @@ import {
   listAgentRuns,
   listAgentTurns,
   startAgentRun,
-  type AgentRun,
   type AgentTurn,
 } from '../../lib/api/agentRuns'
 import { TaskDelivery } from './TaskDelivery'
@@ -26,7 +26,6 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { useToastStore } from '../../components/ui/toastStore'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
 import { Textarea } from '../../components/ui/textarea'
 import { StatusPill } from '../../components/ui/StatusPill'
 import type { StatusTone } from '../../components/ui/statusTone'
@@ -71,7 +70,7 @@ function toneFor(status: string): StatusTone {
 }
 
 export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: string; skills?: string[] }) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const readOnly = useCopilotReadOnly()
   const copy = t.copilot.agentRuns
   const { projectId } = useProjectContext()
@@ -80,8 +79,6 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
   const [openRunId, setOpenRunId] = useState<string | null>(null)
 
   const [goal, setGoal] = useState(initialGoal)
-  const [maxTurns, setMaxTurns] = useState('12')
-  const [maxCost, setMaxCost] = useState('')
 
   const runs = useQuery({
     // The project uuid is part of the key: candidates and runs alike must not
@@ -97,13 +94,10 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
     mutationFn: () => {
       requireCopilotWrite()
       if (!projectId) throw new Error(copy.noProject)
-      const cost = Number(maxCost.trim())
       return startAgentRun({
         project_id: projectId,
         goal: goal.trim(),
         ...(skills ? { skills } : {}),
-        max_turns: Number(maxTurns) || 12,
-        max_cost_usd_cents: maxCost.trim() && Number.isFinite(cost) ? cost : null,
       })
     },
     onSuccess: (accepted) => {
@@ -112,7 +106,7 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
       void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
     },
     onError: (error) =>
-      showToast(error instanceof Error ? error.message : String(error), 'error'),
+      showToast(taskErrorMessage(error, language === 'zh'), 'error'),
   })
 
   if (!projectId) {
@@ -148,31 +142,10 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
           />
         </label>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs">
-            <span>{copy.maxTurns}</span>
-            <Input
-              type="number"
-              min={1}
-              className="w-20 tabular-nums"
-              value={maxTurns}
-              onChange={(event) => setMaxTurns(event.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs">
-            <span>{copy.maxCost}</span>
-            <Input
-              type="number"
-              min={0}
-              className="w-24 tabular-nums"
-              value={maxCost}
-              onChange={(event) => setMaxCost(event.target.value)}
-            />
-          </label>
           <Button type="submit" size="sm" disabled={readOnly || !goal.trim() || start.isPending}>
             {start.isPending ? copy.starting : copy.start}
           </Button>
         </div>
-        <p className="text-xs text-text-secondary">{copy.costHint}</p>
       </form>
 
       {runs.data && runs.data.length > 0 ? (
@@ -192,7 +165,7 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
                   <span className="truncate text-sm">{run.goal}</span>
                 </span>
                 <span className="text-xs tabular-nums text-text-secondary">
-                  {format(copy.turns, { count: run.turn_count })} · {costLabel(run, copy, format)}
+                  {format(copy.turns, { count: run.turn_count })}
                 </span>
               </Button>
             </li>
@@ -203,24 +176,6 @@ export function CopilotAgentRuns({ initialGoal = '', skills }: { initialGoal?: s
       )}
     </div>
   )
-}
-
-function costLabel(
-  run: AgentRun,
-  copy: Record<string, string>,
-  format: (template: string, values: Record<string, string | number>) => string,
-): string {
-  if (run.task_contract?.cost_mode === 'unavailable') return copy.costUnmeasured
-  if (run.task_contract?.cost_mode === 'conservative_estimate') return format(copy.costEstimatedReserve, { cents: run.subtree_cost_usd_cents ?? run.cost_usd_cents })
-  // The server always sends the subtree total; falling back to the run's own
-  // cost keeps an older response readable rather than showing a confident zero.
-  const subtree = run.subtree_cost_usd_cents ?? run.cost_usd_cents
-  // Only say "with subagents" when there actually are some; on a childless run
-  // the two numbers are equal and the longer label would imply otherwise.
-  if (subtree > run.cost_usd_cents) {
-    return format(copy.costWithSubtree, { cents: run.cost_usd_cents, total: subtree })
-  }
-  return format(copy.cost, { cents: run.cost_usd_cents })
 }
 
 export function AgentRunDetail({
@@ -280,7 +235,7 @@ export function AgentRunDetail({
         void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] })
         return
       }
-      showToast(error instanceof Error ? error.message : String(error), 'error')
+      showToast(taskErrorMessage(error, language === 'zh'), 'error')
     },
   })
 
@@ -335,8 +290,7 @@ export function AgentRunDetail({
           ) : null}
           {run.data.goal.length > 160 ? <Disclosure title={language === 'zh' ? '查看完整任务要求' : 'Full task request'}><p className="whitespace-pre-wrap break-words text-sm leading-7">{run.data.goal}</p></Disclosure> : <p className="text-sm leading-7">{run.data.goal}</p>}
           <p className="text-xs tabular-nums text-text-secondary">
-            {format(copy.turns, { count: run.data.turn_count })} ·{' '}
-            {costLabel(run.data, copy, format)}
+            {format(copy.turns, { count: run.data.turn_count })}
           </p>
           {run.data.status === 'awaiting_tasks' ? (
             <p className="text-xs text-text-secondary">{copy.waitingOn}</p>
@@ -353,9 +307,9 @@ export function AgentRunDetail({
         <h4 className="text-sm font-semibold">{language === 'zh' ? '继续处理此任务' : 'Continue working on this task'}</h4>
         <label className="block text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea placeholder={language === 'zh' ? '说明要补充的证据、修改的范围或已修正的问题' : 'Describe new evidence, scope changes or the issue you corrected'} disabled={readOnly || continuation.isPending} value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
         {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
-        <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用或缩小本任务的写入范围和费用上限，增加最多 12 轮处理。' : 'Keeps the same write scope and cost ceiling, with up to 12 more turns.'}</p>
+        <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用本任务剩余调用额度；达到上限后停止。' : 'Uses this task’s remaining model calls and stops at its limit.'}</p>
         <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{continuation.isPending ? (language === 'zh' ? '提交中…' : 'Submitting…') : (language === 'zh' ? '继续此任务' : 'Continue this task')}</Button>
-        {continuation.error ? <p role="alert">{continuation.error instanceof Error ? continuation.error.message : String(continuation.error)}</p> : null}
+        {continuation.error ? <p role="alert">{taskErrorMessage(continuation.error, language === 'zh')}</p> : null}
       </form> : null}
       <Disclosure key={runId} title={copy.transcript}>
         {turns.data && turns.data.length > 0 ? (

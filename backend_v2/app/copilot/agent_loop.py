@@ -174,7 +174,7 @@ def messages_for(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> list[di
         "Tool names, artifact IDs and invented aliases are not call IDs. "
         + json.dumps([{k: record[k] for k in ("call_id", "tool", "successful")}
                       for record in tool_records(turns)], ensure_ascii=False)
-        + f"\nTranscript budget remaining: {max(0, run.max_turns - run.turn_count)} messages. "
+        + f"\nAt most {max(0, min(6, run.max_turns) - sum(t.role == 'assistant' for t in turns))} model calls remain; repairs and review share this limit. "
         "Return a concise final JSON as soon as the goal has sufficient evidence. "
         "Authorized evidence reads are available throughout the recipe. Only write tools follow the contract one step at a time. "
         "A saved source read needs no extra human permission when its tool is provided. "

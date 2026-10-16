@@ -16,6 +16,13 @@ from backend_v2.tests.test_copilot_agent_tasks import _project
 from backend_v2.tests.test_copilot_agent_tasks import wired as wired  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def offline_guard(monkeypatch):
+    from backend_v2.app.copilot import call_guard
+    monkeypatch.setattr(call_guard, "reserve_call", lambda *_: "offline-reservation")
+    monkeypatch.setattr(call_guard, "record_usage", lambda *_: None)
+
+
 @pytest.fixture
 def configured(monkeypatch):
     monkeypatch.setattr(provider, "credential_value", lambda _: "offline-only-token")
@@ -71,7 +78,7 @@ def test_keepalive_response_hits_total_deadline_and_closes_without_replay(config
     assert len(requests) == 1, "Expiry ends this completion instead of starting a fresh deadline"
 
 
-def test_retry_backoff_shares_the_deadline(configured, monkeypatch):
+def test_server_error_returns_without_retry_or_backoff(configured, monkeypatch):
     requests = []
 
     def handler(request):
@@ -79,11 +86,31 @@ def test_retry_backoff_shares_the_deadline(configured, monkeypatch):
         return httpx.Response(503, json={"error": "offline transient failure"})
 
     clients = _transport(monkeypatch, handler)
-    with pytest.raises(DomainError) as error:
+    with pytest.raises(httpx.HTTPStatusError) as error:
         provider.completion_message(configured, [])
-    assert error.value.error_code == "llm_completion_deadline_exceeded"
-    assert len(requests) == 1  # The 250 ms backoff cannot outlive the total 60 ms budget.
+    assert error.value.response.status_code == 503
+    assert len(requests) == 1
     assert all(client.is_closed for client in clients)
+
+
+def test_200_headers_followed_by_broken_body_never_replays_paid_request(configured, monkeypatch):
+    requests = []
+    class BrokenBody(httpx.AsyncByteStream):
+        closed = False
+        async def __aiter__(self):
+            yield b'{"choices":'
+            raise httpx.RemoteProtocolError("Synthetic break after response headers")
+        async def aclose(self):
+            self.closed = True
+    stream = BrokenBody()
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, stream=stream)
+    clients = _transport(monkeypatch, handler)
+    with pytest.raises(httpx.RemoteProtocolError):
+        provider.completion_message(configured, [])
+    assert len(requests) == 1
+    assert stream.closed and all(client.is_closed for client in clients)
 
 
 def test_response_before_deadline_retains_model_parameters_and_tool_protocol(configured, monkeypatch):

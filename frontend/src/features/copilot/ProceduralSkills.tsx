@@ -63,7 +63,7 @@ export function ProceduralSkillSelector({ serviceKind, value, onChange, disabled
   const selected = value ?? skills.data?.filter((skill) => skill.default_for.includes(serviceKind)).map((skill) => skill.id) ?? []
   return <fieldset className="space-y-2 rounded-md border border-border p-3" disabled={disabled}>
     <legend className="px-1 text-sm font-medium">{zh ? '应用科学方法（最多 3 项）' : 'Applied scientific methods (up to 3)'}</legend>
-    <p className="text-xs text-text-secondary">{zh ? '方法指导分析步骤，不增加工具权限或费用额度。新方法包含结构化交付检查，效果需在项目中验证。' : 'Methods guide analysis without granting tools or increasing the budget. Structured delivery checks apply; effectiveness needs project validation.'}</p>
+    <p className="text-xs text-text-secondary">{zh ? '方法指导分析步骤，不增加工具权限。新方法包含结构化交付检查，效果需在项目中验证。' : 'Methods guide analysis without granting tools. Structured delivery checks apply; effectiveness needs project validation.'}</p>
     {skills.isPending ? <p role="status">{zh ? '加载建议方法…' : 'Loading suggested methods…'}</p> : null}
     {skills.isError ? <div role="status"><p className="text-sm">{zh ? '无法显示方法。启动时将沿用服务的默认方法；也可选择不使用方法。' : 'Methods could not load. Starting uses the service defaults, or you can opt out below.'}</p><Button type="button" size="sm" variant="ghost" onClick={() => void skills.refetch()}>{zh ? '重试' : 'Retry'}</Button></div> : null}
     <div className="grid gap-2 md:grid-cols-2">{skills.data?.map((skill) => <label key={skill.id} className="flex items-start gap-2 text-sm">

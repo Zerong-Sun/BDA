@@ -203,19 +203,19 @@ def test_missing_read_tool_preserves_draft_and_gap_without_another_model_call(se
 
 
 def test_turn_limit_preserves_draft_and_never_calls_again(session, monkeypatch):
-    run = _seeded_run(session, monkeypatch, max_turns=3)
+    run = _seeded_run(session, monkeypatch, max_turns=1)
     seen = _script(monkeypatch, [{"content": _answer()}])
     agent_loop.drive(session, run, _provider(session))
     assert len(seen) == 1 and run.turn_count == 3
     assert run.status == "succeeded" and run.outcome["status"] == "partial"
-    assert "turn limit" in run.outcome["source_coverage_check"]["reason"]
+    assert "model call limit" in run.outcome["source_coverage_check"]["reason"]
 
 
 def test_cost_reservation_denial_preserves_gap_and_never_calls_over_budget(session, monkeypatch):
     run = _seeded_run(session, monkeypatch, max_cost_usd_cents=3)
     provider = _provider(session)
     # Every provider call reserves2 cents. The first draft fits; its check does not.
-    provider.config = {"bda_pricing": {"input_usd_per_million": 0, "output_usd_per_million": 1}, "max_tokens": 4000}
+    provider.config = {"bda_pricing": {"input_usd_per_million": 0, "output_usd_per_million": 1}, "max_tokens": 13000}
     seen = _script(monkeypatch, [{"content": _answer()}])
     agent_loop.drive(session, run, provider)
     assert len(seen) == 1 and run.cost_usd_cents == 2
@@ -229,7 +229,7 @@ def test_cost_reservation_denial_preserves_gap_and_never_calls_over_budget(sessi
 
 @pytest.mark.parametrize("status", ["blocked", "needs_input"])
 def test_coverage_limit_does_not_upgrade_an_existing_stop(session, monkeypatch, status):
-    run = _seeded_run(session, monkeypatch, max_turns=3)
+    run = _seeded_run(session, monkeypatch, max_turns=1)
     answer = {**json.loads(_answer()), "status": status, "missing": ["Required input unavailable."]}
     seen = _script(monkeypatch, [{"content": json.dumps(answer)}])
     agent_loop.drive(session, run, _provider(session))

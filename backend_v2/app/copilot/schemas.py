@@ -362,7 +362,7 @@ class AgentRunCreate(BaseModel):
     service_kind: Literal["brief", "literature", "planning", "execution", "interpretation", "custom"] = "custom"
     # Exact tool ids are an explicit scope request, intersected with project permissions.
     authorized_writes: list[Annotated[str, Field(min_length=1, max_length=80)]] | None = Field(default=None, max_length=20)
-    max_turns: int = Field(default=24, ge=1, le=200)
+    max_turns: int = Field(default=6, ge=1, le=6)
     max_cost_usd_cents: int | None = Field(default=None, ge=0, le=1_000_000)
 
 
