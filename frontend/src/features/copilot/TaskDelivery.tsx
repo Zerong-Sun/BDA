@@ -10,7 +10,6 @@ import { z } from 'zod'
 import type { AgentRun } from '../../lib/api/agentRuns'
 import { useI18n } from '../../lib/i18n'
 import { Disclosure } from '../../components/ui/Disclosure'
-import { deliveryLabel } from './taskPresentation'
 import { deliveryMessage, executionLabel, reportCharacters } from './deliveryDisplay'
 
 const Outcome = z.object({
@@ -87,24 +86,24 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   }
   const missingLabel = (item: string) => issueLabels[item] ?? outcome.steps?.find((step) => step.id === item)?.[zh ? 'title_zh' : 'title'] ?? SECTION_LABELS[item]?.[zh ? 1 : 0] ?? deliveryMessage(item, zh)
   const remaining = (outcome.missing ?? []).filter((item) => item !== run.error)
-  return <section className="space-y-3 rounded-lg border border-border p-3" aria-label={zh ? '任务交付' : 'Task delivery'}>
-    <h4 className="font-semibold">{deliveryLabel(run, zh)}</h4>
-    <dl className="grid grid-cols-1 gap-3 rounded-md bg-surface-2 p-3 text-sm sm:grid-cols-3">
-      <div><dt className="text-xs text-text-secondary">{zh ? '任务执行' : 'Execution'}</dt><dd className="mt-1 font-medium">{executionLabel(run.status, zh)}</dd></div>
-      <div><dt className="text-xs text-text-secondary">{zh ? '自动事实复核' : 'Automated factual review'}</dt><dd className="mt-1 font-medium">{reviewLabel}</dd></div>
-      <div><dt className="text-xs text-text-secondary">{zh ? '报告字符数' : 'Report characters'}</dt><dd className="mt-1 font-medium tabular-nums">{hasReport ? characters : (zh ? '尚无报告' : 'No report yet')}</dd></div>
+  return <section className="task-report space-y-5 border-t border-border pt-4" aria-label={zh ? '任务交付' : 'Task delivery'}>
+    <h4 className="text-base font-semibold">{hasReport ? (zh ? '交付报告' : 'Delivery report') : (zh ? '本次结果' : 'Current result')}</h4>
+    <dl className="task-report-meta">
+      <div><dt className="text-xs text-text-secondary">{zh ? '任务执行' : 'Execution'}</dt><dd className="font-medium">{executionLabel(run.status, zh)}</dd></div>
+      <div><dt className="text-xs text-text-secondary">{zh ? '自动事实复核' : 'Automated factual review'}</dt><dd className="font-medium">{reviewLabel}</dd></div>
+      <div><dt className="text-xs text-text-secondary">{zh ? '报告字符数' : 'Report characters'}</dt><dd className="font-medium tabular-nums">{hasReport ? characters : (zh ? '尚无报告' : 'No report yet')}</dd></div>
     </dl>
-    {hasReport ? <p className="text-xs text-text-secondary">{zh ? '字符数包含摘要、原章节标题与正文、待补事项和下一步；不含页面提示。' : 'Counts summary, original section titles and text, remaining items and next action; excludes interface labels.'}</p> : null}
+
     <ExecutionError error={run.error} zh={zh} />
     {outcome.scientific_review === 'automated_review_completed' ? <p className="text-xs text-text-secondary">{zh ? '自动事实复核已完成；这不代表科研验证或人工批准。' : 'Automated factual review completed. This does not constitute scientific validation or human approval.'}</p> : null}
     {outcome.steps?.length ? <ol className="space-y-2">{outcome.steps.map((step) => <li key={step.id} className="rounded border border-border-soft p-2 text-sm"><span className="mr-2">{step.status === 'completed' ? '✓' : '○'}</span>{zh ? step.title_zh : step.title}<span className="ml-2 text-xs text-text-secondary">{step.status === 'completed' ? (zh ? '已核对记录' : 'Records checked') : (zh ? '待完成' : 'Pending')}</span></li>)}</ol> : null}
-    {outcome.summary ? <div><p className="text-xs text-text-secondary">{zh ? '交付内容与依据' : 'Deliverable and basis'}</p><p className="whitespace-pre-wrap break-words text-sm">{outcome.summary}</p></div> : null}
-    {outcome.sections && Object.keys(outcome.sections).length ? <Disclosure key={run.id} title={zh ? '查看完整交付内容' : 'Full deliverable'} defaultOpen={characters <= 1200}><dl className="space-y-3">{Object.entries(outcome.sections).map(([key, value]) => <div key={key}><dt className="text-xs font-semibold">{sectionLabel(key)}</dt><dd className="whitespace-pre-wrap break-words text-sm">{value}</dd></div>)}</dl></Disclosure> : null}
-    {remaining.length ? <div><p className="text-xs text-text-secondary">{zh ? '尚未完成或需要核对' : 'Remaining work or checks'}</p><ul className="list-disc pl-5 text-sm break-words">{remaining.map((item, i) => <li key={i}>{missingLabel(item)}</li>)}</ul></div> : null}
-    {outcome.next_action ? <div><p className="text-xs text-text-secondary">{zh ? '下一步' : 'Next action'}</p><p className="text-sm break-words">{deliveryMessage(outcome.next_action, zh)}</p></div> : null}
+    {outcome.summary ? <div><p className="mb-2 text-sm font-semibold">{zh ? '结论摘要' : 'Summary'}</p><p className="whitespace-pre-wrap break-words text-sm leading-7">{outcome.summary}</p></div> : null}
+    {outcome.sections && Object.keys(outcome.sections).length ? <Disclosure key={run.id} title={zh ? '查看完整交付内容' : 'Full deliverable'} defaultOpen={characters <= 1200}><dl className="space-y-5">{Object.entries(outcome.sections).map(([key, value]) => <div key={key}><dt className="mb-1 text-sm font-semibold">{sectionLabel(key)}</dt><dd className="whitespace-pre-wrap break-words text-sm leading-7">{value}</dd></div>)}</dl></Disclosure> : null}
+    {remaining.length ? <div className="task-report-pending"><p className="mb-2 text-sm font-semibold">{zh ? '尚未完成或需要核对' : 'Remaining work or checks'}</p><ul className="list-disc space-y-1 pl-5 text-sm leading-7 break-words">{remaining.map((item, i) => <li key={i}>{missingLabel(item)}</li>)}</ul></div> : null}
+    {outcome.next_action ? <div><p className="mb-2 text-sm font-semibold">{zh ? '下一步' : 'Next action'}</p><p className="text-sm leading-7 break-words">{deliveryMessage(outcome.next_action, zh)}</p></div> : null}
     {outcome.deliverables?.map((item) => <Link className="block text-sm text-primary" key={`${item.kind}-${item.id}`} to={`${base}&tab=${item.kind === 'literature' ? 'references' : 'data'}`}>{item.kind === 'literature' ? (zh ? '打开检索与文献' : 'Open literature') : (zh ? '打开待审核研究笔记' : 'Open research notes')} · {item.id.slice(0, 8)}</Link>)}
     {outcome.evidence?.length ? <Disclosure title={zh ? '查看来源与操作记录' : 'Sources and actions'}><ul className="space-y-1 text-xs">{outcome.evidence.map((item) => <li key={item.call_id}>{item.successful ? '✓' : '×'} {item.tool} · {item.call_id}</li>)}</ul></Disclosure> : null}
-    <p className="text-xs text-text-secondary">{zh ? '步骤核对说明交付记录存在；科研结论和计算提交仍需对应审核。' : 'Step checks confirm delivery records. Scientific conclusions and compute submission still need their respective review.'}</p>
+    {hasReport ? <Disclosure title={zh ? '计数与审核说明' : 'Counting and review notes'}><p className="text-xs text-text-secondary">{zh ? '字符数包含摘要、原章节标题与正文、待补事项和下一步；不含页面提示。步骤核对仅说明交付记录存在，科研结论和计算提交仍需对应审核。' : 'Counts summary, original section titles and text, remaining items and next action; excludes interface labels. Step checks confirm records only; scientific conclusions and compute submission still need review.'}</p></Disclosure> : null}
     {terminal && outcome.summary && !outcome.decision_record_id ? <Button type="button" variant="outline" disabled={readOnly || record.isPending} onClick={() => record.mutate()}>{zh ? '保存为待审核计划记录' : 'Save as a plan for review'}</Button> : null}
     {outcome.decision_record_id ? <p className="text-sm" role="status">{zh ? '已保存到项目决策记录，可关联目标并继续编辑。' : 'Saved to the project decision record. You can attach a goal and edit it there.'}</p> : null}
     {terminal && outcome.summary && run.task_contract?.service_kind === 'brief' ? <Button type="button" variant="outline" disabled={readOnly || prepareBrief.isPending} onClick={() => prepareBrief.mutate()}>{zh ? '编辑并应用为项目任务书' : 'Edit and apply as project brief'}</Button> : null}

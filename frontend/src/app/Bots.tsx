@@ -76,6 +76,7 @@ function BotProjectWorkspace() {
   // because the room contains what that tab used to show.
   const requested = search.get('view') === 'chat' ? 'room' : search.get('view') ?? ''
   const view = ['room', 'tasks', 'handoffs', 'skills'].includes(requested) ? requested : 'room'
+  const focusedTask = view === 'tasks' && Boolean(search.get('run'))
   const selectView = (value: string) => { const next = new URLSearchParams(search); next.set('view', value); setSearch(next) }
   const selectRun = (id: string | null) => {
     const next = new URLSearchParams(search)
@@ -104,22 +105,22 @@ function BotProjectWorkspace() {
   const context = `route=/bots; project_id=${projectId}; name=${activeProject?.name ?? ''}; query=${search.toString()}; ${selectedEntities.map((id) => `entity=${encodeURIComponent(id)}`).join('; ')}`
   const name = (bot: { title: string; title_zh: string }) => zh ? bot.title_zh : bot.title
 
-  return <section className="bot-page" data-tour-id="bot-workspace">
+  return <section className={`bot-page${focusedTask ? ' bot-page--task' : ''}`} data-tour-id="bot-workspace">
     <header className="science-page-header">
       <div><p className="science-eyebrow">{zh ? 'AI FOR SCIENCE / 研究协作' : 'AI FOR SCIENCE / COLLABORATION'}</p>
-        <h1>{zh ? '研究团队' : 'Research team'}</h1>
+        <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '研究团队' : 'Research team')}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
-      {projectId ? <div className="flex flex-wrap gap-2">
+      {projectId && !focusedTask ? <div className="flex flex-wrap gap-2">
         <Button variant="outline" render={<Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'methods' })}`} />}>{zh ? '已保存的讨论报告' : 'Saved discussion reports'}</Button>
         {canConfigure ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
       </div> : null}
     </header>
     <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>
       {!activeProject ? <div className="science-empty"><BotAvatar id="director" stance="direct" /><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><p>{zh ? '任务、证据和对话会保存在同一个项目里。' : 'Tasks, evidence and conversations stay together in the same project.'}</p><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>
-        {settings && canConfigure ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
+        {settings && canConfigure && !focusedTask ? <div className="mb-6 rounded-lg border border-border p-4"><CopilotSettings /></div> : null}
         <div className="bot-workspace-grid">
-          <BotRoster projectId={projectId} autoActive={view === 'room' && !selectedId} onAuto={() => selectBot(null)} />
+          {!focusedTask ? <BotRoster projectId={projectId} autoActive={view === 'room' && !selectedId} onAuto={() => selectBot(null)} /> : null}
           <div className="bot-main">
             <Tabs value={view} onValueChange={selectView}>
               <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? '研究团队视图' : 'Research team views'}>
@@ -148,12 +149,12 @@ function BotProjectWorkspace() {
               <TabsContent value="skills"><ProceduralSkillCatalog /></TabsContent>
             </Tabs>
           </div>
-          <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />
+          {!focusedTask ? <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />
             <p className="science-eyebrow bot-materials-label">{zh ? '项目资料' : 'PROJECT MATERIALS'}</p>
             <nav aria-label={zh ? '项目资料' : 'Project materials'}>{[
               ['evidence', zh ? '文献与证据' : 'Literature & evidence'], ['structures', zh ? '结构对照' : 'Structure comparison'], ['methods', zh ? '实验方案' : 'Experiment plan'], ['timeline', zh ? '决策记录' : 'Decision record'],
             ].map(([tab, label]) => <Link key={tab} to={`/research?project=${encodeURIComponent(projectId)}&tab=${tab}`}>{label}<ArrowRightIcon /></Link>)}</nav>
-          </aside>
+          </aside> : null}
         </div>
       </>}
     </ApiState>

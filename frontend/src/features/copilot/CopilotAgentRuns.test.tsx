@@ -90,6 +90,17 @@ describe('agent run panel', () => {
     expect(screen.getByText(error)).toBeVisible()
   })
 
+  it('keeps a long request accessible without placing it ahead of the report', async () => {
+    const goal = 'Read the existing evidence and keep uncertainty explicit. '.repeat(10)
+    runReturns({ ...RUN, goal, status: 'succeeded', outcome: { summary: 'Final report', status: 'partial' } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText('Final report')).toBeVisible()
+    const request = screen.getByRole('button', { name: 'Full task request' })
+    expect(request).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(request)
+    expect(screen.getByText(goal.trim())).toBeVisible()
+  })
+
   it('keeps the execution failure visible when a historical outcome is malformed', async () => {
     runReturns({ ...RUN, status: 'failed', error: 'Provider unavailable', outcome: { sections: [] } })
     renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
@@ -241,6 +252,7 @@ describe('agent run panel', () => {
     renderWithProviders(<CopilotAgentRuns />)
     fireEvent.click(await screen.findByRole('button', { name: /Fold the top three/ }))
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Transcript' }))
     expect(await screen.findByText('called list_proteins')).toBeInTheDocument()
   })
 

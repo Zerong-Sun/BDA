@@ -332,7 +332,7 @@ export function AgentRunDetail({
               {language === 'zh' ? `负责人：${owner?.title_zh ?? run.data.bot}` : `Owner: ${owner?.title ?? run.data.bot}`}
             </p>
           ) : null}
-          <p className="text-sm">{run.data.goal}</p>
+          {run.data.goal.length > 160 ? <Disclosure title={language === 'zh' ? '查看完整任务要求' : 'Full task request'}><p className="whitespace-pre-wrap break-words text-sm leading-7">{run.data.goal}</p></Disclosure> : <p className="text-sm leading-7">{run.data.goal}</p>}
           <p className="text-xs tabular-nums text-text-secondary">
             {format(copy.turns, { count: run.data.turn_count })} ·{' '}
             {costLabel(run.data, copy, format)}
@@ -355,7 +355,7 @@ export function AgentRunDetail({
         <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{language === 'zh' ? '继续此任务' : 'Continue this task'}</Button>
         {continuation.error ? <p role="alert">{continuation.error instanceof Error ? continuation.error.message : String(continuation.error)}</p> : null}
       </form> : null}
-      <Disclosure key={run.data?.task_contract?.version ? "task" : "legacy"} title={copy.transcript} defaultOpen={!run.data?.task_contract?.version}>
+      <Disclosure key={runId} title={copy.transcript}>
         {turns.data && turns.data.length > 0 ? (
           <ol className="space-y-2">
             {turns.data.map((turn) => (
