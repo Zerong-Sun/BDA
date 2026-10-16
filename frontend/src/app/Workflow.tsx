@@ -266,12 +266,9 @@ function WorkflowWorkspace() {
   const setWorkflowSeed = useAppStore((s) => s.setWorkflowSeed)
   const [builderOpen, setBuilderOpen] = useState(false)
   const [focusCanvas, setFocusCanvas] = useState(false)
-  const [resourceTab, setResourceTab] = useState('artifacts')
-  const resourcePanelRef = useRef<HTMLDivElement>(null)
   const openResources = (tab: string) => {
     setFocusCanvas(false)
-    setResourceTab(tab)
-    requestAnimationFrame(() => resourcePanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+    patchSearch({ resource: tab === 'artifacts' ? null : tab })
   }
   const [preflightExpanded, setPreflightExpanded] = useState(false)
   const [goal, setGoal] = useState(() =>
@@ -287,6 +284,14 @@ function WorkflowWorkspace() {
   // artifact and dialog state stay local: they are transient inspectors, not
   // places. Node clicks replace the history entry; choosing a run pushes one.
   const [search, patchSearch] = useSearchParamPatch()
+  const requestedResource = search.get('resource')
+  const resourceTab = requestedResource === 'plugins' || requestedResource === 'scripts' ? requestedResource : 'artifacts'
+  const canvasOverview = focusCanvas && resourceTab === 'artifacts'
+  const resourcePanelRef = useCallback((panel: HTMLDivElement | null) => {
+    if (!panel || resourceTab === 'artifacts') return
+    const frame = requestAnimationFrame(() => panel.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+    return () => cancelAnimationFrame(frame)
+  }, [resourceTab])
   const requestedWorkflowRunId = search.get('run')
   const selectedNodeId = search.get('node')
   const setSelectedNodeId = useCallback(
@@ -824,7 +829,7 @@ function WorkflowWorkspace() {
         onAddNode={() => setBuilderOpen((v) => !v)}
         onStart={() => { if (!unsavedNodeChanges) setConfirmRun(true) }}
       /> : null}
-      {workflowRunId ? <div className="mb-3 flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" aria-pressed={focusCanvas} onClick={() => setFocusCanvas((focused) => !focused)}>{language === 'zh' ? (focusCanvas ? '打开流程工作台' : '流程总览') : (focusCanvas ? 'Open workflow workbench' : 'Workflow overview')}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('plugins')}>{language === 'zh' ? '模型与插件' : 'Models & plugins'}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('scripts')}>{language === 'zh' ? '脚本' : 'Scripts'}</Button></div> : null}
+      {workflowRunId ? <div className="mb-3 flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" aria-pressed={canvasOverview} onClick={() => { patchSearch({ resource: null }); setFocusCanvas(!canvasOverview) }}>{language === 'zh' ? (canvasOverview ? '打开流程工作台' : '流程总览') : (canvasOverview ? 'Open workflow workbench' : 'Workflow overview')}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('plugins')}>{language === 'zh' ? '模型与插件' : 'Models & plugins'}</Button><Button type="button" variant="outline" size="sm" onClick={() => openResources('scripts')}>{language === 'zh' ? '脚本' : 'Scripts'}</Button></div> : null}
 
       <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
@@ -1102,11 +1107,11 @@ function WorkflowWorkspace() {
 
         {uiDensity === 'advanced' ? <WorkflowLegend advanced /> : null}
 
-        <WorkflowPanelLayout overview={focusCanvas}>
-          <div ref={resourcePanelRef} data-workflow-panel="resources">
+        <WorkflowPanelLayout overview={canvasOverview}>
+          <div ref={resourcePanelRef} className="scroll-mt-48" data-workflow-panel="resources">
             <WorkflowResourceSidebar
               activeTab={resourceTab}
-              onTabChange={setResourceTab}
+              onTabChange={openResources}
               projectId={projectId}
               artifacts={visibleArtifacts}
               selectedNode={selectedNode}
@@ -1147,7 +1152,7 @@ function WorkflowWorkspace() {
                 initialNodes={demoWorkflow.nodes}
                 initialEdges={demoWorkflow.edges}
                 readOnly
-                overview={focusCanvas}
+                overview={canvasOverview}
                 onNodeSelected={(nodeId) => {
                   if (!setSelectedNodeId(nodeId)) return
                   if (nodeId) setFocusCanvas(false)
@@ -1192,7 +1197,7 @@ function WorkflowWorkspace() {
                   initialEdges={graph?.edges ?? []}
                   workflowRunId={workflowRunId}
                   readOnly={readOnly || unsavedNodeChanges}
-                  overview={focusCanvas}
+                  overview={canvasOverview}
                   onConnectionRequested={requestConnection}
                   onEdgesRemoved={async ids => { await persistConnections((workflowGraph?.edges ?? []).filter(e => !ids.includes(e.id!))); setSelectedEdgeId(null) }}
                   onEdgeSelected={(edgeId) => { if (setSelectedNodeId(null)) { setFocusCanvas(false); setSelectedEdgeId(edgeId) } }}

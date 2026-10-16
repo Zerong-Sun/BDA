@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import clsx from 'clsx'
 import { DotsThreeIcon, PulseIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, WrenchIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
@@ -29,7 +29,7 @@ import {
 // The route list moved to `lib/nav/routes.ts` when the command palette began
 // needing the same one: two copies of "which routes exist and what they are
 // called" drift silently, because renaming one of them breaks nothing.
-const mobileRoutes = APP_ROUTES
+const mobileRoutes = APP_ROUTES.filter(route => route.to !== '/workflow')
 const primaryRoutes = PRIMARY_ROUTES
 
 export function Topbar() {
@@ -40,12 +40,26 @@ export function Topbar() {
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
   const zh = language === 'zh'
+  const workflowResource = new URLSearchParams(location.search).get('resource')
+  const coreLinks = [
+    { resource: '', label: zh ? '工作流' : 'Workflow' },
+    { resource: 'plugins', label: zh ? '模型插件' : 'Models & plugins' },
+    { resource: 'scripts', label: zh ? '脚本' : 'Scripts' },
+  ]
+  const coreHref = (resource: string) => {
+    const params = new URLSearchParams(location.pathname === '/workflow' ? location.search : projectQuery)
+    if (projectId) params.set('project', projectId)
+    if (resource) params.set('resource', resource)
+    else params.delete('resource')
+    return `/workflow${params.size ? `?${params}` : ''}`
+  }
   const activeWorkbench = APP_ROUTES.find((route) => !PRIMARY_ROUTES.includes(route.to) && location.pathname === route.to)
   const navLabel = (key: AppRoute['key']) => routeLabel(key, zh, (item) => t.nav[item])
 
   return (
     <>
-      <header className="science-topbar sticky top-0 z-40 flex flex-wrap items-center gap-2 border-b border-border-soft bg-bg-app/95 px-4 py-2.5 backdrop-blur sm:flex-nowrap lg:gap-3 lg:px-6">
+      <div className="sticky top-0 z-40">
+      <header className="science-topbar flex flex-wrap items-center gap-2 border-b border-border-soft bg-bg-app/95 px-4 py-2.5 backdrop-blur sm:flex-nowrap lg:gap-3 lg:px-6">
         <NavLink
           to={`/projects${projectQuery}`}
           className="science-brand shrink-0 text-sm font-semibold text-text-primary"
@@ -141,12 +155,11 @@ export function Topbar() {
         </div>
       </header>
 
-      {/* On small screens the pipeline rail collapses, so the topbar keeps a
-          full route list for reachability (and for accessibility tests). */}
+      {/* Core tools remain visible at every width and while scrolling. */}
       <nav
         data-tour-id="main-navigation"
         aria-label={t.shared.mainNavigation}
-        className="science-navigation flex gap-1 overflow-x-auto border-b border-border-soft bg-bg-app px-3 py-2"
+        className="science-navigation flex flex-wrap gap-1 border-b border-border-soft bg-bg-app px-3 py-2"
       >
         {mobileRoutes.map((route) => (
           <NavLink
@@ -156,7 +169,7 @@ export function Topbar() {
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-2 shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
-                !primaryRoutes.includes(route.to) && 'md:hidden',
+                !primaryRoutes.includes(route.to) && 'hidden',
                 isActive
                   ? 'bg-accent/15 text-accent'
                   : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
@@ -167,7 +180,11 @@ export function Topbar() {
             {navLabel(route.key)}
           </NavLink>
         ))}
-        <div className="hidden items-stretch md:flex">
+        {coreLinks.map(({ resource, label }) => {
+          const active = location.pathname === '/workflow' && (workflowResource || '') === resource
+          return <Link key={resource} data-nav-route={resource ? `/workflow?resource=${resource}` : '/workflow'} to={coreHref(resource)} aria-current={active ? 'page' : undefined} className={clsx('flex shrink-0 items-center rounded px-3 py-1.5 text-sm transition-colors', active ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary')}>{label}</Link>
+        })}
+        <div className="flex items-stretch">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" aria-current={activeWorkbench ? 'true' : undefined} />}><WrenchIcon aria-hidden="true" />{activeWorkbench ? navLabel(activeWorkbench.key) : zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -181,6 +198,7 @@ export function Topbar() {
           </DropdownMenu>
         </div>
       </nav>
+      </div>
       <BackendHealthBanner />
     </>
   )

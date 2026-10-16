@@ -3,25 +3,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { WorkflowCanvas } from './WorkflowCanvas'
 import { defaultWorkflowNodes } from './workflowTypes'
-import type { NodeChange } from '@xyflow/react'
+import type { NodeChange, ReactFlowProps } from '@xyflow/react'
 
 const saveLayout = vi.hoisted(() => vi.fn())
+const flowRender = vi.hoisted(() => vi.fn())
+const fitView = vi.hoisted(() => vi.fn())
 vi.mock('../../lib/api/workflow', () => ({
   saveWorkflowLayout: saveLayout, addWorkflowNode: vi.fn(), getWorkflowGraph: vi.fn(),
 }))
 vi.mock('@xyflow/react', async (importOriginal) => ({
   ...await importOriginal<typeof import('@xyflow/react')>(),
-  ReactFlow: ({ onNodeDragStop, onNodesChange }: { onNodeDragStop: () => void; onNodesChange: (changes: NodeChange[]) => void }) => (
+  ReactFlow: (props: ReactFlowProps & { onNodeDragStop: () => void; onNodesChange: (changes: NodeChange[]) => void }) => {
+    flowRender(props)
+    props.onInit?.({ fitView } as unknown as Parameters<NonNullable<ReactFlowProps['onInit']>>[0])
+    const { onNodeDragStop, onNodesChange } = props
+    return (
     <>
       <button type="button" onClick={onNodeDragStop}>Finish moving node</button>
       <button type="button" onClick={() => onNodesChange([{ id: defaultWorkflowNodes[0].id, type: 'dimensions', dimensions: { width: 360, height: 120 }, setAttributes: 'width', resizing: true }])}>Resize node</button>
       <button type="button" onClick={() => onNodesChange([{ id: defaultWorkflowNodes[0].id, type: 'dimensions', dimensions: { width: 360, height: 120 }, resizing: false }])}>Finish resizing node</button>
     </>
-  ),
+  )},
 }))
 
 beforeEach(() => {
   vi.useFakeTimers()
+  flowRender.mockClear()
+  fitView.mockClear()
   saveLayout.mockReset().mockResolvedValue(undefined)
 })
 afterEach(() => {
@@ -30,6 +38,27 @@ afterEach(() => {
 })
 
 describe('WorkflowCanvas pending layout saves', () => {
+  it('opens a linked card at readable scale and allows jumping through a read-only workflow without saving', async () => {
+    const onNodeSelected = vi.fn()
+    renderWithProviders(<WorkflowCanvas workflowRunId="run-a" initialNodes={defaultWorkflowNodes} selectedNodeId={defaultWorkflowNodes[1].id} readOnly onNodeSelected={onNodeSelected} />)
+    expect(flowRender.mock.lastCall?.[0].fitViewOptions).toEqual(expect.objectContaining({ nodes: [{ id: defaultWorkflowNodes[1].id }], minZoom: 0.9, maxZoom: 1 }))
+    fireEvent.click(screen.getByRole('combobox', { name: /Focus workflow step|定位工作流步骤/ }))
+    const option = screen.getByRole('option', { name: new RegExp(defaultWorkflowNodes[2].data.label) })
+    fireEvent.pointerDown(option, { button: 0 })
+    fireEvent.pointerUp(option, { button: 0 })
+    fireEvent.click(option)
+    expect(onNodeSelected).toHaveBeenCalledWith(defaultWorkflowNodes[2].id)
+    expect(fitView).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: defaultWorkflowNodes[2].id }], minZoom: 0.9 }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    expect(saveLayout).not.toHaveBeenCalled()
+  })
+
+  it('still fits the whole route in the explicit overview', () => {
+    renderWithProviders(<WorkflowCanvas initialNodes={defaultWorkflowNodes} overview />)
+    expect(flowRender.mock.lastCall?.[0].fitViewOptions.nodes).toBeUndefined()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
   it('saves width when resizing finishes and preserves it through polling and subsequent dragging', async () => {
     const view = renderWithProviders(<WorkflowCanvas workflowRunId="run-a" initialNodes={defaultWorkflowNodes} />)
     fireEvent.click(screen.getByRole('button', { name: 'Resize node' }))

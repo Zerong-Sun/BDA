@@ -14,8 +14,11 @@ import {
   type Node,
   type NodeChange,
   type NodeTypes,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import { CursorClick, SpinnerGap } from '@phosphor-icons/react'
+import { Button } from '../../components/ui/Button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import { WorkflowNodeCard } from './WorkflowNode'
 import { WorkflowEdge } from './WorkflowEdge'
@@ -434,6 +437,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       addRecommendedWorkflow,
     ])
 
+    const flowInstance = useRef<ReactFlowInstance<BdaWorkflowNode, BdaWorkflowEdge> | null>(null)
+    const orderedNodes = useMemo(() => [...nodes].sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y), [nodes])
+    const focusNodeId = nodes.some(node => node.id === selectedNodeId) ? selectedNodeId! : orderedNodes[0]?.id
+    const focusCard = (id = focusNodeId) => {
+      if (id) void flowInstance.current?.fitView({ nodes: [{ id }], minZoom: 0.9, maxZoom: 1, padding: 0.12, duration: 200 })
+    }
     const proOptions = useMemo(() => ({ hideAttribution: true }), [])
     // Node deletion has no canvas persistence handler. React Flow's default
     // Backspace removal would only hide server nodes locally (even read-only
@@ -505,7 +514,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             </div>
           </div>
         ) : null}
+        {!overview && nodes.length > 0 ? <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-soft px-3 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+            <span className="shrink-0">{language === 'zh' ? '步骤' : 'Step'}</span>
+            <Select value={focusNodeId ?? null} items={orderedNodes.map((node, index) => ({ value: node.id, label: `${index + 1}. ${node.data.label}` }))} onValueChange={id => { if (id) { onNodeSelected?.(id); focusCard(id) } }}>
+              <SelectTrigger aria-label={language === 'zh' ? '定位工作流步骤' : 'Focus workflow step'} className="min-w-0 flex-1"><SelectValue className="truncate" /></SelectTrigger>
+              <SelectContent>{orderedNodes.map((node, index) => <SelectItem key={node.id} value={node.id}>{index + 1}. {node.data.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => focusCard()}>{language === 'zh' ? '可读大小' : 'Readable size'}</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void flowInstance.current?.fitView({ padding: 0.15, duration: 200 })}>{language === 'zh' ? '适应全图' : 'Fit all'}</Button>
+        </div> : null}
         <ReactFlow
+          onInit={instance => { flowInstance.current = instance }}
           className="min-h-0 flex-1"
           key={flowKey}
           nodes={overview ? overviewGraph.nodes : renderedNodes}
@@ -528,7 +549,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           edgeTypes={edgeTypes}
           fitView
           minZoom={0.1}
-          fitViewOptions={{ padding: overview ? 0.07 : 0.2, minZoom: 0.1, maxZoom: overview ? 1.25 : 2 }}
+          fitViewOptions={overview ? { padding: 0.07, minZoom: 0.1, maxZoom: 1.25 } : { nodes: focusNodeId ? [{ id: focusNodeId }] : undefined, padding: 0.12, minZoom: 0.9, maxZoom: 1 }}
           proOptions={proOptions}
           nodesDraggable={!readOnly && !overview}
           nodesConnectable={!readOnly && !overview}

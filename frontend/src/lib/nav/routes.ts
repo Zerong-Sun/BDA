@@ -46,7 +46,7 @@ export const APP_ROUTES: readonly AppRoute[] = [
 /**
  * Ordered by who acts: the project, what waits on you, the team that works on
  * it, and the research record. The stage workbenches follow behind one menu on
- * desktop; on small screens every route stays a link for reachability.
+ * all screen sizes; workflow resources also have direct links in the top bar.
  */
 export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research', '/tools', '/workflow']
 

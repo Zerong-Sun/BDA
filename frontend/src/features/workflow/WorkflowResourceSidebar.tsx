@@ -104,8 +104,8 @@ export function WorkflowResourceSidebar({
                   className="flex items-center justify-between gap-2 rounded-xl border border-border-soft bg-bg-app px-2.5 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <strong className="truncate text-sm">{plugin.name}</strong>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="break-words text-sm">{plugin.name}</strong>
                       <StatusPill
                         label={
                           plugin.enabled ? plugin.validation_status : t.shared.status.disconnected
@@ -113,7 +113,7 @@ export function WorkflowResourceSidebar({
                         tone={statusTone(plugin.enabled ? plugin.validation_status : 'disconnected')}
                       />
                     </div>
-                    <p className="truncate text-xs text-text-secondary">
+                    <p className="break-all text-xs text-text-secondary">
                       v{plugin.plugin_version} · {plugin.plugin_key}
                     </p>
                     <p className="truncate text-[11px] text-text-muted">

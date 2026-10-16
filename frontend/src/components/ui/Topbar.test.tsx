@@ -97,6 +97,28 @@ describe('Topbar logout', () => {
     expect(await screen.findByRole('button', { name: 'Manage project' })).toBeInTheDocument()
   })
 
+  it('keeps workflow, plugins and scripts directly reachable for the current project', async () => {
+    renderWithProviders(<Topbar />)
+    const nav = screen.getByRole('navigation')
+    for (const [name, suffix] of [['工作流', ''], ['模型插件', '&resource=plugins'], ['脚本', '&resource=scripts']]) {
+      await waitFor(() => expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', `#/workflow?project=proj_live${suffix}`))
+      expect(within(nav).getByRole('link', { name }).className).not.toMatch(/hidden/)
+    }
+  })
+
+  it('switches resources without losing the selected workflow or highlighting multiple entries', async () => {
+    window.location.hash = '/workflow?project=proj_live&run=run-a&node=node-b&resource=scripts'
+    renderWithProviders(<Topbar />)
+    const nav = screen.getByRole('navigation')
+    expect(within(nav).getByRole('link', { name: '脚本' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('link', { name: '工作流' })).not.toHaveAttribute('aria-current')
+    const plugins = within(nav).getByRole('link', { name: '模型插件' })
+    expect(plugins).toHaveAttribute('href', '#/workflow?project=proj_live&run=run-a&node=node-b&resource=plugins')
+    fireEvent.click(plugins)
+    await waitFor(() => expect(plugins).toHaveAttribute('aria-current', 'page'))
+    expect(within(nav).getByRole('link', { name: '脚本' })).not.toHaveAttribute('aria-current')
+  })
+
   it('exposes user actions through menu semantics', () => {
     useAppStore.setState({ language: 'en' })
     sessionStorage.setItem(
