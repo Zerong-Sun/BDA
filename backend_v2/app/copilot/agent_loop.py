@@ -405,6 +405,39 @@ def _delivery_completion(session: Session, run: CopilotAgentRun, provider: LLMPr
         return completion_message(retry, messages), "truncated_output_json_retry"
 
 
+_LENGTH_REPAIR_INSTRUCTION = (
+    "Follow the field character budgets. Keep only details needed for the user's goal; "
+    "surplus examples remain in saved receipts. Only contract required_sections keys may appear "
+    "in sections; otherwise return sections={} and put the requested content in summary. "
+    "Preserve necessary qualifications and exact source IDs. Do not add facts, claims, actions "
+    "or evidence IDs. Do not copy server diagnostic delivery_length_exceeded into missing. "
+    "Return only the shortened delivery JSON."
+)
+
+
+def _length_repair_packet(run: CopilotAgentRun, turns: list[CopilotAgentTurn], draft: Any) -> dict:
+    constraints = delivery_constraints(run, turns)
+    limit = constraints["max_visible_characters"]
+    has_sections = bool((run.task_contract or {}).get("required_sections"))
+    return {"goal": run.goal, "contract": run.task_contract,
+            "user_followups": [turn.content for turn in turns if turn.role == "user"],
+            "draft": draft, "delivery_constraints": constraints,
+            "field_budgets": {"summary": int(limit * (.1 if has_sections else .6)),
+                              "sections_combined_including_titles": int(limit * .5) if has_sections else 0,
+                              "missing_combined": int(limit * .1), "next_action": int(limit * .1)}}
+
+
+def _length_repair_messages(run: CopilotAgentRun, turns: list[CopilotAgentTurn], draft: dict) -> list[dict]:
+    packet = _length_repair_packet(run, turns, draft)
+    packet["repair_reasons"] = ["delivery_length_exceeded"]
+    return [
+        {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
+         + "\nShorten the supplied draft once. This is formatting, not a factual review or another scientific task. "
+         + _LENGTH_REPAIR_INSTRUCTION},
+        {"role": "user", "content": json.dumps(packet, ensure_ascii=False)},
+    ]
+
+
 def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
     """Advance the run by one provider call. Returns the resulting status."""
     if run.status != "running":
@@ -503,7 +536,24 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                      "repair_reasons": sorted(repair_reasons), "draft": answer,
                      "tool_records": prompt_records(tool_records(turns))}, ensure_ascii=False)},
                 ]
-                repaired_message, recovery = _delivery_completion(session, run, provider, repair_messages)
+                if repair_reasons == {"delivery_length_exceeded"}:
+                    # The validated draft already has exact evidence IDs. A
+                    # pure shortening needs no duplicated receipts; the factual
+                    # pass below still receives the original bounded records.
+                    repair_messages = _length_repair_messages(run, turns, run.outcome)
+                    correction_provider = structured_retry_provider(provider) or provider
+                    reserve_model_call(session, run, correction_provider, repair_messages)
+                    repaired_message = completion_message(correction_provider, repair_messages)
+                    recovery = None
+                else:
+                    if delivery_constraints(run, turns)["max_visible_characters"]:
+                        # Format/evidence repair still needs receipts, but must
+                        # honor the same visible-field budgets as pure shortening.
+                        packet = json.loads(repair_messages[1]["content"])
+                        packet.update(_length_repair_packet(run, turns, answer))
+                        repair_messages[1]["content"] = json.dumps(packet, ensure_ascii=False)
+                        repair_messages[0]["content"] += "\n" + _LENGTH_REPAIR_INSTRUCTION
+                    repaired_message, recovery = _delivery_completion(session, run, provider, repair_messages)
                 repaired = str(repaired_message.get("content") or "")
                 repaired_outcome = evaluate_delivery(run, repaired, turns)
                 agent_runs.append_turn(session, run, role="assistant", content=repaired,
@@ -524,26 +574,7 @@ def step(session: Session, run: CopilotAgentRun, provider: LLMProvider) -> str:
                     agent_runs.append_turn(session, run, role="assistant", content=reviewed)
                     # One bounded correction of the reviewed delivery. Preserve
                     # its claims/qualifications and the same exact receipts.
-                    constraints = delivery_constraints(run, turns)
-                    limit = constraints["max_visible_characters"]
-                    has_sections = bool((run.task_contract or {}).get("required_sections"))
-                    packet = {"goal": run.goal, "contract": run.task_contract,
-                              "user_followups": [turn.content for turn in turns if turn.role == "user"],
-                              "draft": reviewed_outcome, "delivery_constraints": constraints,
-                              "field_budgets": {"summary": int(limit * (.1 if has_sections else .6)),
-                                                "sections_combined_including_titles": int(limit * .5) if has_sections else 0,
-                                                "missing_combined": int(limit * .1), "next_action": int(limit * .1)}}
-                    short_conversation = [
-                        {"role": "system", "content": SCIENTIFIC_POLICY + "\n" + FINAL_INSTRUCTION
-                         + "\nShorten the supplied reviewed draft once. This is formatting, not another scientific task. "
-                           "Follow the field character budgets. Keep only details needed for the user's goal; "
-                           "surplus examples remain in saved receipts. Only contract required_sections keys may appear "
-                           "in sections; otherwise return sections={} and put the requested content in summary. "
-                           "Preserve necessary qualifications and exact source IDs. Do not add facts, claims, actions "
-                           "or evidence IDs. Do not copy server diagnostic delivery_length_exceeded into missing. "
-                           "Return only the shortened delivery JSON."},
-                        {"role": "user", "content": json.dumps(packet, ensure_ascii=False)},
-                    ]
+                    short_conversation = _length_repair_messages(run, turns, reviewed_outcome)
                     # This correction only formats the preceding factual pass;
                     # its saved attempt above consumes a transcript slot.
                     correction_provider = structured_retry_provider(provider) or provider
