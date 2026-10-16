@@ -340,11 +340,6 @@ export function AgentRunDetail({
           {run.data.status === 'awaiting_tasks' ? (
             <p className="text-xs text-text-secondary">{copy.waitingOn}</p>
           ) : null}
-          {run.data.error ? (
-            <p role="alert" className="text-xs text-destructive">
-              {run.data.error}
-            </p>
-          ) : null}
         </div>
       ) : null}
 

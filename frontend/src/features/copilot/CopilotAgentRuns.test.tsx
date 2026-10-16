@@ -59,6 +59,44 @@ afterEach(() => cleanup())
 beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'application', language: 'en' }) })
 
 describe('agent run panel', () => {
+  it('separates execution, review and report count without hiding a short report', async () => {
+    useAppStore.setState({ language: 'zh' })
+    runReturns({ ...RUN, status: 'succeeded', outcome: {
+      status: 'partial', summary: '摘要🧬', sections: { '证据': '待核验' }, missing: ['映射缺失'],
+      next_action: '查原记录', scientific_review: 'automated_review_completed',
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const delivery = await screen.findByRole('region', { name: '任务交付' })
+    expect(within(delivery).getByText('执行结束')).toBeVisible()
+    expect(within(delivery).getByText('已完成', { exact: true })).toBeVisible()
+    expect(within(delivery).getByText('16', { exact: true })).toBeVisible()
+    expect(within(delivery).getByText('待核验')).toBeVisible()
+    expect(within(delivery).getByText('映射缺失')).toBeVisible()
+  })
+
+  it('localizes a failed generation without presenting the error as a report or completed review', async () => {
+    useAppStore.setState({ language: 'zh' })
+    const error = 'Model completion exceeded the 180-second total deadline; no response was accepted.'
+    runReturns({ ...RUN, status: 'failed', error, outcome: {
+      status: 'blocked', summary: '', missing: [error], next_action: 'Review the failure and continue after correcting the cause.',
+    } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText('执行失败')).toBeVisible()
+    expect(screen.getByText('未记录完成')).toBeVisible()
+    expect(screen.getByText('尚无报告')).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent('模型在 180 秒内未完成回复，本次未生成可接受的报告。')
+    expect(screen.getByText('先排查失败原因，修正后再继续任务。')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '查看原始错误' }))
+    expect(screen.getByText(error)).toBeVisible()
+  })
+
+  it('keeps the execution failure visible when a historical outcome is malformed', async () => {
+    runReturns({ ...RUN, status: 'failed', error: 'Provider unavailable', outcome: { sections: [] } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByText('Invalid task result. Reload the task.')).toBeVisible()
+    expect(screen.getByText('Provider unavailable')).toBeVisible()
+  })
+
   it.each([
     ['en', 'The review result failed delivery validation. The saved draft still needs review.'],
     ['zh', '复核结果未通过交付校验，已保存的草稿仍需审核。'],
