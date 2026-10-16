@@ -59,6 +59,14 @@ describe('archived research overview', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'View source 1' }))
     expect(screen.getByRole('button', { name: '[1] Saved source 36' })).toHaveAttribute('aria-expanded', 'true')
   })
+  it('keeps fallback brief prose separate from report citation numbering', async () => {
+    respond('## Research questions\nWhich ligand?', [{ document_id: 'doc-1', ref_id: 'R001', title: { en: 'Report source' } }])
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, summary: 'Brief objective.[1]' }} />)
+    expect(await screen.findByText('Which ligand?')).toBeVisible()
+    expect(screen.getByText('Source: project brief')).toBeVisible()
+    expect(screen.getByText('Brief objective.[1]')).toBeVisible()
+    expect(screen.queryByRole('link', { name: /View source/ })).not.toBeInTheDocument()
+  })
   it('reports fetch failures with a retry rather than empty goals', async () => {
     server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ detail: 'unavailable' }, { status: 503 })))
     renderWithProviders(<ProjectResearchOverview project={project} />)

@@ -35,6 +35,7 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
     setReportOpen(['report'])
     reportRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
   }
+  const briefSource = brief.source === 'public-package' ? (zh ? '来源：已导入资料包任务书' : 'Source: imported package brief') : (zh ? '来源：项目任务书' : 'Source: project brief')
   const source = (title: string) => <p className="text-xs text-text-muted">{zh ? '原报告章节' : 'Saved report section'} · {title}</p>
 
   return <section aria-label={zh ? '项目研究总结' : 'Project research summary'} className="space-y-5 pb-6">
@@ -68,9 +69,8 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
       </nav>
       <section aria-label={zh ? '研究目标与问题' : 'Research objectives and questions'} className="space-y-3">
         <h2 className="font-semibold">{zh ? '研究目标与问题' : 'Research objectives and questions'}</h2>
-        {objectives.length ? source(objectives.map(section => section.title).join(' · ')) : <p className="text-xs text-text-muted">{brief.source === 'public-package' ? (zh ? '来源：已导入资料包任务书' : 'Source: imported package brief') : (zh ? '来源：项目任务书' : 'Source: project brief')}</p>}
-        {prose(objective.objective || brief.objective || (zh ? '原资料未记录目标。' : 'No objective is recorded in the source.'))}
-        {objective.questions ? <div className="rounded-lg bg-surface-2 p-4"><h3 className="mb-2 text-sm font-semibold">{zh ? '原报告中的研究问题' : 'Research questions from the saved report'}</h3>{prose(objective.questions)}</div> : brief.questions.length ? <ReviewMarkdown>{brief.questions.map((question, index) => `${index + 1}. ${question}`).join('\n')}</ReviewMarkdown> : null}
+        {objective.objective ? <>{source(objectives.filter((_, index) => objectiveParts[index].objective).map(section => section.title).join(' · '))}{prose(objective.objective)}</> : <><p className="text-xs text-text-muted">{briefSource}</p><ReviewMarkdown>{brief.objective || (zh ? '原资料未记录目标。' : 'No objective is recorded in the source.')}</ReviewMarkdown></>}
+        {objective.questions ? <div className="space-y-2 rounded-lg bg-surface-2 p-4"><h3 className="text-sm font-semibold">{zh ? '原报告中的研究问题' : 'Research questions from the saved report'}</h3>{source(objectives.filter((_, index) => objectiveParts[index].questions).map(section => section.title).join(' · '))}{prose(objective.questions)}</div> : brief.questions.length ? <div className="space-y-2"><p className="text-xs text-text-muted">{briefSource}</p><ReviewMarkdown>{brief.questions.map((question, index) => `${index + 1}. ${question}`).join('\n')}</ReviewMarkdown></div> : null}
       </section>
       <section aria-label={zh ? '遗留问题与推进条件' : 'Open questions and advancement conditions'} className="space-y-3 border-t border-border-soft pt-4">
         <h2 className="font-semibold">{zh ? '遗留问题与推进条件' : 'Open questions and advancement conditions'}</h2>
