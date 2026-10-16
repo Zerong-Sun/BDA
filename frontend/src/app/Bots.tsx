@@ -105,7 +105,7 @@ function BotProjectWorkspace() {
   return <section className={`bot-page${focusedTask ? ' bot-page--task' : ''}`} data-tour-id="bot-workspace">
     <header className="science-page-header">
       <div><p className="science-eyebrow">{zh ? 'AI FOR SCIENCE / 研究协作' : 'AI FOR SCIENCE / COLLABORATION'}</p>
-        <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '研究团队' : 'Research team')}</h1>
+        <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '项目研究团队' : 'Project research team')}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
       {projectId && !focusedTask ? <div className="flex flex-wrap gap-2">

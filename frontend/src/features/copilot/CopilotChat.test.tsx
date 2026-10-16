@@ -62,6 +62,27 @@ describe('CopilotChat', () => {
     vi.clearAllMocks()
   })
 
+  it('never imports unscoped legacy history or another project into a new project team', async () => {
+    const foreign = [{ role: 'assistant' as const, content: 'Other project private result' }]
+    useAppStore.setState({
+      copilotMessages: [{ role: 'assistant', content: 'Unscoped legacy private result' }],
+      copilotSessions: { other_project: { conversationId: 'other-conversation', bot: 'analyst', messages: foreign } },
+    })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    expect(screen.queryByText('Other project private result')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unscoped legacy private result')).not.toBeInTheDocument()
+    fireEvent.change(input, { target: { value: 'Current project progress' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0]).toMatchObject({
+      project_id: 'proj_test', conversation_id: null, bot: 'conductor',
+      messages: [{ role: 'user', content: 'Current project progress' }],
+    })
+    expect(useAppStore.getState().copilotSessions.other_project.messages).toEqual(foreign)
+    expect(useAppStore.getState().copilotMessages[0].content).toBe('Unscoped legacy private result')
+  })
+
   it('offers persistent calculation mode without sending conflicting bot hints or creating a research task', async () => {
     const taskRequested = vi.fn()
     const view = renderWithProviders(<CopilotChat externalRoster onTaskRequested={taskRequested} />)
@@ -267,7 +288,7 @@ describe('CopilotChat', () => {
   it('localizes citation origins and secures external links', async () => {
     useAppStore.setState({
       language: 'zh',
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: '给出来源' },
         {
           role: 'assistant',
@@ -281,7 +302,7 @@ describe('CopilotChat', () => {
             ],
           },
         },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
@@ -324,10 +345,10 @@ describe('CopilotChat', () => {
 
   it('sanitizes persisted empty assistant placeholders before calling the API', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: 'Earlier question' },
         { role: 'assistant', content: '' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
@@ -353,10 +374,10 @@ describe('CopilotChat', () => {
 
   it('hides save-to-review on generic workflow chat', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: 'Explain candidate ranking' },
         { role: 'assistant', content: 'Candidate A is ranked first because of composite score.' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
@@ -368,14 +389,14 @@ describe('CopilotChat', () => {
 
   it('shows save-to-review when a review section prompt was used', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         {
           role: 'user',
           content: '请完善结合策略章节',
           meta: { reviewTrack: 'binding_strategy' },
         },
         { role: 'assistant', content: 'Binding strategy draft with supporting evidence.' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/research; research_tab=evidence; project_id=proj_test" />)

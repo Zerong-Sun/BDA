@@ -27,8 +27,8 @@ export function BotRoster({ projectId, activeBotId = null, autoActive = false, o
   const stanceLabel: Record<string, string> = { direct: zh ? '协调' : 'Coordinate', produce: zh ? '研究与产出' : 'Research & produce', review: zh ? '审阅' : 'Review' }
 
   return <aside className="bot-roster" aria-label={zh ? '研究 Bot 名录' : 'Research Bot roster'}>
-    <h2>{zh ? '团队成员' : 'Team members'}</h2>
-    <p className="mb-4 text-xs text-text-muted">{zh ? '选择成员，查看职责与任务。' : 'Select a member to view their role and tasks.'}</p>
+    <h2>{zh ? '本项目成员' : 'Project team members'}</h2>
+    <p className="mb-4 text-xs text-text-muted">{zh ? '对话、任务与工作记录仅限当前项目。' : 'Conversations, tasks and work records belong to this project.'}</p>
     <div className="bot-roster-scroll">
       <Button variant="ghost" className="bot-roster-item" type="button" aria-pressed={autoActive} onClick={onAuto}><BotAvatar id="auto" stance="direct" /><span><strong>{zh ? '团队群聊' : 'Team chat'}</strong><small>{zh ? '项目负责人统筹推进' : 'Coordinated by the project lead'}</small></span></Button>
       <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>

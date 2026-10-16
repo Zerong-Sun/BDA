@@ -4,11 +4,12 @@ import { copilotHandoffsQueryKey } from './handoffs'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { requireCopilotWrite } from './commandAccess'
 
 const MAX_COPILOT_HISTORY = 20
+const EMPTY_MESSAGES: CopilotChatMessage[] = []
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
 
 function explainCopilotError(err: unknown): string {
@@ -33,8 +34,9 @@ function explainCopilotError(err: unknown): string {
 export function useCopilotChat(projectId?: string, pageContext?: string, language: 'en' | 'zh' = 'en') {
   const queryClient = useQueryClient()
   const session = useAppStore((state) => projectId ? state.copilotSessions[projectId] : undefined)
-  const legacyMessages = useAppStore((state) => state.copilotMessages)
-  const messages = session?.messages ?? legacyMessages
+  // Unscoped legacy history has no trustworthy project owner. Never attach it
+  // to whichever project happens to open first, or send it as that team's context.
+  const messages = session?.messages ?? EMPTY_MESSAGES
   const conversationId = session?.conversationId ?? null
   const setLegacyMessages = useAppStore((state) => state.setCopilotMessages)
   const setSessionMessages = useAppStore((state) => state.setCopilotSessionMessages)
@@ -46,8 +48,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   ) => {
     const state = useAppStore.getState()
     const current = projectId
-      ? state.copilotSessions[projectId]?.messages ?? state.copilotMessages
-      : state.copilotMessages
+      ? state.copilotSessions[projectId]?.messages ?? EMPTY_MESSAGES
+      : EMPTY_MESSAGES
     const resolved = typeof next === 'function' ? next(current) : next
     if (projectId) setSessionMessages(projectId, resolved)
     else setLegacyMessages(resolved)
@@ -56,15 +58,6 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     if (projectId) resetSession(projectId)
     else setLegacyMessages([])
   }
-  useEffect(() => {
-    if (!projectId) return
-    const state = useAppStore.getState()
-    const existing = state.copilotSessions[projectId]
-    if (existing) return
-    const migratedMessages = state.copilotMessages
-    setSessionMessages(projectId, migratedMessages)
-    setLegacyMessages([])
-  }, [projectId, setLegacyMessages, setSessionMessages])
   const loading = Boolean(session?.pending)
   const loadingStage: CopilotLoadingStage = session?.pending?.stage ?? 'idle'
   const loadingDetail = session?.pending?.detail ?? null
