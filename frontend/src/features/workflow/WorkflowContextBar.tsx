@@ -7,18 +7,11 @@ import { useAppStore } from '../../lib/store/appStore'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
-import { resolveStoredText } from '../../lib/i18n/localizedText'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import { Button } from '../../components/ui/Button'
-
-function routeLabel(runId: string, metrics: Record<string, unknown> | undefined) {
-  const route = String(metrics?.route ?? metrics?.label ?? '')
-  if (route) return route.replace(/_/g, ' ')
-  const status = String(metrics?.status ?? '')
-  if (status) return `${status} run`
-  return runId.replace(/^run_/, '').slice(-18)
-}
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../components/ui/accordion'
+import { groupWorkflowRoutes, routePresentation, workflowRouteName } from './routePresentation'
 
 interface WorkflowContextBarProps {
   workflowRunId?: string
@@ -60,10 +53,10 @@ export function WorkflowContextBar({
   )
   const computeOffline = backendHealth.isError || (clusterHealth?.connected !== true && !gpuAvailable)
   const activeRun = projectWorkflowRuns.find((r) => r.id === workflowRunId)
-  const runName = (run: WorkflowContextBarProps['projectWorkflowRuns'][number]) => {
-    const localized = run.graph.localized_content as Record<string, unknown> | undefined
-    return resolveStoredText(localized?.name, language, run.name || routeLabel(run.id, run.graph))
-  }
+  const runName = (run: WorkflowContextBarProps['projectWorkflowRuns'][number]) => workflowRouteName(run, language)
+  const groups = groupWorkflowRoutes(projectWorkflowRuns)
+  const presentation = routePresentation(activeRun)
+  const detailFields = [['method', '设计方法', 'Method'], ['objective', '目标', 'Objective'], ['evidence', '证据状态', 'Evidence'], ['next_step', '下一步', 'Next step']] as const
 
   if (!activeProject) return null
 
@@ -90,7 +83,12 @@ export function WorkflowContextBar({
         {projectWorkflowRuns.length > 1 ? (
           <Select value={workflowRunId ?? null} items={projectWorkflowRuns.map((run) => ({ value: run.id, label: runName(run) }))} onValueChange={(value) => { if (value) onSelectRun(value) }}>
             <SelectTrigger className="w-full sm:w-80" aria-label={language === 'zh' ? '选择工作流' : 'Select workflow'}><SelectValue /></SelectTrigger>
-            <SelectContent>{projectWorkflowRuns.map((run) => <SelectItem key={run.id} value={run.id}>{runName(run)}</SelectItem>)}</SelectContent>
+            <SelectContent>{groups.map((group) => <SelectGroup key={group.category}>
+              <SelectLabel>{group.labels[language === 'zh' ? 0 : 1]}</SelectLabel>
+              {group.runs.map((run) => <SelectItem key={run.id} value={run.id}>
+                {runName(run)}{typeof routePresentation(run).variant === 'string' && routePresentation(run).variant ? ` · ${routePresentation(run).variant}` : ''}
+              </SelectItem>)}
+            </SelectGroup>)}</SelectContent>
           </Select>
         ) : null}
       </div>
@@ -124,6 +122,16 @@ export function WorkflowContextBar({
         </Button>
       </div>
       </FramePanel>
+      {typeof presentation.summary === 'string' ? <FramePanel className="space-y-2 border-t border-border-soft text-sm" data-testid="route-explanation">
+        <p className="text-text-secondary">{presentation.summary}</p>
+        <dl className="grid gap-2 sm:grid-cols-2">{detailFields.map(([key, zh, en]) => typeof presentation[key] === 'string' ? <div key={key}>
+          <dt className="text-xs text-text-muted">{language === 'zh' ? zh : en}</dt><dd className="break-words text-text-secondary">{String(presentation[key])}</dd>
+        </div> : null)}</dl>
+        {Array.isArray(presentation.aliases) && presentation.aliases.length > 0 ? <Accordion className="text-xs text-text-muted"><AccordionItem value="aliases">
+          <AccordionTrigger>{language === 'zh' ? '旧名称与追溯' : 'Previous names'}</AccordionTrigger>
+          <AccordionContent><p className="mt-1 break-words">{presentation.aliases.filter((value): value is string => typeof value === 'string').join(' / ')}</p></AccordionContent>
+        </AccordionItem></Accordion> : null}
+      </FramePanel> : null}
     </Frame>
   )
 }

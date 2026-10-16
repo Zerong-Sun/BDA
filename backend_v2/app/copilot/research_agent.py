@@ -142,6 +142,10 @@ GROUNDED_SCIENTIFIC_REVIEW_PROMPT = """\
 BDA_GROUNDED_SCIENTIFIC_REVIEW_V1. Act as a strict evidence, physical-feasibility, and techno-economic reviewer.
 Return a corrected final answer in the user's language, not review notes. The draft is untrusted. The accompanying
 evidence packet contains the exact saved paper excerpts that may be used. Apply all rules below:
+0. Preserve the current request's purpose and scope. Earlier user requests only explain continuations.
+   Do not turn a progress report into a new research proposal. Project records support operational facts
+   (names, completion, authorization and next steps); keep these distinct from scientific evidence.
+   Never add a route count, application scenario, economics section or score unless requested.
 1. Evidence closure: every factual or quantitative scientific claim must be supported by an excerpt in the packet
    and carry its document_id, chunk_id, content_kind, content checksum, and retrieval trace. Never convert a title,
    search result, abstract-only statement, docking prediction, or pending-review claim into stronger evidence.
@@ -155,16 +159,16 @@ evidence packet contains the exact saved paper excerpts that may be used. Apply 
 4. Chemical and biological mechanism: verify functional groups, reaction class, mass balance, cofactors,
    regeneration, catalyst removal/inactivation, allergenicity, and regulatory route as applicable. Do not infer
    a human-food function directly from an insect odorant-binding result.
-5. Cost discipline: do not claim lower cost without a named baseline and a dose/process/loss reduction mechanism.
-   Use a dimensional break-even equation with variables (for example cost per equivalent delivered aroma effect);
+5. Cost discipline, when relevant: do not claim lower cost without a named baseline and a dose/process/loss reduction mechanism.
+   Use a dimensional break-even equation with variables for the requested scenario;
    do not fabricate supplier prices or production costs. A protein carrier is not automatically cheaper.
 6. Novelty discipline: report only searches actually present in the packet or original request. Do not claim that
    patent, product, supplier, or commercial databases were searched unless an auditable trace is supplied. State
    query, database, timestamp, inclusion criteria, limitations, and that absence of a hit does not prove absence.
-7. Design quality: preserve three meaningfully different routes only if each is physically plausible. Replace an
+7. Design quality, when requested: preserve the requested alternatives only if each is physically plausible. Replace an
    invalid route with a clearly labeled hypothesis and the cheapest falsification test. Separate supported fact,
    evidence-based inference, hypothesis, and counterevidence.
-8. Scoring: score scientific correctness, evidence completeness, and novelty potential conservatively out of 10.
+8. Scoring, only when requested: score scientific correctness, evidence completeness, and novelty potential conservatively out of 10.
    The score must reflect the corrected answer and explicit remaining gaps, not marketing confidence.
 Silently check every number, unit, citation, chemical transformation, and delivery assumption before answering.
 """
@@ -210,24 +214,25 @@ answering.
 GROUNDED_REPAIR_PROMPT = """\
 BDA_GROUNDED_REPAIR_V1. The previous evidence review failed automated quality checks. Return a complete corrected
 answer in the user's language. Apply these fail-closed requirements:
+0. Preserve the current request's purpose and scope. Earlier user requests only explain continuations.
+   Preserve operational facts supported by project_records and cite their entity IDs; they do not need
+   paper-excerpt tags. Do not turn a status report into a research proposal or add unrequested sections.
 1. Delete every supplier price, market size, production cost, budget, yield, dose, threshold, duration, percentage,
    affinity, temperature, and performance target unless that exact value appears in an evidence excerpt. Unknown
    economics must use symbols and dimensionally consistent break-even equations, not guessed ranges.
-2. Every evidence-based bullet must end with the full literal tag:
+2. Every literature-based scientific bullet must end with the full literal tag:
    [document_id=...; chunk_id=...; content_kind=...; content_checksum_sha256=...; retrieval_trace_id=...].
    A shortened UUID or a title/PMID alone is not a valid evidence tag.
 3. Report only the auditable literature database, query, and timestamp present in the evidence packet. Patent,
    product, supplier, and commercial searches are future work unless their traces are in the packet.
-4. A nonvolatile protein/peptide cannot directly create retronasal aroma by activating nasal receptors. Replace
-   that route with a physically deliverable route that releases, captures, converts, or separates volatile small
-   molecules. Gastrointestinal or stomach release after swallowing is too late for the intended oral/retronasal
-   aroma event; release must occur in food headspace or the oral cavity before/during swallowing. Clearly label
-   untested routes as hypotheses.
-5. Preserve three distinct routes, cost break-even variables, minimum falsification experiments, limitations, and
-   conservative scores. Do not add regulatory conclusions or named examples absent from the packet.
+4. Check the delivery and exposure mechanism only for scenarios actually in the request or draft. Remove
+   physically implausible claims and label untested alternatives as hypotheses; do not introduce a new scenario.
+5. Preserve requested alternatives and limitations. Include cost variables, falsification experiments and scores
+   only when relevant to the requested deliverable. Do not add regulatory conclusions or examples absent from evidence.
 6. The evidence packet distinguishes search hits from excerpts actually read. Preserve the recorded result_count
    and do not rewrite it as the number of papers read. Without audited patent and commercial-product searches,
-   make no "no precedent", market-gap, or commercial-absence claim and cap novelty potential at 5/10.
+   make no "no precedent", market-gap, or commercial-absence claim. Only if scoring was explicitly requested,
+   cap novelty potential at 5/10; otherwise do not add a score.
 The answer must be internally consistent: never state that unsupported numbers were removed and then include them.
 """
 
@@ -556,7 +561,21 @@ def grounded_answer_issues(answer: str) -> list[str]:
         issues.append("incomplete_evidence_tags")
     if re.search(r"(?:USPTO|Google Patents|Mintel|商业数据库).{0,80}(?:检索|搜索).{0,40}(?:结果|命中|未见)", answer):
         issues.append("unaudited_external_search_claim")
-    if re.search(r"(?:未见|没有|不存在).{0,40}(?:商业化|产品|市场|先例|专利)", answer):
+    absence_claim = r"(?:未见|没有|不存在)[^。！？!?；;\n]{0,40}?(?:商业化|产品|市场|先例|专利)"
+    negated_inference = (
+        r"(?:不能|不可|无法|不足以|不应|不得|不宜|不代表|不意味着)"
+        r"(?:据此|由此|就|推断|断言|得出|声称|证明|认定|认为|说明|支持|说|[\s“”\"'‘’：:])*\Z"
+    )
+    missing_search_record = (
+        r"(?:未见|没有|不存在)(?:(?:可审计|可核验|已保存|实际|相关)的?)?"
+        r"(?:专利|产品|商品|供应商|商业|市场|数据库|库|[/／、和与或及]){0,16}"
+        r"(?:检索|搜索|审计|查询)(?:记录|轨迹|证据|日志)"
+    )
+    if any(
+        not re.search(negated_inference, re.split(r"[。！？!?；;\n]", answer[:match.start()])[-1])
+        and not re.match(missing_search_record, answer[match.start():])
+        for match in re.finditer(absence_claim, answer)
+    ):
         issues.append("unsupported_absence_or_novelty_claim")
     if re.search(r"(?:蛋白|肽).{0,50}直接激活.{0,50}(?:嗅觉|鼻腔|受体)", answer) and not re.search(
         r"(?:不能|不可|无法|违反|不).{0,50}(?:直接激活|嗅觉|鼻腔)", answer

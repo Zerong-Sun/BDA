@@ -117,6 +117,7 @@ class SkillResponse(BaseModel):
 
 
 class BotResponse(BaseModel):
+    aliases: list[str] = Field(default_factory=list)
     id: str
     title: str
     title_zh: str
@@ -240,6 +241,11 @@ class RoomTask(BaseModel):
     updated_at: datetime
 
 
+class RoomDiscussion(BaseModel):
+    run_id: uuid.UUID
+    content: str
+
+
 class RoomEvent(BaseModel):
     """One entry in the room, carrying exactly the record it came from.
 
@@ -249,7 +255,7 @@ class RoomEvent(BaseModel):
     that an unsupported claim and a cited answer are the same kind of thing.
     """
 
-    kind: Literal["message", "handoff", "task", "decision"]
+    kind: Literal["message", "handoff", "task", "decision", "discussion"]
     id: uuid.UUID
     occurred_at: datetime
     #: The operator this entry belongs to: the speaker, the sender of a
@@ -260,6 +266,7 @@ class RoomEvent(BaseModel):
     handoff: HandoffResponse | None = None
     task: RoomTask | None = None
     decision: DecisionRequestResponse | None = None
+    discussion: RoomDiscussion | None = None
 
 
 class RoomPage(BaseModel):

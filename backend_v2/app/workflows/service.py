@@ -8,7 +8,43 @@ from ..identity.models import User
 from ..projects.models import Project
 from .models import WorkflowNode, WorkflowRun
 from .repository import WorkflowRepository
-from .schemas import WorkflowCreate, WorkflowLayoutUpdate, WorkflowNodeInput, WorkflowNodeUpdate
+from .schemas import RoutePresentation, WorkflowCreate, WorkflowLayoutUpdate, WorkflowNodeInput, WorkflowNodeUpdate
+
+
+def update_presentation(
+    session: Session, workflow: WorkflowRun, payload: RoutePresentation,
+    user: User, project: Project, expected_version: int,
+) -> WorkflowRun:
+    """Organize existing records without touching nodes, results, gates or status."""
+    if workflow.project_id != project.id:
+        raise DomainError("workflow_not_found", "Workflow was not found", status_code=404)
+    if workflow.version != expected_version:
+        raise DomainError("version_conflict", "Workflow was modified by another request", status_code=412)
+    previous = {"name": workflow.name, "route_presentation": (workflow.graph or {}).get("route_presentation")}
+    presentation = payload.model_dump(mode="json")
+    graph = workflow.graph or {}
+    stored = graph.get("route_presentation")
+    old_presentation = stored if isinstance(stored, dict) else {}
+    stored_aliases = old_presentation.get("aliases")
+    aliases = [*(stored_aliases if isinstance(stored_aliases, list) else []), *payload.aliases]
+    if workflow.name != payload.name:
+        aliases.append(workflow.name)
+    # Keep the oldest identity and recent names visible; the audit retains the full transition.
+    presentation["aliases"] = list(dict.fromkeys(name.strip() for name in aliases if isinstance(name, str) and name.strip()))
+    if len(presentation["aliases"]) > 30:
+        presentation["aliases"] = presentation["aliases"][:1] + presentation["aliases"][-29:]
+    stored_localized = graph.get("localized_content")
+    localized = {**(stored_localized if isinstance(stored_localized, dict) else {}), "name": {"zh": payload.name, "en": payload.name_en}}
+    if graph.get("route_presentation") == presentation and workflow.name == payload.name and graph.get("localized_content") == localized:
+        return workflow
+    workflow.name = payload.name
+    workflow.graph = {**graph, "route_presentation": presentation, "localized_content": localized}
+    workflow.version += 1
+    record_audit(session, action="workflow.presentation.update", entity_type="workflow_run",
+        entity_id=workflow.id, project_id=project.id, organization_id=project.organization_id,
+        actor_id=user.id, payload={"before": previous, "after": presentation})
+    session.flush()
+    return workflow
 
 
 def create_workflow(session: Session, project: Project, payload: WorkflowCreate, user: User) -> WorkflowRun:
@@ -76,8 +112,12 @@ def replace_workflow_graph(
         raise DomainError("workflow_locked", "Only draft workflows can be edited", status_code=409)
     if workflow.version != expected_version:
         raise DomainError("version_conflict", "Workflow was modified by another request", status_code=412)
+    display = {key: workflow.graph[key] for key in ("route_presentation", "localized_content") if key in workflow.graph}
+    if "route_presentation" in display and payload.name.strip() != workflow.name:
+        raise DomainError("workflow_presentation_rename_required", "Rename an organized route through its presentation endpoint", status_code=409)
     workflow.name = payload.name.strip()
     workflow.graph = {
+        **display,
         "nodes": [node.model_dump(mode="json") for node in payload.nodes],
         "edges": [edge.model_dump(mode="json") for edge in payload.edges],
     }

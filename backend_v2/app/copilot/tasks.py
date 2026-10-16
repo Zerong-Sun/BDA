@@ -247,13 +247,17 @@ def copilot_respond(message_id: str) -> dict:
                     citations = agent_result.citations
                     tool_calls = agent_result.tool_calls
                     grounded_citations = _traceable_literature_citations(citations)
+                    review_request = source.content
+                    if history:
+                        earlier = "\n\n".join(item.content for item in history if item.role == "user")[-12_000:]
+                        review_request = f"Current request:\n{source.content}\n\nEarlier user requests (context only):\n{earlier}"
                     # Server-rendered arithmetic already carries its validated assumptions.
                     # A prose reviewer must not rewrite the calculator's facts.
                     if not agent_result.calculator_delivery and len(answer) >= 1500 and grounded_citations:
                         evidence_packet = research_context.grounding_packet(citations)
                         reviewed = review_grounded_scientific_answer_result(
                             provider,
-                            source.content,
+                            review_request,
                             answer,
                             evidence_packet,
                         )
@@ -269,7 +273,7 @@ def copilot_respond(message_id: str) -> dict:
                         if review_issues:
                             reviewed = repair_grounded_scientific_answer_result(
                                 provider,
-                                source.content,
+                                review_request,
                                 answer,
                                 evidence_packet,
                                 review_issues,
@@ -292,7 +296,7 @@ def copilot_respond(message_id: str) -> dict:
                                     + "。不得将本回答作为已验证科学结论。"
                                 )
                     elif not agent_result.calculator_delivery and _needs_scientific_review(available_kinds, answer):
-                        reviewed = review_scientific_answer_result(provider, source.content, answer)
+                        reviewed = review_scientific_answer_result(provider, review_request, answer)
                         answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                 elif settings.is_production:
                     raise RuntimeError("copilot_provider_not_configured")

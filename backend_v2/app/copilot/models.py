@@ -88,7 +88,7 @@ AGENT_RUN_STATUSES = (
 #: lifecycle: a literature search, a target intelligence run, a gap repair. They
 #: were the awkward case before it existed, because the agent could start them
 #: and then had nothing to do but report "queued" and stop.
-AGENT_TASK_KINDS = ("gpu_job", "subagent", "operation")
+AGENT_TASK_KINDS = ("gpu_job", "subagent", "operation", "decision")
 
 AGENT_TASK_STATUSES = ("running", "succeeded", "failed", "cancelled")
 

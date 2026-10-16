@@ -38,6 +38,7 @@
 - [版本化科研 Skill 方法包](SCIENTIFIC_METHOD_PACKAGES.md)
 - [Bot 名册](COPILOT_BOT_ROSTER.md)
 - [Bot 职责与委派规则](COPILOT_BOT_GOVERNANCE.md)
+- [团队协作与路线整理六维验证（2026-10-16）](TEAM_ROUTE_REVIEW_2026-10-16.md)
 - [MCP 能力与调用契约](MCP_CAPABILITY_SURFACE.md)
 - [决策归属与人工放行](DECISION_TRANSPARENCY.md)
 - [工作流连接与门控](WORKFLOW_GATES.md)

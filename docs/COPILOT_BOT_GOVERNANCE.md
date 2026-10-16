@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-14（Asia/Shanghai；名册合并为 6 个 operator，stance 规则、复核与交接协议不变；steward 并入 auditor）
+最后核验：2026-10-16（Asia/Shanghai；团队任务、公开讨论、等待用户选择与恢复均有回归验证）
 
 权威范围：bot 的职责轴（stance）、决定权与拒绝的机械约束、bot 之间的交接协议与委派规则。
 
@@ -36,8 +36,9 @@ producers along tool boundaries: nine producers for what a person experiences
 as four pieces of work. The roster is now `conductor` (direct), `researcher`,
 `planner`, `runner`, `analyst` (produce) and `auditor` (review). Everything this
 document requires still holds and is still enforced at import: three stances,
-no writes outside producers, every producer reviewed, review and delegation
-terminating on producers, one owner per guided recipe. `steward`'s resource
+no writes outside producers, every producer reviewed, reviews targeting producers,
+and no recursive director delegation, one owner per guided recipe. The director
+can also delegate to the fixed independent reviewer. `steward`'s resource
 review is part of `auditor`, which already held `review-audit`. Retired ids and
 how their history is read are described in the
 [roster](COPILOT_BOT_ROSTER.md#the-chain-and-its-six-operators); sections below
@@ -72,10 +73,14 @@ stance says what it is *for*, and what it may therefore never do.
 "None" means no capability that changes the research record. Both stances still
 hold `chain-messaging`, which writes a handover row — a reviewer that could not
 report its verdict, or a director that could not say why it routed, would be
-useless. That one exemption is named in `bots._INTERNAL_WRITE_CAPABILITIES`, its
+useless. This messaging exemption is named in `bots._INTERNAL_WRITE_CAPABILITIES`; its
 tools declare `intent="internal"` in the registry so the same claim is made from
 both sides, and the argument for it is below: the note changes no domain table.
-The list is short on purpose; anything else added to it is a hole in this rule.
+Orchestration also writes a durable coordination task. `start_team_task` is a
+draft-mode, user-intent write: it requires the original user's explicit request,
+validates the source message and existing task ownership, and records an audit.
+Read-only transports must exclude it. Its task bookkeeping grants no research
+mutation. The exemption list contains only messaging and orchestration.
 
 The enforcement is the entire point, and it lives in `_validate_roster()`
 beside the existing unknown-capability check, so a violation fails at import
@@ -155,7 +160,7 @@ implicit in a handler.
 
 ## 3. Three new bots
 
-### `conductor` — 总调度 (stance: `direct`)
+### `conductor` — 项目负责人 (stance: `direct`)
 
 Capabilities: `project-read`, `research-read`, `chain-orchestration`,
 `chain-messaging`. No domain writes.
@@ -179,9 +184,12 @@ purposes, not the conductor's instruction — otherwise the conductor could emit
 side of the conversation. The instruction steers the work; it can never
 authorise it.
 
-Delegation requires an agent run (`requires="agent_run"`), so in chat the
-conductor can only recommend an operator. That matches `spawn_subagent` and
-keeps the chat surface incapable of opening runs behind the user's back.
+Delegation requires an agent run (`requires="agent_run"`). In chat, the lead
+uses `start_team_task()` to promote an explicit action request to one durable
+run per source message. The source must be the requesting user's unchanged
+message in the same project. Advice and negated requests do not open runs.
+Once started, the background worker continues without another user message.
+All members use `read_team_progress()` to read shared public discussion.
 
 A child run is also **dispatched**, through the outbox, at the moment it is
 created. `start_agent_run` did that for a run a person started and nothing did
@@ -193,13 +201,14 @@ that nothing was going to run. The defect was `spawn_subagent`'s first;
 `delegate_to_operator` inherited it, which would have made `conductor` a bot
 that cannot complete a single delegation.
 
-### `auditor` — 复核 (stance: `review`)
+### `auditor` — 科学审阅员 (stance: `review`)
 
 Capabilities: `project-read`, `research-read`, `review-audit`,
 `chain-messaging`. Zero writes.
 
-- `read_operator_work(run_id)` — which tools an operator actually called and
-  what came back, not what it said it did
+- `read_operator_work(run_id)` — recorded tool calls and results, plus the final
+  outcome whose claims need checking. The outcome is separate from evidence;
+  both are bounded and any truncation is explicit.
 - `list_operator_charters()` — the refusals it is checking against
 
 Its output is a verdict per claim: `supported`, `unsupported`, `contradicted`,

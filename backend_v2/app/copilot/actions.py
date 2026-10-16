@@ -27,6 +27,10 @@ from ..projects.service import require_project
 from .research_actions import ResearchActionService
 
 _ACTION_REQUEST_TERMS = {
+    "start_team_task": {
+        "domains": {"team", "project", "goal", "task", "research", "pd-l1", "pdl1", "团队", "项目", "目标", "任务", "研究", "分工", "推进"},
+        "verbs": {"start", "carry out", "coordinate", "delegate", "complete", "investigate", "run", "开始", "执行", "完成", "安排", "分工", "推进", "调研", "分析", "帮我", "测试", "尝试", "整理", "添加", "补充"},
+    },
     "resolve_research_gaps": {
         "domains": {"gap", "gaps", "缺口", "补齐", "修复"},
         "verbs": {
@@ -60,6 +64,8 @@ _ACTION_REQUEST_TERMS = {
             "启动",
             "排队",
             "摄取",
+            "添加",
+            "补充",
             "检索",
             "搜索",
         },

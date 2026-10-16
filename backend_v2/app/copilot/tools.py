@@ -1668,6 +1668,8 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
                 evidence["content_preview"] = content
         remaining_chars -= min(len(content), allowance)
         results.append(evidence)
+    outcome_text = json.dumps(run.outcome or {}, ensure_ascii=False)
+    outcome_truncated = len(outcome_text) > _REVIEW_TOOL_RESULTS_CHARS
     return {
         "run_id": str(run.id),
         "bot": run.bot,
@@ -1675,6 +1677,9 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "status": run.status,
         "turn_count": run.turn_count,
         "allowed_tools": list(run.allowed_tools or []),
+        "outcome": None if outcome_truncated else (run.outcome or {}),
+        "outcome_preview": outcome_text[:_REVIEW_TOOL_RESULTS_CHARS] if outcome_truncated else None,
+        "outcome_truncated": outcome_truncated,
         "tool_calls": calls,
         "tool_results": results,
         "transcript_truncated": len(turns) < run.turn_count,
@@ -1705,8 +1710,9 @@ _register(
         id="read_operator_work",
         description=(
             "What an operator's run actually called and what came back, turn by "
-            "turn. Use this rather than its summary: the summary is the thing "
-            "under review. Tool results are bounded; truncation or parse errors "
+            "turn, together with its final outcome (the claims under review). "
+            "Compare the outcome against the tool results; the outcome is not evidence. "
+            "Tool results and outcome are bounded; truncation or parse errors "
             "mean the evidence is incomplete, not verified."
         ),
         parameters={
@@ -1752,6 +1758,94 @@ def _list_operators(ctx: ToolContext, args: dict[str, Any]) -> Any:
         }
         for bot in roster.all_bots()
     ]
+
+
+def _start_team_task(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """Promote the user's chat request to durable coordination, once per message."""
+    from ..audit.service import record_audit
+    from .models import CopilotAgentRun, CopilotConversation, CopilotMessage
+    from .schemas import AgentRunCreate
+    from .service import start_agent_run
+
+    if _bot_of(ctx) != "conductor":
+        raise ValueError("copilot_delegation_not_allowed")
+    if ctx.agent_run is not None:
+        return {"run_id": str(ctx.agent_run.id), "status": ctx.agent_run.status,
+                "next_action": "delegate_to_operator"}
+    actions = ctx.actions
+    source = ctx.session.scalar(select(CopilotMessage).where(
+        CopilotMessage.id == actions.source_message_id).with_for_update())
+    conversation = ctx.session.get(CopilotConversation, source.conversation_id) if source else None
+    if (source is None or source.role != "user" or conversation is None
+            or conversation.project_id != ctx.project_id
+            or actions.request_text != source.content
+            or str((source.context or {}).get("_requested_by") or conversation.created_by) != str(ctx.user_id)):
+        raise ValueError("copilot_team_request_required")
+    actions._require_explicit("start_team_task")
+    existing = (source.context or {}).get("team_run_id")
+    try:
+        existing_id = uuid.UUID(str(existing)) if existing else None
+    except ValueError as exc:
+        raise ValueError("copilot_team_request_required") from exc
+    run = ctx.session.get(CopilotAgentRun, existing_id) if existing_id else None
+    if run is not None and (
+        run.project_id != ctx.project_id or run.created_by != ctx.user_id
+        or run.conversation_id != conversation.id or run.goal != source.content
+        or run.bot != "conductor" or run.parent_run_id is not None
+    ):
+        raise ValueError("copilot_team_request_required")
+    if run is None:
+        run, _ = start_agent_run(ctx.session, actions.project, actions.user, AgentRunCreate(
+            project_id=ctx.project_id, conversation_id=conversation.id,
+            goal=source.content, bot="conductor", max_turns=80,
+        ))
+        source.context = {**(source.context or {}), "team_run_id": str(run.id)}
+        source.version += 1
+        record_audit(ctx.session, action="copilot.team.start", entity_type="copilot_agent_run",
+            entity_id=run.id, project_id=ctx.project_id, organization_id=actions.project.organization_id,
+            actor_id=ctx.user_id, payload={"source_message_id": str(source.id)})
+        ctx.session.flush()
+    return {"run_id": str(run.id), "bot": run.bot, "status": run.status,
+            "goal": run.goal, "continuation": "background_worker",
+            "next_action": "Acknowledge this run and end the chat turn. The background worker continues "
+                           "automatically; the user does not need to send another message. "
+                           "Follow the team's progress in the research room."}
+
+
+_register(ToolSpec(
+    id="start_team_task",
+    description=("Start durable team coordination for the user's current project goal. "
+                 "Use only when the user asks you to carry out work, not for advice or status. "
+                 "The server preserves the original request and starts at most one task per message. "
+                 "Inside an existing run use delegate_to_operator instead."),
+    parameters=_EMPTY_OBJECT, capability="chain-orchestration", execution_mode="draft",
+    requires="actions", needs_operator=True, audit=True, handler=_start_team_task,
+))
+
+
+def _read_team_progress(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import room
+    from .models import CopilotAgentRun
+    from .schemas import RoomEvent
+
+    project_id = _project_of(ctx)
+    active = ctx.session.scalars(select(CopilotAgentRun).where(
+        CopilotAgentRun.project_id == project_id,
+        CopilotAgentRun.status.in_(("running", "awaiting_tasks")),
+    ).order_by(CopilotAgentRun.created_at.desc()).limit(30))
+    entries, _ = room.events(ctx.session, project_id=project_id, limit=30)
+    return {
+        "active_tasks": [{"run_id": str(run.id), "bot": run.bot, "goal": run.goal,
+                          "status": run.status} for run in active],
+        "recent_activity": [RoomEvent.model_validate(entry).model_dump(mode="json") for entry in entries],
+    }
+
+
+_register(ToolSpec(
+    id="read_team_progress", description="Read this project's active team tasks and recent public discussion before reporting progress or planning the next assignment.",
+    parameters=_EMPTY_OBJECT, capability="chain-messaging", execution_mode="read",
+    requires="session", handler=_read_team_progress,
+))
 
 
 def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
@@ -1983,7 +2077,10 @@ def _request_decision(ctx: ToolContext, args: dict[str, Any]) -> Any:
         recommended=_arg_str(args, "recommended") or None,
         run_id=getattr(run, "id", None),
     )
-    return decisions.to_json(row)
+    result = decisions.to_json(row)
+    if run is not None:
+        result["resource_id"] = str(row.id)
+    return result
 
 
 _DECISION_OPTION_SCHEMA: dict[str, Any] = {
@@ -2038,6 +2135,7 @@ _register(
             "additionalProperties": False,
         },
         capability="chain-messaging",
+        awaits="decision",
         execution_mode="draft",
         requires="session",
         # Copilot bookkeeping, like a handover: it changes no research record,

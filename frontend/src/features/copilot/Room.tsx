@@ -68,7 +68,7 @@ export function Room({
   const bots = useCopilotBots()
   const roster = bots.data ?? []
   const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode } = useCopilotChat(
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode, bot: selectedBot } = useCopilotChat(
     projectId,
     pageContext,
     language,
@@ -118,6 +118,7 @@ export function Room({
   // show the addressee before it is sent rather than after.
   const mention = mode === 'bench' ? null : parseMention(input, roster)
   const addressee = mention?.bot
+  const recipient = mode === 'bench' ? undefined : addressee ?? resolveBot(selectedBot ?? 'conductor', roster)
   const unknownHandle = mention && !mention.bot ? mention.handle : null
   const assignable = addressee ? ownedService(addressee) : undefined
 
@@ -142,11 +143,13 @@ export function Room({
       >
         <ScrollArea className="room-scroll">
           <div className="room-feed">
+            {feed.hasNextPage ? <Button type="button" variant="ghost" disabled={feed.isFetchingNextPage}
+              onClick={() => void feed.fetchNextPage()}>{zh ? '查看更早的讨论' : 'Earlier discussion'}</Button> : null}
             {visible.length === 0 && !loading ? (
               <p className="room-empty" role="status">
                 {zh
-                  ? '这里会记录团队的每一次发言、交接与任务。说点什么，或者 @ 一位成员。'
-                  : 'Every message, handover and task in this project appears here. Say something, or @ a member.'}
+                  ? '把目标告诉项目负责人，团队会分工推进。这里显示成员的讨论、任务进度与待你决定的选项，也可以 @ 任一成员。'
+                  : 'Tell the project lead your goal. Follow team discussions, assignments and decisions here, or @ any member.'}
               </p>
             ) : null}
             {visible.map((entry) => (
@@ -188,12 +191,12 @@ export function Room({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      {addressee || unknownHandle ? (
+      {recipient || unknownHandle ? (
         <p className="room-addressee" role="status">
-          {addressee ? (
+          {recipient && !unknownHandle ? (
             <>
-              <span>{zh ? '发给' : 'To'} <strong>{zh ? addressee.title_zh : addressee.title}</strong></span>
-              {assignable && onAssign && !readOnly ? (
+              <span>{zh ? '发给' : 'To'} <strong>{zh ? recipient.title_zh : recipient.title}</strong></span>
+              {addressee && assignable && onAssign && !readOnly ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -315,6 +318,20 @@ function RoomEntry({
   onOpenRun?: (runId: string) => void
   onOpenBot?: (botId: string) => void
 }) {
+  if (entry.kind === 'discussion' && entry.discussion) {
+    const speaker = resolveBot(entry.bot, roster)
+    return <article className="room-entry">
+      {speaker ? <BotAvatar id={speaker.id} stance={speaker.stance} /> : null}
+      <div className="room-entry-body">
+        <p className="room-speaker">{speakerName(entry.bot, roster, zh)}</p>
+        <div className="room-text"><ReviewMarkdown projectId={projectId}>{entry.discussion.content}</ReviewMarkdown></div>
+        {onOpenRun ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenRun(entry.discussion!.run_id)}>
+          {zh ? '查看任务与证据' : 'Open task and evidence'}
+        </Button> : null}
+      </div>
+    </article>
+  }
+
   if (entry.kind === 'handoff' && entry.handoff) {
     return (
       <article className="room-entry room-entry--handoff">

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { readRoomApiV2CopilotProjectsProjectIdRoomGet } from '../../lib/api/generated'
 import type { RoomEvent } from '../../lib/api/generated'
 import { LIVE_RUN_STATUSES } from '../../lib/api/agentRuns'
@@ -27,23 +27,26 @@ function isLiveEntry(entry: RoomEvent): boolean {
 }
 
 export function useCopilotRoom(projectId: string | null, limit = 100) {
-  return useQuery({
+  const query = useInfiniteQuery({
     // The project id is part of the key because a room belongs to one project
     // and nothing else; a shared key would show one project's chain in another.
     queryKey: copilotRoomQueryKey(projectId),
     enabled: Boolean(projectId),
-    queryFn: async () => {
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
       const { data } = await readRoomApiV2CopilotProjectsProjectIdRoomGet<true>({
         throwOnError: true,
         path: { project_id: projectId as string },
-        query: { limit },
+        query: { limit, cursor: pageParam },
       })
-      return data.items
+      return data
     },
-    // A pending turn or task can finish without a connected stream. Poll until
-    // every visible entry settles, including after a browser reload.
-    refetchInterval: (query) => (query.state.data ?? []).some(isLiveEntry) ? 4000 : false,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    // Keep discovering discussion even if active tasks have moved off the loaded
+    // pages or another tab starts work; visible active tasks use a faster cadence.
+    refetchInterval: (query) => (query.state.data?.pages ?? []).some((page) => page.items.some(isLiveEntry)) ? 4000 : 15000,
   })
+  return { ...query, data: query.data?.pages.flatMap((page) => page.items) }
 }
 
 /**
@@ -73,5 +76,6 @@ export function childTasksByParent(entries: readonly RoomEvent[]): Map<string, R
 
 /** Top-level entries: everything except the delegated children nested above. */
 export function topLevelEntries(entries: readonly RoomEvent[]): RoomEvent[] {
-  return entries.filter((entry) => !entry.task?.parent_run_id)
+  const present = new Set(entries.flatMap((entry) => entry.task ? [entry.task.id] : []))
+  return entries.filter((entry) => !entry.task?.parent_run_id || !present.has(entry.task.parent_run_id))
 }

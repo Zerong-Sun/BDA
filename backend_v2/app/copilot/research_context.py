@@ -19,6 +19,7 @@ from ..literature.models import (
     LiteratureSearchRun,
 )
 from ..projects.models import Project
+from ..research.models import ResearchBrief
 from ..research.workspace import build_research_workspace
 
 SENSITIVE_KEYS = {"download_url", "object_key", "credential_ref", "api_key", "token"}
@@ -68,6 +69,16 @@ class ResearchContextService:
             )
         }
         self._items = self._flatten()
+        # The preferred review is only one brief. Selected progress notes and
+        # later corrections must remain readable without replacing that review.
+        review_id = (self.workspace.get("review_document") or {}).get("id")
+        self._items.extend({
+            "kind": "research_brief", "id": str(row.id), "label": row.title,
+            "data": _sanitize({"id": str(row.id), "title": row.title, "content": row.content,
+                "review_status": row.status, "scope": row.scope, "version": row.version,
+                "updated_at": row.updated_at.isoformat(), "content_kind": "project_record"}),
+        } for row in session.scalars(select(ResearchBrief).where(ResearchBrief.project_id == project.id)
+            .order_by(ResearchBrief.created_at.desc(), ResearchBrief.id.desc())) if str(row.id) != review_id)
         self._items.extend(self._literature_evidence_items())
 
     def research_overview(self) -> dict[str, Any]:
@@ -93,6 +104,9 @@ class ResearchContextService:
             },
             "primary_target_present": project.get("primary_target") is not None,
             "available_kinds": sorted({item["kind"] for item in self._items}),
+            "recent_briefs": [{"id": item["id"], "title": item["label"],
+                "review_status": item["data"]["review_status"], "updated_at": item["data"]["updated_at"]}
+                for item in self._items if item["kind"] == "research_brief"][:5],
         }
 
     def search_research(
@@ -333,14 +347,47 @@ class ResearchContextService:
                 "scope": (
                     "Exact saved literature excerpts used by the draft. These remain pending human review. "
                     "Use only the supplied citation_markers for these excerpts; packet order is not citation numbering. "
-                    "Anything not supported here must be removed, parameterized, or labeled as a hypothesis."
+                    "Project records support operational status only, not independent scientific validation. "
+                    "Unsupported scientific claims must be removed, parameterized, or labeled as a hypothesis."
                 ),
                 "searches": searches,
                 "items": packet,
+                "project_records": self._project_records_for_review(catalog),
             },
             ensure_ascii=False,
             default=str,
         )
+
+    def _project_records_for_review(self, citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Keep cited progress corrections in a literature review without upgrading them to paper evidence."""
+        wanted = [
+            (str(c.get("workspace_type")), str(c.get("entity_id")))
+            for c in citations if c.get("source_type") == "research_workspace"
+        ]
+        if not wanted:
+            return []
+        available = {(item["kind"], item["id"]): item for item in self._items}
+        records: list[dict[str, Any]] = []
+        remaining = 12_000
+        # Keep selection/citation order: a selected correction must not lose its
+        # budget to a larger, older canonical review earlier in the workspace.
+        for key in dict.fromkeys(wanted):
+            item = available.get(key)
+            if item is None or item["kind"] not in {
+                "project", "review_document", "research_brief", "method",
+            }:
+                continue
+            content = json.dumps(item["data"], ensure_ascii=False, default=str)
+            allowance = min(6000, remaining)
+            if allowance <= 0:
+                break
+            records.append({
+                "entity_id": item["id"], "kind": item["kind"], "label": item["label"],
+                "record": content[:allowance], "truncated": len(content) > allowance,
+                "evidence_scope": "project record; not independent scientific validation",
+            })
+            remaining -= min(len(content), allowance)
+        return records
 
     def build_context(
         self,
@@ -374,6 +421,7 @@ class ResearchContextService:
             "coverage": {
                 "retrieved": len(selected),
                 "available": len(self._items),
+                "unavailable_selected_ids": sorted(selected_ids - {item["id"] for item in selected}),
                 "note": "Only retrieved items may be used as factual evidence. Request another page if needed.",
             },
         }

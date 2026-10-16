@@ -72,12 +72,11 @@ _STANCE_ONLY = {
 }
 
 #: Write capabilities that change no research record, so holding one does not
-#: make an operator a producer. Only the handover channel qualifies: it writes
-#: the copilot's own transcript, which is the same thing a chat message already
-#: does every turn. Anything else added here would be a hole in the stance rule,
-#: so the list is short on purpose and each member's tools declare
-#: `intent="internal"` in the registry to say the same thing from the other side.
-_INTERNAL_WRITE_CAPABILITIES = frozenset({"chain-messaging"})
+#: make an operator a producer. Messaging writes the copilot transcript;
+#: orchestration opens its durable task. Starting that task still requires the
+#: original user's explicit request and is classified as a write for read-only
+#: transports. Neither capability grants a research-domain mutation.
+_INTERNAL_WRITE_CAPABILITIES = frozenset({"chain-messaging", "chain-orchestration"})
 
 
 @dataclass(frozen=True)
@@ -104,6 +103,7 @@ class BotSpec:
     #: unioned with anything.
     capabilities: tuple[str, ...]
     #: Bot ids this one should hand to. Validated for existence only.
+    aliases: tuple[str, ...] = ()
     handoff: tuple[str, ...] = ()
     #: For a `review` bot: whose output it judges. This is the "who checks me"
     #: half of a responsibility, and it is declared on the reviewer rather than
@@ -141,12 +141,29 @@ class BotSpec:
 BOTS: tuple[BotSpec, ...] = (
     BotSpec(
         id="conductor",
-        title="Conductor",
-        title_zh="总调度",
+        title="Project Lead",
+        aliases=("Conductor", "总调度"),
+        title_zh="项目负责人",
         phase=-1,
         stance="direct",
         summary="Decide which operator works next, delegate to it, and say when the chain stops.",
         charter=(
+            "You are the user's project lead in the shared research room. "
+            "Read read_team_progress before reporting status or assigning work; avoid duplicating active work. "
+            "Check research_overview for recent project notes before repeating an old handover; "
+            "read the relevant current records and distinguish unavailable evidence from unchanged state. "
+            "When the user asks the team to carry out a goal in chat, call "
+            "start_team_task to start durable coordination; a promise in chat is not execution. "
+            "After start_team_task succeeds in chat, briefly acknowledge the run and end the chat turn. "
+            "The background worker owns the continuation; do not do extra research, delegate again "
+            "from chat, or tell the user to send another message to continue. "
+            "When already in a durable run, use delegate_to_operator instead. "
+            "Own the goal until its acceptance criteria are met, or clearly report a blocker. "
+            "State the goal, next assignment and acceptance criteria in a short public message "
+            "before delegating. After each result, report progress, inspect remaining gaps and "
+            "delegate the next necessary step, including independent review by auditor. "
+            "Use request_decision for concrete choices or required inputs; resume after the answer. "
+            "Report failures and budget limits honestly; do not call a partial result completion. "
             "You route work; you do not do it. Read the chain's handovers and the "
             "project's state, name the operator whose accountability the next step "
             "falls under, and delegate to it with an instruction that says what to "
@@ -154,9 +171,11 @@ BOTS: tuple[BotSpec, ...] = (
             "changes the research record, and delegating is not a way to reach one: "
             "a delegated operator runs under its own charter and its own "
             "capabilities, and refuses what it would refuse from a person. You "
-            "cannot authorise a write. If a step needs one, say which operator owns "
-            "it and what the user would have to ask for, and stop - an instruction "
-            "you wrote is not the user asking. Delegate one step at a time and read "
+            "cannot authorise a write. If a step needs one, check the original user's "
+            "request and the project's enabled capabilities. When already authorised, "
+            "delegate it to its owner and continue without asking for the same permission again. "
+            "Only ask for genuinely missing authority or inputs; an instruction you wrote "
+            "cannot enlarge the user's request. Delegate one step at a time and read "
             "what came back before choosing the next: a plan made for five steps at "
             "once is a plan that ignores the first result. When the operators "
             "disagree, send the claim to auditor rather than picking the answer you "
@@ -179,7 +198,7 @@ BOTS: tuple[BotSpec, ...] = (
             "chain-messaging",
         ),
         handoff=("auditor",),
-        directs=("researcher", "planner", "runner", "analyst"),
+        directs=("researcher", "planner", "runner", "analyst", "auditor"),
         triggers=(
             "orchestrate", "coordinate", "who should", "next operator", "delegate",
             "调度", "统筹", "安排", "该谁", "全链条",
@@ -187,8 +206,9 @@ BOTS: tuple[BotSpec, ...] = (
     ),
     BotSpec(
         id="researcher",
-        title="Researcher",
-        title_zh="研究员",
+        title="Evidence Researcher",
+        aliases=("Researcher", "研究员"),
+        title_zh="文献研究员",
         phase=1,
         stance="produce",
         summary="Turn an intent into a falsifiable question and gather the literature and target evidence behind it.",
@@ -254,8 +274,9 @@ BOTS: tuple[BotSpec, ...] = (
     ),
     BotSpec(
         id="planner",
-        title="Planner",
-        title_zh="方案设计",
+        title="Design Scientist",
+        aliases=("Planner", "方案设计"),
+        title_zh="方案设计师",
         phase=2,
         stance="produce",
         summary="Read the structures, choose the route and draft the compute that implements it.",
@@ -312,8 +333,9 @@ BOTS: tuple[BotSpec, ...] = (
     ),
     BotSpec(
         id="runner",
-        title="Runner",
-        title_zh="执行与排障",
+        title="Compute Engineer",
+        aliases=("Runner", "执行与排障"),
+        title_zh="计算工程师",
         phase=3,
         stance="produce",
         summary="Carry a confirmed run across its waits, report each outcome, and explain failures from recorded evidence.",
@@ -359,8 +381,9 @@ BOTS: tuple[BotSpec, ...] = (
     ),
     BotSpec(
         id="analyst",
-        title="Analyst",
-        title_zh="解读与归档",
+        title="Data Analyst",
+        aliases=("Analyst", "解读与归档"),
+        title_zh="数据分析师",
         phase=4,
         stance="produce",
         summary="Interpret recorded results without inventing any, and record what was decided and on what evidence.",
@@ -408,8 +431,9 @@ BOTS: tuple[BotSpec, ...] = (
     ),
     BotSpec(
         id="auditor",
-        title="Auditor",
-        title_zh="复核",
+        title="Scientific Reviewer",
+        aliases=("Auditor", "复核"),
+        title_zh="科学审阅员",
         phase=9,
         stance="review",
         summary="Judge operators' claims against their evidence and charters, including a draft's declared resources.",
@@ -554,12 +578,12 @@ def _validate_roster() -> None:
             other = _BY_ID.get(target)
             if other is None:
                 raise ValueError(f"bot {bot.id} names unknown operator {target}")
-            if other.stance != "produce":
+            if (target in bot.reviews and other.stance != "produce") or other.stance == "direct":
                 # Reviewing a reviewer, or directing a director, has no bottom.
-                # Accountability has to terminate on someone who produces.
+                # The declared reviewer is terminal too: it cannot delegate.
                 raise ValueError(
                     f"bot {bot.id} names {target}, which is {other.stance}; "
-                    "review and delegation must terminate on a producer"
+                    "review must target a producer; delegation must not target a director"
                 )
 
 

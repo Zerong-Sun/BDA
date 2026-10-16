@@ -13,6 +13,10 @@ const bundle = JSON.parse(await readFile(new URL('../public/research-packages/pd
 const pdb = await readFile(new URL('../../examples/migration-fixtures/pd1/complexes/PD1Binder_a0172_complex.pdb', import.meta.url), 'utf8')
 const base = createFixtureRouter({ routeId: 'research' })
 const catalog = process.env.BDA_BOT_TEST_CATALOG ? JSON.parse(await readFile(process.env.BDA_BOT_TEST_CATALOG, 'utf8')) : null
+const memberName = (id, fallback) => catalog?.bots.find((bot) => bot.id === id)?.title ?? fallback
+const plannerName = memberName('planner', 'Planner')
+const researcherName = memberName('researcher', 'Researcher')
+const conductorName = memberName('conductor', 'Conductor')
 const project = structuredClone((await base.resolve('GET', '/api/v2/projects?limit=200')).body.items[0])
 Object.assign(project, { name: bundle.projects[0].name.en, summary: bundle.projects[0].summary.en, source_package_id: bundle.package_id, source_project_key: 'PD1', localized_content: { name: bundle.projects[0].name, summary: bundle.projects[0].summary } })
 const workspace = structuredClone((await base.resolve('GET', '/api/v2/projects/proj_browser/research-workspace')).body)
@@ -38,7 +42,7 @@ const browser = await chromium.launch({ headless: true })
 const checks = []
 let server
 
-async function newPage(language = 'en', themePreference = 'light', scenario = 'populated', chatFixture = null) {
+async function newPage(language = 'en', themePreference = 'light', scenario = 'populated', chatFixture = null, roomFixture = null) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' })
   const storage = createStorageSeed({ authenticated: true, language, themePreference, scenario })
   storage.session.bda_user = JSON.stringify({ ...JSON.parse(storage.session.bda_user), role: scenario === 'read-only' ? 'viewer' : 'researcher' })
@@ -53,6 +57,17 @@ async function newPage(language = 'en', themePreference = 'light', scenario = 'p
     const url = new URL(request.url())
     const path = url.pathname
     const method = request.method()
+    if (roomFixture && path.endsWith('/room')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: roomFixture.entries, next_cursor: null }) })
+      return
+    }
+    if (roomFixture && method === 'POST' && path.endsWith('/answers')) {
+      roomFixture.answer = { ...request.postDataJSON(), version: request.headers()['if-match'] }
+      const decision = roomFixture.entries.find((entry) => entry.kind === 'decision').decision
+      Object.assign(decision, { status: 'answered', answer: roomFixture.answer.choice, version: 2 })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(decision) })
+      return
+    }
     if (chatFixture && method === 'POST' && path === '/api/v2/copilot/chat') {
       chatFixture.requests.push(request.postDataJSON())
       await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ conversation_id: 'qa-stream', message: { id: 'qa-request' } }) })
@@ -180,10 +195,10 @@ try {
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
   await page.getByRole('tab', { name: 'Research room', selected: true }).waitFor()
   checks.push('Structure A/B selection survives Bot round trips and full page reloads')
-  await page.locator('.bot-roster-item', { hasText: 'Planner' }).click()
-  await page.getByRole('heading', { level: 1, name: 'Planner', exact: true }).waitFor()
+  await page.locator('.bot-roster-item', { hasText: plannerName }).click()
+  await page.getByRole('heading', { level: 1, name: plannerName, exact: true }).waitFor()
   assert.ok(page.url().includes('/bots/planner?project=proj_browser'))
-  assert.equal(await page.locator('.bot-roster-item', { hasText: 'Planner' }).getAttribute('aria-current'), 'page')
+  assert.equal(await page.locator('.bot-roster-item', { hasText: plannerName }).getAttribute('aria-current'), 'page')
   await page.getByRole('tab', { name: 'Conversation', exact: true }).click()
   await page.locator('.bot-chat-surface').waitFor()
   await screenshot(page, 'bot-planner-en-light')
@@ -231,7 +246,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 })
   checks.push('Localized filters display labels after selection; last mobile Bot remains keyboard-accessible')
   await page.getByLabel('Task goal', { exact: true }).fill('Research the existing project sources')
-  await page.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Researcher.*Research the evidence/ }).click()
+  await page.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: new RegExp(`^${researcherName}.*Research the evidence`) }).click()
   await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).check()
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).focus()
   await page.keyboard.press('ArrowLeft')
@@ -320,12 +335,13 @@ try {
   await streaming.getByText('Synthetic streaming reply after navigation.', { exact: true }).waitFor()
   assert.ok(await streaming.getByLabel('Say something in the room', { exact: true }).isEnabled())
   assert.equal(chatFixture.requests[0].project_id, 'proj_browser')
+  assert.equal(chatFixture.requests[0].bot, 'conductor', 'An unaddressed room message goes to the project lead')
   checks.push('Delayed synthetic SSE reply stays locked across tabs and completes in its original project')
 
   const detail = await newPage()
   await detail.goto(`${origin}/#/bots/librarian?project=proj_browser`)
   // A retired id opens the operator that absorbed it, with its recorded task.
-  await detail.getByRole('heading', { level: 1, name: 'Researcher', exact: true }).waitFor()
+  await detail.getByRole('heading', { level: 1, name: researcherName, exact: true }).waitFor()
   assert.ok(detail.url().includes('/bots/researcher?project=proj_browser'))
   await detail.getByRole('button', { name: /Review the synthetic QA sources/ }).waitFor()
   assert.ok((await detail.getByRole('link', { name: 'Literature & evidence', exact: true }).getAttribute('href')).includes('tab=evidence'))
@@ -340,10 +356,10 @@ try {
   assert.ok(detail.url().includes('/bots/researcher?') && detail.url().includes('run=task-browser'))
   await detail.goBack()
   const writesBeforeAssign = writes.length
-  await detail.getByRole('button', { name: 'Assign “Research the evidence” to Researcher', exact: true }).click()
+  await detail.getByRole('button', { name: `Assign “Research the evidence” to ${researcherName}`, exact: true }).click()
   await detail.getByLabel('Task goal', { exact: true }).waitFor()
   assert.ok(detail.url().includes('/bots?project=proj_browser&view=tasks'))
-  assert.equal(await detail.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Researcher.*Research the evidence/ }).getAttribute('aria-pressed'), 'true')
+  assert.equal(await detail.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: new RegExp(`^${researcherName}.*Research the evidence`) }).getAttribute('aria-pressed'), 'true')
   assert.equal(writes.length, writesBeforeAssign, 'Assigning a task must only prepare the composer')
   await detail.goto(`${origin}/#/bots/ghost?project=proj_browser`)
   await detail.getByText('This Bot is not in the roster', { exact: true }).waitFor()
@@ -377,8 +393,8 @@ try {
   await errorPage.getByText('The task owner roster could not be loaded, so work cannot be assigned yet.', { exact: true }).waitFor()
   failRoster = false
   await errorPage.getByRole('button', { name: 'Retry', exact: true }).click()
-  await errorPage.locator('.bot-roster-item', { hasText: 'Conductor' }).waitFor()
-  await errorPage.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: /^Researcher.*Research the evidence/ }).waitFor()
+  await errorPage.locator('.bot-roster-item', { hasText: conductorName }).waitFor()
+  await errorPage.getByRole('group', { name: 'Task owner', exact: true }).getByRole('button', { name: new RegExp(`^${researcherName}.*Research the evidence`) }).waitFor()
   checks.push('Roster failure is explained once in the task composer and recovers task owners through Retry')
   failTask = true
   const taskError = await newPage()
@@ -393,6 +409,46 @@ try {
   await empty.goto(`${origin}/#/bots`)
   await empty.getByRole('heading', { name: 'Start with a research project' }).waitFor()
   checks.push('Empty workspace offers project selection without broken task controls')
+  emptyProjects = false
+  const roomFixture = { entries: [
+    { kind: 'decision', id: 'qa-decision', occurred_at: '2026-10-16T00:03:00Z', bot: 'conductor', decision: {
+      id: 'qa-decision', project_id: 'proj_browser', run_id: 'qa-team', asked_by: 'conductor',
+      question: 'Synthetic QA: which PD-L1 step comes next?', status: 'open', version: 1,
+      created_at: '2026-10-16T00:03:00Z', recommended: 'evidence', options: [
+        { key: 'evidence', label: 'Check saved evidence', rationale: 'Resolve the documented gap first', evidence_refs: [] },
+        { key: 'design', label: 'Compare design routes', rationale: 'Prepare alternatives', evidence_refs: [] },
+      ],
+    } },
+    { kind: 'discussion', id: 'qa-review', occurred_at: '2026-10-16T00:02:00Z', bot: 'auditor', discussion: {
+      run_id: 'qa-review-task', content: 'Synthetic QA: independent review confirms a measurement gap remains.' } },
+    { kind: 'discussion', id: 'qa-evidence', occurred_at: '2026-10-16T00:01:00Z', bot: 'researcher', discussion: {
+      run_id: 'qa-evidence-task', content: 'Synthetic QA: PD-L1 evidence inspected; no experiment was performed.' } },
+    { kind: 'discussion', id: 'qa-lead', occurred_at: '2026-10-16T00:00:00Z', bot: 'conductor', discussion: {
+      run_id: 'qa-team', content: 'Synthetic QA: evidence inspection and independent review assigned.' } },
+  ] }
+  const team = await newPage('en', 'light', 'populated', null, roomFixture)
+  await team.goto(`${origin}/#/bots?project=proj_browser`)
+  await team.getByText('Synthetic QA: evidence inspection and independent review assigned.', { exact: true }).waitFor()
+  await team.locator('.room-addressee', { hasText: conductorName }).waitFor()
+  await team.getByText('Synthetic QA: independent review confirms a measurement gap remains.', { exact: true }).waitFor()
+  await team.getByLabel('Say something in the room', { exact: true }).fill('@Project Lead continue with the evidence')
+  if (catalog) await team.locator('.room-addressee', { hasText: conductorName }).waitFor()
+  await team.getByLabel('Say something in the room', { exact: true }).fill('@researcher inspect this source')
+  await team.locator('.room-addressee', { hasText: researcherName }).waitFor()
+  await team.getByLabel('Say something in the room', { exact: true }).fill('')
+  await screenshot(team, 'team-discussion-en-light')
+  await team.setViewportSize({ width: 390, height: 1000 })
+  await noOverflow(team, 'Team discussion 390')
+  await screenshot(team, 'team-discussion-mobile')
+  await team.getByRole('button', { name: 'Choose: Check saved evidence', exact: true }).click()
+  await team.getByText('Decided: Check saved evidence', { exact: true }).waitFor()
+  assert.deepEqual(roomFixture.answer, { choice: 'evidence', note: '', version: 'W/"1"' })
+  await team.reload()
+  await team.getByText('Decided: Check saved evidence', { exact: true }).waitFor()
+  await team.getByText('Synthetic QA: PD-L1 evidence inspected; no experiment was performed.', { exact: true }).waitFor()
+  checks.push('Team room shows named background discussion, defaults to the lead, supports specialist mentions and preserves answered choices after reload')
+  await team.close()
+
   assert.deepEqual(failures, [], 'No uncaught browser errors')
   assert.equal(writes.length, 0, 'Read-only navigation never mutates backend state')
   await writeFile(`${output}/report.json`, JSON.stringify({ checks, failures, writes, syntheticChatPosts: chatFixture.requests.length, catalog: catalog ? { bots: catalog.bots.length, services: catalog.services.length } : 'lightweight fixtures' }, null, 2))

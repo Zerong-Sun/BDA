@@ -20,6 +20,7 @@ from .models import WorkflowNode, WorkflowRun
 from .preflight import evaluate_preflight
 from .repository import WorkflowRepository
 from .schemas import (
+    RoutePresentation,
     ScriptPreviewCreate,
     ScriptPreviewResponse,
     WorkflowCreate,
@@ -35,7 +36,15 @@ from .schemas import (
     WorkflowResponse,
     WorkflowValidation,
 )
-from .service import add_node, create_workflow, delete_node, replace_workflow_graph, update_layout, update_node
+from .service import (
+    add_node,
+    create_workflow,
+    delete_node,
+    replace_workflow_graph,
+    update_layout,
+    update_node,
+    update_presentation,
+)
 
 router = APIRouter(tags=["workflows"])
 
@@ -56,6 +65,24 @@ def list_workflows(
         items=[WorkflowResponse.model_validate(item) for item in page],
         next_cursor=encode_cursor(page[-1].id) if has_next and page else None,
     )
+
+
+@router.patch(
+    "/workflow-runs/{workflow_id}/presentation", response_model=WorkflowResponse,
+    openapi_extra={"x-permission": "workflow.update"},
+)
+def patch_workflow_presentation(
+    workflow_id: uuid.UUID, payload: RoutePresentation, response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> WorkflowResponse:
+    workflow = WorkflowRepository(session).get(workflow_id)
+    if workflow is None:
+        raise DomainError("workflow_not_found", "Workflow was not found", status_code=404)
+    project = require_project(session, workflow.project_id, user)
+    row = update_presentation(session, workflow, payload, user, project, parse_if_match(if_match))
+    response.headers["ETag"] = etag(row.version)
+    return WorkflowResponse.model_validate(row)
 
 
 @router.post(
