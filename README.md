@@ -154,6 +154,7 @@ python scripts/check_public_data.py
 ## 9. 文档、贡献与引用
 
 - [文档索引](docs/README.md)
+- [近期代码更新与集成状态（2026-10-17）](docs/RECENT_UPDATES_2026-10-17.md)
 - [工作区结构说明](docs/WORKSPACE_MAP.md)
 - [后端说明](docs/BACKEND_V2.md)
 - [前端说明](docs/FRONTEND_V2.md)

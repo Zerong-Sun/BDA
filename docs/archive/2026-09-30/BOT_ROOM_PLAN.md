@@ -6,19 +6,19 @@
 
 ---
 
-> **规划资料，非当前功能清单。** 本文描述尚未实现的形态。当前行为见 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md)、[Copilot bot 名册](../COPILOT_BOT_ROSTER.md)与 [决策透明度](../DECISION_TRANSPARENCY.md)。
+> **规划资料，非当前功能清单。** 本文描述尚未实现的形态。当前行为见 [Bot-first 科研工作台](../../BOT_FIRST_WORKSPACE.md)、[Copilot bot 名册](../../COPILOT_BOT_ROSTER.md)与 [决策透明度](../../DECISION_TRANSPARENCY.md)。
 
 # 研究室：一个群聊入口、可见的交接、以及在结构上选位点
 
-状态：P0–P4 已实现于 `claude/bot-interaction-decision-display-fb5506`（2026-09-14）。实现后的行为以 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md) 的 iteration 7 为准；本文保留为当时的设计论证与分期依据。
+状态：P0–P4 已实现于 `claude/bot-interaction-decision-display-fb5506`（2026-09-14）。实现后的行为以 [Bot-first 科研工作台](../../BOT_FIRST_WORKSPACE.md) 的 iteration 7 为准；本文保留为当时的设计论证与分期依据。
 
 最后核验：2026-09-14（Asia/Shanghai；对照 `codex/bot-first-science-workspace` 合并点 `8007e022`，该点已合入六人名册、职责页、决策收件箱与按角色的权限门）
 
-权威范围：本文只规定「人与 Bot 在哪一个界面里协作、Bot 之间的交接如何呈现、哪些判断需要停下来问人、以及如何在三维结构上选择位点并让它进入计算」。能力与权限边界仍以 [Copilot 服务与权限指南](../COPILOT_SERVICE_GUIDE.md) 为准；对外调用契约仍以 [MCP 能力面](../MCP_CAPABILITY_SURFACE.md) 为准；谁负责链条哪一段仍以 [Copilot bot 名册](../COPILOT_BOT_ROSTER.md) 为准。
+权威范围：本文只规定「人与 Bot 在哪一个界面里协作、Bot 之间的交接如何呈现、哪些判断需要停下来问人、以及如何在三维结构上选择位点并让它进入计算」。能力与权限边界仍以 [Copilot 服务与权限指南](../../COPILOT_SERVICE_GUIDE.md) 为准；对外调用契约仍以 [MCP 能力面](../../MCP_CAPABILITY_SURFACE.md) 为准；谁负责链条哪一段仍以 [Copilot bot 名册](../../COPILOT_BOT_ROSTER.md) 为准。
 
 数据来源：`backend_v2/app/copilot/{api,service,tasks,agent_loop,agent_runs,bots,handoffs,tools,registry,models,mcp,mcp_app}.py`、`backend_v2/app/{structures,intelligence,timeline}/`、`frontend/src/app/{Bots,BotDetail,Inbox}.tsx`、`frontend/src/features/copilot/`、`frontend/src/features/pdb-viewer/`、`backend_v2/alembic/versions/00{24,26,33}_*.py`、`qm-scripts/library/catalog.json`，均核对于 `8007e022`。外部参考：MCP Apps 扩展（2026-01-26）、MolViewSpec、BindCraft/BoltzGen 的 hotspot 输入形态。
 
-替代关系：不取代任何活跃文档。本文是 [Bot-first 科研工作台](../BOT_FIRST_WORKSPACE.md)的下一组迭代（iteration 7 起）的规划；实施后各期行为写回该文档，本文对应阶段随之移入归档。
+替代关系：不取代任何活跃文档。本文是 [Bot-first 科研工作台](../../BOT_FIRST_WORKSPACE.md)的下一组迭代（iteration 7 起）的规划；实施后各期行为写回该文档，本文对应阶段随之移入归档。
 
 ---
 
