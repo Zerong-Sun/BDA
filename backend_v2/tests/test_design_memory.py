@@ -209,9 +209,47 @@ def test_feedback_must_use_final_review_not_abandoned_draft(client):
     abandoned = review(client, rid)
     review(client, rid)
     finish(client, rid)
-    response = client[0].post(f"/api/v2/workflow-runs/{rid}/design-learning/feedback", json={
-        **lesson_body(outcome="inconclusive"), "review_id": abandoned["id"], "item_key": "identity"})
+    response = client[0].post(
+        f"/api/v2/workflow-runs/{rid}/design-learning/feedback",
+        json={**lesson_body(outcome="inconclusive"), "review_id": abandoned["id"], "item_key": "identity"},
+    )
     assert response.status_code == 409
+
+
+def test_manual_execution_has_review_and_feedback_gates_without_creating_jobs(client):
+    rid = run(client)
+    endpoint = f"/api/v2/workflow-runs/{rid}/design-learning/manual-execution"
+
+    def transition(phase):
+        return client[0].post(
+            endpoint, json={"phase": phase}, headers={"If-Match": f'W/"{state(client, rid)["workflow_version"]}"'}
+        )
+
+    # Executable routes cannot use the manual path to bypass compute submission.
+    assert transition("start").status_code == 409
+    with client[2]() as s:
+        node = s.scalar(select(WorkflowNode).where(WorkflowNode.workflow_run_id == uuid.UUID(rid)))
+        node.execution_mode = "manual"
+        s.commit()
+    assert transition("start").status_code == 409
+    original = review(client, rid)
+    response = transition("start")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "running"
+    assert transition("complete").status_code == 409
+    for item in original["payload"]["items"]:
+        response = client[0].post(
+            f"/api/v2/workflow-runs/{rid}/design-learning/feedback",
+            json={**lesson_body(outcome="execution_blocked"), "review_id": original["id"], "item_key": item["key"]},
+        )
+        assert response.status_code == 201, response.text
+    response = transition("complete")
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    assert state(client, rid)["manual_execution_complete"]
+    assert transition("complete").status_code == 409
+    with client[2]() as s:
+        assert not list(s.scalars(select(Job)))
 
 
 def test_revision_preserves_history_and_import_requires_source_access(client):

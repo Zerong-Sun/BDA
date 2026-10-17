@@ -5,10 +5,10 @@ import { useAppStore } from '../../lib/store/appStore'
 import * as memory from '../../lib/api/designMemory'
 import { DesignLearningPanel, DesignLessonLibrary } from './DesignLearning'
 
-vi.mock('../../lib/api/designMemory', () => ({ getDesignLearning: vi.fn(), listDesignLessons: vi.fn(), saveDesignReview: vi.fn(), saveDesignFeedback: vi.fn(), createDesignLesson: vi.fn(), importDesignLesson: vi.fn() }))
+vi.mock('../../lib/api/designMemory', () => ({ getDesignLearning: vi.fn(), listDesignLessons: vi.fn(), saveDesignReview: vi.fn(), saveDesignFeedback: vi.fn(), recordManualExecution: vi.fn(), createDesignLesson: vi.fn(), importDesignLesson: vi.fn() }))
 vi.mock('../../lib/api/projects', () => ({ listProjects: vi.fn(async () => []) }))
 const lesson: memory.Lesson = { id: 'lesson-1', created_at: '2026-10-17T00:00:00Z', created_by: 'user', project_id: 'p', review_id: null, item_key: null, supersedes_id: null, payload: { title: 'Conditional lesson', statement: 'Effect may depend on state', conditions: 'Only matched state A', limitations: 'No functional validation', evidence: ['record:one'], outcome: 'hypothesis', next_design_change: 'Add state B control' } }
-const state: memory.DesignLearning = { required: true, state: 'missing', workflow_version: 4, fingerprint: 'a'.repeat(64), memory_digest: 'b'.repeat(64), checklist: [{ key: 'identity', title: '身份', title_en: 'Identity', prompt: '对象', prompt_en: 'Identify inputs' }], lessons: [lesson], review: null, history: [], feedback: [], pending_feedback: [] }
+const state: memory.DesignLearning = { manual_only: false, manual_execution: false, manual_execution_complete: false, required: true, state: 'missing', workflow_version: 4, fingerprint: 'a'.repeat(64), memory_digest: 'b'.repeat(64), checklist: [{ key: 'identity', title: '身份', title_en: 'Identity', prompt: '对象', prompt_en: 'Identify inputs' }], lessons: [lesson], review: null, history: [], feedback: [], pending_feedback: [] }
 beforeEach(() => { vi.resetAllMocks(); useAppStore.setState({ language: 'en' }); vi.mocked(memory.getDesignLearning).mockResolvedValue(state); vi.mocked(memory.listDesignLessons).mockResolvedValue([lesson]) })
 afterEach(cleanup)
 

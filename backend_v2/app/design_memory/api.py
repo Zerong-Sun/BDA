@@ -15,9 +15,23 @@ from ..projects.service import require_project, require_project_permission
 from ..workflows.models import WorkflowRun
 from . import service
 from .models import DesignLesson, DesignReview
-from .schemas import FeedbackCreate, LessonCreate, LessonImport, ReviewCreate
+from .schemas import FeedbackCreate, LessonCreate, LessonImport, ManualExecution, ReviewCreate
 
 router = APIRouter(tags=["design-memory"])
+
+
+@router.post(
+    "/workflow-runs/{workflow_id}/design-learning/manual-execution", openapi_extra={"x-permission": "project:write"}
+)
+def post_manual_execution(
+    workflow_id: uuid.UUID,
+    payload: ManualExecution,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+):
+    project, workflow = scope(session, workflow_id, user, write=True)
+    return service.manual_execution(session, project, workflow, user, payload.phase, parse_if_match(if_match))
 
 
 def scope(session, workflow_id, user, *, write=False):

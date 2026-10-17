@@ -6529,6 +6529,16 @@ export type LoginRequest = {
 };
 
 /**
+ * ManualExecution
+ */
+export type ManualExecution = {
+    /**
+     * Phase
+     */
+    phase: 'start' | 'complete';
+};
+
+/**
  * McpSessionCreate
  */
 export type McpSessionCreate = {
@@ -114637,6 +114647,323 @@ export type PostFeedbackApiV2WorkflowRunsWorkflowIdDesignLearningFeedbackPostRes
      * Successful Response
      */
     201: unknown;
+};
+
+export type PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostData = {
+    body: ManualExecution;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'If-Match'?: string | null;
+    };
+    path: {
+        /**
+         * Workflow Id
+         */
+        workflow_id: string;
+    };
+    query?: never;
+    url: '/api/v2/workflow-runs/{workflow_id}/design-learning/manual-execution';
+};
+
+export type PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostErrors = {
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    400: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    401: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    403: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    404: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    409: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    422: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+    /**
+     * Problem
+     *
+     * RFC 9457 Problem Details
+     */
+    500: {
+        /**
+         * Detail
+         */
+        detail: string;
+        /**
+         * Error Code
+         */
+        error_code: string;
+        /**
+         * Errors
+         */
+        errors?: Array<{
+            [key: string]: unknown;
+        }> | null;
+        /**
+         * Instance
+         */
+        instance: string;
+        /**
+         * Status
+         */
+        status: number;
+        /**
+         * Title
+         */
+        title: string;
+        /**
+         * Trace Id
+         */
+        trace_id: string;
+        /**
+         * Type
+         */
+        type: string;
+    };
+};
+
+export type PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostError = PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostErrors[keyof PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostErrors];
+
+export type PostManualExecutionApiV2WorkflowRunsWorkflowIdDesignLearningManualExecutionPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
 };
 
 export type PostReviewApiV2WorkflowRunsWorkflowIdDesignLearningReviewsPostData = {

@@ -37,6 +37,13 @@ A derived design cannot submit while the executed parent has missing feedback;
 new feedback also forces the child's evidence review to be refreshed. Feedback can
 record partial results after submission, and never marks compute as successful.
 
+Entirely manual or external routes have an explicit start action after review. It
+freezes the design without creating compute jobs. Completion requires feedback for
+all applicable items. Blocked executions close as cancelled, invalid methods as
+failed, and otherwise the execution record closes as succeeded; a refuted hypothesis
+can still come from a successfully completed experiment. Individual manual-node
+scientific gates are not automatically approved by this action.
+
 ## API and scope
 
 - `GET/POST /projects/{id}/design-lessons`; `POST .../design-lessons/import`

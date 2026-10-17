@@ -11229,6 +11229,24 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "ManualExecution": {
+        "additionalProperties": false,
+        "properties": {
+          "phase": {
+            "enum": [
+              "start",
+              "complete"
+            ],
+            "title": "Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase"
+        ],
+        "title": "ManualExecution",
+        "type": "object"
+      },
       "McpSessionCreate": {
         "properties": {
           "agent_run_id": {
@@ -185027,6 +185045,524 @@
           }
         ],
         "summary": "Post Feedback",
+        "tags": [
+          "design-memory"
+        ],
+        "x-permission": "project:write"
+      }
+    },
+    "/api/v2/workflow-runs/{workflow_id}/design-learning/manual-execution": {
+      "post": {
+        "operationId": "post_manual_execution_api_v2_workflow_runs__workflow_id__design_learning_manual_execution_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workflow_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workflow Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualExecution"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "title": "Detail",
+                      "type": "string"
+                    },
+                    "error_code": {
+                      "title": "Error Code",
+                      "type": "string"
+                    },
+                    "errors": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Errors"
+                    },
+                    "instance": {
+                      "title": "Instance",
+                      "type": "string"
+                    },
+                    "status": {
+                      "title": "Status",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "title": "Title",
+                      "type": "string"
+                    },
+                    "trace_id": {
+                      "title": "Trace Id",
+                      "type": "string"
+                    },
+                    "type": {
+                      "title": "Type",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "instance",
+                    "error_code",
+                    "trace_id"
+                  ],
+                  "title": "Problem",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RFC 9457 Problem Details"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Post Manual Execution",
         "tags": [
           "design-memory"
         ],

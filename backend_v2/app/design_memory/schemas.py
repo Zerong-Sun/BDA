@@ -62,3 +62,7 @@ class FeedbackCreate(LessonCreate):
 
 class LessonImport(Contract):
     source_id: uuid.UUID
+
+
+class ManualExecution(Contract):
+    phase: Literal["start", "complete"]

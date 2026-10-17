@@ -156,6 +156,7 @@ def review_state(session: Session, workflow: WorkflowRun) -> dict:
     review = latest_review(session, workflow)
     current = fingerprint(session, workflow)
     memory = memory_digest(rows)
+    nodes = WorkflowRepository(session).nodes(workflow.id)
     valid = bool(review and review.fingerprint == current and review.memory_digest == memory)
     # Feedback adds new lessons; it must not retroactively invalidate an executed review.
     state = "ready" if valid else "stale" if review else "missing"
@@ -170,6 +171,10 @@ def review_state(session: Session, workflow: WorkflowRun) -> dict:
             if item["disposition"] != "not_applicable" and item["key"] not in done
         ]
     return {
+        "manual_only": bool(nodes) and all(n.execution_mode == "manual" for n in nodes),
+        "manual_execution": bool(workflow.graph.get("design_learning_manual_execution")),
+        "manual_execution_complete": bool(workflow.graph.get("design_learning_manual_execution"))
+        and workflow.status in ("succeeded", "failed", "cancelled"),
         "required": bool(workflow.graph.get("design_learning_required")),
         "state": state,
         "fingerprint": current,
@@ -304,7 +309,9 @@ def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
     if not review or review.workflow_run_id != workflow.id or review.project_id != project.id:
         raise DomainError("design_review_not_found", "Review was not found for this design", status_code=404)
     if review.id != latest_review(session, workflow).id:
-        raise DomainError("design_review_superseded", "Link results to the final review of the executed design", status_code=409)
+        raise DomainError(
+            "design_review_superseded", "Link results to the final review of the executed design", status_code=409
+        )
     item = next((i for i in review.payload["items"] if i["key"] == payload.item_key), None)
     if not item or item["disposition"] == "not_applicable":
         raise DomainError(
@@ -314,3 +321,47 @@ def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
         )
     # A later observation corrects the record by appending; it never rewrites the hypothesis.
     return save_lesson(session, project, user, payload, review=review, item_key=payload.item_key)
+
+
+def manual_execution(session, project, workflow, user, phase: str, expected_version: int):
+    session.scalar(
+        select(WorkflowRun)
+        .where(WorkflowRun.id == workflow.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if workflow.version != expected_version:
+        raise DomainError("version_conflict", "Workflow changed; reload before continuing", status_code=412)
+    state = review_state(session, workflow)
+    if not state["manual_only"]:
+        raise DomainError(
+            "manual_execution_only", "This action is only for entirely manual or external routes", status_code=409
+        )
+    if phase == "start":
+        if workflow.status != "draft" or state["state"] != "ready" or blockers(session, workflow):
+            raise DomainError(
+                "design_review_required",
+                "Complete the current design review and parent feedback first",
+                status_code=409,
+            )
+        workflow.status = "running"
+        workflow.graph = {**workflow.graph, "design_learning_manual_execution": True}
+    else:
+        if workflow.status != "running" or not state["manual_execution"] or state["pending_feedback"]:
+            raise DomainError(
+                "design_feedback_required",
+                "Record all applicable learning outcomes before completing the manual record",
+                status_code=409,
+            )
+        outcomes = {row["payload"]["outcome"] for row in state["feedback"]}
+        workflow.status = (
+            "cancelled"
+            if "execution_blocked" in outcomes
+            else "failed"
+            if "method_invalid" in outcomes
+            else "succeeded"
+        )
+    workflow.version += 1
+    session.flush()
+    audit(session, project, user, "design.manual_execution." + phase, workflow)
+    return {"workflow_run_id": str(workflow.id), "status": workflow.status, "workflow_version": workflow.version}
