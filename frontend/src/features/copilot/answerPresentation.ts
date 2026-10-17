@@ -1,5 +1,5 @@
 /** Reorder existing prose only. Never summarize tool output into a scientific claim. */
-const processTitle = /^(?:本次所做工作|本轮所做工作|本次工作|本轮性质|工具(?:调用|回读|返回|结果)|执行过程|操作过程|调用记录|过程记录|已调用工具|work performed|tool (?:calls?|results?|output)|execution log)/i
+const processTitle = /^(?:本次所做工作|本轮所做工作|本次工作|本轮性质|工具(?:调用|回读|返回|结果)|执行层|执行过程|操作过程|调用记录|过程记录|已调用工具|work performed|tool (?:calls?|results?|output)|execution log)/i
 const nextTitle = /^(?:下一(?:步|项|个)|后续(?:工作|顺序|队列)|建议下一步|next (?:steps?|actions?))/i
 const resultTitle = /^(?:结论|项目结论|当前结论|当前进展|(?:作业|工作流)?真实状态|三类状态|按三类状态|状态分类|结果|研究结果|主要发现|conclusions?|results?|summary|findings)/i
 const reviewTitle = /^(?:复核|审阅结论|review|关键约束|主要风险|未关闭|项目整体还差)/i
@@ -8,7 +8,7 @@ const knownTitle = (value: string) => [processTitle, nextTitle, resultTitle, rev
 
 function priority(title: string) {
   const value = cleanTitle(title)
-  return resultTitle.test(value) ? 0 : reviewTitle.test(value) ? 1 : nextTitle.test(value) ? 2 : 3
+  return !value || resultTitle.test(value) ? 0 : reviewTitle.test(value) ? 1 : nextTitle.test(value) ? 2 : 3
 }
 
 export function answerPresentation(markdown: string) {
@@ -51,7 +51,9 @@ export function answerPresentation(markdown: string) {
       if (!value.trim()) return false
       const start = value.trim().replace(/^(?:[-*]|\d+[.)])\s+/, '').replace(/^`/, '')
       const toolOutput = /^(?:(?:get|list|search|read|fetch)_[a-z_]+)(?:`?\s*\([^\n]*\))?`?\s*(?:→|->|返回|=)/i.test(start)
+      const stateRows = /^`?[0-9a-f]{8}-/i.test(start) && /\b(?:model_plugin_id|error_message|status:)\b/.test(value)
       const onlyLog = /^\s*(?:```|~~~)/.test(value) || (!value.includes('\n') && /project-refresh-\d+/.test(value)) || /^工作流 ID 备查[：:]/.test(start)
+        || /按时间序的 message ID[：:]/.test(value) || /^(?:review_document|讨论 conversation_id)\b/.test(start) || stateRows
       if (toolOutput || onlyLog) { folded.push(value); return false }
       return true
     }).join('\n\n').trim()

@@ -36,4 +36,8 @@ describe('latest answer presentation', () => {
     expect(answer.visible).not.toContain('get_compute_status')
     expect(answer.folded).toContain('`jobs: []`')
   })
+  it('keeps an unheaded delivery summary ahead of a structured next action', () => {
+    const answer = answerPresentation('Saved summary: QC remains pending.\n\n## Next step\nCheck the sequence mapping.')
+    expect(answer.visible.indexOf('QC remains pending')).toBeLessThan(answer.visible.indexOf('Next step'))
+  })
 })
