@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(os.getenv("BDA_V2_RUN_DB_TESTS") != "1", reason=
     "0056_workflow_gates", "0059_workflow_gates",
     "0056_copilot_task_contracts", "0061_autopilot_stage_operator",
     "0057_plugin_output_routing", "0058_staged_port_paths",
-    "0062_proteinmpnn_parser", "0064_public_integration",
+    "0062_proteinmpnn_parser", "0064_public_integration", "0077_copilot_call_guard",
 ])
 def test_existing_feature_head_upgrades_and_downgrades(previous, monkeypatch):
     settings = settings_module.get_settings()
@@ -47,11 +47,26 @@ def test_existing_feature_head_upgrades_and_downgrades(previous, monkeypatch):
         with Session(engine) as session:
             user = User(username="migration-canary", display_name="Keep this row", role="researcher")
             session.add(user)
+            if previous == "0077_copilot_call_guard":
+                from backend_v2.app.identity.models import Organization
+                from backend_v2.app.projects.models import Project
+                from backend_v2.app.workflows.models import WorkflowRun
+                org = Organization(name="Migration canary")
+                session.add(org)
+                session.flush()
+                project = Project(organization_id=org.id, owner_id=user.id, name="Migration canary", project_type="test")
+                session.add(project)
+                session.flush()
+                session.add_all([WorkflowRun(project_id=project.id, created_by=user.id, name=status, status=status, graph={"nodes": [], "edges": [], "marker": "preserved"}) for status in ("draft", "succeeded")])
             session.commit()
         command.upgrade(config, "head")
         with Session(engine) as session:
             assert session.scalar(select(User.display_name).where(User.username == "migration-canary")) == "Keep this row"
             assert session.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == ScriptDirectory.from_config(config).get_current_head()
+            if previous == "0077_copilot_call_guard":
+                for workflow in session.scalars(select(WorkflowRun)):
+                    assert workflow.graph["marker"] == "preserved"
+                    assert bool(workflow.graph.get("design_learning_required")) == (workflow.status == "draft")
         assert {"workflow_results", "workflow_gate_evaluations"} <= set(inspect(engine).get_table_names())
         command.check(config)
         command.downgrade(config, "base")

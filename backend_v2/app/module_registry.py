@@ -25,6 +25,7 @@ class ModuleDescriptor:
 
 
 MODULES = (
+    ModuleDescriptor("design_memory", ("backend_v2.app.design_memory.models",), ("backend_v2.app.design_memory.api",), permission_actions=("project:write",)),
     ModuleDescriptor("identity", ("backend_v2.app.identity.models",), ("backend_v2.app.identity.api", "backend_v2.app.identity.organizations_api"), permission_actions=("organization:manage",)),
     ModuleDescriptor("projects", ("backend_v2.app.projects.models",), ("backend_v2.app.projects.api",), ("backend_v2.app.projects.tasks",), ("project:read", "project:write")),
     ModuleDescriptor("targets", ("backend_v2.app.targets.models",), ("backend_v2.app.targets.api",), ("backend_v2.app.targets.tasks",), ("project:write",)),

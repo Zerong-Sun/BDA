@@ -42,6 +42,7 @@ SERVICES: dict[str, dict] = {
         "deliverable_zh": "适用路线、比较依据、输入缺口和待审核方案",
         "capabilities": ["project-read", "research-read", "workflow-planning"], "write_tools": [],
         "steps": [
+            _step("experience", "Review prior lessons and applicability", "检查已有经验与适用条件", ["list_design_lessons"]),
             _step("context", "Inspect inputs", "检查目标与输入", ["list_project_targets", "research_overview"]),
             _step("routes", "Compare registered routes", "比较已注册路线", ["plan_workflow_route"]),
         ],
@@ -61,7 +62,7 @@ SERVICES: dict[str, dict] = {
         "deliverable": "Observed results, limitations, supported/refuted hypotheses and next actions",
         "deliverable_zh": "结果比较、限制、支持或否定的假设和下一轮建议",
         "capabilities": ["project-read", "research-read", "result-interpretation"], "write_tools": [],
-        "steps": [_step("results", "Read recorded results", "读取实际结果", ["list_experiment_results", "list_project_candidates"])],
+        "steps": [_step("experience", "Review hypotheses and prior lessons", "检查原假说与已有经验", ["list_design_lessons"]), _step("results", "Read recorded results", "读取实际结果", ["list_experiment_results", "list_project_candidates"])],
     },
 }
 

@@ -117,6 +117,9 @@ def evaluate_preflight(
     blockers: list[dict] = []
     warnings: list[dict] = []
 
+    from ..design_memory.service import blockers as design_learning_blockers
+    blockers.extend(design_learning_blockers(session, workflow))
+
     if not nodes:
         blockers.append({"code": "workflow_empty", "message": "Workflow has no executable nodes"})
     elif all(getattr(node, "execution_mode", "dispatch") == "manual" for node in nodes):

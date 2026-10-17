@@ -126,6 +126,16 @@ class ProjectContextService:
         result.pop("markdown")
         return result
 
+    def design_lessons(self, *, offset: int = 0, limit: int = 50) -> dict:
+        from ..design_memory.service import CHECKLIST, active_lessons, lessons
+
+        rows = active_lessons(lessons(self.session, self.project_id))
+        offset, limit = max(0, offset), max(1, min(limit, 100))
+        return {"checklist": CHECKLIST, "total": len(rows), "offset": offset,
+            "next_offset": offset + limit if offset + limit < len(rows) else None,
+            "policy": "Before a new design, assess each lesson's conditions and contrary evidence. Freeze hypotheses, controls, readouts and decision rules in the workflow design-learning review. After execution, record outcomes and next changes; execution failure is not hypothesis refutation.",
+            "items": [self._item("design_lesson", r.id, r.payload["title"], r.payload) for r in rows[offset:offset + limit]]}
+
     def list_targets(self, *, limit: int = 20) -> list[dict[str, Any]]:
         rows = self.session.scalars(
             select(Target)

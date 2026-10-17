@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkle, SpinnerGap } from '@phosphor-icons/react'
 import { Link } from 'react-router'
 import { WorkflowCanvas, type WorkflowCanvasHandle } from '../features/workflow/WorkflowCanvas'
+import { DesignLearningPanel } from '../features/learning/DesignLearning'
 import { WorkflowPanelLayout } from '../features/workflow/WorkflowPanelLayout'
 import { NodeBuilder } from '../features/workflow/NodeBuilder'
 import { mapApiGraphToGraph } from '../features/workflow/workflowMapper'
@@ -816,6 +817,7 @@ function WorkflowWorkspace() {
         <Button type="button" variant="outline" onClick={() => void workflowPreflight.refetch()}>{language === 'zh' ? '重新检查' : 'Run check again'}</Button>
       </Alert> : null}
 
+      {!isDemoMode && workflowRunId && workflowRun && <DesignLearningPanel key={workflowRunId} workflowId={workflowRunId} projectId={projectId} workflowVersion={workflowRun.version} draft={draftWorkflow} writable={canEdit && !unsavedNodeChanges} />}
       {!showRoutePlanner ? <WorkflowToolbar
         isDemoMode={isDemoMode}
         readOnly={readOnly || unsavedNodeChanges}
