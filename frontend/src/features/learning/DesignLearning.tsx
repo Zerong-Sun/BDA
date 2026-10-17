@@ -115,7 +115,7 @@ function ReviewQuestion({ itemKey, title, prompt, prior, copy }: { itemKey: stri
       {prompt && <p className="whitespace-pre-wrap text-sm text-text-secondary md:col-span-2">{prompt}</p>}
       <Field title={copy('本轮适用性（每次重新确认）', 'Applicability (reconfirm for this design)')}><Choice name={name('disposition')} value={choice} onChange={e => setChoice(e.target.value)} required><option value="">{copy('请选择', 'Select')}</option><option value="apply">{copy('适用，纳入设计', 'Apply to this design')}</option><option value="test">{copy('不确定，设置验证', 'Uncertain; test it')}</option><option value="not_applicable">{copy('不适用，说明原因', 'Not applicable; explain why')}</option></Choice></Field>
       <Field title={copy('适用 / 不适用的理由与条件', 'Rationale and conditions')}><Textarea name={name('rationale')} required maxLength={6000} defaultValue={prior?.rationale} /></Field>
-      {choice !== 'not_applicable' && planFields.map(([key, zh, en]) => <Field key={key} title={copy(zh, en)}><Textarea name={name(key)} required maxLength={6000} defaultValue={prior?.[key as keyof memory.ReviewItem] ?? ''} /></Field>)}
+      {choice && choice !== 'not_applicable' && planFields.map(([key, zh, en]) => <Field key={key} title={copy(zh, en)}><Textarea name={name(key)} required maxLength={6000} defaultValue={prior?.[key as keyof memory.ReviewItem] ?? ''} /></Field>)}
     </div>
   </section>
 }
