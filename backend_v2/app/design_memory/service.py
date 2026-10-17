@@ -303,6 +303,8 @@ def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
     review = session.get(DesignReview, payload.review_id)
     if not review or review.workflow_run_id != workflow.id or review.project_id != project.id:
         raise DomainError("design_review_not_found", "Review was not found for this design", status_code=404)
+    if review.id != latest_review(session, workflow).id:
+        raise DomainError("design_review_superseded", "Link results to the final review of the executed design", status_code=409)
     item = next((i for i in review.payload["items"] if i["key"] == payload.item_key), None)
     if not item or item["disposition"] == "not_applicable":
         raise DomainError(

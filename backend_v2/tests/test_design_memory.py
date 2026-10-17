@@ -204,6 +204,16 @@ def test_feedback_cannot_reference_another_design_or_unexecuted_hypothesis(clien
     assert client[0].post(url, json=body).status_code == 422
 
 
+def test_feedback_must_use_final_review_not_abandoned_draft(client):
+    rid = run(client)
+    abandoned = review(client, rid)
+    review(client, rid)
+    finish(client, rid)
+    response = client[0].post(f"/api/v2/workflow-runs/{rid}/design-learning/feedback", json={
+        **lesson_body(outcome="inconclusive"), "review_id": abandoned["id"], "item_key": "identity"})
+    assert response.status_code == 409
+
+
 def test_revision_preserves_history_and_import_requires_source_access(client):
     initial = lesson(client)
     newer = lesson(client, supersedes_id=initial["id"], outcome="refuted")
