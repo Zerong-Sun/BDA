@@ -64,7 +64,8 @@ def citations_for(
             "review_status": result.get("analysis_status"),
         }]
     if policy == "project_items" and project_context is not None:
-        return [project_context.citation_for_item(item) for item in result]
+        rows = result.get("items", []) if isinstance(result, dict) else result
+        return [project_context.citation_for_item(item) for item in rows]
     if policy == "project_compute" and project_context is not None:
         rows = [*result.get("drafts", []), *result.get("jobs", [])]
         return [project_context.citation_for_item(item) for item in rows]
