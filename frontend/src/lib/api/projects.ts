@@ -17,6 +17,7 @@ import {
   patchProjectApiV2ProjectsProjectIdPatch,
   patchTargetApiV2TargetsTargetIdPatch,
   postFindingApiV2ProjectsProjectIdResearchFindingsPost,
+  postDeliveryApiV2ProjectsProjectIdDeliveryPackagesPost,
   postProjectApiV2ProjectsPost,
   postProjectPromptDraftApiV2ProjectsPromptDraftsPost,
   postTargetApiV2ProjectsProjectIdTargetsPost,
@@ -300,10 +301,17 @@ export async function getResultsSummary(projectId: string) {
 
 export async function getDeliveryPackage(projectId: string) {
   const page = (await listDeliveryApiV2ProjectsProjectIdDeliveryPackagesGet<true>({
-    path: { project_id: projectId }, query: { limit: 1 }, throwOnError: true,
+    path: { project_id: projectId }, query: { limit: 1, order: 'newest' }, throwOnError: true,
   })).data
   if (!page.items[0]) throw new ApiError('Delivery package was not found', 404)
   return DeliveryPackageSchema.parse(page.items[0])
+}
+
+export async function createDeliveryPackage(projectId: string, name: string) {
+  const { data } = await postDeliveryApiV2ProjectsProjectIdDeliveryPackagesPost<true>({
+    path: { project_id: projectId }, body: { name, candidate_ids: [], include_experiment_results: true }, throwOnError: true,
+  })
+  return DeliveryPackageSchema.parse(data.delivery_package)
 }
 
 export async function getDeliveryPackageOrNull(projectId: string): Promise<DeliveryPackageData | null> {

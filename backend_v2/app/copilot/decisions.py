@@ -23,10 +23,9 @@ on every path into the table:
   made by a person. Collapsing it into either "human" or "agent" would destroy
   the only comparison the column exists for.
 
-When the question is asked *by* a run, answering it does not resume that run.
-The run is suspended by whatever tool suspended it; a decision request is a
-question, not a scheduler, and giving it the power to wake work would make two
-mechanisms responsible for the same transition.
+A question asked by a run uses the durable task wait mechanism. Answering or
+withdrawing settles that wait and resumes the operator through the outbox,
+without expanding its original authorization.
 """
 
 from __future__ import annotations
@@ -292,6 +291,7 @@ def answer(
     row.decision_entry_id = entry.id
     row.version += 1
     session.flush()
+    _settle_wait(session, row)
     return row
 
 
@@ -311,7 +311,29 @@ def withdraw(session: Session, row: CopilotDecisionRequest) -> CopilotDecisionRe
     row.status = "withdrawn"
     row.version += 1
     session.flush()
+    _settle_wait(session, row)
     return row
+
+
+def _settle_wait(session: Session, row: CopilotDecisionRequest) -> None:
+    """Deliver a human choice to the suspended operator without changing its grant."""
+    from . import agent_runs
+    from .models import CopilotAgentTask
+
+    if row.run_id is None:
+        return
+    run = agent_runs.require_run(session, row.run_id, for_update=True)
+    task = session.scalar(select(CopilotAgentTask).where(
+        CopilotAgentTask.run_id == run.id, CopilotAgentTask.kind == "decision",
+        CopilotAgentTask.resource_id == row.id, CopilotAgentTask.status == "running",
+    ))
+    if task is None:
+        return
+    agent_runs.settle_task(session, task,
+        status="succeeded" if row.status == "answered" else "cancelled",
+        result=to_json(row))
+    if agent_runs.resume(session, run):
+        agent_runs.enqueue_first_step(session, run)
 
 
 def to_json_model(row: CopilotDecisionRequest) -> dict[str, Any]:

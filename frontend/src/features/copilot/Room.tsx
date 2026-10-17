@@ -1,3 +1,9 @@
+import { Link } from 'react-router'
+import { focusRoom, conclusionReview } from './roomFocus'
+import { chatFailureMessage } from './deliveryDisplay'
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
+import { LatestAnswer } from './LatestAnswer'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,7 +18,7 @@ import { Input } from '../../components/ui/Input'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { BotAvatar } from './BotAvatar'
-import { CopilotCitations } from './CopilotCitations'
+import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
 import { HandoffCard } from './CopilotChain'
 import { ownedService, parseMention } from './mentions'
@@ -22,6 +28,7 @@ import { resolveBot, useCopilotBots, type CopilotBot } from './bots/registry'
 import { childTasksByParent, copilotRoomQueryKey, inReadingOrder, topLevelEntries, useCopilotRoom } from './roomFeed'
 import { roomTaskLabel } from './taskPresentation'
 import { useCopilotChat } from './useCopilotChat'
+import { ChatModeSwitch } from './ChatModeSwitch'
 
 /**
  * The project's research room.
@@ -52,7 +59,7 @@ export function Room({
   onOpenBot?: (botId: string) => void
   /**
    * Hand this work to an operator as a guided task. The room prepares it and
-   * nothing more: the plan, the writes and the budget are still reviewed in the
+   * nothing more: the plan and the writes are still reviewed in the
    * composer, because starting a run spends money and a room message is not a
    * place to approve that.
    */
@@ -65,12 +72,17 @@ export function Room({
   const readOnly = useCopilotReadOnly()
   const bots = useCopilotBots()
   const roster = bots.data ?? []
-  const feed = useCopilotRoom(projectId || null)
-  const { send, loading, loadingStage, loadingDetail, error, messages } = useCopilotChat(
+  const [historyProject, setHistoryProject] = useState<string | null>(null)
+  const historyOpen = historyProject === projectId
+  const [archiveProject, setArchiveProject] = useState<string | null>(null)
+  const showArchived = archiveProject === projectId
+  const feed = useCopilotRoom(projectId || null, 100, showArchived)
+  const { send, loading, loadingStage, loadingDetail, error, pendingMessages, mode, setMode, bot: selectedBot, setBot, resetMessages } = useCopilotChat(
     projectId,
     pageContext,
     language,
   )
+  const [newConversationProject, setNewConversationProject] = useState<string | null>(null)
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
   const setSessionInput = useAppStore((state) => state.setCopilotSessionInput)
   const draft = useAppStore((state) => state.copilotDraft)
@@ -102,19 +114,24 @@ export function Room({
 
   const entries = inReadingOrder(feed.data ?? [])
   const children = childTasksByParent(entries)
-  const visible = topLevelEntries(entries)
+  const focus = focusRoom(entries)
+  const visible = topLevelEntries(focus.current)
+  const history = topLevelEntries(focus.history)
+  const review = conclusionReview(focus.conclusion)
   useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [visible.length, loading])
+    if (loading) endRef.current?.scrollIntoView?.({ block: 'end' })
+  }, [loading])
 
-  // The turn in flight. Its user message is already a row, but the room only
-  // refetches when the turn ends, so both halves are echoed until then.
-  const pending = loading ? messages.slice(-2) : []
+  // Project events can refresh the feed before the reply arrives. Replace
+  // local echoes by persisted message id, never by text (two "hi"s are valid).
+  const recordedMessageIds = new Set(entries.flatMap((entry) => entry.message ? [entry.message.id] : []))
+  const pending = pendingMessages.filter((message) => !message.id || !recordedMessageIds.has(message.id))
 
   // Who this message is addressed to, recomputed as it is typed so the room can
   // show the addressee before it is sent rather than after.
-  const mention = parseMention(input, roster)
+  const mention = mode === 'bench' ? null : parseMention(input, roster)
   const addressee = mention?.bot
+  const recipient = mode === 'bench' ? undefined : addressee ?? resolveBot(selectedBot ?? 'conductor', roster)
   const unknownHandle = mention && !mention.bot ? mention.handle : null
   const assignable = addressee ? ownedService(addressee) : undefined
 
@@ -124,25 +141,51 @@ export function Room({
     // person believes they addressed someone, and sending it elsewhere without
     // saying so is the failure this check exists for.
     if (!trimmed || loading || readOnly || unknownHandle) return
+    setNewConversationProject(null)
     setSessionInput(projectId, '')
     await send(trimmed, addressee ? { bot: addressee.id } : undefined)
   }
 
   return (
     <div className="room" data-tour-id="research-room">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
+        <Button type="button" variant="outline" size="sm" disabled={readOnly || loading || !projectId} onClick={() => {
+          resetMessages()
+          setBot(selectedBot)
+          setMode(mode)
+          setSessionInput(projectId, input)
+          setNewConversationProject(projectId)
+        }}>{zh ? '新建对话' : 'New conversation'}</Button>
+      </div>
+      {newConversationProject === projectId ? <p role="status" className="mt-2 text-xs text-text-secondary">{zh ? '新对话已准备，发送下一条消息后开始。历史记录仍保留在研究室中。' : 'A new conversation is ready for your next message. Earlier records remain in this room.'}</p> : null}
       <ApiState
         isLoading={feed.isLoading}
         isError={feed.isError}
         error={feed.error}
         onRetry={() => void feed.refetch()}
       >
-        <ScrollArea className="room-scroll">
+        <ScrollArea className="room-scroll room-scroll--focus">
           <div className="room-feed">
-            {visible.length === 0 && !loading ? (
+            <section className="room-latest" aria-label={zh ? '最新结论与交付' : 'Latest conclusion and delivery'}>
+              <div className="room-latest-heading">
+                <h3>{zh ? '最新结论' : 'Latest conclusion'}</h3>
+                {focus.conclusion ? <time dateTime={focus.conclusion.occurred_at}>{new Date(focus.conclusion.occurred_at).toLocaleString(zh ? 'zh-CN' : 'en-GB')}</time> : null}
+              </div>
+              <div className="room-result-links">
+                <Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'goals', brief: '1' })}`}>{zh ? '项目结果与报告' : 'Project results and reports'}</Link>
+                {focus.latestTask?.task && onOpenRun ? <Button type="button" size="sm" variant="outline" onClick={() => onOpenRun(focus.latestTask!.task!.id)}>{zh ? '最近任务与复核' : 'Latest task and review'} · {roomTaskLabel(focus.latestTask.task, zh)}</Button> : null}
+              </div>
+              {focus.conclusion ? <>
+                <p className="room-review-state">{zh ? '本条答复自动复核：' : 'Automated review of this reply: '}{review === 'completed' ? (zh ? '已完成（不等于人工批准）' : 'Completed (not human approval)') : review === 'incomplete' ? (zh ? '未完成' : 'Incomplete') : (zh ? '未记录完成' : 'No completion recorded')}</p>
+                <RoomEntry key={focus.conclusion.id} focused entry={focus.conclusion} roster={roster} projectId={projectId} zh={zh} childTasks={[]} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />
+              </> : <p className="text-sm text-text-secondary">{zh ? '暂无已保存的结论。可先查看项目报告；运行中状态见下方。' : 'No saved conclusion yet. Open project reports; current activity is shown below.'}</p>}
+            </section>
+            {entries.length === 0 && !loading ? (
               <p className="room-empty" role="status">
                 {zh
-                  ? '这里会记录团队的每一次发言、交接与任务。说点什么，或者 @ 一位成员。'
-                  : 'Every message, handover and task in this project appears here. Say something, or @ a member.'}
+                  ? '把目标告诉项目负责人，团队会分工推进。这里显示成员的讨论、任务进度与待你决定的选项，也可以 @ 任一成员。'
+                  : 'Tell the project lead your goal. Follow team discussions, assignments and decisions here, or @ any member.'}
               </p>
             ) : null}
             {visible.map((entry) => (
@@ -152,13 +195,13 @@ export function Room({
                 roster={roster}
                 projectId={projectId}
                 zh={zh}
-                childTasks={entry.task ? children.get(entry.task.id) ?? [] : []}
+                childTasks={entry.task ? (children.get(entry.task.id) ?? []).filter((child) => focus.current.includes(child)) : []}
                 onOpenRun={onOpenRun}
                 onOpenBot={onOpenBot}
               />
             ))}
             {pending.map((message, index) => (
-              <article className="room-entry" key={`pending-${index}`}>
+              <article className={`room-entry${message.role === 'user' ? ' room-entry--mine' : ''}`} key={message.id ?? `pending-${index}`}>
                 <div className="room-entry-body">
                   <p className="room-speaker">
                     {message.role === 'user' ? (zh ? '你' : 'You') : zh ? '正在回复' : 'Replying'}
@@ -176,20 +219,39 @@ export function Room({
               </article>
             ))}
             <div ref={endRef} />
+            <section className="room-history">
+              <Button type="button" variant="ghost" className="w-full justify-between" disabled={!projectId || projectsLoading} aria-expanded={historyOpen} aria-controls={`room-history-${projectId}`} onClick={() => setHistoryProject(historyOpen ? null : projectId)}>
+                {`${zh ? '历史讨论与过程记录' : 'Discussion and process history'} (${history.length}${feed.hasNextPage ? '+' : ''})`}<span aria-hidden="true">{historyOpen ? '−' : '+'}</span>
+              </Button>
+              {historyOpen ? <div id={`room-history-${projectId}`}>
+
+              <p className="text-xs text-text-secondary">{zh ? '旧任务通知、成员过程记录和历次改稿。原文按时间保留。' : 'Earlier task notices, member activity and revisions, preserved in chronological order.'}</p>
+      <Button type="button" variant="ghost" size="sm" aria-pressed={showArchived}
+        onClick={() => setArchiveProject(showArchived ? null : projectId)}>
+        {showArchived ? (zh ? '隐藏已清理对话' : 'Hide archived messages') : (zh ? '显示已清理对话' : 'Show archived messages')}
+      </Button>
+      {showArchived ? <p role="status" className="text-xs text-text-secondary">{zh ? '已清理消息仅供追溯，不代表当前进展，也不会自动加入后续聊天上下文。' : 'Archived messages are retained for audit, not current progress or future chat context.'}</p> : null}
+
+              {feed.hasNextPage ? <Button type="button" variant="ghost" disabled={feed.isFetchingNextPage} onClick={() => void feed.fetchNextPage()}>{zh ? '查看更早的讨论' : 'Earlier discussion'}</Button> : null}
+              <div className="room-history-feed">
+                {history.map((entry) => <RoomEntry key={`${entry.kind}-${entry.id}`} entry={entry} roster={roster} projectId={projectId} zh={zh} childTasks={entry.task ? (children.get(entry.task.id) ?? []).filter((child) => focus.history.includes(child)) : []} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />)}
+              </div>
+              </div> : null}
+            </section>
           </div>
         </ScrollArea>
       </ApiState>
       {error ? (
         <Alert variant="destructive" className="mt-2">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{chatFailureMessage(error, language === 'zh')}</AlertDescription>
         </Alert>
       ) : null}
-      {addressee || unknownHandle ? (
+      {recipient || unknownHandle ? (
         <p className="room-addressee" role="status">
-          {addressee ? (
+          {recipient && !unknownHandle ? (
             <>
-              <span>{zh ? '发给' : 'To'} <strong>{zh ? addressee.title_zh : addressee.title}</strong></span>
-              {assignable && onAssign && !readOnly ? (
+              <span>{zh ? '发给' : 'To'} <strong>{zh ? recipient.title_zh : recipient.title}</strong></span>
+              {addressee && assignable && onAssign && !readOnly ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -302,6 +364,7 @@ function RoomEntry({
   childTasks,
   onOpenRun,
   onOpenBot,
+  focused = false,
 }: {
   entry: RoomEvent
   roster: readonly CopilotBot[]
@@ -310,7 +373,25 @@ function RoomEntry({
   childTasks: readonly RoomEvent[]
   onOpenRun?: (runId: string) => void
   onOpenBot?: (botId: string) => void
+  focused?: boolean
 }) {
+  if (entry.kind === 'discussion' && entry.discussion) {
+    const speaker = resolveBot(entry.bot, roster)
+    const nextAction = entry.discussion.next_action
+    const content = nextAction && entry.discussion.content.endsWith(`\n\n${nextAction}`) ? entry.discussion.content.slice(0, -(nextAction.length + 2)) : entry.discussion.content
+    return <article className="room-entry">
+      {speaker ? <BotAvatar id={speaker.id} stance={speaker.stance} /> : null}
+      <div className="room-entry-body">
+        <p className="room-speaker">{speakerName(entry.bot, roster, zh)}</p>
+        <div className="room-text">{focused ? <LatestAnswer content={`${content}${nextAction ? `\n\n## ${zh ? '下一步' : 'Next step'}\n${nextAction}` : ''}`} projectId={projectId} zh={zh} /> : <ReviewMarkdown presentation="chat" projectId={projectId}>{content}</ReviewMarkdown>}</div>
+        {!focused && nextAction ? <div className="room-next-action"><strong>{zh ? '下一步' : 'Next step'}</strong><ReviewMarkdown presentation="chat" projectId={projectId}>{nextAction}</ReviewMarkdown></div> : null}
+        {onOpenRun ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenRun(entry.discussion!.run_id)}>
+          {zh ? '查看任务与证据' : 'Open task and evidence'}
+        </Button> : null}
+      </div>
+    </article>
+  }
+
   if (entry.kind === 'handoff' && entry.handoff) {
     return (
       <article className="room-entry room-entry--handoff">
@@ -364,6 +445,8 @@ function RoomEntry({
 
   const message = entry.message
   if (!message) return null
+  const archive = message.context?.chat_archive
+  const archived = typeof archive === 'object' && archive !== null && 'archived' in archive && archive.archived === true
   const mine = message.role === 'user'
   const bot = resolveBot(message.bot, roster)
   return (
@@ -372,13 +455,11 @@ function RoomEntry({
       <div className="room-entry-body">
         <p className="room-speaker">
           {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
-          {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : ''}
+          {archived ? ` · ${zh ? '已清理历史' : 'archived history'}` : ''}
+          {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
-        <div className="room-text">{message.content}</div>
-        <CopilotCitations
-          citations={(message.citations ?? []) as Array<Record<string, unknown>>}
-          projectId={projectId}
-        />
+        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : focused ? <LatestAnswer content={message.content} citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId} zh={zh} /> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        {!mine ? focused ? message.tool_calls?.some(call => call && typeof call === 'object' && 'result' in call) ? <Disclosure title={zh ? '工具调用详情' : 'Tool call details'}><ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /></Disclosure> : null : <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>
   )

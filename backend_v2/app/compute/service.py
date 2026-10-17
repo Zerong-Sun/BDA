@@ -206,7 +206,9 @@ def create_submission(
             raise DomainError("preview_incomplete", "Review every executable node before submitting", status_code=412)
     _record_lineage(session, workflow, nodes)
     settings = get_settings()
-    backend = payload.compute_backend or settings.compute_backend
+    from ..workflows.preflight import workflow_backend
+
+    backend = workflow_backend(workflow, payload.compute_backend)
     if settings.is_production and backend == "demo":
         raise DomainError("demo_compute_forbidden", "Demo compute cannot run in production", status_code=409)
     # Refuse LSF before doing any work when no cluster is configured; the deployment
@@ -467,6 +469,11 @@ def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: W
     elif any(status in {"dispatching", "queued", "running", "collecting"} for status in statuses):
         submission.status = "running"
         set_workflow_status(workflow, "running")
+    elif "pending" in statuses:
+        # A new attempt is live even before its dispatch event is consumed.
+        # Retaining the previous terminal outcome would settle downstream work.
+        submission.status = "pending"
+        set_workflow_status(workflow, "queued")
 
 
 def set_workflow_status(workflow: WorkflowRun, status: WorkflowRunStatus) -> None:

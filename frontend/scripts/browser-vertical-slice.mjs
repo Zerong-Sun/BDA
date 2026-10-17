@@ -49,13 +49,17 @@ const ROUTE_SURFACES = Object.freeze({
   guide: '.guide-page main',
   experiments: '[data-slot="app-shell"]',
   workflow: '[data-tour-id="workflow-page"]',
-  candidates: '[data-tour-id="candidate-filters"]',
+  candidates: '[data-tour-id="candidates-workspace"]',
   results: '[data-tour-id="results-validation"]',
   research: '[data-tour-id="research-tabs"]',
   faq: '[data-tour-id="faq-content"]',
   timeline: '[data-tour-id="timeline-page"]',
   autopilot: '[data-tour-id="autopilot-page"]',
+  learning: '[data-tour-id="learning-page"]',
   lab: '[data-tour-id="lab-page"]',
+  extensions: '[data-testid="extension-center"]',
+  'research-goals': '[data-testid="research-decision-center"]',
+  tools: '[data-testid="lab-tools-page"]',
 })
 
 const matrix = buildBrowserMatrix()
@@ -538,7 +542,8 @@ async function assertDocumentContract(page, testCase) {
       + `received theme=${actual.theme}, dark=${actual.dark}.`,
     )
   }
-  const expectedRoute = canonicalHashRoute(testCase.routePath)
+  const expectedRoute = canonicalHashRoute(testCase.routeId === 'timeline'
+    ? testCase.routePath.replace('/timeline?', '/research?tab=timeline&') : testCase.routePath)
   const actualRoute = canonicalHashRoute(actual.hash)
   const emptyProjectLibraryCanonicalRoute =
     testCase.routeId === 'experiments' && testCase.scenario === 'empty' && actualRoute === '/projects'
@@ -905,10 +910,11 @@ async function auditKeyboardFocus(page, testCase) {
   }
 }
 
-async function assertEscapeFocusReturn(page, trigger, layer, label, diagnostics) {
+async function assertEscapeFocusReturn(page, trigger, layer, label, diagnostics, afterTrigger) {
   await expectVisible(trigger, `${label} trigger`)
   await trigger.focus()
   await trigger.click()
+  if (afterTrigger) await afterTrigger()
   await expectVisible(layer, `${label} layer`)
   const motion = await assertReducedMotion(page, { requiredLayer: layer, label })
   diagnostics.overlayMotion ??= {}
@@ -997,6 +1003,7 @@ async function exerciseGlobalLayers(page, testCase, diagnostics) {
     page.getByRole('dialog'),
     'Tour menu',
     diagnostics,
+    async () => page.getByRole('menuitem', { name: 'Interface tour', exact: true }).click(),
   )
 
   const projectTrigger = page.locator('[data-tour-id="project-selector"] button').first()
@@ -1103,7 +1110,15 @@ async function exerciseCandidateGrid(page, diagnostics) {
   const filterInput = filters.getByPlaceholder(CANDIDATE_SEARCH_FILTER_PATTERN).first()
   await filterInput.fill('later-page-family')
   await page.keyboard.press('Enter')
+  if (await filterInput.inputValue() !== 'later-page-family') {
+    throw new Error('Candidate search lost its input while closing the add-filter menu.')
+  }
   await expectVisible(page.getByText('Browser candidate 12').first(), 'filtered later-page candidate')
+  const filteredRows = await table.locator('tbody tr').evaluateAll((rows) =>
+    rows.map((row) => row.getAttribute('data-row-id')))
+  if (JSON.stringify(filteredRows) !== JSON.stringify(['candidate_browser_12'])) {
+    throw new Error(`Candidate search did not isolate the later-page match: ${JSON.stringify(filteredRows)}`)
+  }
   if (await page.getByText('Browser candidate 1', { exact: true }).count()) {
     throw new Error('Candidate filter left a non-matching row visible.')
   }
@@ -1117,11 +1132,53 @@ async function exerciseCandidateGrid(page, diagnostics) {
   diagnostics.interactions.candidatePagination = { pageOneRows, pageTwoRows, restoredRows }
   diagnostics.interactions.candidateRequestContract = {
     cursorRequests: candidateRequests,
+    filteredRows,
     filtering: 'complete cursor collection first; filter/sort/paginate locally without fabricated API parameters',
   }
 }
 
+async function openResearchNotes(page) {
+  const notes = page.getByRole('button', { name: /^(Research notes & review record|研究笔记与审阅记录)\s+\d+\s+(records|条)$/ })
+  await expectVisible(notes, 'research notes disclosure')
+  if (await notes.getAttribute('aria-expanded') !== 'true') await notes.click()
+  if (await notes.getAttribute('aria-expanded') !== 'true') {
+    throw new Error('Research notes disclosure did not expand.')
+  }
+}
+
 async function exerciseResearchGrids(page, diagnostics) {
+  await openResearchNotes(page)
+  const readingGuide = page.getByRole('region', { name: 'Research reading guide' })
+  await expectVisible(readingGuide, 'research reading guide')
+  const notesBefore = await page.getByTestId('research-finding').count()
+  const readingSearch = readingGuide.getByRole('textbox', { name: 'Search research records' })
+  await readingSearch.fill('no-matching-review-record')
+  await expectVisible(page.getByText(/No records match this view/), 'research reading empty filter')
+  await readingGuide.getByRole('button', { name: 'All records', exact: true }).click()
+  if ((await page.getByTestId('research-finding').count()) !== notesBefore) {
+    throw new Error('Clearing the research reading filter did not restore the full record.')
+  }
+  diagnostics.interactions.researchReadingGuide = 'search, empty state and restore without data mutation'
+  diagnostics.interactions.researchReadingGuideOverflow = await assertNoPageOverflow(page)
+  const referenceTab = page.getByRole('navigation', { name: 'Evidence categories' }).getByRole('button', { name: 'References', exact: true })
+  await referenceTab.click()
+  const evidenceWorkbench = page.getByRole('region', { name: 'Literature evidence workbench' })
+  await expectVisible(evidenceWorkbench, 'literature evidence workbench')
+  await expectVisible(evidenceWorkbench.getByText('The response changed under the reported conditions.', { exact: true }), 'verbatim source quote')
+  await expectVisible(evidenceWorkbench.getByText('It does not establish our candidate performance.', { exact: true }), 'evidence limits')
+  await evidenceWorkbench.getByRole('button', { name: 'By argument', exact: true }).click()
+  const evidenceSearch = evidenceWorkbench.getByRole('textbox', { name: 'Find papers and evidence' })
+  await evidenceSearch.fill('no-matching-evidence-card')
+  await expectVisible(evidenceWorkbench.getByText(/No matching evidence/), 'argument filter empty state')
+  await evidenceSearch.fill('controlled comparison')
+  await expectVisible(evidenceWorkbench.getByTestId('evidence-note-card'), 'argument search restored evidence')
+  await evidenceWorkbench.getByRole('button', { name: 'Edit evidence', exact: true }).click()
+  const quoteInput = evidenceWorkbench.getByRole('textbox', { name: 'Original quote (source language)' })
+  if (await quoteInput.inputValue() !== 'The response changed under the reported conditions.') throw new Error('Editing evidence lost the original quotation')
+  diagnostics.interactions.evidenceEditorOverflow = await assertNoPageOverflow(page)
+  await evidenceWorkbench.getByRole('button', { name: 'Cancel', exact: true }).click()
+  diagnostics.interactions.literatureEvidence = 'original quote, linked argument, limits, argument search and source-preserving edit form'
+  diagnostics.interactions.literatureEvidenceOverflow = await assertNoPageOverflow(page)
   const dataTab = page.getByRole('navigation', { name: 'Evidence categories' }).getByRole('button', { name: /Data/i })
   await dataTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await dataTab.click()
@@ -1152,26 +1209,17 @@ async function exerciseResearchGrids(page, diagnostics) {
   const methodsTab = page.getByRole('tab', { name: 'Experiment plan' })
   await methodsTab.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
   await methodsTab.click()
-  await expectVisible(page.getByText('Computational Decision Evidence Tree'), 'computational decision tree')
-  await expectVisible(page.getByText('Advance the restrained backbone route'), 'decision tree node')
-  // The tree shows decisions. A `problem` entry like the interface-drift one is part of
-  // the same record but belongs to the timeline view, so asserting it here would be
-  // asserting that the decision tree is not a decision tree.
-  await expectVisible(
-    page.locator('[data-tour-id="dry-lab-decision-tree"]').getByText('Show reasoning').first(),
-    'decision tree node reasoning toggle',
-  )
-  // The research panel and the timeline page render the same DecisionTreeView, so the
-  // node is a tree card (<li>) with a "Show reasoning" toggle, not the phase-column
-  // <article> the panel used to draw for itself.
-  const decisionNode = page
-    .locator('[data-tour-id="dry-lab-decision-tree"] li')
-    .filter({ hasText: 'Advance the restrained backbone route' })
-    .first()
-  const decisionDocument = decisionNode.getByRole('button', { name: /Show reasoning/i })
-  await decisionDocument.click()
-  await expectVisible(page.getByText('Browser decision basis'), 'expanded decision document')
-  diagnostics.interactions.researchDecisionTree = 'method tab, decision node, and expanded reasoning'
+  const methodsEntry = page.locator('[data-tour-id="dry-lab-decision-tree"]')
+  await expectVisible(methodsEntry.getByText('Reasoning behind method choices'), 'methods decision context')
+  if (await methodsEntry.getByText('Show reasoning').count()) throw new Error('Methods duplicated the decision record')
+  await methodsEntry.getByRole('link', { name: 'Open decision record', exact: true }).click()
+  await page.getByRole('tab', { name: 'Decision tree', exact: true }).click()
+  const record = page.locator('[data-tour-id="timeline-page"]')
+  await expectVisible(record.getByText('Advance the restrained backbone route'), 'canonical decision tree node')
+  const decisionNode = record.locator('li').filter({ hasText: 'Advance the restrained backbone route' }).first()
+  await decisionNode.getByRole('button', { name: /Show reasoning/i }).click()
+  await expectVisible(record.getByText('Browser decision basis'), 'expanded canonical decision document')
+  diagnostics.interactions.researchDecisionTree = 'methods entry links to canonical decision record and expanded reasoning'
   diagnostics.interactions.researchDecisionTreeOverflow = await assertNoPageOverflow(page)
 }
 
@@ -1240,9 +1288,26 @@ async function exerciseDisclosure(page, containerSelector, label) {
 async function exerciseRouteInteractions(page, testCase, diagnostics) {
   if (testCase.appearanceId !== 'en-light') return
 
+  if (testCase.routeId === 'candidates' && testCase.scenario === 'empty') {
+    await assertEscapeFocusReturn(page, page.getByRole('button', { name: 'Add candidate manually', exact: true }),
+      page.getByRole('dialog', { name: 'Add a candidate proposal' }), 'Empty candidate proposal', diagnostics)
+    diagnostics.interactions.emptyCandidate = 'manual proposal opens without prior computation'
+    return
+  }
+
+  if (testCase.routeId === 'workflow' && testCase.scenario === 'blocked') {
+    await assertEscapeFocusReturn(page, page.getByRole('button', { name: 'Add workflow node', exact: true }),
+      page.getByRole('dialog'), 'Draft editing before target readiness', diagnostics)
+    if (!(await page.getByRole('button', { name: 'Submit workflow', exact: true }).isDisabled())) {
+      throw new Error('Draft editing must not authorize compute before target readiness.')
+    }
+    diagnostics.interactions.blockedWorkflow = 'draft editor opens; compute remains disabled'
+    return
+  }
+
   if (testCase.routeId === 'login' && testCase.scenario === 'auth-retry') {
     await page.getByLabel(/username/i).fill('browser.qa')
-    await page.getByLabel(/password/i).fill('wrong-then-correct')
+    await page.getByLabel('Password', { exact: true }).fill('wrong-then-correct')
     await page.getByRole('button', { name: /sign in/i }).click()
     await expectVisible(page.getByText(LOGIN_INVALID_CREDENTIALS_PATTERN), 'login 401 alert')
     await page.getByRole('button', { name: /sign in/i }).click()
@@ -1336,18 +1401,71 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
       await exerciseDisclosure(page, '[data-tour-id="faq-content"]', 'FAQ')
   } else if (testCase.routeId === 'timeline') {
     await exerciseTimelineViews(page, diagnostics)
+  } else if (testCase.routeId === 'extensions') {
+    const root = page.getByTestId('extension-center')
+    await root.getByRole('textbox', { name: 'Search integrations' }).fill('Nextflow')
+    const choices = root.getByRole('navigation', { name: 'Integration options' })
+    if (await choices.getByRole('button').count() !== 1) throw new Error('Extension filter did not restrict the catalog.')
+    await choices.getByRole('button', { name: /Nextflow/ }).click()
+    await expectVisible(root.getByText('Preparation or an execution adapter is still needed', { exact: true }), 'planned extension state')
+    await expectVisible(root.getByText('No execution adapter is shipped for this extension. Requirements can be reviewed, but this assessment cannot install or run it.', { exact: true }).first(), 'explicit future-adapter boundary')
+    diagnostics.interactions.extensionSelection = 'Filtering and selecting a future integration shows its actual missing adapter'
+  } else if (testCase.routeId === 'research-goals') {
+    const root = page.getByTestId('research-decision-center')
+    const currentQuestion = root.getByRole('combobox', { name: 'Current question', exact: true })
+    if ((await currentQuestion.locator('[data-slot="select-value"]').textContent())?.trim() !== 'Does the designed binder hold at bench concentrations?') {
+      throw new Error('The closed question selector must show the question title rather than its internal ID.')
+    }
+    await root.getByRole('button', { name: 'Edit decision definition', exact: true }).click()
+    const form = root.getByRole('form', { name: 'Edit decision definition' })
+    await form.getByLabel('Testable hypothesis', { exact: true }).fill('A reversible browser draft')
+    await expectVisible(form.getByRole('button', { name: 'Save decision definition', exact: true }), 'explicit decision save')
+    await form.getByRole('button', { name: 'Cancel', exact: true }).click()
+    if (await root.getByRole('form', { name: 'Edit decision definition' }).count()) throw new Error('Cancelling did not close the decision draft.')
+    diagnostics.interactions.decisionDefinition = 'A typed decision draft can be opened and cancelled without writing a result'
+  } else if (testCase.routeId === 'learning') {
+    const root = page.locator('[data-tour-id="learning-page"]')
+    await root.getByRole('button', { name: 'Record an observation', exact: true }).click()
+    const observation = root.locator('form').filter({ has: page.getByRole('button', { name: 'Save observation', exact: true }) })
+    await observation.getByLabel('Batch', { exact: true }).fill('browser-batch')
+    await observation.getByLabel('Biological replicate key', { exact: true }).fill('bio-1')
+    await observation.getByLabel('Value / detection limit (nM)', { exact: true }).fill('12.5')
+    await observation.getByLabel('Result notes and QC rationale', { exact: true }).fill('Synthetic browser measurement')
+    await observation.getByRole('checkbox', { name: 'Source evidence checked; QC accepted', exact: true }).check()
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/learning/observations'))
+    await observation.getByRole('button', { name: 'Save observation', exact: true }).click()
+    const body = (await request).postDataJSON()
+    if (body.value !== 12.5 || body.unit !== 'nM' || body.qc_accepted !== true || body.batch_key !== 'browser-batch' || !body.candidate_id || !body.source_artifact_id) {
+      throw new Error('Observation form did not preserve values, evidence, QC and candidate selection.')
+    }
+    await expectVisible(root.getByText('Saved. Continue when ready.', { exact: true }), 'learning observation receipt')
+    diagnostics.interactions.learningObservation = 'Typed measurement with selected candidate, artifact and QC reaches the generated transport'
   } else if (testCase.routeId === 'lab') {
-    await page.getByRole('link', { name: 'Toolbox', exact: true }).click()
-    await expectVisible(page.getByRole('heading', { name: 'Lab toolbox' }), 'standalone toolbox')
-    await page.getByRole('button', { name: 'Choose a project for saving (optional)' }).click()
-    await page.getByRole('combobox', { name: /select research project/i }).click()
-    await page.getByRole('option', { name: 'No project', exact: true }).click()
-    const concentration = page.getByRole('region', { name: 'Concentration (A280)', exact: true })
-    await concentration.getByRole('button', { name: 'Compute', exact: true }).click()
-    await expectVisible(concentration.getByText('100 µM · 1.2 mg/mL', { exact: true }), 'projectless concentration result')
-    await expectVisible(page.getByRole('button', { name: 'Preview without saving' }), 'projectless analysis preview action')
-    diagnostics.interactions.standaloneToolbox = 'toolbox opens without project gating and calculates after deselecting project'
-    diagnostics.interactions.toolboxOverflow = await assertNoPageOverflow(page)
+    const root = page.locator('[data-tour-id="lab-page"]')
+    await expectVisible(root.getByRole('tab', { name: 'Proteins & constructs', exact: true }), 'project construct library')
+    if (await root.getByRole('form', { name: 'Protein A280 → concentration' }).count()) throw new Error('General calculators must not be duplicated inside the project lab.')
+    await root.getByRole('link', { name: 'Open standalone calculations and previews' }).click()
+    await expectVisible(page.getByTestId('lab-tools-page'), 'independent lab tools')
+    diagnostics.interactions.standaloneToolbox = 'project lab links to one canonical standalone calculator workspace'
+  } else if (testCase.routeId === 'tools') {
+    const root = page.getByTestId('lab-tools-page')
+    const nav = root.getByRole('navigation', { name: 'Lab tool categories' })
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    if (await nav.getByRole('button').count() !== 14) throw new Error('Lab tools must contain 14 categorized entries.')
+    await nav.getByRole('button', { name: 'Nucleic acid A260 → concentration', exact: true }).click()
+    const form = root.getByRole('form', { name: 'Nucleic acid A260 → concentration', exact: true })
+    await form.getByLabel('Sample A260 (AU)', { exact: true }).fill('1')
+    const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/wetlab/calculations'))
+    await form.getByRole('button', { name: 'Calculate', exact: true }).click()
+    const body = (await request).postDataJSON()
+    if (body.kind !== 'nucleic-a260' || body.sample_absorbance !== 1 || body.path_length_cm !== 1 || body.absorbance_basis !== 'normalized-1cm' || body.project_id) throw new Error('Standalone absorbance payload lost its units or depends on a project.')
+    await expectVisible(root.getByRole('region', { name: 'Calculation result' }), 'absorbance result')
+    await form.getByLabel('Sample A260 (AU)', { exact: true }).fill('2')
+    await expectVisible(root.getByText('Inputs changed. These are the previous results; calculate again before using them.'), 'stale result marker')
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    await nav.getByRole('button', { name: 'BLI data preview', exact: true }).click()
+    await expectVisible(root.getByRole('button', { name: 'Preview without saving' }), 'explicit projectless preview')
+    diagnostics.interactions.labTools = 'categorized tool navigation, unit-preserving calculation, stale-result handling and standalone preview'
   } else if (testCase.routeId === 'autopilot') {
     await exerciseAutopilotPromptGuard(page, diagnostics)
   }
@@ -1378,7 +1496,11 @@ function assertControlAcceptance(testCase, diagnostics) {
     faq: ['faqDisclosure'],
     timeline: ['timelineViews'],
     autopilot: ['autopilotPromptGuard'],
+    learning: ['learningObservation'],
+    extensions: ['extensionSelection'],
+    'research-goals': ['decisionDefinition'],
     lab: [],
+    tools: ['labTools'],
   }[testCase.routeId]
   if (testCase.routeId === 'experiments') {
     for (const layer of ['Settings', 'Copilot', 'Tour menu', 'Project selector']) {
@@ -1441,7 +1563,27 @@ async function findContractControl(root, descriptor) {
 }
 
 async function assertScenarioState(page, testCase, diagnostics) {
+  if (testCase.routeId === 'research' && ['populated', 'read-only'].includes(testCase.scenario)) {
+    // Notes are collapsed initially. Reach their controls as a reader would
+    // before auditing focus or asserting that note mutations are disabled.
+    await openResearchNotes(page)
+    await expectVisible(page.getByRole('region', { name: /^(Research reading guide|研究阅读导览)$/ }),
+      'expanded research notes before focus and permission audits')
+  }
   if (['populated', 'auth-retry', 'loading'].includes(testCase.scenario)) return
+  if (testCase.routeId === 'experiments' && ['blocked', 'read-only'].includes(testCase.scenario)) {
+    // Target preparation now lives behind the project-details disclosure. Reach
+    // it as a user would; retain all exact readiness and mutation-lock checks.
+    const details = page.locator('.projects-page').getByRole('button', {
+      name: testCase.language === 'zh' ? '项目详情与靶标准备' : 'Project details and target preparation', exact: true,
+    })
+    await expectVisible(details, 'project target preparation disclosure')
+    if (await details.getAttribute('aria-expanded') !== 'true') await details.click()
+    if (await details.getAttribute('aria-expanded') !== 'true') {
+      throw new Error('Project target preparation disclosure did not expand.')
+    }
+    diagnostics.interactions.targetPreparation = 'Opened project details before readiness and read-only assertions'
+  }
   const contract = SCENARIO_CONTRACTS[`${testCase.routeId}:${testCase.scenario}`]
   if (!contract) {
     throw new Error(`${testCase.routeId}:${testCase.scenario} has no route-scoped state contract.`)
@@ -1509,6 +1651,20 @@ async function assertScenarioState(page, testCase, diagnostics) {
   }
 }
 
+async function openResearchDecisionDefinitions(page) {
+  // The populated fixture has a saved report. Wait for the results overview,
+  // not the transient decision center shown before that async report arrives.
+  await expectVisible(page.getByRole('region', { name: /^(Project research summary|项目研究总结)$/ }),
+    'saved research report overview before opening decision definitions')
+  const definitions = page.getByRole('button', { name: /^(Structured questions and decision definitions|结构化问题与决策定义)$/ })
+  await expectVisible(definitions, 'structured research decision disclosure')
+  if (await definitions.getAttribute('aria-expanded') !== 'true') await definitions.click()
+  if (await definitions.getAttribute('aria-expanded') !== 'true') {
+    throw new Error('Structured research decision disclosure did not expand.')
+  }
+  await expectVisible(page.getByTestId('research-decision-center'), 'expanded research decision center')
+}
+
 async function navigateCase(page, testCase, caseDirectory) {
   const url = `${BASE_URL}/#${testCase.routePath}`
   const navigation = page.goto(url, { waitUntil: 'domcontentloaded', timeout: CASE_TIMEOUT_MS })
@@ -1524,12 +1680,47 @@ async function navigateCase(page, testCase, caseDirectory) {
     })
   }
   await navigation
+  if (testCase.routeId === 'research-goals' && testCase.scenario === 'populated') {
+    await openResearchDecisionDefinitions(page)
+  }
   await expectVisible(page.locator(ROUTE_SURFACES[testCase.routeId]).first(), `${testCase.routeId} route surface`)
+  if (testCase.routeId === 'login') {
+    // The initial form precedes auth/config; wait for the intended private realm
+    // before auditing focus or submitting credentials, rather than that transient UI.
+    await expectVisible(page.locator('[data-tour-id="auth-page"]').getByText('Private', { exact: true }), 'private credential realm')
+    await expectVisible(page.locator('form #login-username'), 'private login username')
+  }
+  if (testCase.routeId === 'learning') {
+    // The route header precedes the project-scoped async data. Audit controls
+    // only after the actual workbench, rather than its loading header, exists.
+    await expectVisible(page.locator('[data-tour-id="learning-page"]').getByRole('heading', { name: /^01/ }), 'loaded learning contract')
+  }
   if (testCase.scenario === 'loading') {
     const contract = SCENARIO_CONTRACTS[`${testCase.routeId}:loading`]
     const skeleton = page.locator(contract.root).first().locator(contract.loadingSelector).first()
     await expectHidden(skeleton, `${testCase.routeId} layout Skeleton`, 8_000)
   }
+}
+
+async function enterReadOnlyDemo(page, testCase, diagnostics) {
+  if (testCase.scenario !== 'read-only') return
+
+  // Operating mode is session-only. Enter demo through the same settings action
+  // as a user instead of relying on an unsupported persisted appMode field.
+  const settingsName = testCase.language === 'zh' ? '应用设置' : 'Application settings'
+  const settingsTrigger = await firstVisible(page.getByRole('button', { name: settingsName, exact: true }))
+  if (settingsTrigger) {
+    await settingsTrigger.click()
+  } else {
+    await page.getByRole('button', { name: /^(More workspace actions|更多工作区操作)$/ }).click()
+    await page.getByRole('menuitem', { name: settingsName, exact: true }).click()
+  }
+  const drawer = page.getByRole('dialog').filter({ has: page.locator('[data-tour-id="settings-drawer"]') })
+  await expectVisible(drawer, 'Settings for read-only demo setup')
+  await drawer.getByRole('button', { name: /^(Demo mode|演示模式)/ }).click()
+  await page.keyboard.press('Escape')
+  await expectHidden(drawer, 'Settings for read-only demo setup')
+  diagnostics.interactions.demoMode = 'Entered read-only demo through application settings'
 }
 
 async function runCase(browser, testCase) {
@@ -1586,6 +1777,7 @@ async function runCase(browser, testCase) {
     page.setDefaultTimeout(10_000)
     diagnosticController = await installDiagnostics(page, testCase, router, diagnostics)
     await navigateCase(page, testCase, caseDirectory)
+    await enterReadOnlyDemo(page, testCase, diagnostics)
     await assertDocumentContract(page, testCase)
     await assertScenarioState(page, testCase, diagnostics)
 
@@ -1625,6 +1817,9 @@ async function runCase(browser, testCase) {
     await diagnosticController?.quiesce().catch((quiesceError) => {
       diagnostics.failures.push(`Diagnostic quiescence failed: ${asError(quiesceError).message}`)
     })
+    // CI must expose the cause even if artifact upload is unavailable or fails.
+    console.error(`[FAIL] ${testCase.id}\n${failure.stack ?? failure.message}`)
+    if (diagnostics.failures.length) console.error(`Diagnostic failures: ${diagnostics.failures.join('\n')}`)
     if (page) {
       await page.screenshot({
         path: path.join(failureDirectory, `${safeFilePart(testCase.id)}.png`),
@@ -1676,7 +1871,7 @@ async function run() {
   await access(executablePath, fsConstants.X_OK).catch(() => {
     throw new Error(
       `Playwright Chromium is missing or not executable at ${executablePath}.\n`
-      + 'Install the exact Playwright 1.62.0 browser with: TMPDIR=/tmp npx playwright install chromium',
+      + 'Install the browser matching the locked Playwright version with: TMPDIR=/tmp npx playwright install chromium',
     )
   })
 

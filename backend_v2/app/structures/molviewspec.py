@@ -68,7 +68,11 @@ def _residue_selector(residue: dict[str, Any]) -> dict[str, Any]:
     if not chain or number is None:
         raise SceneError("A highlighted residue needs a chain and a residue number.")
     try:
-        return {"auth_asym_id": chain, "auth_seq_id": int(number)}
+        return {
+            "auth_asym_id": chain,
+            "auth_seq_id": int(number),
+            "pdbx_PDB_ins_code": str(residue.get("insertion_code") or "").strip(),
+        }
     except (TypeError, ValueError) as error:
         raise SceneError(f"{number!r} is not a residue number.") from error
 
@@ -159,13 +163,19 @@ def residues_from_contacts(contacts: dict[str, Any], *, chain: str) -> list[dict
     interface is built from the same measurement the operator reported rather
     than from a second list assembled by hand.
     """
-    side = "residue_a" if contacts.get("chain_a") == chain else "residue_b"
-    seen: dict[tuple[str, int], dict[str, Any]] = {}
-    for pair in contacts.get("pairs", []):
-        residue = pair.get(side) or {}
+    if chain not in {contacts.get("chain_a"), contacts.get("chain_b")}:
+        raise SceneError("The selected chain is not part of this contact measurement.")
+    side = "a" if contacts.get("chain_a") == chain else "b"
+    seen: dict[tuple[str, int, str], dict[str, Any]] = {}
+    details = contacts.get(f"interface_residue_details_{side}")
+    selected = details if isinstance(details, list) else [
+        pair.get(side) or pair.get(f"residue_{side}") or {} for pair in contacts.get("pairs", [])
+    ]
+    for residue in selected:
         chain_id = str(residue.get("chain") or residue.get("chain_id") or chain)
         number = residue.get("seq", residue.get("residue_seq"))
         if number is None:
             continue
-        seen[(chain_id, int(number))] = {"chain": chain_id, "seq": int(number)}
+        code = str(residue.get("insertion_code") or "").strip()
+        seen[(chain_id, int(number), code)] = {"chain": chain_id, "seq": int(number), "insertion_code": code or None}
     return list(seen.values())

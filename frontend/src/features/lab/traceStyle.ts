@@ -1,28 +1,10 @@
-/**
- * How the nth trace in a chart is drawn.
- *
- * Its own module because the chart component must export only components for
- * fast refresh to work, and because the legend and the line both read it —
- * deriving both from one function is what keeps them from disagreeing.
- *
- * There are five theme chart colours and a BLI run can carry eight
- * concentrations, so the ramp wraps into a dashed stroke rather than repeating
- * a solid one: two curves that look identical are worse than one drawn dashed.
- */
-
+/** Shared scientific plot semantics: color identifies a series; dash identifies its origin. */
+export type TraceKind = 'measured' | 'fitted' | 'instrument-fit' | 'simulated'
 const RAMP = [
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-  'var(--color-chart-5)',
+  'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)',
+  'var(--color-chart-4)', 'var(--color-chart-5)', '#0072b2', '#d55e00', '#009e73',
 ]
-
-const DASHES = ['none', '5 3', '1 2']
-
-export function traceStyle(index: number): { stroke: string; dash: string } {
-  return {
-    stroke: RAMP[index % RAMP.length],
-    dash: DASHES[Math.floor(index / RAMP.length) % DASHES.length],
-  }
+const DASHES: Record<TraceKind, string> = { measured: 'none', fitted: '6 3', 'instrument-fit': '2 3', simulated: '8 3 2 3' }
+export function traceStyle(index: number, kind: TraceKind = 'measured'): { stroke: string; dash: string } {
+  return { stroke: RAMP[index % RAMP.length], dash: DASHES[kind] }
 }

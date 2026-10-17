@@ -297,6 +297,18 @@ def test_direct_request_after_advice_marker_authorizes_search(
     assert instance.request_allows("start_literature_search") is True
 
 
+@pytest.mark.parametrize("request_text,allowed", [
+    ("把甜味蛋白项目用 Bot 来做一下尝试，然后添加更多的文献和新的思路。", True),
+    ("请补充甜味蛋白项目文献。", True),
+    ("不要添加项目文献。", False),
+    ("不要补充文献。", False),
+    ("如何添加项目文献？", False),
+])
+def test_chinese_literature_addition_respects_explicit_intent(monkeypatch, action_environment, request_text, allowed):
+    instance, _, _ = service(monkeypatch, action_environment, request_text)
+    assert instance.request_allows("start_literature_search") is allowed
+
+
 def test_project_scope_rejection_is_failure_audited(
     monkeypatch,
     action_environment,

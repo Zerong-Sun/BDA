@@ -1,4 +1,4 @@
-import { resolveBot, type CopilotBot } from './bots/registry'
+import { type CopilotBot } from './bots/registry'
 
 /**
  * Addressing one member of the room.
@@ -34,7 +34,7 @@ export interface Mention {
 /** Every way one operator can be named, longest first so a prefix match is greedy. */
 function handlesOf(bots: readonly CopilotBot[]): { handle: string; bot: CopilotBot }[] {
   return bots
-    .flatMap((bot) => [bot.id, bot.title, bot.title_zh, ...(bot.absorbs ?? [])]
+    .flatMap((bot) => [bot.id, bot.title, bot.title_zh, ...(bot.aliases ?? []), ...(bot.absorbs ?? [])]
       .filter((name): name is string => Boolean(name))
       .map((name) => ({ handle: name.toLowerCase(), bot })))
     .sort((a, b) => b.handle.length - a.handle.length)
@@ -50,26 +50,18 @@ function handlesOf(bots: readonly CopilotBot[]): { handle: string; bot: CopilotB
 export function parseMention(text: string, bots: readonly CopilotBot[]): Mention | null {
   const match = /^\s*@(\S+)/.exec(text)
   if (!match) return null
+  const address = text.trimStart().slice(1)
+  const candidates = handlesOf(bots)
+  // Longest name wins, including multi-word English names. Chinese names
+  // allow a following sentence without a space; English handles need a boundary.
+  const named = candidates.find(({ handle }) => address.toLowerCase().startsWith(handle)
+    && (!/^[a-z0-9 _-]+$/i.test(handle) || !/[a-z0-9_-]/i.test(address[handle.length] ?? '')))
+  if (named) return {
+    handle: address.slice(0, named.handle.length), bot: named.bot,
+    body: address.slice(named.handle.length).replace(/^[:：,，.。\s]+/, '').trim(),
+  }
   const typed = match[1].replace(/[:：,，.。]+$/, '')
   const rest = text.slice(match.index + match[0].length).trim()
-  const lower = typed.toLowerCase()
-  const candidates = handlesOf(bots)
-
-  const exact = candidates.find((entry) => entry.handle === lower)
-  if (exact) return { handle: typed, bot: resolveBot(exact.bot.id, bots) ?? exact.bot, body: rest }
-
-  // Chinese names carry no word boundary, so `@方案设计帮我看一下` arrives as one
-  // token. Longest prefix wins, and the remainder rejoins the message rather
-  // than being dropped - the part after the name is what the work is.
-  const prefixed = candidates.find((entry) => lower.startsWith(entry.handle))
-  if (prefixed) {
-    const remainder = typed.slice(prefixed.handle.length)
-    return {
-      handle: typed.slice(0, prefixed.handle.length),
-      bot: resolveBot(prefixed.bot.id, bots) ?? prefixed.bot,
-      body: [remainder, rest].filter(Boolean).join(' ').trim(),
-    }
-  }
   return { handle: typed, body: rest }
 }
 

@@ -44,7 +44,7 @@ database access.
 
 Which of these capabilities a given phase of work needs, who is accountable for that
 phase, and what that operator must refuse are one level up, in
-[Copilot bot roster](COPILOT_BOT_ROSTER.md). A bot narrows this matrix and never
+[Copilot bot roster](../../COPILOT_BOT_ROSTER.md). A bot narrows this matrix and never
 extends it: the capabilities in force are always the bot's declaration intersected
 with the project's enabled set.
 

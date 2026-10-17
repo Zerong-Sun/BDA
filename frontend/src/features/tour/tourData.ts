@@ -1,4 +1,4 @@
-export type TourSectionId = 'projects' | 'research' | 'workflow' | 'candidates' | 'results' | 'copilot-settings' | 'faq'
+export type TourSectionId = 'projects' | 'research' | 'team' | 'workflow' | 'candidates' | 'lab' | 'results' | 'copilot-settings' | 'faq'
 export type TourAdvanceMode = 'button' | 'target-click'
 export type TourPreparation = 'copilot' | 'settings'
 
@@ -57,17 +57,17 @@ export const TOUR_SECTIONS: TourSection[] = [
     description: { en: 'Choose a project and learn the shared workspace controls.', zh: '选择项目并认识工作区的通用控件。' },
     steps: [
       step('projects', 'projects-welcome', '/projects', undefined, 'button',
-        { title: 'Welcome to the interface tour', body: 'Explore demo is a read-only walkthrough of the product. Guide explains the scientific workflow; this tour teaches you where controls live and how to use them.' },
-        { title: '欢迎使用界面导览', body: 'Explore Demo 是只读的产品操作教学。Guide 解释科研工作流，本导览帮助您认识控件位置和使用方式。' }),
+        { title: 'Welcome to the interface tour', body: 'Learn the controls with the read-only demo. Follow the highlighted area, or choose Next. Pause whenever you like; your progress is saved.' },
+        { title: '欢迎使用界面导览', body: '在只读演示项目中认识常用操作。跟随高亮区域，或点击“下一步”。可以随时暂停，进度会保留。' }),
       step('projects', 'project-selector', '/projects', 'project-selector', 'target-click',
-        { title: 'Active project', body: 'Every page shares this project context. Open the selector to see the available projects.', interactionHint: 'Click the project name inside the highlighted frame at the top of the page. You can also use Next to continue.' },
-        { title: '当前项目', body: '所有页面共享这里的项目上下文。打开选择器可以查看可用项目。', interactionHint: '点击页面顶部高亮框内的项目名称，打开下拉列表。也可以点击下方“下一步”继续。' }),
+        { title: 'Active project', body: 'The selected project follows you across pages.', interactionHint: 'Open the project list, then close it to continue.' },
+        { title: '当前项目', body: '切换页面时，仍会保留当前项目。', interactionHint: '打开项目列表，关闭后继续导览。' }),
       step('projects', 'project-library', '/projects', 'project-library', 'button',
-        { title: 'Project library', body: 'Search, filter, sort, open, and manage research projects here. Destructive actions are explained but never run by this tour.' },
-        { title: '项目库', body: '在这里搜索、筛选、排序、打开和管理研究项目。导览只说明破坏性操作，不会实际执行。' }),
+        { title: 'Project library', body: 'Find a project and open its brief. Start real work by creating a project in application mode.' },
+        { title: '项目库', body: '找到项目，打开任务书。正式开始研究时，在应用模式中新建项目。' }),
       step('projects', 'main-navigation', '/projects', 'main-navigation', 'button',
-        { title: 'Main navigation', body: 'Decisions, Research team and Research are where you work; Workflow, Candidates, Lab and Results sit under Workbenches. Each has its own tour chapter.' },
-        { title: '主导航', body: '待我决定、研究团队和研究是日常入口；工作流、候选物、实验台与结果收在“工作台”里，每一部分都有独立导览章节。' }),
+        { title: 'Main navigation', body: 'Start with Research or Research team. Workbenches opens Workflow, Candidates, Lab and Results.' },
+        { title: '主导航', body: '从“研究”或“研究团队”开始。“工作台”中可打开工作流、候选物、实验台和结果。' }),
     ],
   },
   {
@@ -76,14 +76,30 @@ export const TOUR_SECTIONS: TourSection[] = [
     description: { en: 'Review evidence, references, structures, data, and methods.', zh: '查看证据、文献、结构、数据与方法。' },
     steps: [
       step('research', 'research-tabs', '/research?tab=evidence', 'research-tabs', 'target-click',
-        { title: 'Five research views', body: 'The same project evidence is organized into five focused views.', interactionHint: 'Click any research tab to continue.' },
-        { title: '五个研究视图', body: '同一项目的研究资料被整理为五个聚焦视图。', interactionHint: '点击任一研究标签继续。' }),
+        { title: 'Research views', body: 'Move between goals, evidence, plans and decisions.', interactionHint: 'Select a research tab to continue.' },
+        { title: '研究视图', body: '在目标、文献证据、实验方案和决策记录之间切换。', interactionHint: '选择一个研究标签继续。' }),
       step('research', 'research-workspace', '/research?tab=evidence', 'research-workspace', 'button',
-        { title: 'Stored research content', body: 'Review claims and citations here. Switching language only uses text already stored in the library; missing translations remain in the original language.' },
-        { title: '已存研究内容', body: '在这里审核声明和引用。切换语言只读取资料库已有文本，缺少译文时保留原文。' }),
+        { title: 'Stored research content', body: 'Read the evidence and open its sources. A missing translation stays in the original language.' },
+        { title: '已存研究内容', body: '阅读证据并打开来源。资料没有译文时保留原文。' }),
       step('research', 'research-operations', '/research?tab=evidence', 'research-operations', 'target-click',
-        { title: 'Research operations', body: 'Operational tools are grouped in collapsible areas so the evidence remains readable.', interactionHint: 'Expand this area to continue. Write actions will not be run.' },
-        { title: '研究操作区', body: '操作工具集中在折叠区域，避免干扰证据阅读。', interactionHint: '展开此区域继续；导览不会执行写入操作。' }),
+        { title: 'Research operations', body: 'Open the tools when you need to search or add evidence.', interactionHint: 'Expand this section. The tour will not run a search or save data.' },
+        { title: '研究操作区', body: '需要检索或补充证据时，再展开相关工具。', interactionHint: '展开此区域；导览不会检索或保存数据。' }),
+    ],
+  },
+  {
+    id: 'team', route: '/bots',
+    title: { en: 'Research team & decisions', zh: '研究团队与待办' },
+    description: { en: 'Ask a Bot, inspect its work, and make decisions.', zh: '向 Bot 提问、查看交付物并作出决定。' },
+    steps: [
+      step('team', 'team-room', '/bots?view=chat', 'research-room', 'button',
+        { title: 'Research room', body: 'Address a Bot with @. Messages, tasks and handoffs stay together here. The demo does not send messages.' },
+        { title: '研究室', body: '用 @ 指定 Bot。消息、任务和交接记录集中在这里。演示模式不会发送消息。' }),
+      step('team', 'team-tasks', '/bots?view=tasks', 'bot-workspace', 'button',
+        { title: 'Tasks and deliverables', body: 'Choose an owner and review the task scope. Check the delivered evidence, missing inputs and next step.' },
+        { title: '任务与交付物', body: '选择负责人并检查任务范围。完成后查看证据、缺失信息和下一步。' }),
+      step('team', 'team-decisions', '/inbox', 'decision-inbox', 'button',
+        { title: 'Needs your decision', body: 'Find tasks waiting for your input. Open each item to review and decide; Bots cannot confirm for you.' },
+        { title: '待我决定', body: '这里汇总等待你处理的事项。打开原记录检查并决定，Bot 不会代你确认。' }),
     ],
   },
   {
@@ -92,14 +108,14 @@ export const TOUR_SECTIONS: TourSection[] = [
     description: { en: 'Inspect the route, graph, resources, jobs, and node details.', zh: '查看路线、画布、资源、任务与节点详情。' },
     steps: [
       step('workflow', 'workflow-page', '/workflow', 'workflow-page', 'button',
-        { title: 'Workflow workspace', body: 'Demo mode shows a read-only reference DAG. In application mode, target readiness gates editing and submission.' },
-        { title: '工作流工作区', body: '演示模式展示只读参考 DAG；应用模式中，必须先满足靶点准备条件才能编辑和提交。' }),
+        { title: 'Workflow workspace', body: 'Build a plan from connected steps. Before a real run, prepare the target and review the inputs.' },
+        { title: '工作流工作区', body: '把步骤连成计算方案。正式运行前，先准备靶点并检查输入。' }),
       step('workflow', 'workflow-canvas', '/workflow', 'workflow-canvas', 'target-click',
-        { title: 'Interactive DAG', body: 'Pan, zoom, and select nodes to understand dependencies and status.', interactionHint: 'Click the workflow canvas to continue.' },
-        { title: '交互式 DAG', body: '可平移、缩放并选择节点，以理解依赖关系和状态。', interactionHint: '点击工作流画布继续。' }),
+        { title: 'Connected steps', body: 'Each node is a step; lines show which step supplies the next input.', interactionHint: 'Select a node to inspect it.' },
+        { title: '步骤与连线', body: '每个节点是一个步骤，连线表示下一步的输入来源。', interactionHint: '选择一个节点，查看详情。' }),
       step('workflow', 'workflow-inspector', '/workflow', 'workflow-inspector', 'button',
-        { title: 'Resources and inspector', body: 'Artifacts and plugins appear beside the graph; selecting a node exposes parameters, status, and outputs. Submission is never triggered by the tour.' },
-        { title: '资源与检查器', body: '制品和插件位于画布旁，选择节点后可查看参数、状态和输出。导览不会提交任务。' }),
+        { title: 'Step details', body: 'Check parameters, status and outputs here. For a real run, finish preflight, review the script, then confirm submission.' },
+        { title: '步骤详情', body: '在这里查看参数、状态和输出。正式运行时，先通过预检、查看脚本，再确认提交。' }),
     ],
   },
   {
@@ -116,6 +132,16 @@ export const TOUR_SECTIONS: TourSection[] = [
       step('candidates', 'candidate-table', '/candidates', 'candidate-table', 'button',
         { title: 'Table and structure detail', body: 'Select rows to compare metrics and inspect structures. Export and download controls are explained but not activated.' },
         { title: '表格与结构详情', body: '选择数据行以比较指标和查看结构。导出和下载只作说明，不会自动触发。' }),
+    ],
+  },
+  {
+    id: 'lab', route: '/lab',
+    title: { en: 'Lab', zh: '实验台' },
+    description: { en: 'Connect constructs and measurements to the project.', zh: '把构建体和实验测量关联到项目。' },
+    steps: [
+      step('lab', 'lab-workspace', '/lab', 'lab-page', 'button',
+        { title: 'Lab records', body: 'Inspect constructs, concentrations and instrument results. In application mode, preview an uploaded file before saving its analysis.' },
+        { title: '实验记录', body: '查看构建体、浓度和仪器结果。正式分析文件时，先预览，再保存到项目。' }),
     ],
   },
   {

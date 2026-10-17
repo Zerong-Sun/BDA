@@ -12,9 +12,10 @@ import {
 } from './command'
 import { Button } from './Button'
 import { useI18n } from '../../lib/i18n'
+import { projectText } from '../../lib/i18n/projectText'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useCopilotBots } from '../../features/copilot/bots/registry'
-import { APP_ROUTES, routeLabel } from '../../lib/nav/routes'
+import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchGroups } from '../../lib/nav/routes'
 
 /**
  * Go anywhere, by typing its name.
@@ -99,8 +100,9 @@ export function CommandPalette() {
         <CommandList>
           <CommandEmpty>{zh ? '没有匹配项。' : 'Nothing matches.'}</CommandEmpty>
 
-          <CommandGroup heading={zh ? '页面' : 'Pages'}>
-            {routes.map((route) => (
+          {[{ key: 'primary', label: zh ? '主要页面' : 'Main pages', routes: routes.filter((route) => PRIMARY_ROUTES.includes(route.to)) },
+            ...workbenchGroups(zh).map((group) => ({ ...group, routes: group.routes.map((route) => ({ ...route, label: routeLabel(route.key, zh, (key) => t.nav[key]) })) }))].map((group) => <CommandGroup key={group.key} heading={group.label}>
+            {group.routes.map((route) => (
               <CommandItem
                 key={route.to}
                 value={`${route.label} ${route.to}`}
@@ -109,7 +111,7 @@ export function CommandPalette() {
                 {route.label}
               </CommandItem>
             ))}
-          </CommandGroup>
+          </CommandGroup>)}
 
           {visibleProjects.length ? (
             <CommandGroup heading={zh ? '项目' : 'Projects'}>
@@ -125,7 +127,7 @@ export function CommandPalette() {
                     go(`/projects?project=${encodeURIComponent(project.id)}`)
                   }}
                 >
-                  {project.name}
+                  {projectText(project, 'name', language)}
                 </CommandItem>
               ))}
             </CommandGroup>

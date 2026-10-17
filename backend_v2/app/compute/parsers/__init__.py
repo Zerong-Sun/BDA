@@ -36,6 +36,7 @@ from . import (  # noqa: E402, F401  isort:skip
     manifest_metadata,
     proteinhunter,
     proteinmpnn,
+    rosetta_interface,
 )
 
 __all__ = [

@@ -19,10 +19,11 @@ import { HotspotSetPanel } from './HotspotSetPanel'
  */
 
 vi.mock('../pdb-viewer/StructureViewerLazy', () => ({
-  StructureViewerLazy: ({ onResiduePick }: { onResiduePick?: (residue: { chainId: string; seq: number }) => void }) => (
+  StructureViewerLazy: ({ onResiduePick }: { onResiduePick?: (residue: { chainId: string; seq: number; insertionCode?: string }) => void }) => (
     <div>
       <button type="button" onClick={() => onResiduePick?.({ chainId: 'A', seq: 164 })}>pick A164</button>
       <button type="button" onClick={() => onResiduePick?.({ chainId: 'A', seq: 168 })}>pick A168</button>
+      <button type="button" onClick={() => onResiduePick?.({ chainId: 'A', seq: 164, insertionCode: 'A' })}>pick A164A</button>
     </div>
   ),
 }))
@@ -45,6 +46,16 @@ function stub(items: unknown[]) {
 }
 
 describe('HotspotSetPanel', () => {
+  it('rejects an inserted residue without retargeting or removing the plain-number residue', async () => {
+    stub([])
+    renderWithProviders(<HotspotSetPanel projectId="proj_test" targetId="tgt1" source={{ url: '/s.pdb' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Pick on the structure' }))
+    fireEvent.click(screen.getByRole('button', { name: 'pick A164' }))
+    fireEvent.click(screen.getByRole('button', { name: 'pick A164A' }))
+    expect(screen.getByText('Picked: A164')).toBeInTheDocument()
+    expect(screen.getByText(/do not support insertion codes/)).toBeInTheDocument()
+  })
+
   it('says who proposed a set and shows what it rests on', async () => {
     stub([PROPOSED])
     renderWithProviders(<HotspotSetPanel projectId="proj_test" targetId="tgt1" />)

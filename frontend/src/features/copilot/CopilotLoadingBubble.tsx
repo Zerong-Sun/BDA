@@ -57,7 +57,7 @@ export function CopilotLoadingBubble({
       >
         {stage === 'connecting' ? <ConnectingDots /> : null}
         {stage === 'streaming' ? <StreamingCursor /> : null}
-        <span className="sr-only">{label}</span>
+        <span>{label}</span>
       </span>
     )
   }

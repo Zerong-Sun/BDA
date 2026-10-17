@@ -1,3 +1,4 @@
+import { botDisplayText } from '../features/copilot/bots/displayText'
 import { useEffect } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
@@ -12,6 +13,7 @@ import { Button } from '../components/ui/Button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs'
 import { ApiState } from '../components/ui/ApiState'
 import { Frame } from '../components/reui/frame'
+import { BotRecords } from '../features/copilot/BotRecords'
 import { BotAvatar } from '../features/copilot/BotAvatar'
 import { BotRoster } from '../features/copilot/BotRoster'
 import { CopilotChat } from '../features/copilot/CopilotChat'
@@ -53,7 +55,7 @@ function BotResponsibility({ botId }: { botId: string }) {
   useEffect(() => {
     if (projectId && bot) setSessionBot(projectId, bot.id)
   }, [projectId, bot, setSessionBot])
-  const view = search.get('view') === 'chat' ? 'chat' : 'work'
+  const view = search.get('view') === 'chat' ? 'chat' : search.get('view') === 'records' ? 'records' : 'work'
   const runId = search.get('run')
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(search)
@@ -81,20 +83,25 @@ function BotResponsibility({ botId }: { botId: string }) {
           <BotRoster projectId={projectId} activeBotId={botId} onAuto={() => { setSessionBot(projectId, null); navigate(`${team}&view=chat`) }} />
           <div className="bot-main">
             <ApiState isLoading={bots.isLoading} isError={bots.isError} error={bots.error} onRetry={() => void bots.refetch()}>
-              {bot ? <Tabs value={view} onValueChange={(value) => setParam('view', value === 'chat' ? 'chat' : null)}>
+              {bot ? <Tabs value={view} onValueChange={(value) => setParam('view', value === 'work' ? null : value)}>
                 <div className="bot-selected-header"><BotAvatar id={bot.id} stance={bot.stance} /><div className="min-w-0">
                   <p className="bot-selected-stance">{stanceLabel[bot.stance] ?? bot.stance}</p>
-                  <h2>{name(bot)}</h2><p>{bot.summary}</p>
+                  <h2>{name(bot)}</h2><p>{botDisplayText(bot, language).summary}</p>
                 </div></div>
                 <TabsList className="bot-surface-tabs" variant="line" aria-label={zh ? 'Bot 职责页视图' : 'Bot page views'}>
                   <TabsTrigger value="work">{zh ? '职责与工作' : 'Responsibilities & work'}</TabsTrigger>
+                  <TabsTrigger value="records">{zh ? '工作记录' : 'Work records'}</TabsTrigger>
                   <TabsTrigger value="chat">{zh ? '对话' : 'Conversation'}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="work">
                   {runId ? <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setParam('run', null)} />
                     : <BotWork bot={bot} bots={bots.data ?? []} projectId={projectId} onOpenRun={(id) => setParam('run', id)} onChat={() => setParam('view', 'chat')} />}
                 </TabsContent>
-                <TabsContent value="chat"><div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div></TabsContent>
+                <TabsContent value="records"><BotRecords key={`${projectId}:${botId}`} projectId={projectId} botId={bot.id} /></TabsContent>
+                <TabsContent value="chat">
+                  <p className="mb-3 text-sm text-text-secondary"><Link to={`${team}&view=room`} className="text-accent underline">{zh ? '查看已保存的团队对话记录' : 'View saved team conversation history'}</Link></p>
+                  <div className="bot-chat-surface"><CopilotChat pageContext={context} externalRoster /></div>
+                </TabsContent>
               </Tabs> : <div className="science-empty">
                 <h2>{zh ? '名录中没有这个 Bot' : 'This Bot is not in the roster'}</h2>
                 <p>{zh ? '它可能已被移出名录；以它身份运行过的任务记录仍会保留。' : 'It may have been retired; tasks that ran as it are still recorded.'}</p>
@@ -124,11 +131,11 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   const sent = handoffs.data?.filter((handoff) => ids.has(handoff.from_bot)) ?? []
   const owned = bot.task_services ?? []
   // Assigning prepares the composer with this owner and opens it. Nothing
-  // starts here: the plan, writes and budget are still reviewed there.
+  // starts here: the plan and writes are still reviewed there.
   const assign = (kind: string) => {
     const store = useAppStore.getState()
     const current = store.copilotTaskDrafts[projectId]
-    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', maxTurns: current?.maxTurns ?? 24, maxCost: current?.maxCost ?? '', writes: [], bot: bot.id, service: kind, preview: true })
+    store.setCopilotTaskDraft(projectId, { goal: current?.goal ?? '', writes: [], bot: bot.id, service: kind, preview: true })
     navigate(`/bots?project=${encodeURIComponent(projectId)}&view=tasks`)
   }
   const handoffList = (label: string, items: HandoffResponse[], empty: string) => <div role="group" aria-label={label}>
@@ -140,7 +147,7 @@ function BotWork({ bot, bots, projectId, onOpenRun, onChat }: { bot: CopilotBot;
   return <div className="bot-work">
     <section aria-label={zh ? '职责与边界' : 'Mandate and refusals'}>
       <h3>{zh ? '职责与边界' : 'Mandate and refusals'}</h3>
-      <p className="text-sm text-text-secondary">{bot.charter}</p>
+      <div className="space-y-3 text-sm leading-7 text-text-secondary">{botDisplayText(bot, language).charter.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
     </section>
     <section aria-label={zh ? '托管任务' : 'Guided tasks'}>
       <h3>{zh ? '托管任务' : 'Guided tasks'}</h3>

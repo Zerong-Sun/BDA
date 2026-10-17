@@ -10,9 +10,14 @@ from __future__ import annotations
 import hashlib
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.problem import DomainError
+from ..experiments.models import ExperimentResult
+from ..experiments.service import review_instrument_result
+from ..identity.models import User
+from ..projects.models import Project
 from .kernels import calculators
 from .models import Protein
 from .repository import ProteinRepository
@@ -35,6 +40,24 @@ from .schemas import (
 #: characters is 48 bits - collision-free for any realistic library, and short
 #: enough to read out loud in a lab.
 FINGERPRINT_CHARS = 12
+
+
+def review_analysis(
+    session: Session, project: Project, result_id: uuid.UUID, user: User, *, expected: int,
+    accept: bool, rationale: str,
+) -> tuple[ExperimentResult, bool]:
+    """Lock a project result and atomically review its measured projection."""
+    from .analysis import record_measured_metric
+
+    row = session.scalar(select(ExperimentResult).where(
+        ExperimentResult.id == result_id, ExperimentResult.project_id == project.id,
+    ).with_for_update())
+    if row is None:
+        raise DomainError("instrument_result_not_found", "Instrument result was not found", status_code=404)
+    reviewed = review_instrument_result(session, project, row, user, expected=expected,
+                                        accept=accept, rationale=rationale)
+    metric = record_measured_metric(session, reviewed)
+    return reviewed, metric is not None
 
 
 def sequence_digest(sequence: str) -> str:

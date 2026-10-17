@@ -161,9 +161,10 @@ describe('Layer 8 product contract pages', () => {
     renderWithProviders(<ExperimentsPage />)
 
     expect((await screen.findAllByText('Binder Design MVP')).length).toBeGreaterThan(0)
-    // A project that is not target-ready opens target preparation on arrival:
-    // the repair is the next thing to do, so it is not behind a disclosure.
-    expect(screen.getByRole('button', { name: 'Project details and target preparation' })).toHaveAttribute('aria-expanded', 'true')
+    // Project selection stays primary; target preparation remains one click away.
+    const details = screen.getByRole('button', { name: 'Project details and target preparation' })
+    expect(details).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(details)
     expect((await screen.findAllByText('Confirm target identity')).length).toBeGreaterThan(0)
     const readinessLinks = screen.getAllByRole('link', { name: 'Resolve target readiness' })
     expect(readinessLinks.length).toBeGreaterThan(0)
@@ -234,6 +235,7 @@ describe('Layer 8 product contract pages', () => {
       link.getAttribute('href') === '#/research?tab=structures&project=proj_layer8',
     )).toBe(true)
     expect(screen.getByRole('button', { name: 'Submit workflow' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add workflow node' })).toBeEnabled())
   })
 
   it('Workflow editor goes read-only once the run reaches a terminal status', async () => {
@@ -595,7 +597,9 @@ describe('Layer 8 product contract pages', () => {
 
     renderWithProviders(<ResultsPage />)
 
-    expect(await screen.findByText('No wet-lab readouts are recorded for this project yet. Upload experiment results or run a validation workflow to populate this view.')).toBeInTheDocument()
+    expect(await screen.findByText('No wet-lab readouts are recorded. Upload measurements and link them to the tested candidates.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Read saved discussion reports' })).toHaveAttribute('href', '#/research?project=proj_layer8&tab=methods')
+    expect(screen.getByRole('link', { name: 'Review decision record' })).toHaveAttribute('href', '#/research?project=proj_layer8&tab=timeline')
     expect(screen.getByRole('button', { name: 'Prepare delivery package' })).toBeDisabled()
     expect(
       screen.getByText('No delivery package has been generated from verified project artifacts yet.'),

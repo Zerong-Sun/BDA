@@ -14,7 +14,8 @@ from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
 from ..projects.service import require_project, require_project_permission
-from . import patent_service
+from . import evidence_notes, patent_service
+from .evidence_notes_api import router as evidence_notes_router
 from .models import (
     LiteratureDocument,
     LiteratureSearchRun,
@@ -53,6 +54,7 @@ from .schemas import (
 from .service import create_search, ingest, review_resource, subscribe, update_subscription
 
 router = APIRouter(tags=["literature"])
+router.include_router(evidence_notes_router)
 
 
 @router.get("/projects/{project_id}/patents/landscape", response_model=dict[str, Any])
@@ -390,11 +392,15 @@ def review_claim(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ClaimResponse:
-    row = LiteratureRepository(session).claim(claim_id)
+    row = LiteratureRepository(session).claim(claim_id, for_update=True)
     if row is None:
         raise DomainError("literature_claim_not_found", "Literature claim was not found", status_code=404)
-    _document(session, row.document_id, user)
-    review_resource(row, payload, parse_if_match(if_match), user)
+    document = _document(session, row.document_id, user)
+    if evidence_notes.is_note(row):
+        require_project_permission(session, document.project_id, user, "write")
+        evidence_notes.review_note(session, row, document, payload, parse_if_match(if_match), user)
+    else:
+        review_resource(row, payload, parse_if_match(if_match), user)
     response.headers["ETag"] = etag(row.version)
     return ClaimResponse.model_validate(row)
 

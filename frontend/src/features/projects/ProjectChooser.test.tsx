@@ -37,6 +37,7 @@ vi.mock('../../lib/hooks/useProjectContext', () => ({
 vi.mock('../../lib/api/projects', () => ({ createProject, createProjectPromptDraft, waitForProjectPromptDraft, deleteProject }))
 
 beforeEach(() => {
+  sessionStorage.clear()
   setProjectId.mockReset()
   createProject.mockReset()
   createProjectPromptDraft.mockReset()
@@ -44,9 +45,17 @@ beforeEach(() => {
   useAppStore.setState({ appMode: 'application', language: 'en' })
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); sessionStorage.clear() })
 
 describe('ProjectChooser', () => {
+  it('does not open project creation for an invited viewer, including a controlled dialog request', () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    renderWithProviders(<ProjectChooser creating />)
+    expect(screen.getByRole('button', { name: /create project/i })).toBeDisabled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(createProject).not.toHaveBeenCalled()
+  })
+
   it('clears a selected project through the localized sentinel option', () => {
     renderWithProviders(<ProjectChooser />)
 

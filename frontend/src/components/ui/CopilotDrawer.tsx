@@ -1,11 +1,11 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { lazy, Suspense, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import { CopilotChat } from '../../features/copilot/CopilotChat'
 import { CopilotActions } from '../../features/copilot/CopilotActions'
 import { CopilotChain } from '../../features/copilot/CopilotChain'
-import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
+const CopilotMcpSessions = lazy(() => import('../../features/copilot/CopilotMcpSessions').then((module) => ({ default: module.CopilotMcpSessions })))
 import { CopilotWorkspace } from '../../features/copilot/CopilotWorkspace'
-import { CopilotSettings } from '../../features/copilot/CopilotSettings'
+const CopilotSettings = lazy(() => import('../../features/copilot/CopilotSettings').then((module) => ({ default: module.CopilotSettings })))
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { managesProject, useProjectAccess } from '../../lib/hooks/useProjectAccess'
@@ -142,14 +142,14 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
         </Tabs>
         {settingsOpen && canConfigure ? (
           <ScrollArea className="h-[40%] shrink-0 border-b">
-            <CopilotSettings />
+            <Suspense fallback={null}><CopilotSettings /></Suspense>
           </ScrollArea>
         ) : null}
         {surface === 'tasks' ? (
           <CopilotWorkspace pageContext={pageContext} />
         ) : surface === 'mcp' ? (
           <ScrollArea className="min-h-0 flex-1">
-            <CopilotMcpSessions />
+            <Suspense fallback={null}><CopilotMcpSessions /></Suspense>
           </ScrollArea>
         ) : surface === 'chain' ? (
           <ScrollArea className="min-h-0 flex-1">

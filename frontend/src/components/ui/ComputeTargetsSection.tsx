@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { awaitOperation } from '../../lib/api/operations'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HeartbeatIcon, PlusIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
@@ -37,7 +38,7 @@ import {
 const BACKENDS = ['lsf', 'docker'] as const
 
 export function ComputeTargetsSection() {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const copy = t.settingsExt.computeTargets
   const showToast = useToastStore((s) => s.show)
   const queryClient = useQueryClient()
@@ -53,7 +54,7 @@ export function ComputeTargetsSection() {
     staleTime: 30_000,
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['compute-nodes'] })
+  const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ['compute-nodes'] }), queryClient.invalidateQueries({ queryKey: ['cluster-health'] })])
   const fail = (err: unknown, fallback: string) =>
     showToast(err instanceof Error ? err.message : fallback, 'error')
 
@@ -70,7 +71,10 @@ export function ComputeTargetsSection() {
   })
 
   const check = useMutation({
-    mutationFn: (nodeId: string) => checkComputeNodeHealth(nodeId),
+    mutationFn: async (nodeId: string) => {
+      const accepted = await checkComputeNodeHealth(nodeId)
+      return awaitOperation(accepted.operation_id, { timeoutMs: 60_000 })
+    },
     onSuccess: () => void invalidate(),
     onError: (err) => fail(err, copy.healthCheckFailed),
   })
@@ -88,16 +92,17 @@ export function ComputeTargetsSection() {
         {copy.title}
       </div>
 
-      {nodes.data?.length ? (
+      {nodes.isError ? <p role="alert" className="text-xs text-danger">{nodes.error.message}</p> : null}
+      {nodes.isPending ? <p role="status" className="text-xs text-text-secondary">{language === 'zh' ? '正在加载计算目标…' : 'Loading compute targets…'}</p> : nodes.data?.length ? (
         <ul className="grid gap-2">
           {nodes.data.map((node) => (
             <li
               key={node.id}
-              className="flex flex-wrap items-center gap-2 rounded-md border border-border-soft px-3 py-2 text-xs"
+              className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border-soft px-3 py-2 text-xs"
             >
-              <span className="min-w-0 flex-1 truncate text-text-primary">{node.name}</span>
+              <span title={node.name} className="min-w-0 basis-full break-words text-text-primary">{node.name}</span>
               <span className="text-text-secondary">{node.backend}</span>
-              {node.queue ? <span className="font-mono text-text-muted">{node.queue}</span> : null}
+              {node.queue ? <span className="break-all font-mono text-text-muted">{node.queue}</span> : null}
               <StatusPill label={node.health_status} tone={statusTone(node.health_status)} />
               {isAdmin ? (
                 <>
@@ -109,7 +114,7 @@ export function ComputeTargetsSection() {
                     aria-label={format(copy.checkHealthOf, { name: node.name })}
                     onClick={() => check.mutate(node.id)}
                   >
-                    {copy.checkHealth}
+                    {check.isPending && check.variables === node.id ? (language === 'zh' ? '检查中…' : 'Checking…') : copy.checkHealth}
                   </Button>
                   {node.enabled ? (
                     <Button
@@ -127,6 +132,8 @@ export function ComputeTargetsSection() {
                   )}
                 </>
               ) : null}
+              {node.health_error ? <p className="w-full break-words text-text-secondary" role="status">{node.health_error}</p> : null}
+              {node.health_checked_at ? <p className="w-full text-text-muted">{language === 'zh' ? '上次检查：' : 'Last checked: '}{new Date(node.health_checked_at).toLocaleString(language)}</p> : null}
             </li>
           ))}
         </ul>
@@ -136,14 +143,14 @@ export function ComputeTargetsSection() {
 
       {isAdmin ? (
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="grid min-w-0 grid-cols-2 items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault()
             if (name.trim()) register.mutate()
           }}
         >
           <Input
-            className="min-w-0 flex-1"
+            className="col-span-2 min-w-0 w-full"
             value={name}
             placeholder={copy.namePlaceholder}
             aria-label={copy.namePlaceholder}
@@ -162,7 +169,7 @@ export function ComputeTargetsSection() {
             </SelectContent>
           </Select>
           <Input
-            className="w-32"
+            className="min-w-0 w-full"
             value={queue}
             placeholder={copy.queuePlaceholder}
             aria-label={copy.queuePlaceholder}

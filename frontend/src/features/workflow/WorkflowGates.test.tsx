@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GateInspector } from './GateInspector'
 import { GatePolicyEditor } from './GatePolicyEditor'
 import { emptyPolicy, gateLabel, type GateSummary } from './gates'
-import { releaseGate, gateResults, retryGate } from '../../lib/api/workflowGates'
+import { releaseGate, gateResults, retryGate, previewSources } from '../../lib/api/workflowGates'
 import { WorkflowNodeCard } from './WorkflowNode'
 
 vi.mock('../../lib/i18n', () => ({
@@ -20,6 +20,9 @@ vi.mock('../../lib/api/workflowGates', () => ({
 }))
 vi.mock('../../lib/api/artifacts', () => ({
   getArtifact: vi.fn().mockRejectedValue(new Error('Synthetic preview error')),
+}))
+vi.mock('../../lib/api/scientificGates', () => ({
+  scientificGates: vi.fn().mockResolvedValue({ workflow_version: 1, items: [] }),
 }))
 vi.mock('@xyflow/react', () => ({
   Handle: ({ id, type }: { id: string; type: string }) => (
@@ -75,7 +78,7 @@ beforeEach(() => {
   })
 })
 
-function inspector(runs: GateSummary[] = [gate]) {
+function inspector(runs: GateSummary[] = [gate], canOperate = true, historical = false) {
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={cache}>
@@ -83,6 +86,7 @@ function inspector(runs: GateSummary[] = [gate]) {
         workflowId="wf"
         edge={{
           id: 'edge',
+          legacy_connection: historical,
           source: 'mpnn',
           target: 'af2',
           source_port: 'sequences',
@@ -91,6 +95,7 @@ function inspector(runs: GateSummary[] = [gate]) {
         }}
         runs={runs}
         readOnly
+        canOperate={canOperate}
         onSave={vi.fn()}
         onClose={vi.fn()}
         onSource={vi.fn()}
@@ -103,6 +108,24 @@ function inspector(runs: GateSummary[] = [gate]) {
 }
 
 describe('workflow gates', () => {
+  it('shows historical dependencies without querying nonexistent gate records or offering execution', async () => {
+    inspector([], true, true)
+    expect(screen.getByText('历史依赖')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '查看上游步骤' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '试运行' })).not.toBeInTheDocument()
+    expect(previewSources).not.toHaveBeenCalled()
+    expect(gateResults).not.toHaveBeenCalled()
+  })
+
+  it('lets viewers inspect results while disabling previews and release', async () => {
+    inspector([gate], false)
+    await screen.findByText('keep')
+    expect(screen.getByRole('button', { name: '试运行' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '选择本页合格项' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '不保留结果，结束分支' })).toBeDisabled()
+    expect(releaseGate).not.toHaveBeenCalled()
+  })
+
   it('blocks release and bulk selection until result loading completes', async () => {
     vi.mocked(gateResults).mockImplementation(() => new Promise(() => {}))
     inspector()
@@ -264,4 +287,10 @@ describe('workflow gates', () => {
     expect(screen.getByTestId('target-backbone')).toBeVisible()
     expect(screen.getByTestId('source-sequences')).toBeVisible()
   })
+})
+
+it('offers parser metrics without structure-only controls for a sequence gate', () => {
+  render(<GatePolicyEditor value={emptyPolicy()} onChange={vi.fn()} metrics={['score', 'seq_recovery']} allowStructure={false} />)
+  expect(screen.getByText('添加上游模型指标')).toBeInTheDocument()
+  expect(screen.queryByText('结构质量标准（DSSP）')).not.toBeInTheDocument()
 })

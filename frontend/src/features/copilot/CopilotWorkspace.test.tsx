@@ -26,6 +26,7 @@ const run = { id: 'task-1', project_id: 'project-task', goal: 'Research PD1', bo
   task_contract: { version: 1, service_kind: 'literature' }, outcome: { status: 'needs_input', summary: 'Target identity is missing.', missing: ['Target identity'], next_action: 'Provide an identifier.', steps: [] } }
 function handlers(eligible: string[] = ['literature']) {
   server.use(
+    http.get('/api/v2/copilot/procedural-skills', () => HttpResponse.json([])),
     http.get('/api/v2/copilot/task-services', () => HttpResponse.json([service, planningService])),
     http.get('/api/v2/copilot/bots', () => HttpResponse.json(roster)),
     http.get('/api/v2/copilot/projects/:projectId/task-readiness', () => HttpResponse.json({ model: 'test-model', checks: {}, eligible_services: eligible })),
@@ -38,6 +39,25 @@ beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ language: 'en'
 afterEach(cleanup)
 
 describe('task-centered Copilot', () => {
+  it('searches legacy owners and combines status filters, clears an empty result and focuses the task composer', async () => {
+    server.use(http.get('/api/v2/copilot/bots', () => HttpResponse.json(roster.map((item) => item.id === 'researcher' ? { ...item, id: 'evidence-owner', title: 'Researcher' } : item))), http.get('/api/v2/copilot/projects/:projectId/agent-runs', () => HttpResponse.json({ items: [run, { ...run, id: 'active-2', bot: 'planner', goal: 'Prepare active plan', status: 'running', outcome: null }, { ...run, id: 'child-3', parent_run_id: 'task-1', goal: 'Child work' }] })))
+    renderWithProviders(<CopilotWorkspace />)
+    const search = await screen.findByRole('textbox', { name: 'Search loaded tasks' })
+    fireEvent.change(search, { target: { value: 'evidence-owner' } })
+    expect(screen.getByRole('button', { name: /Research PD1/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Prepare active plan/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }))
+    expect(screen.getByText('No loaded tasks match.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(search).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Prepare active plan/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Child work/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Needs attention' }))
+    expect(screen.queryByRole('button', { name: /Prepare active plan/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }))
+    expect(screen.getByLabelText('Task goal')).toHaveFocus()
+  })
+
   it('does not navigate back when task startup completes after leaving the workspace', async () => {
     let release!: () => void
     const responseReady = new Promise<void>((resolve) => { release = resolve })
@@ -77,21 +97,28 @@ describe('task-centered Copilot', () => {
     expect(await screen.findByRole('checkbox', { name: 'Allow external literature search and ingestion' })).toBeChecked()
     expect(screen.getByRole('button', { name: 'Start this plan' })).toBeInTheDocument()
   })
-  it('blocks invalid budgets and turn limits with a visible correction', async () => {
-    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" initialService="literature" />)
+  it('ignores legacy draft budgets and starts with six model calls without billing controls', async () => {
+    const legacy = { goal: 'Research PD1', bot: 'researcher', service: 'literature', preview: true, writes: [], maxTurns: 200, maxCost: '1000000' }
+    useAppStore.setState({ copilotTaskDrafts: { 'project-task': legacy } })
+    const bodies: Record<string, unknown>[] = []
+    server.use(http.post('/api/v2/copilot/agent-runs', async ({ request }) => { bodies.push(await request.json() as Record<string, unknown>); return HttpResponse.json({ run, operation_id: 'op' }, { status: 202 }) }))
+    renderWithProviders(<CopilotWorkspace rememberDraft />)
     const start = await screen.findByRole('button', { name: 'Start this plan' })
     fireEvent.click(screen.getByRole('button', { name: 'Advanced options and direct editing' }))
-    const budget = screen.getByLabelText('Estimated model budget (cents, optional)')
-    for (const value of ['-1', '1.5', '1000001']) {
-      fireEvent.change(budget, { target: { value } })
-      expect(start).toBeDisabled()
-      expect(screen.getByRole('alert')).toHaveTextContent('Budget must be a whole number')
-    }
-    fireEvent.change(budget, { target: { value: '0' } })
-    expect(start).toBeEnabled()
-    fireEvent.change(screen.getByLabelText('Turn limit'), { target: { value: '0' } })
-    expect(start).toBeDisabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Turn limit must be a whole number')
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.queryByText(/budget|cents|billing/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/up to 6 model calls/)).toBeVisible()
+    fireEvent.click(start)
+    await waitFor(() => expect(bodies).toHaveLength(1))
+    expect(bodies[0]).toMatchObject({ goal: legacy.goal, max_turns: 6 })
+    expect(bodies[0]).not.toHaveProperty('max_cost_usd_cents')
+  })
+  it('shows an allowance failure from task creation without displaying internal billing', async () => {
+    server.use(http.post('/api/v2/copilot/agent-runs', () => HttpResponse.json({ error_code: 'copilot_task_budget_exhausted', detail: 'Internal cost limit 100 cents' }, { status: 409 })))
+    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" initialService="literature" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start this plan' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('This task’s model-call allowance is exhausted.')
+    expect(screen.queryByText(/100 cents/)).not.toBeInTheDocument()
   })
   it('recovers the unavailable service list without losing the request', async () => {
     server.use(http.get('/api/v2/copilot/task-services', () => HttpResponse.json({ detail: 'Service unavailable' }, { status: 422 })))

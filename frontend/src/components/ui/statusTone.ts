@@ -3,7 +3,7 @@ export type StatusTone = 'green' | 'amber' | 'blue' | 'red' | 'neutral'
 export function statusTone(status: string): StatusTone {
   const normalized = status.toLowerCase()
   // Negative states must precede substring matches such as available/connected.
-  if (['disconnected', 'failed', 'rejected', 'trashed'].includes(normalized)) return 'red'
+  if (['unhealthy', 'disconnected', 'failed', 'rejected', 'trashed'].includes(normalized)) return 'red'
   if (['unavailable', 'offline', 'inactive', 'skipped', 'cancelled', 'canceled', 'archived'].includes(normalized)) return 'neutral'
   if (
     ['draft', 'paused', 'blocked', 'pending', 'queued', 'review', 'guided', 'retest', 'hold', 'qc risk', 'warning', 'unreachable'].some(
@@ -13,7 +13,7 @@ export function statusTone(status: string): StatusTone {
     return 'amber'
   }
   if (
-    ['available', 'active', 'succeeded', 'validated', 'completed', 'pass', 'connected', 'success', 'anchor', 'order'].some(
+    ['healthy', 'available', 'active', 'succeeded', 'validated', 'completed', 'pass', 'connected', 'success', 'anchor', 'order'].some(
       (s) => normalized.includes(s),
     )
   ) {

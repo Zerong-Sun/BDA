@@ -152,3 +152,7 @@ def test_a_design_missing_a_measurement_is_reported_as_missing(session: Session)
     assert verdict["tier"] is None
     assert verdict["failed"] == 0
     assert "not that the design failed" in result["reading_note"]
+    assert "supplied metrics" in result["reading_note"]
+    assert "elsewhere is unknown" in result["reading_note"]
+    assert "including nulls" in result["reading_note"]
+    assert "nothing has measured" not in result["reading_note"]

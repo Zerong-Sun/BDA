@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useAppStore } from '../store/appStore'
+import { invalidateAuthRequests } from '../api/client'
 
 const AUTHENTICATED_SESSION_KEYS = [
   'bda_token',
@@ -9,6 +10,7 @@ const AUTHENTICATED_SESSION_KEYS = [
 
 /** Remove every user- or project-scoped browser value while preserving UI preferences. */
 export function clearAuthenticatedBrowserState(queryClient?: QueryClient): void {
+  invalidateAuthRequests()
   for (const key of AUTHENTICATED_SESSION_KEYS) sessionStorage.removeItem(key)
   queryClient?.clear()
   useAppStore.getState().resetAuthenticatedState()

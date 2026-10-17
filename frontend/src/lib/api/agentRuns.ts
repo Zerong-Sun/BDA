@@ -34,11 +34,10 @@ export async function startAgentRun(body: {
   service_kind?: 'brief' | 'literature' | 'planning' | 'execution' | 'interpretation' | 'custom'
   authorized_writes?: string[]
   skills?: string[]
-  max_turns?: number
-  max_cost_usd_cents?: number | null
+  procedural_skills?: string[] | null
 }) {
   const accepted = await startAgentRunApiV2CopilotAgentRunsPost<true>({
-    body,
+    body: { ...body, max_turns: 6 },
     throwOnError: true,
   })
   return accepted.data

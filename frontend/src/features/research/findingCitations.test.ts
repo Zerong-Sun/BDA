@@ -20,3 +20,12 @@ describe('findingCitationSources', () => {
     })).toEqual([])
   })
 })
+
+it('keeps answer-local source order when merging legacy references', async () => {
+  const { findingCitationRecords } = await import('./findingCitations')
+  const citations = [{ entity_id: 'second', reference_ids: ['PMID:2'] }, { entity_id: 'first', reference_ids: ['PMID:1'] }]
+  const result = findingCitationRecords({ citations, source_refs: ['PMID:1', 'PMID:3'] })
+  expect(result.slice(0, 2)).toEqual(citations)
+  expect(result).toHaveLength(3)
+  expect(result[2].entity_id).toBe('PMID:3')
+})

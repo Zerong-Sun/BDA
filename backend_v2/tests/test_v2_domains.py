@@ -656,9 +656,12 @@ def test_workflow_editor_and_project_aggregates(domain_client) -> None:
     layout = client.patch(
         f"/api/v2/workflow-runs/{workflow_id}/layout",
         headers={"If-Match": 'W/"3"'},
-        json={"viewport": {"x": 0, "y": 0, "zoom": 1}, "positions": {"design": {"x": 10, "y": 20}}},
+        json={"nodes": [{"id": node_id, "position": {"x": 30, "y": 40}, "width": 360}]},
     )
     assert layout.status_code == 200 and layout.headers["etag"] == 'W/"4"'
+    restored = client.get(f"/api/v2/workflow-runs/{workflow_id}/graph").json()
+    assert restored["layout"]["nodes"] == [{"id": "design", "position": {"x": 30, "y": 40}, "width": 360}]
+    assert restored["nodes"][0]["position"] == {"x": 30, "y": 40}
     preview = client.post(f"/api/v2/workflow-nodes/{node_id}/script-previews", json={"overrides": {"samples": 16}})
     assert preview.status_code == 200 and "run-model" in preview.json()["script"]
     assert len(client.get(f"/api/v2/workflow-runs/{workflow_id}/nodes").json()["items"]) == 1

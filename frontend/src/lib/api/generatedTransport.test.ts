@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { generatedClient } from './generatedTransport'
-import { setUnauthorizedHandler } from './client'
+import { invalidateAuthRequests, setUnauthorizedHandler } from './client'
 
 afterEach(() => {
+  invalidateAuthRequests()
   sessionStorage.clear()
   vi.unstubAllGlobals()
   setUnauthorizedHandler(() => {})
@@ -13,6 +14,32 @@ const rejected = () => new Response(JSON.stringify({ detail: 'Rejected' }), {
 })
 
 describe('generated transport session boundaries', () => {
+  it('does not sign out a new account when a previous account retry returns 401 late', async () => {
+    let finishRetry!: (response: Response) => void
+    let retryStarted!: () => void
+    const started = new Promise<void>(resolve => { retryStarted = resolve })
+    const fetch = vi.fn().mockResolvedValueOnce(rejected())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'old-refreshed', user: { id: 'old' } }), {
+        headers: { 'content-type': 'application/json' },
+      })).mockImplementationOnce(() => new Promise<Response>(resolve => {
+        finishRetry = resolve
+        retryStarted()
+      }))
+    vi.stubGlobal('fetch', fetch)
+    const unauthorized = vi.fn()
+    setUnauthorizedHandler(unauthorized)
+    sessionStorage.setItem('bda_user', JSON.stringify({ id: 'old' }))
+    const pending = generatedClient.get({ url: '/api/v2/auth/me' })
+    const rejectedRequest = expect(pending).rejects.toMatchObject({ status: 401 })
+    await started
+    invalidateAuthRequests()
+    sessionStorage.setItem('bda_user', JSON.stringify({ id: 'new' }))
+    sessionStorage.setItem('bda_token', 'new-login')
+    finishRetry(rejected())
+    await rejectedRequest
+    expect(unauthorized).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('bda_token')).toBe('new-login')
+  })
   it('does not refresh or retry an explicitly rejected login', async () => {
     const fetch = vi.fn().mockImplementation(rejected)
     const unauthorized = vi.fn()

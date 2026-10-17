@@ -77,7 +77,8 @@ function DeleteProjectRoutes() {
 describe('project lifecycle hooks', () => {
   it('drops the old run and structure selection when selecting another project', async () => {
     mockProjectList([makeProject('a'), makeProject('b')])
-    window.location.hash = '/bots?project=a&view=tasks&run=old&structureA=old-a&structureB=old-b&compare=1'
+    window.location.hash = '/bots?project=a&view=tasks&run=old&structureA=old-a&structureB=old-b&compare=1&artifact=old&residues=old&knowledge=old&goal=old&draft=old&draft_project=a&service=literature&from=references'
+    useAppStore.setState({ copilotSelectedEntityIds: ['old-evidence'] })
     function SwitchProject() {
       const { projectId, setProjectId } = useProjectContext()
       return <Button type="button" disabled={!projectId} onClick={() => setProjectId('b')}>Switch project</Button>
@@ -86,6 +87,7 @@ describe('project lifecycle hooks', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Switch project' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Switch project' }))
     expect(window.location.hash).toBe('#/bots?project=b&view=tasks')
+    expect(useAppStore.getState().copilotSelectedEntityIds).toEqual([])
   })
   beforeEach(() => {
     localStorage.clear()
@@ -112,6 +114,16 @@ describe('project lifecycle hooks', () => {
     expect(screen.getByTestId('project-id')).toHaveTextContent('none')
     expect(useAppStore.getState().activeProjectId).toBe('')
     expect(window.location.hash).not.toContain('project=proj_missing')
+  })
+
+  it('never silently opens a previous project for an unavailable explicit project link', async () => {
+    mockProjectList([makeProject('previous')])
+    useAppStore.setState({ activeProjectId: 'previous' })
+    window.location.hash = '/results?project=unavailable&artifact=private-evidence&residues=old'
+    renderWithProviders(<ProjectContextProbe />)
+    await waitFor(() => expect(useAppStore.getState().activeProjectId).toBe(''))
+    expect(screen.getByTestId('project-id')).toHaveTextContent('none')
+    expect(window.location.hash).toBe('#/results')
   })
 
   it('clears current project state and URL when a project is moved to trash', async () => {

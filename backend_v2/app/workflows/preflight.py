@@ -20,6 +20,7 @@ from ..compute.binding import binding_blockers, edge_port_blockers
 from ..core.config import get_settings
 from ..registry.models import ModelPlugin
 from ..registry.ports import parse_output_ports
+from ..registry.qualification import model_qualification_issues
 from ..registry.runtime_validation import runtime_validation_is_current
 from .models import WorkflowRun
 from .repository import WorkflowRepository
@@ -100,12 +101,17 @@ def order_pair_blockers(node: Any, plugin: Any) -> list[dict]:
     return blockers
 
 
+def workflow_backend(workflow: WorkflowRun, override: str | None = None) -> str:
+    """A saved route's host/container choice also governs previews and submission."""
+    return override or (workflow.graph or {}).get("compute_backend") or get_settings().compute_backend
+
+
 def evaluate_preflight(
     session: Session, workflow: WorkflowRun, *, compute_backend: str | None = None
 ) -> tuple[list[dict], list[dict], dict]:
     """Returns (blockers, warnings, checks)."""
     settings = get_settings()
-    backend = compute_backend or settings.compute_backend
+    backend = workflow_backend(workflow, compute_backend)
     strict = settings.is_production or settings.compute_require_runtime_proof
     nodes = WorkflowRepository(session).nodes(workflow.id)
     blockers: list[dict] = []
@@ -237,6 +243,24 @@ def evaluate_preflight(
                 }
             )
 
+    # Scientific authorization is independent of ordinary port/configuration validation.
+    # This path is also called by real compute submission, not just the UI preview.
+    from .scientific_gates import approval_status
+
+    for edge in workflow.graph.get("edges", []):
+        if getattr(by_key.get(edge.get("target")), "execution_mode", "dispatch") == "manual":
+            continue
+        if (edge.get("gate") or {}).get("mode", "automatic") == "automatic":
+            try:
+                status = approval_status(session, workflow, edge)
+                for code in status["blockers"]:
+                    blockers.append({"code": code, "edge_id": edge.get("id"), "node_key": edge.get("target"),
+                                     "message": "Scientific automatic gate requires a reviewed source, parameter and local calibration contract"})
+            except ValueError:
+                blockers.append({"code": "scientific_evidence_invalid", "edge_id": edge.get("id"),
+                                 "node_key": edge.get("target"),
+                                 "message": "Scientific policy or parameter binding is invalid; review this connection"})
+
     # Route authors use this flag for a stronger, project-specific readiness gate:
     # inputs may be described in the method yet not be present as immutable artifacts.
     # It must be enforced by the same preflight used by submission; leaving it as canvas
@@ -258,6 +282,7 @@ def evaluate_preflight(
     # per plugin: a nine-node route on three plugins was emitting the same two sentences
     # nine times, which is how ten real binding blockers ended up looking like noise.
     plugin_warnings: dict[tuple[str, str], dict] = {}
+    qualification_checked: set[str] = set()
     for node in nodes:
         # A manual stage is part of the route but is not run here - target intake, a
         # hand-built hotspot map, a scientist reviewing candidates. Requiring a registry
@@ -283,6 +308,11 @@ def evaluate_preflight(
                 }
             )
             continue
+        if backend == "docker" and plugin.runtime_mode != "container":
+            blockers.append({
+                "code": "plugin_backend_incompatible", "node_key": node.node_key,
+                "message": f"Plugin '{plugin.plugin_key}' uses a host runtime; select the LSF backend for this workflow",
+            })
         if not plugin.enabled:
             blockers.append(
                 {
@@ -292,6 +322,11 @@ def evaluate_preflight(
                     "node_id": str(node.id),
                 }
             )
+        if str(plugin.id) not in qualification_checked:
+            qualification_checked.add(str(plugin.id))
+            qualification_blockers, qualification_warnings = model_qualification_issues(plugin)
+            blockers.extend(qualification_blockers)
+            warnings.extend(qualification_warnings)
         if strict and node.container_image and node.container_image != plugin.container_image:
             blockers.append(
                 {

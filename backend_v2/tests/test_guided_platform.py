@@ -203,7 +203,8 @@ def test_strict_preflight_requires_current_runtime_proof(compute_session, monkey
     )
     blockers, warnings, checks = preflight.evaluate_preflight(session, workflow, compute_backend="demo")
     assert {"plugin_unvalidated", "plugin_runtime_unproven"} <= {item["code"] for item in blockers}
-    assert not warnings
+    # Legacy qualification remains a warning even in strict runtime-proof mode.
+    assert {item["code"] for item in warnings} == {"model_qualification_missing"}
     assert checks["connectivity_checked"] is False
     node = session.scalar(select(WorkflowNode).where(WorkflowNode.workflow_run_id == workflow.id))
     node.container_image = "unvalidated:image"

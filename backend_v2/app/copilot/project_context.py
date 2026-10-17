@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from ..candidates.models import Candidate
 from ..compute.models import ComputeDraft, Job
 from ..experiments.models import ExperimentResult
-from ..knowledge.models import KnowledgeEntry
 from ..projects.models import Project
 from ..targets.models import Target
 from ..workflows.models import WorkflowNode, WorkflowRun
@@ -74,6 +73,45 @@ def _uuid(value: str | None) -> uuid.UUID | None:
         raise ValueError("invalid_entity_id") from exc
 
 
+def _experiment_metadata(row: ExperimentResult) -> dict[str, Any]:
+    """Omit saved plot coordinates from model context without mutating the record.
+
+    Only these declared BLI plot fields are compacted: fit parameters, QC,
+    processing and unrelated numerical arrays remain evidence. Count before
+    `_sanitize` bounds lists so the count describes the complete saved snapshot.
+    """
+    metadata = row.result_metadata or {}
+    summary = metadata.get("summary")
+    if not isinstance(summary, dict) or not isinstance(summary.get("curves"), list):
+        return metadata
+    plot_fields = {"points", "instrument_fit_points", "analysis_fit_points", "processed_points"}
+    curves = []
+    omitted = False
+    for curve in summary["curves"]:
+        if not isinstance(curve, dict):
+            curves.append(curve)
+            continue
+        counts = {key: len(value) for key, value in curve.items() if key in plot_fields and isinstance(value, list)}
+        if counts:
+            omitted = True
+            curves.append({**{key: value for key, value in curve.items() if key not in counts}, "plot_point_counts": counts})
+        else:
+            curves.append(curve)
+    if not omitted:
+        return metadata
+    return {
+        **metadata,
+        "summary": {**summary, "curves": curves},
+        "context_plot_data": {
+            "omitted_from_model_context": True,
+            "experiment_result_id": str(row.id),
+            "source_artifact_id": str(row.source_artifact_id) if row.source_artifact_id else None,
+            "stored_at": "experiment_result.result_metadata.summary.curves",
+            "note": "Complete saved plot snapshots remain in the experiment result; original raw bytes remain in the source artifact. Counts refer to saved plot points, not raw observations.",
+        },
+    }
+
+
 class ProjectContextService:
     """Bounded, read-only access to operational project data."""
 
@@ -81,6 +119,12 @@ class ProjectContextService:
         self.session = session
         self.project = project
         self.project_id = project.id
+
+    def search_bot_records(self, bot_id: str, query: str = "", *, limit: int = 20, offset: int = 0):
+        from .records import read_record
+        result = read_record(self.session, self.project_id, bot_id, query, max(1, min(limit, 50)), max(0, offset))
+        result.pop("markdown")
+        return result
 
     def list_targets(self, *, limit: int = 20) -> list[dict[str, Any]]:
         rows = self.session.scalars(
@@ -188,7 +232,7 @@ class ProjectContextService:
                     "unit": row.unit,
                     "conclusion": row.conclusion,
                     "failure_reason": row.failure_reason,
-                    "metadata": _sanitize(row.result_metadata or {}),
+                    "metadata": _sanitize(_experiment_metadata(row)),
                     "source_artifact_id": (
                         str(row.source_artifact_id)
                         if row.source_artifact_id
@@ -331,21 +375,9 @@ class ProjectContextService:
         *,
         limit: int = 12,
     ) -> list[dict[str, Any]]:
-        normalized = query.strip().lower()
-        rows = list(
-            self.session.scalars(
-                select(KnowledgeEntry)
-                .where(KnowledgeEntry.project_id == self.project_id)
-                .order_by(KnowledgeEntry.updated_at.desc())
-                .limit(500)
-            )
-        )
-        matches = [
-            row
-            for row in rows
-            if not normalized
-            or normalized in f"{row.title}\n{row.content}\n{' '.join(row.tags or [])}".lower()
-        ][: max(1, min(limit, 50))]
+        from ..knowledge.repository import KnowledgeRepository
+
+        matches = KnowledgeRepository(self.session).search(self.project_id, query, limit=limit)
         return [
             self._item(
                 "knowledge_entry",

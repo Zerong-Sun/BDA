@@ -1,8 +1,15 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { AppSettingsDrawer } from './AppSettingsDrawer'
+import { getCopilotConfig } from '../../lib/api/copilot'
+import { getClusterHealth } from '../../lib/api/registry'
+
+vi.mock('../../lib/auth/account', async (original) => ({
+  ...await original<typeof import('../../lib/auth/account')>(),
+  useAuthConfig: () => ({ data: { deployment_kind: 'public', private_portal_url: 'http://localhost:5177' } }),
+}))
 
 vi.mock('../../features/copilot/CopilotSettings', () => ({
   CopilotSettings: () => <div data-testid="copilot-settings" />,
@@ -62,10 +69,32 @@ vi.mock('../../lib/api/copilot', () => ({
 
 describe('AppSettingsDrawer', () => {
   beforeEach(() => {
+    sessionStorage.clear()
+    vi.clearAllMocks()
     useAppStore.setState({ language: 'en', settingsOpen: true })
   })
 
-  afterEach(cleanup)
+  afterEach(() => { cleanup(); sessionStorage.clear() })
+
+  it('does not request model configuration without a project when refreshing connections', async () => {
+    renderWithProviders(<AppSettingsDrawer />)
+    fireEvent.click(screen.getByRole('button', { name: /revalidate/i }))
+    await waitFor(() => expect(getClusterHealth).toHaveBeenCalled())
+    expect(getCopilotConfig).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Done' })).toBeVisible()
+  })
+
+  it('shows Private access instead of account, infrastructure and model controls for a visitor', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ public_visitor: true, role: 'viewer' }))
+    renderWithProviders(<AppSettingsDrawer />)
+    expect(await screen.findByRole('link', { name: /Create a Private account/ })).toHaveAttribute('href', 'http://localhost:5177/#/register')
+    expect(screen.queryByTestId('copilot-settings')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /password, invitations/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /revalidate/i }))
+    expect(getClusterHealth).not.toHaveBeenCalled()
+    expect(getCopilotConfig).not.toHaveBeenCalled()
+  })
 
   it('closes the settings sheet with Escape', () => {
     renderWithProviders(<AppSettingsDrawer />)

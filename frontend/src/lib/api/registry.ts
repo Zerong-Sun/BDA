@@ -83,9 +83,18 @@ export interface ClusterHealth {
   reason?: string | null
 }
 
+export function summarizeClusterHealth(nodes: ComputeNode[]): ClusterHealth {
+  const lsf = nodes.filter((node) => node.backend === 'lsf' && node.enabled)
+  const healthy = lsf.filter((node) => node.health_status === 'healthy')
+  return { mode: 'registry', connected: healthy.length > 0,
+    queues: [...new Set(healthy.flatMap((node) => node.queue ? [node.queue] : []))],
+    all_queues: [...new Set(lsf.flatMap((node) => node.queue ? [node.queue] : []))],
+    reason: lsf.length ? (healthy.length ? null : 'No LSF target has passed a connection check. Use Check below.') : 'No enabled LSF targets are registered',
+  }
+}
+
 export function getClusterHealth(): Promise<ClusterHealth> {
-  return listComputeNodes().then((nodes) => ({ mode: 'registry', connected: nodes.some((node) => node.enabled && node.health_status !== 'unhealthy'),
-    queues: [], reason: nodes.length ? null : 'No compute nodes are registered' }))
+  return listComputeNodes().then(summarizeClusterHealth)
 }
 
 export async function listServers(): Promise<ServerConnection[]> {

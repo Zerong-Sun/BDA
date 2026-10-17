@@ -1,5 +1,7 @@
 # BDA Workbench
 
+**2.6 release candidate:** [Install and upgrade Iteravia RC3](docs/RELEASE_2_6_RC3.md). RC3 opens the full Public workspace without an account, separates Private registration and team access, strengthens literature evidence and Bot reading contracts, and completes reviewed structure-to-experiment workflows. [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
+
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.
 
 BDA Workbench 面向计算蛋白设计中“证据、设计、计算、实验和决策分散在不同工具里”的问题。分散的记录使研究者难以回答三个基本问题：某个候选为何产生、它由哪些输入和软件版本生成，以及后续结论能否被独立复核。
@@ -9,6 +11,8 @@ BDA Workbench 面向计算蛋白设计中“证据、设计、计算、实验和
 BDA 将项目作为权限与追溯边界，把研究证据、版本化工作流、异步计算、制品谱系、候选和实验记录放入同一模块化单体。平台使用 PostgreSQL 保存业务事实，使用 MinIO 保存计算制品，使用 Redis/Celery 传递异步工作；Copilot 与 Autopilot 只能通过受限、可审计的服务接口参与这一过程。
 
 当前公开 alpha 已通过后端、前端、浏览器、迁移和公开数据检查，并提供可重复导入的 PD1 演示包。该验证证明的是软件基线可测试、演示数据可追溯和关键状态约束可执行，不证明真实模型性能、实验有效性或生产基础设施已经验收。
+
+本轮跨模块升级与明确尚未接入的方案见[全平台能力升级账本](docs/PLATFORM_CAPABILITY_UPGRADE.md)。
 
 ## 1. 系统边界
 
@@ -20,7 +24,7 @@ BDA 将项目作为权限与追溯边界，把研究证据、版本化工作流�
 - MinIO 是结构、模型输出、报告和交付包等计算制品的真源。
 - Git 保存软件、不可变清单、小型公开演示数据和可审查文档，不保存私有研究运行包。
 
-公开 `BDA` 仓库是软件真源。私有 `BDA-demo` 只能跟随明确的 BDA release tag，并在允许目录中增加私有研究数据和部署配置；软件变更通过受保护的单向同步 PR 进入 demo，不从 demo 反向发布。
+公开 `BDA` 仓库是软件真源。私有 `BDA-demo` 跟随不可变的 BDA release tag 或公开仓库的完整提交 SHA，并在允许目录中增加私有研究数据和部署配置；软件变更通过受保护的单向同步 PR 进入 demo，不从 demo 反向发布。
 
 ## 2. 研究流程
 
@@ -74,7 +78,7 @@ Autopilot 用于冻结协议后的自动执行交接，其当前交互顺序为�
 4. 启动时事务性预留预算并返回异步 operation ID。
 5. 取消时幂等地级联到阶段、operation、research generation 和计算 job，再由 worker 对账未提交预算。
 
-当前 worker 能够可靠地完成预算预留、执行交接、首阶段就绪和取消对账；具体 research/compute 阶段仍需要版本化 stage adapter。因而，本 alpha **尚不提供从任意自然语言需求到真实多阶段计算、结果回写和实验复盘的无人值守闭环**。执行地图、候选漏斗和自动迭代控制台属于后续界面与适配器工作，不应从归档设计稿推断为已发布功能。详见 [Autopilot 协议与边界](docs/AUTOPILOT_CAMPAIGNS.md)。
+当前 worker 支持预算预留、执行交接、阶段就绪和取消对账。2.6 候选版还支持计算工作流成功后的阶段结算、失败暂停和重试状态核验；各研究及计算方法仍须提供有效的版本化 adapter 和运行配置。平台 **尚不提供从任意自然语言需求到真实多阶段计算、结果回写和实验复盘的无人值守闭环**。执行地图、候选漏斗和自动迭代控制台属于后续界面与适配器工作，不应从归档设计稿推断为已发布功能。详见 [Autopilot 协议与边界](docs/AUTOPILOT_CAMPAIGNS.md)。
 
 ## 4. 当前能力与成熟度
 
@@ -118,11 +122,7 @@ FastAPI 模块化单体 ─────► PostgreSQL
 
 要求：Docker Engine、Docker Compose v2，以及可用于本地开发的空闲端口。
 
-```bash
-cp .env.example .env
-# 替换 .env 中的全部示例密钥和密码
-docker compose up --build
-```
+按 [RC3 安装说明](docs/RELEASE_2_6_RC3.md#新安装) 生成配置、迁移数据库并配置独立 scheduler 身份，再启动全部服务。
 
 启动后可访问：
 
@@ -154,6 +154,7 @@ python scripts/check_public_data.py
 ## 9. 文档、贡献与引用
 
 - [文档索引](docs/README.md)
+- [近期代码更新与集成状态（2026-10-17）](docs/RECENT_UPDATES_2026-10-17.md)
 - [工作区结构说明](docs/WORKSPACE_MAP.md)
 - [后端说明](docs/BACKEND_V2.md)
 - [前端说明](docs/FRONTEND_V2.md)

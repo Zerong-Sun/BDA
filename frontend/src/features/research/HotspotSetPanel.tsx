@@ -91,6 +91,12 @@ export function HotspotSetPanel({
   })
 
   const addPick = (residue: HighlightedResidue) => {
+    if (residue.insertionCode) {
+      setFailed(zh
+        ? '设计热点暂不支持插入码。请先提供明确映射并重新编号的构建体。'
+        : 'Hotspot design parameters do not support insertion codes. Use an explicitly mapped, renumbered construct.')
+      return
+    }
     setPicked((current) => {
       // Clicking a residue twice removes it: the second click on the same thing
       // is how a person un-picks, and a set that only grows is a trap.

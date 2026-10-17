@@ -20,6 +20,7 @@ from .models import WorkflowNode, WorkflowRun
 from .preflight import evaluate_preflight
 from .repository import WorkflowRepository
 from .schemas import (
+    RoutePresentation,
     ScriptPreviewCreate,
     ScriptPreviewResponse,
     WorkflowCreate,
@@ -35,7 +36,16 @@ from .schemas import (
     WorkflowResponse,
     WorkflowValidation,
 )
-from .service import add_node, create_workflow, delete_node, replace_workflow_graph, update_layout, update_node
+from .scientific_gates import ScientificEvidenceCreate, ScientificEvidenceReview
+from .service import (
+    add_node,
+    create_workflow,
+    delete_node,
+    replace_workflow_graph,
+    update_layout,
+    update_node,
+    update_presentation,
+)
 
 router = APIRouter(tags=["workflows"])
 
@@ -56,6 +66,24 @@ def list_workflows(
         items=[WorkflowResponse.model_validate(item) for item in page],
         next_cursor=encode_cursor(page[-1].id) if has_next and page else None,
     )
+
+
+@router.patch(
+    "/workflow-runs/{workflow_id}/presentation", response_model=WorkflowResponse,
+    openapi_extra={"x-permission": "workflow.update"},
+)
+def patch_workflow_presentation(
+    workflow_id: uuid.UUID, payload: RoutePresentation, response: Response,
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    session: Session = Depends(get_session), user: User = Depends(require_command),
+) -> WorkflowResponse:
+    workflow = WorkflowRepository(session).get(workflow_id)
+    if workflow is None:
+        raise DomainError("workflow_not_found", "Workflow was not found", status_code=404)
+    project = require_project(session, workflow.project_id, user)
+    row = update_presentation(session, workflow, payload, user, project, parse_if_match(if_match))
+    response.headers["ETag"] = etag(row.version)
+    return WorkflowResponse.model_validate(row)
 
 
 @router.post(
@@ -515,3 +543,29 @@ def gate_preview_sources(
     from .gate_service import preview_sources
 
     return preview_sources(session, workflow_id, edge_id, user)
+
+
+@router.get("/workflow-runs/{workflow_id}/scientific-gates")
+def get_scientific_gates(workflow_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from .scientific_gates import list_scientific_gates
+    return list_scientific_gates(workflow_id, session, user)
+
+
+@router.get("/workflow-runs/{workflow_id}/connections/{edge_id}/scientific-evidence/sources")
+def get_scientific_sources(workflow_id: uuid.UUID, edge_id: str, q: str = Query(default="", max_length=500), session: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from .scientific_gates import search_sources
+    return search_sources(workflow_id, edge_id, q, session, user)
+
+
+
+
+@router.post("/workflow-runs/{workflow_id}/connections/{edge_id}/scientific-evidence", status_code=201, openapi_extra={"x-permission": "workflow.update"})
+def post_scientific_evidence(workflow_id: uuid.UUID, edge_id: str, payload: ScientificEvidenceCreate, session: Session = Depends(get_session), user: User = Depends(require_command)) -> dict:
+    from .scientific_gates import save_evidence
+    return save_evidence(workflow_id, edge_id, payload, session, user)
+
+
+@router.post("/workflow-runs/{workflow_id}/connections/{edge_id}/scientific-evidence/{evidence_id}/review", openapi_extra={"x-permission": "workflow.update"})
+def post_scientific_review(workflow_id: uuid.UUID, edge_id: str, evidence_id: uuid.UUID, payload: ScientificEvidenceReview, session: Session = Depends(get_session), user: User = Depends(require_command)) -> dict:
+    from .scientific_gates import review_evidence
+    return review_evidence(workflow_id, edge_id, evidence_id, payload, session, user)

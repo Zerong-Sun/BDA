@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import uuid
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +35,14 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6380/1"
     jwt_secret: str = "development-only-change-this-bda-v2-secret"
     jwt_issuer: str = "bda-v2"
+    auth_realm: str = Field(default="bda", pattern=r"^[a-z][a-z0-9_-]{0,31}$")
+    deployment_kind: str = Field(default="private", pattern="^(public|private)$")
+    registration_mode: str = Field(default="closed", pattern="^(closed|invite|open)$")
+    public_portal_url: str = ""
+    private_portal_url: str = ""
+    public_workspace_user_id: uuid.UUID | None = None
+    public_workspace_organization_id: uuid.UUID | None = None
+    public_workspace_read_limit: int = Field(default=600, ge=1, le=10_000)
     access_token_minutes: int = Field(default=15, ge=5, le=60)
     refresh_token_days: int = Field(default=30, ge=1, le=90)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -48,6 +58,7 @@ class Settings(BaseSettings):
     compute_backend: str = "docker"
     # Production always requires proof; development can opt in for acceptance runs.
     compute_require_runtime_proof: bool = False
+    registry_task_queue: str = "maintenance"
     docker_host: str = "tcp://localhost:2376"
     docker_tls_ca: str | None = None
     docker_tls_cert: str | None = None
@@ -92,7 +103,7 @@ class Settings(BaseSettings):
     allow_legacy_research_package_payload: bool = False
     allow_legacy_plugin_definition: bool = False
     build_revision: str = "development"
-    schema_revision: str = "0070_af3_msa_port"
+    schema_revision: str = "0077_copilot_call_guard"
     worker_queues: str = ""
     required_worker_queues: str = ""
     scheduler_dispatch_paused: bool = False
@@ -100,6 +111,35 @@ class Settings(BaseSettings):
     oidc_providers_json: str = "{}"
     otel_endpoint: str | None = None
     expose_docs: bool = True
+
+    @property
+    def refresh_cookie_name(self) -> str:
+        # Cookie scope does not include the port. Separate realms must not overwrite
+        # each other's refresh sessions when both portals share a development host.
+        return "bda_v2_refresh" if self.auth_realm == "bda" else f"bda_v2_{self.auth_realm}_refresh"
+
+    @model_validator(mode="after")
+    def validate_account_portals(self) -> Settings:
+        if bool(self.public_workspace_user_id) != bool(self.public_workspace_organization_id):
+            raise ValueError("public workspace requires both a viewer and an organization")
+        if self.public_workspace_user_id and self.deployment_kind != "public":
+            raise ValueError("anonymous workspace access is only allowed in Public")
+        # Self-service registration creates an isolated organization. Private
+        # deployments may enable it without granting access to existing teams.
+        for value in (self.public_portal_url, self.private_portal_url):
+            if not value:
+                continue
+            url = urlsplit(value)
+            if not url.hostname or any(char.isspace() for char in value) or url.port == 0:
+                raise ValueError("account portal URLs require a valid host and port")
+            local_http = not self.is_production and url.scheme == "http" and url.hostname in {"localhost", "127.0.0.1", "::1"}
+            if (url.scheme != "https" and not local_http) or not url.netloc or url.username or url.password or url.query or url.fragment or url.path not in {"", "/"}:
+                raise ValueError("account portal URLs must be HTTPS origins (loopback HTTP is allowed in development)")
+        return self
+
+    @property
+    def public_workspace_enabled(self) -> bool:
+        return self.deployment_kind == "public" and bool(self.public_workspace_user_id and self.public_workspace_organization_id)
 
     @property
     def is_production(self) -> bool:
