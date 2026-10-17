@@ -24,6 +24,7 @@ export function focusRoom(entries: readonly RoomEvent[]) {
   if (conclusion) focusIds.add(`${conclusion.kind}-${conclusion.id}`)
   // Never fold a live task or unanswered decision into history.
   for (const entry of entries) {
+    if (isArchived(entry)) continue
     if ((entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
       || entry.decision?.status === 'open' || entry.message?.status === 'pending') {
       focusIds.add(`${entry.kind}-${entry.id}`)

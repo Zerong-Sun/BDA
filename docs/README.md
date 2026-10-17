@@ -13,6 +13,7 @@
 ## 开始使用
 
 - [近期代码更新、集成状态与维护入口（2026-10-17）](RECENT_UPDATES_2026-10-17.md)
+- [研究团队与结果展示：六项验证及修复清单](SIX_DIMENSION_REVIEW_2026-10-17.md)
 
 - [Public / Private 登录、注册与账号管理](ACCOUNT_ACCESS.md)
 

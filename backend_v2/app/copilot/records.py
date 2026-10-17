@@ -41,6 +41,16 @@ def _refs(value):
     return sorted(found)
 
 
+def _archive_metadata(value):
+    """Legacy JSON may be malformed; only a boolean true marks archived work."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "archived": value.get("archived") is True,
+        **{key: value[key] for key in ("reason", "archived_at") if isinstance(value.get(key), str)},
+    }
+
+
 def source_items(session, project_id, bot_id):
     from .models import CopilotAgentRun, CopilotAgentTurn, CopilotConversation, CopilotMessage
     from .project_context import _sanitize
@@ -69,11 +79,9 @@ def source_items(session, project_id, bot_id):
                 "source_version": message.version,
                 "content": message.content or "",
                 "error": message.error,
-                "archive": {
-                    key: value
-                    for key, value in ((message.context or {}).get("chat_archive") or {}).items()
-                    if key in {"archived", "reason", "archived_at"}
-                },
+                "archive": _archive_metadata(
+                    message.context.get("chat_archive") if isinstance(message.context, dict) else None
+                ),
                 "citations": _sanitize(message.citations or []),
                 "references": _refs([message.context, message.tool_calls, message.citations]),
             }
@@ -137,7 +145,7 @@ def markdown(project_id, bot_id, items):
             item["content"],
             "",
         ]
-        if item.get("archive", {}).get("archived"):
+        if _archive_metadata(item.get("archive")).get("archived"):
             lines += [f"Archived history (excluded from current work): {item['archive'].get('reason', '')}", ""]
         for key in ("conversation_id", "parent_run_id", "error"):
             if item.get(key):
@@ -219,7 +227,7 @@ def read_record(session, project_id, bot_id, query="", limit=100, offset=0):
     matching = [
         item
         for item in reversed(all_items)
-        if not item.get("archive", {}).get("archived")
+        if not _archive_metadata(item.get("archive")).get("archived")
         and (not needle or needle in json.dumps(item, ensure_ascii=False).casefold())
     ]
     return {

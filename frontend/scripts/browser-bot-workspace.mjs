@@ -138,21 +138,25 @@ try {
   for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 1000 }); await noOverflow(page, `Projects ${width}`); if (width === 390) await screenshot(page, 'projects-mobile') }
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('link', { name: 'Open', exact: true }).click()
-  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  await page.getByRole('region', { name: 'Project research summary' }).waitFor()
   assert.ok(page.url().includes('/research?project=proj_browser&tab=goals'))
   assert.ok(await page.getByText('Which structures and sources support ligand recognition and antibody binding?').isVisible())
   const currentStage = page.locator('[data-slot="stepper-trigger"][aria-current="page"]')
   assert.ok((await currentStage.textContent()).includes('Research'))
   assert.ok((await currentStage.textContent()).includes('You are here'))
-  checks.push('Open reaches the project brief in one click; no decorative project images; source-derived questions are visible without saved goals')
-  await screenshot(page, 'brief-en-light')
-  await page.getByRole('button', { name: 'Discuss with a Bot: Which structures and sources support ligand recognition and antibody binding?', exact: true }).click()
-  await page.getByRole('tab', { name: 'Research room', selected: true }).waitFor()
-  await page.waitForFunction(() => document.querySelector('input[aria-label="Say something in the room"]')?.value.includes('Which structures and sources'))
+  checks.push('Open reaches saved results, report, review and source-derived questions in one click')
+  const fullReport = page.getByRole('button', { name: 'Full report and cited sources', exact: true })
+  assert.equal(await fullReport.getAttribute('aria-expanded'), 'false')
+  await page.getByRole('button', { name: 'Read full report', exact: true }).click()
+  assert.equal(await fullReport.getAttribute('aria-expanded'), 'true')
+  await fullReport.click()
+  await screenshot(page, 'results-en-light')
+  await page.getByRole('link', { name: 'View Bot review records →', exact: true }).click()
+  await page.waitForURL('**/bots/auditor?project=proj_browser&view=records')
   assert.equal(writes.length, 0)
   await page.goBack()
-  await page.getByRole('region', { name: 'Project brief' }).waitFor()
-  checks.push('A brief question opens an editable, unsent Bot draft with citation requirements')
+  await page.getByRole('region', { name: 'Project research summary' }).waitFor()
+  checks.push('Full report expands on request and the review record link stays in the same project')
   await page.goBack()
   await page.locator('.project-row').waitFor()
   assert.ok(page.url().includes('/projects'))
@@ -258,7 +262,7 @@ try {
   assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
   assert.ok(await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).isChecked())
   await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
-  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  await page.getByRole('region', { name: 'Project research summary' }).waitFor()
   await page.goBack()
   await page.getByLabel('Task goal', { exact: true }).waitFor()
   assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
@@ -269,8 +273,8 @@ try {
   await page.reload()
   await page.getByText(task.outcome.summary, { exact: true }).waitFor()
   await screenshot(page, 'task-delivery-en-light')
-  await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
-  await page.getByRole('region', { name: 'Project brief' }).waitFor()
+  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Research', exact: true }).click()
+  await page.getByRole('region', { name: 'Project research summary' }).waitFor()
   await page.goBack()
   await page.getByText(task.outcome.summary, { exact: true }).waitFor()
   await page.getByRole('button', { name: 'Back to runs', exact: true }).click()
@@ -288,13 +292,13 @@ try {
   await zh.locator('.project-row').waitFor()
   assert.equal(await zh.getByRole('combobox', { name: '按状态筛选' }).innerText(), '全部状态')
   assert.equal(await zh.getByRole('combobox', { name: '排序方式' }).innerText(), '最近更新')
-  assert.ok((await zh.locator('.science-preview-footer').innerText()).includes(bundle.projects[0].name.zh))
+  assert.ok((await zh.locator('.project-row').innerText()).includes(bundle.projects[0].name.zh))
   await screenshot(zh, 'projects-zh-dark')
   await zh.getByRole('link', { name: 'Open', exact: true }).count().then(async (count) => {
     if (count) await zh.getByRole('link', { name: 'Open', exact: true }).click()
     else await zh.locator('.project-row-actions a').first().click()
   })
-  await zh.getByRole('region', { name: '项目简报' }).waitFor()
+  await zh.getByRole('region', { name: '项目研究总结' }).waitFor()
   await zh.getByRole('button', { name: '管理问题与目标树', exact: true }).click()
   assert.ok(await zh.locator('[data-tour-id="research-goals"] input').isDisabled())
   await screenshot(zh, 'brief-zh-dark')
@@ -381,8 +385,9 @@ try {
   }
   await inbox.setViewportSize({ width: 1440, height: 1000 })
   await inbox.getByRole('button', { name: 'Workbenches', exact: true }).click()
-  await inbox.getByRole('menuitem', { name: 'Workflow', exact: true }).waitFor()
+  await inbox.getByRole('menuitem', { name: 'Candidates', exact: true }).waitFor()
   await inbox.keyboard.press('Escape')
+  await inbox.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Workflow', exact: true }).waitFor()
   assert.equal(writes.length, writesBeforeInbox, 'The decision inbox must only read')
   checks.push('Decisions gathers what waits on a person, links each to where it is decided, and only reads; workbenches sit behind one menu')
 
@@ -409,6 +414,7 @@ try {
   await empty.goto(`${origin}/#/bots`)
   await empty.getByRole('heading', { name: 'Start with a research project' }).waitFor()
   checks.push('Empty workspace offers project selection without broken task controls')
+  await empty.close()
   emptyProjects = false
   const roomFixture = { entries: [
     { kind: 'decision', id: 'qa-decision', occurred_at: '2026-10-16T00:03:00Z', bot: 'conductor', decision: {
@@ -420,7 +426,15 @@ try {
       ],
     } },
     { kind: 'discussion', id: 'qa-review', occurred_at: '2026-10-16T00:02:00Z', bot: 'auditor', discussion: {
-      run_id: 'qa-review-task', content: 'Synthetic QA: independent review confirms a measurement gap remains.' } },
+      run_id: 'qa-review-task', content: [
+        '## Conclusion', 'Synthetic QA: independent review confirms a measurement gap remains.', '',
+        '### Limitations', 'No assay data is available.', '',
+        '| Job | State |', '| --- | --- |', '',
+        'get_compute_status -> []', 'An empty queue does not establish success.', '',
+        '````text', '```', '## Conclusion', 'RAW TOOL OUTPUT ONLY', '````',
+        'The project-refresh-20261016 run failed; validation is still pending.', '',
+        '## Next steps', 'Check the original assay report.',
+      ].join('\n'), is_delivery: true } },
     { kind: 'discussion', id: 'qa-evidence', occurred_at: '2026-10-16T00:01:00Z', bot: 'researcher', discussion: {
       run_id: 'qa-evidence-task', content: 'Synthetic QA: PD-L1 evidence inspected; no experiment was performed.' } },
     { kind: 'discussion', id: 'qa-lead', occurred_at: '2026-10-16T00:00:00Z', bot: 'conductor', discussion: {
@@ -428,6 +442,23 @@ try {
   ] }
   const team = await newPage('en', 'light', 'populated', null, roomFixture)
   await team.goto(`${origin}/#/bots?project=proj_browser`)
+  await team.getByText('Synthetic QA: independent review confirms a measurement gap remains.', { exact: true }).waitFor()
+  assert.ok(await team.getByText('An empty queue does not establish success.', { exact: true }).isVisible())
+  assert.ok(await team.getByText('The project-refresh-20261016 run failed; validation is still pending.', { exact: true }).isVisible())
+  assert.ok(await team.getByText('Check the original assay report.', { exact: true }).isVisible())
+  const rawDetails = team.getByRole('button', { name: 'Tool output and process records', exact: true })
+  assert.equal(await rawDetails.getAttribute('aria-expanded'), 'false')
+  assert.equal(await team.getByText('RAW TOOL OUTPUT ONLY', { exact: false }).count(), 0)
+  assert.equal(await team.getByRole('columnheader', { name: 'Job', exact: true }).count(), 0)
+  await rawDetails.click()
+  await team.getByText('RAW TOOL OUTPUT ONLY', { exact: false }).waitFor()
+  assert.ok(await team.getByRole('columnheader', { name: 'Job', exact: true }).isVisible())
+  await rawDetails.click()
+  checks.push('Latest answer preserves caveats and next steps while raw tool output and empty tables remain expandable')
+  const history = team.getByRole('button', { name: /Discussion and process history/ })
+  assert.equal(await history.getAttribute('aria-expanded'), 'false')
+  assert.equal(await team.getByText('Synthetic QA: evidence inspection and independent review assigned.', { exact: true }).count(), 0)
+  await history.click()
   await team.getByText('Synthetic QA: evidence inspection and independent review assigned.', { exact: true }).waitFor()
   await team.locator('.room-addressee', { hasText: conductorName }).waitFor()
   await team.getByText('Synthetic QA: independent review confirms a measurement gap remains.', { exact: true }).waitFor()
@@ -444,6 +475,7 @@ try {
   await team.getByText('Decided: Check saved evidence', { exact: true }).waitFor()
   assert.deepEqual(roomFixture.answer, { choice: 'evidence', note: '', version: 'W/"1"' })
   await team.reload()
+  await team.getByRole('button', { name: /Discussion and process history/ }).click()
   await team.getByText('Decided: Check saved evidence', { exact: true }).waitFor()
   await team.getByText('Synthetic QA: PD-L1 evidence inspected; no experiment was performed.', { exact: true }).waitFor()
   checks.push('Team room shows named background discussion, defaults to the lead, supports specialist mentions and preserves answered choices after reload')

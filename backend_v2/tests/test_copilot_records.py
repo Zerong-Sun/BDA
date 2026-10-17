@@ -192,3 +192,15 @@ def test_projection_lock_is_scoped_to_project_and_bot_not_project_rows():
     _lock_record(session, project_id, "runner")
     assert calls == [("SELECT pg_advisory_xact_lock(:key)", {"key": _record_lock_key(project_id, "runner")})]
     assert "projects" not in calls[0][0]
+
+
+@pytest.mark.parametrize("archive", ["legacy", [True], True, {"archived": "false"}, {"archived": False}])
+def test_malformed_archive_metadata_does_not_break_message_commit_or_hide_work(session, archive):
+    project, user = _project(session)
+    message = _message(session, _conversation(session, project, user), bot="analyst", content="Current result")
+    message.context = {"chat_archive": archive}
+    session.commit()
+    record = read_record(session, project.id, "analyst")
+    assert record["matched"] == 1
+    assert record["items"][0]["content"] == "Current result"
+    assert "Archived history" not in record["markdown"]

@@ -88,7 +88,7 @@ describe('ResearchPage', () => {
       })),
     )
     renderWithProviders(<ResearchPage />)
-    expect(await screen.findByText('The historical research question.')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('The historical research question.')).toBeVisible())
     expect(screen.getByText('The historical result.')).toBeVisible()
     expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByTestId('decision-center')).not.toBeInTheDocument()
@@ -113,7 +113,7 @@ describe('ResearchPage', () => {
       review_document: { id: 'saved-report', title: { en: 'Stage report' }, content: { en: '## Research objective\nAn ongoing question.\n## Results\nA recorded stage result.' }, status: 'accepted', version: 1 },
     })))
     renderWithProviders(<ResearchPage />)
-    expect(await screen.findByText('A recorded stage result.')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('A recorded stage result.')).toBeVisible())
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Project results, reports & review')
     expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText('Completed project · saved research record')).not.toBeInTheDocument()

@@ -41,3 +41,44 @@ describe('latest answer presentation', () => {
     expect(answer.visible.indexOf('QC remains pending')).toBeLessThan(answer.visible.indexOf('Next step'))
   })
 })
+
+it('keeps subordinate review headings attached to their conclusion', () => {
+  const input = '## Conclusion\nBinding is unverified.\n### Limitations\nNo assay has run.\n## Next steps\nRun the assay.'
+  expect(answerPresentation(input).visible).toBe(input.replace('\n## Next steps', '\n\n## Next steps'))
+})
+
+it('does not interpret a shorter fence inside a longer code block as prose', () => {
+  const input = '````text\n```\n## Conclusion\nThis is tool output, not a result.\n````\n\n## Conclusion\nNo validated result.'
+  const answer = answerPresentation(input)
+  expect(answer.visible).toBe('## Conclusion\nNo validated result.')
+  expect(answer.folded).toContain('This is tool output, not a result.')
+})
+
+it('keeps a meaningful conclusion containing a workflow identifier visible', () => {
+  const input = 'The project-refresh-20261016 run failed; validation is still pending.[cite:2]'
+  expect(answerPresentation(input).visible).toBe(input)
+})
+
+it('keeps prose after a fenced log even without a blank line', () => {
+  const answer = answerPresentation('```json\n{"jobs": []}\n```\nNo validated result exists.[cite:1]')
+  expect(answer.visible).toBe('No validated result exists.[cite:1]')
+  expect(answer.folded).toContain('{"jobs": []}')
+})
+
+it('folds an empty Markdown table while keeping the interpretation immediately below it', () => {
+  const answer = answerPresentation('## Results\n| Job | State |\n| --- | --- |\nNo execution is recorded; this is not a successful validation.[cite:1]')
+  expect(answer.visible).toContain('No execution is recorded; this is not a successful validation.[cite:1]')
+  expect(answer.visible).not.toContain('| Job |')
+  expect(answer.folded).toContain('| Job | State |')
+})
+
+it('retains populated result tables and their citation markers', () => {
+  const input = '## Results\n| Sample | Result |\n| --- | --- |\n| A | Unverified.[cite:1] |'
+  expect(answerPresentation(input).visible).toBe(input)
+})
+
+it('keeps a caveat on the line after an English tool receipt visible', () => {
+  const answer = answerPresentation('get_compute_status -> []\nNo execution is recorded; success is unverified.[cite:2]')
+  expect(answer.visible).toBe('No execution is recorded; success is unverified.[cite:2]')
+  expect(answer.folded).toContain('get_compute_status -> []')
+})
