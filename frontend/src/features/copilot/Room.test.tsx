@@ -224,6 +224,8 @@ describe('Room', () => {
     }) }])
     renderWithProviders(<Room />)
     expect(await screen.findByText('Geometric contacts from predicted coordinates.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tool call details' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Tool call details' }))
     const selections = await screen.findAllByRole('link', { name: 'Open structure and residues in Results' })
     expect(selections).toHaveLength(2)
     for (const selection of selections) {
@@ -490,6 +492,22 @@ it('keeps cleaned messages out by default and provides a labelled audit view', a
   await waitFor(() => expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument())
 })
 
+
+it('folds tool output in the latest answer while keeping the conclusion, next step and original citation numbers', async () => {
+  stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', message: message({
+    content: '**Work performed**\n\nget_compute_status → {"jobs": []}\n\n## Conclusion\nNo validated result yet.[cite:2]\n\n## Next steps\nCheck the sample identity.',
+    citations: [{ title: 'First source' }, { title: 'Second source' }],
+  }) }])
+  renderWithProviders(<Room />)
+  expect(await screen.findByText('No validated result yet.')).toBeInTheDocument()
+  expect(screen.getByText('Check the sample identity.')).toBeInTheDocument()
+  expect(screen.queryByText(/get_compute_status/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Tool output and process records' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('link', { name: 'View source 2' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Tool output and process records' }))
+  expect(await screen.findByText(/get_compute_status/)).toBeVisible()
+})
 
 it('opens only the newest conclusion with next step, leaving revisions and notices in history', async () => {
   stub([

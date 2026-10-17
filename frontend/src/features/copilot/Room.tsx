@@ -2,6 +2,8 @@ import { Link } from 'react-router'
 import { focusRoom, conclusionReview } from './roomFocus'
 import { chatFailureMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
+import { LatestAnswer } from './LatestAnswer'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { useEffect, useRef, useState } from 'react'
 import { PaperPlaneTiltIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -176,7 +178,7 @@ export function Room({
               </div>
               {focus.conclusion ? <>
                 <p className="room-review-state">{zh ? '本条答复自动复核：' : 'Automated review of this reply: '}{review === 'completed' ? (zh ? '已完成（不等于人工批准）' : 'Completed (not human approval)') : review === 'incomplete' ? (zh ? '未完成' : 'Incomplete') : (zh ? '未记录完成' : 'No completion recorded')}</p>
-                <RoomEntry entry={focus.conclusion} roster={roster} projectId={projectId} zh={zh} childTasks={[]} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />
+                <RoomEntry key={focus.conclusion.id} focused entry={focus.conclusion} roster={roster} projectId={projectId} zh={zh} childTasks={[]} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />
               </> : <p className="text-sm text-text-secondary">{zh ? '暂无已保存的结论。可先查看项目报告；运行中状态见下方。' : 'No saved conclusion yet. Open project reports; current activity is shown below.'}</p>}
             </section>
             {entries.length === 0 && !loading ? (
@@ -362,6 +364,7 @@ function RoomEntry({
   childTasks,
   onOpenRun,
   onOpenBot,
+  focused = false,
 }: {
   entry: RoomEvent
   roster: readonly CopilotBot[]
@@ -370,6 +373,7 @@ function RoomEntry({
   childTasks: readonly RoomEvent[]
   onOpenRun?: (runId: string) => void
   onOpenBot?: (botId: string) => void
+  focused?: boolean
 }) {
   if (entry.kind === 'discussion' && entry.discussion) {
     const speaker = resolveBot(entry.bot, roster)
@@ -379,8 +383,8 @@ function RoomEntry({
       {speaker ? <BotAvatar id={speaker.id} stance={speaker.stance} /> : null}
       <div className="room-entry-body">
         <p className="room-speaker">{speakerName(entry.bot, roster, zh)}</p>
-        <div className="room-text"><ReviewMarkdown presentation="chat" projectId={projectId}>{content}</ReviewMarkdown></div>
-        {nextAction ? <div className="room-next-action"><strong>{zh ? '下一步' : 'Next step'}</strong><ReviewMarkdown presentation="chat" projectId={projectId}>{nextAction}</ReviewMarkdown></div> : null}
+        <div className="room-text">{focused ? <LatestAnswer content={`${content}${nextAction ? `\n\n## ${zh ? '下一步' : 'Next step'}\n${nextAction}` : ''}`} projectId={projectId} zh={zh} /> : <ReviewMarkdown presentation="chat" projectId={projectId}>{content}</ReviewMarkdown>}</div>
+        {!focused && nextAction ? <div className="room-next-action"><strong>{zh ? '下一步' : 'Next step'}</strong><ReviewMarkdown presentation="chat" projectId={projectId}>{nextAction}</ReviewMarkdown></div> : null}
         {onOpenRun ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenRun(entry.discussion!.run_id)}>
           {zh ? '查看任务与证据' : 'Open task and evidence'}
         </Button> : null}
@@ -454,8 +458,8 @@ function RoomEntry({
           {archived ? ` · ${zh ? '已清理历史' : 'archived history'}` : ''}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
-        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
-        {!mine ? <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
+        <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : focused ? <LatestAnswer content={message.content} citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId} zh={zh} /> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
+        {!mine ? focused ? message.tool_calls?.some(call => call && typeof call === 'object' && 'result' in call) ? <Disclosure title={zh ? '工具调用详情' : 'Tool call details'}><ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /></Disclosure> : null : <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>
     </article>
   )
