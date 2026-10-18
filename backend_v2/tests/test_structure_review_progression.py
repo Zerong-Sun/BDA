@@ -15,7 +15,7 @@ from backend_v2.app.workflows.gate_runtime import capture_results, latest_gate, 
 from backend_v2.app.workflows.preflight import evaluate_preflight
 from backend_v2.app.workflows.schemas import WorkflowCreate
 from backend_v2.app.workflows.service import create_workflow
-from backend_v2.tests.scientific_gate_helpers import approve_test_gate
+from backend_v2.tests.scientific_gate_helpers import approve_test_gate, review_test_design
 from backend_v2.tests.test_compute_binding import env as _binding_env
 from backend_v2.tests.test_workflow_gates import MemoryStorage
 
@@ -104,6 +104,8 @@ def test_three_models_advance_only_with_filtered_checksum_matched_structures(env
     # synthetic parser/scheduler regression; no production check is bypassed.
     blockers, _, _ = evaluate_preflight(s, workflow, compute_backend="demo")
     assert sum(item["code"] == "scientific_evidence_approval_required" for item in blockers) == 2
+    # Freeze the design first: its new version must be the one gates approve.
+    review_test_design(s, env["project"], workflow, env["user"])
     for edge in workflow.graph["edges"]:
         approve_test_gate(env, workflow, edge)
     blockers, _, _ = evaluate_preflight(s, workflow, compute_backend="demo")

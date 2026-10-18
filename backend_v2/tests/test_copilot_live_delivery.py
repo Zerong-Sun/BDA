@@ -48,11 +48,11 @@ def _execution_turns():
 def test_empty_reads_are_successful_but_do_not_establish_recorded_results():
     turns = [_turn("list_experiment_results", []), _turn("list_project_candidates", [], "read-2")]
     assert all(record["successful"] for record in tool_records(turns))
-    result_step = progress(build_contract("interpretation", []), turns)[0]
+    result_step = next(step for step in progress(build_contract("interpretation", []), turns) if step["id"] == "results")
     assert result_step["status"] == "pending"
     assert result_step["evidence_call_ids"] == []
     turns.append(_turn("list_project_candidates", [{"id": "synthetic-candidate"}], "read-3"))
-    assert progress(build_contract("interpretation", []), turns)[0]["evidence_call_ids"] == ["read-3"]
+    assert next(step for step in progress(build_contract("interpretation", []), turns) if step["id"] == "results")["evidence_call_ids"] == ["read-3"]
 
 
 def test_empty_results_can_be_cited_to_explain_an_incomplete_interpretation():

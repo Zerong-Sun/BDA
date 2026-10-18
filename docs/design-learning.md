@@ -75,3 +75,5 @@ scientific gates are not automatically approved by this action.
 The loop records the predeclared criteria; domain-specific numerical gates remain
 in their existing workflow connections. A human judgment in the lesson library
 does not override those execution gates.
+
+设计评审保存后会递增工作流版本。先冻结设计学习评审，再审阅该版本的自动门控来源与参数；随后再次修改设计评审时，旧版本门控批准失效，需要重新核验。

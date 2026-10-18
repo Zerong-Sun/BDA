@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..audit.service import record_audit
 from ..core.problem import DomainError
 from ..projects.models import Project
+from ..projects.service import require_project_permission
 from ..workflows.models import WorkflowRun
 from ..workflows.repository import WorkflowRepository
 from .models import DesignLesson, DesignReview
@@ -383,3 +384,43 @@ def manual_execution(session, project, workflow, user, phase: str, expected_vers
     session.flush()
     audit(session, project, user, "design.manual_execution." + phase, workflow)
     return {"workflow_run_id": str(workflow.id), "status": workflow.status, "workflow_version": workflow.version}
+
+
+def scope(session, workflow_id, user, *, write=False):
+    workflow = session.get(WorkflowRun, workflow_id)
+    if not workflow:
+        raise DomainError("workflow_not_found", "Workflow was not found", status_code=404)
+    project = require_project_permission(session, workflow.project_id, user, "write" if write else "read")
+    return project, workflow
+
+
+def import_lesson(session, project, user, source_id):
+    source = session.get(DesignLesson, source_id)
+    if not source:
+        raise DomainError("design_lesson_not_found", "Source lesson was not found", status_code=404)
+    require_project_permission(session, source.project_id, user, "read")
+    if source.project_id == project.id:
+        raise DomainError("design_lesson_already_local", "This lesson already belongs to the project", status_code=409)
+    body = LessonCreate.model_validate({k: v for k, v in source.payload.items() if k in LessonCreate.model_fields})
+    return save_lesson(
+        session,
+        project,
+        user,
+        body,
+        origin={
+            "project_id": str(source.project_id),
+            "lesson_id": str(source.id),
+            "snapshot": serialize(source),
+        },
+    )
+
+
+def review_history(session, workflow):
+    return [
+        serialize(row)
+        for row in session.scalars(
+            select(DesignReview)
+            .where(DesignReview.workflow_run_id == workflow.id)
+            .order_by(DesignReview.created_at.desc())
+        )
+    ]

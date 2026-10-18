@@ -97,6 +97,15 @@ describe('archived research overview', () => {
     expect(await screen.findByText('A retained source.')).toBeVisible()
     expect(screen.getByText('Final review: not separately recorded in this research record')).toBeVisible()
   })
+  it('shows an unsectioned progress record with its caveats when no result section exists', async () => {
+    respond('## Research objective\nOriginal scope.')
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Recorded comparison', status: 'progress_note', updated_at: '2026-10-16T06:39:00Z', content: '# Recorded comparison\n\nReused two saved outputs.\n\nThis is a model score, not a measured affinity.' }], next_cursor: null })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByText('Reused two saved outputs.')).toBeVisible()
+    expect(screen.getByText('This is a model score, not a measured affinity.')).toBeVisible()
+    expect(screen.getByText('Latest progress record (without section headings)')).toBeVisible()
+    expect(screen.queryByText(/No separate results section/)).not.toBeInTheDocument()
+  })
   it.each(['2026-09-01T00:00:00Z', 'invalid-date'])('does not overwrite a report with older or undated progress (%s)', async updatedAt => {
     server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Separate progress record', status: 'progress_note', updated_at: updatedAt, content: '## Results\nSeparate progress result.\n## Next steps\nSeparate progress condition.' }], next_cursor: null })))
     renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)

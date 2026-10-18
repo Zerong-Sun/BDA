@@ -102,3 +102,24 @@ def approve_test_gate(env, workflow, edge=None):
         env["user"],
     )
     return candidate
+
+
+def review_test_design(session, project, workflow, user):
+    """Freeze a complete synthetic design review through the production service."""
+    from backend_v2.app.design_memory.schemas import ReviewCreate
+    from backend_v2.app.design_memory.service import review_state, save_review
+
+    state = review_state(session, workflow)
+    keys = [item["key"] for item in state["checklist"]] + [f"lesson:{row['id']}" for row in state["lessons"]]
+    payload = ReviewCreate(
+        fingerprint=state["fingerprint"], memory_digest=state["memory_digest"],
+        objective="Verify synthetic dependency and filtered-output propagation",
+        context="Isolated regression fixture; no scientific claim or external compute",
+        items=[dict(key=key, disposition="test", rationale="Relevant to the synthetic execution contract",
+                    hypothesis="Only eligible synthetic outputs reach dependent nodes",
+                    action="Execute the isolated scheduler and parser fixture",
+                    comparison="Blocked dependencies and rejected outputs remain unsubmitted",
+                    readout="Job states, outbox events and checksum-bound input subsets",
+                    decision_rule="Every expected dependency and subset assertion must pass") for key in keys],
+    )
+    return save_review(session, project, workflow, user, payload, workflow.version)
