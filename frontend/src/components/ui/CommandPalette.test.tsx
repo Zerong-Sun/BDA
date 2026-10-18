@@ -64,7 +64,7 @@ describe('CommandPalette', () => {
     await openWithKeyboard()
 
     // The two routes whose nav wording differs from their page titles.
-    expect(await screen.findByText('Decisions')).toBeInTheDocument()
+    expect(await screen.findByText('Review queue')).toBeInTheDocument()
     expect(screen.getByText('Research team')).toBeInTheDocument()
     expect(screen.getByText('Lab tools')).toBeInTheDocument()
     expect(screen.getByText('Computational design')).toBeInTheDocument()

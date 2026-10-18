@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Children, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -14,7 +14,6 @@ import { useCopilotReadOnly } from '../features/copilot/commandAccess'
 import { useCopilotHandoffs } from '../features/copilot/handoffs'
 import { useDecisionRequests } from '../features/copilot/decisionRequests'
 import { resolveBot, useCopilotBots, type CopilotBot } from '../features/copilot/bots/registry'
-import { botHref } from '../features/copilot/bots/workbenches'
 import { deliveryLabel, deliveryState } from '../features/copilot/taskPresentation'
 
 /**
@@ -55,49 +54,54 @@ function DecisionInbox() {
   const project = encodeURIComponent(projectId)
 
   // Only top-level tasks a person started; a delegated child reports through its parent.
-  const settled = (runs.data ?? []).filter((run) => !run.parent_run_id && !isLive(run))
+  const settled = (runs.data ?? []).filter((run) => !run.parent_run_id && !isLive(run)).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   const needInput = settled.filter((run) => INPUT_STATES.has(deliveryState(run)))
   // Saving a delivery as a decision record moves its review to the record; it is no longer waiting here.
-  const toReview = settled.filter((run) => REVIEW_STATES.has(deliveryState(run)) && !(run.outcome as Record<string, unknown> | undefined)?.decision_record_id).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  const toReview = settled.filter((run) => REVIEW_STATES.has(deliveryState(run)) && !(run.outcome as Record<string, unknown> | undefined)?.decision_record_id)
   const pendingDrafts = (drafts.data?.items ?? []).filter((draft) => draft.status === 'draft')
   const pendingClaims = claims.data?.items.length ?? 0
   const unsupported = (handoffs.data ?? []).filter((handoff) => (handoff.claims ?? []).some((claim) => claim.confidence === 'unsupported'))
   const loaded = runs.isSuccess && drafts.isSuccess && claims.isSuccess && handoffs.isSuccess && questions.isSuccess
   const openQuestions = questions.data ?? []
   const total = openQuestions.length + needInput.length + toReview.length + pendingDrafts.length + pendingClaims + unsupported.length
-  const taskHref = (run: AgentRun) => {
-    const owner = resolveBot(run.bot, roster)
-    return owner ? `${botHref(owner.id, projectId)}&run=${encodeURIComponent(run.id)}` : `/bots?project=${project}&view=tasks&run=${encodeURIComponent(run.id)}`
-  }
+  const taskHref = (run: AgentRun) => `/bots?${new URLSearchParams({ project: projectId, view: 'tasks', run: run.id })}`
   const taskRow = (run: AgentRun) => {
     const owner = resolveBot(run.bot, roster)
+    const summary = typeof run.outcome?.summary === 'string' && run.outcome.summary.trim() ? run.outcome.summary : run.goal
     return <Link key={run.id} to={taskHref(run)} className="inbox-row">
       <span className="inbox-row-main">{owner ? <BotAvatar id={owner.id} stance={owner.stance} /> : null}
-        <span><small>{owner ? name(owner, zh) : (zh ? '未指定负责人' : 'No assigned owner')} · {deliveryLabel(run, zh)}</small>{run.goal}</span></span>
+        <span><small>{owner ? name(owner, zh) : (zh ? '未指定负责人' : 'No assigned owner')} · {deliveryLabel(run, zh)}</small><span className="inbox-row-title" title={summary}>{summary}</span><time className="inbox-row-date" dateTime={run.updated_at}>{new Date(run.updated_at).toLocaleDateString(zh ? 'zh-CN' : 'en-GB')}</time></span></span>
       <ArrowRightIcon aria-hidden="true" />
     </Link>
   }
 
   return <section className="bot-page inbox-page" data-tour-id="decision-inbox">
     <header className="science-page-header">
-      <div><p className="science-eyebrow">{zh ? '需要你来决定' : 'YOUR DECISIONS'}</p>
-        <h1>{zh ? '待我决定' : 'Needs your decision'}</h1>
+      <div><h1>{zh ? '待办复核' : 'Review queue'}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，查看等待你决定的事项。' : 'Choose a project to see what is waiting on you.')}</p>
       </div>
     </header>
     <ApiState isLoading={projectsLoading} isError={projectsError} error={projectsQueryError} onRetry={() => void refetchProjects()}>
       {!activeProject ? <div className="science-empty"><h2>{zh ? '先选择一个研究项目' : 'Start with a research project'}</h2><Button type="button" render={<Link to="/projects" />}>{zh ? '查看项目' : 'Browse projects'}<ArrowRightIcon /></Button></div> : <>
-        <p className="inbox-intro">{zh ? 'Bot 负责准备、起草和提出断言；下面这些只有你能确认。这里只汇总并链接到做决定的地方，不会替你执行任何操作。' : 'Bots prepare, draft and claim; these are the things only you can settle. This page gathers them and links to where each decision is made; it does nothing on your behalf.'}
-          {readOnly ? (zh ? ' 当前为只读模式，可以查看，确认需要研究员权限。' : ' You are in read-only mode: you can inspect these, but settling them needs researcher access.') : null}</p>
+        <nav className="inbox-shortcuts" aria-label={zh ? '项目上下文' : 'Project context'}>
+          <Link to={`/research?project=${project}`}>{zh ? '查看项目结果与报告' : 'Project results & reports'}<ArrowRightIcon aria-hidden="true" /></Link>
+          <Link to={`/bots?project=${project}&view=tasks`}>{zh ? '全部任务与交付' : 'All tasks & deliverables'}<ArrowRightIcon aria-hidden="true" /></Link>
+        </nav>
+        {readOnly ? <p className="inbox-intro">{zh ? '只读模式：可查看，确认需要研究员权限。' : 'Read-only: researcher access is required to confirm decisions.'}</p> : null}
         {loaded && total === 0 ? <p role="status" className="inbox-clear">{zh ? '目前没有需要你决定的事项。' : 'Nothing needs your decision right now.'}</p> : null}
         <div className="inbox-grid">
+          <InboxSection label={zh ? '交付物待你审核' : 'Ready for your review'} count={runs.isSuccess ? toReview.length : null} query={runs}
+            empty={zh ? '没有等待审核的交付物。' : 'No delivery is waiting for review.'}
+            footer={toReview.length > REVIEW_LIMIT ? <Link to={`/bots?project=${project}&view=tasks`}>{zh ? `查看全部 ${toReview.length} 项` : `See all ${toReview.length}`}</Link> : null}>
+            {toReview.slice(0, REVIEW_LIMIT).map(taskRow)}
+          </InboxSection>
           <InboxSection label={zh ? 'Bot 在等你的判断' : 'A Bot is waiting on your call'} count={questions.isSuccess ? openQuestions.length : null} query={questions}
             empty={zh ? '没有等待你判断的问题。' : 'No operator is waiting on a decision.'}>
             {openQuestions.map((request) => {
               const asked = resolveBot(request.asked_by, roster)
               return <Link key={request.id} to={`/bots?project=${project}&view=room`} className="inbox-row">
                 <span className="inbox-row-main">{asked ? <BotAvatar id={asked.id} stance={asked.stance} /> : null}
-                  <span><small>{asked ? name(asked, zh) : request.asked_by} · {zh ? `${(request.options ?? []).length} 个选项` : `${(request.options ?? []).length} options`}</small>{request.question}</span></span>
+                  <span><small>{asked ? name(asked, zh) : request.asked_by} · {zh ? `${(request.options ?? []).length} 个选项` : `${(request.options ?? []).length} options`}</small><span className="inbox-row-title" title={request.question}>{request.question}</span></span></span>
                 <ArrowRightIcon aria-hidden="true" />
               </Link>
             })}
@@ -106,14 +110,9 @@ function DecisionInbox() {
             empty={zh ? '没有等待补充信息的任务。' : 'No task is waiting for your input.'}>
             {needInput.map(taskRow)}
           </InboxSection>
-          <InboxSection label={zh ? '交付物待你审核' : 'Ready for your review'} count={runs.isSuccess ? toReview.length : null} query={runs}
-            empty={zh ? '没有等待审核的交付物。' : 'No delivery is waiting for review.'}
-            footer={toReview.length > REVIEW_LIMIT ? <Link to={`/bots?project=${project}&view=tasks`}>{zh ? `查看全部 ${toReview.length} 项` : `See all ${toReview.length}`}</Link> : null}>
-            {toReview.slice(0, REVIEW_LIMIT).map(taskRow)}
-          </InboxSection>
           <InboxSection label={zh ? '计算草稿待确认' : 'Compute drafts to confirm'} count={drafts.isSuccess ? pendingDrafts.length : null} query={drafts}
             empty={zh ? '没有等待确认的计算草稿。' : 'No compute draft is waiting for confirmation.'}
-            footer={pendingDrafts.length ? <span>{zh ? '确认会占用集群资源；确认前可请 Auditor 核对资源声明。' : 'Confirming spends cluster resources; ask Auditor to check the declared resources first.'}</span> : null}>
+            footer={pendingDrafts.length ? <span>{zh ? '提交前请核对资源与参数。' : 'Review resources and parameters before submitting.'}</span> : null}>
             {pendingDrafts.map((draft) => <Link key={draft.id} to={`/workflow?project=${project}`} className="inbox-row">
               <span className="inbox-row-main"><span><small>{BACKEND_LABELS[draft.backend]?.[zh ? 1 : 0] ?? draft.backend}</small>{draft.name}</span></span><ArrowRightIcon aria-hidden="true" />
             </Link>)}
@@ -130,9 +129,9 @@ function DecisionInbox() {
               const from = resolveBot(handoff.from_bot, roster)
               const to = resolveBot(handoff.to_bot, roster)
               const count = (handoff.claims ?? []).filter((claim) => claim.confidence === 'unsupported').length
-              return <Link key={handoff.id} to={to ? botHref(to.id, projectId) : `/bots?project=${project}&view=handoffs`} className="inbox-row">
+              return <Link key={handoff.id} to={`/bots?project=${project}&view=handoffs`} className="inbox-row">
                 <span className="inbox-row-main">{from ? <BotAvatar id={from.id} stance={from.stance} /> : null}
-                  <span><small>{from ? name(from, zh) : handoff.from_bot} → {to ? name(to, zh) : handoff.to_bot} · {zh ? `${count} 条无依据` : `${count} unsupported`}</small>{handoff.summary}</span></span>
+                  <span><small>{from ? name(from, zh) : handoff.from_bot} → {to ? name(to, zh) : handoff.to_bot} · {zh ? `${count} 条无依据` : `${count} unsupported`}</small><span className="inbox-row-title" title={handoff.summary}>{handoff.summary}</span></span></span>
                 <ArrowRightIcon aria-hidden="true" />
               </Link>
             })}
@@ -155,10 +154,18 @@ function InboxSection({ label, count, query, empty, footer, children }: {
   footer?: ReactNode
   children: ReactNode
 }) {
+  const { language } = useI18n()
+  const [expanded, setExpanded] = useState(false)
+  const rows = Children.toArray(children)
+  if (count === 0 && !query.isLoading && !query.isError) return null
+
   return <section className="inbox-section" aria-label={label}>
     <h2>{label}{count !== null ? <span className="inbox-count">{count}</span> : null}</h2>
     <ApiState isLoading={query.isLoading} isError={query.isError} error={query.error} onRetry={() => void query.refetch()}>
-      {count === 0 ? <p className="text-sm text-text-secondary">{empty}</p> : <div>{children}</div>}
+      {count === 0 ? <p className="text-sm text-text-secondary">{empty}</p> : <div>{expanded ? rows : rows.slice(0, REVIEW_LIMIT)}</div>}
+      {rows.length > REVIEW_LIMIT ? <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+        {expanded ? (language === 'zh' ? '收起' : 'Show less') : (language === 'zh' ? `查看全部 ${rows.length} 项` : `Show all ${rows.length}`)}
+      </Button> : null}
       {footer ? <p className="inbox-footer">{footer}</p> : null}
     </ApiState>
   </section>

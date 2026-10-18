@@ -31,24 +31,23 @@ export type NavTranslationKey = Exclude<AppRoute['key'], 'inbox' | 'bots' | 'lea
 /** Every route reachable from navigation, in the order a person meets them. */
 export const APP_ROUTES: readonly AppRoute[] = [
   { to: '/projects', key: 'projects' },
-  { to: '/inbox', key: 'inbox' },
-  { to: '/bots', key: 'bots' },
   { to: '/research', key: 'research' },
-  { to: '/tools', key: 'tools' },
+  { to: '/bots', key: 'bots' },
   { to: '/workflow', key: 'workflow' },
+  { to: '/inbox', key: 'inbox' },
   { to: '/candidates', key: 'candidates' },
   { to: '/lab', key: 'lab' },
   { to: '/learning', key: 'learning' },
   { to: '/results', key: 'results' },
+  { to: '/tools', key: 'tools' },
   { to: '/extensions', key: 'extensions' },
 ]
 
 /**
- * Ordered by who acts: the project, what waits on you, the team that works on
- * it, and the research record. The stage workbenches follow behind one menu on
- * all screen sizes; workflow resources also have direct links in the top bar.
+ * Read results, work with the team, inspect execution, then resolve pending
+ * decisions. Supporting workbenches stay in one menu on every screen size.
  */
-export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/inbox', '/bots', '/research', '/tools', '/workflow']
+export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/research', '/bots', '/workflow', '/inbox']
 
 /** Routes that sit behind the Workbenches menu rather than in the primary bar. */
 export function workbenchRoutes(): AppRoute[] {
@@ -60,7 +59,7 @@ export function workbenchGroups(zh: boolean) {
   return [
     { key: 'design', label: zh ? '计算设计' : 'Computational design', paths: ['/workflow', '/candidates'] },
     { key: 'learning', label: zh ? '实验学习' : 'Experimental learning', paths: ['/lab', '/learning', '/results'] },
-    { key: 'platform', label: zh ? '平台' : 'Platform', paths: ['/extensions'] },
+    { key: 'platform', label: zh ? '平台' : 'Platform', paths: ['/tools', '/extensions'] },
   ].map(({ paths, ...group }) => ({ ...group, routes: paths.flatMap((path) => APP_ROUTES.filter((route) => route.to === path && !PRIMARY_ROUTES.includes(path))) }))
 }
 
@@ -78,7 +77,8 @@ export function routeLabel(
 ): string {
   // Both overrides return before the fallback, which is what narrows `key` to
   // the subset `t.nav` actually carries.
-  if (key === 'inbox') return zh ? '待我决定' : 'Decisions'
+  if (key === 'inbox') return zh ? '待办复核' : 'Review queue'
+  if (key === 'research') return zh ? '项目结果' : 'Project results'
   if (key === 'learning') return zh ? '项目学习' : 'Project learning'
   if (key === 'bots') return zh ? '研究团队' : 'Research team'
   if (key === 'extensions') return zh ? '能力与扩展' : 'Capabilities & extensions'

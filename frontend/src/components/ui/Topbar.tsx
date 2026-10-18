@@ -29,8 +29,7 @@ import {
 // The route list moved to `lib/nav/routes.ts` when the command palette began
 // needing the same one: two copies of "which routes exist and what they are
 // called" drift silently, because renaming one of them breaks nothing.
-const mobileRoutes = APP_ROUTES.filter(route => route.to !== '/workflow')
-const primaryRoutes = PRIMARY_ROUTES
+const mobileRoutes = APP_ROUTES.filter(route => PRIMARY_ROUTES.includes(route.to))
 
 export function Topbar() {
   const navigate = useNavigate()
@@ -42,7 +41,6 @@ export function Topbar() {
   const zh = language === 'zh'
   const workflowResource = new URLSearchParams(location.search).get('resource')
   const coreLinks = [
-    { resource: '', label: zh ? '工作流' : 'Workflow' },
     { resource: 'plugins', label: zh ? '模型插件' : 'Models & plugins' },
     { resource: 'scripts', label: zh ? '脚本' : 'Scripts' },
   ]
@@ -165,11 +163,10 @@ export function Topbar() {
           <NavLink
             key={route.to}
             data-nav-route={route.to}
-            to={`${route.to}${projectQuery}`}
+            to={route.to === '/workflow' ? coreHref('') : `${route.to}${projectQuery}`}
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-2 shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
-                !primaryRoutes.includes(route.to) && 'hidden',
                 isActive
                   ? 'bg-accent/15 text-accent'
                   : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
@@ -180,14 +177,14 @@ export function Topbar() {
             {navLabel(route.key)}
           </NavLink>
         ))}
-        {coreLinks.map(({ resource, label }) => {
-          const active = location.pathname === '/workflow' && (workflowResource || '') === resource
-          return <Link key={resource} data-nav-route={resource ? `/workflow?resource=${resource}` : '/workflow'} to={coreHref(resource)} aria-current={active ? 'page' : undefined} className={clsx('flex shrink-0 items-center rounded px-3 py-1.5 text-sm transition-colors', active ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary')}>{label}</Link>
-        })}
         <div className="flex items-stretch">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" aria-current={activeWorkbench ? 'true' : undefined} />}><WrenchIcon aria-hidden="true" />{activeWorkbench ? navLabel(activeWorkbench.key) : zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{zh ? '工作流资源' : 'Workflow resources'}</DropdownMenuLabel>
+                {coreLinks.map(({ resource, label }) => <DropdownMenuItem key={resource} render={<Link to={coreHref(resource)} />} aria-current={location.pathname === '/workflow' && workflowResource === resource ? 'page' : undefined}>{label}</DropdownMenuItem>)}
+              </DropdownMenuGroup>
               {workbenchGroups(zh).map((group) => <DropdownMenuGroup key={group.key}>
                 <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
                 {group.routes.map((route) => (

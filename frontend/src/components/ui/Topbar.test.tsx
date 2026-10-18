@@ -92,31 +92,32 @@ describe('Topbar logout', () => {
 
     const mobileNav = screen.getByRole('navigation', { name: 'Main navigation' })
     expect(mobileNav).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Research' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Project results' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: 'Workflow' }).length).toBeGreaterThan(0)
     expect(await screen.findByRole('button', { name: 'Manage project' })).toBeInTheDocument()
   })
 
-  it('keeps workflow, plugins and scripts directly reachable for the current project', async () => {
+  it('orders project navigation and keeps supporting resources in the menu', async () => {
+    useAppStore.setState({ language: 'en' })
     renderWithProviders(<Topbar />)
     const nav = screen.getByRole('navigation')
-    for (const [name, suffix] of [['工作流', ''], ['模型插件', '&resource=plugins'], ['脚本', '&resource=scripts']]) {
-      await waitFor(() => expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', `#/workflow?project=proj_live${suffix}`))
-      expect(within(nav).getByRole('link', { name }).className).not.toMatch(/hidden/)
-    }
+    await waitFor(() => expect(within(nav).getByRole('link', { name: 'Workflow' })).toHaveAttribute('href', '#/workflow?project=proj_live'))
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['Projects', 'Project results', 'Research team', 'Workflow', 'Review queue'])
+    fireEvent.click(screen.getByRole('button', { name: 'Workbenches' }))
+    expect(screen.getByRole('menuitem', { name: 'Models & plugins' })).toHaveAttribute('href', '#/workflow?project=proj_live&resource=plugins')
+    expect(screen.getByRole('menuitem', { name: 'Scripts' })).toHaveAttribute('href', '#/workflow?project=proj_live&resource=scripts')
   })
 
-  it('switches resources without losing the selected workflow or highlighting multiple entries', async () => {
+  it('switches resources without losing the selected workflow', async () => {
     window.location.hash = '/workflow?project=proj_live&run=run-a&node=node-b&resource=scripts'
     renderWithProviders(<Topbar />)
-    const nav = screen.getByRole('navigation')
-    expect(within(nav).getByRole('link', { name: '脚本' })).toHaveAttribute('aria-current', 'page')
-    expect(within(nav).getByRole('link', { name: '工作流' })).not.toHaveAttribute('aria-current')
-    const plugins = within(nav).getByRole('link', { name: '模型插件' })
+    expect(screen.getByRole('link', { name: '工作流' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('button', { name: '工作台' }))
+    expect(screen.getByRole('menuitem', { name: '脚本' })).toHaveAttribute('aria-current', 'page')
+    const plugins = screen.getByRole('menuitem', { name: '模型插件' })
     expect(plugins).toHaveAttribute('href', '#/workflow?project=proj_live&run=run-a&node=node-b&resource=plugins')
     fireEvent.click(plugins)
-    await waitFor(() => expect(plugins).toHaveAttribute('aria-current', 'page'))
-    expect(within(nav).getByRole('link', { name: '脚本' })).not.toHaveAttribute('aria-current')
+    await waitFor(() => expect(window.location.hash).toContain('run=run-a&node=node-b&resource=plugins'))
   })
 
   it('exposes user actions through menu semantics', () => {
@@ -148,14 +149,14 @@ describe('Topbar logout', () => {
     renderWithProviders(<Topbar />)
     await screen.findByRole('combobox', { name: 'Select project' })
     const navigation = screen.getByRole('navigation', { name: 'Main navigation' })
-    expect(screen.getAllByRole('link', { name: 'Lab tools' })).toHaveLength(1)
-    expect(within(navigation).getByRole('link', { name: 'Lab tools' })).toHaveAttribute('href', '#/tools?project=proj_live')
+    expect(within(navigation).queryByRole('link', { name: 'Lab tools' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Toolbox' })).not.toBeInTheDocument()
     expect(within(navigation).queryByRole('link', { name: /FAQ|Timeline/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Workbenches' }))
     await waitFor(() => expect(screen.getByText('Computational design')).toBeVisible())
     expect(screen.getByText('Experimental learning')).toBeVisible()
     expect(screen.getByText('Platform')).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'Lab tools' })).toBeVisible()
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Open interface tour' })).not.toBeInTheDocument()
