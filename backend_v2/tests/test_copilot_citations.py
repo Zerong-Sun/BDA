@@ -47,6 +47,15 @@ CANDIDATE = {
 }
 
 
+def test_paginated_design_memory_cites_items_not_pagination_metadata():
+    item = {"kind": "design_lesson", "id": str(uuid.uuid4()), "label": "Conditional evidence", "data": {"conditions": "Only matched inputs"}}
+    packet = {"checklist": [], "total": 2, "offset": 0, "next_offset": 1, "items": [item]}
+    produced = citations.citations_for(_Spec(citation="project_items"), packet, _Research(), ProjectContextService)
+    assert len(produced) == 1
+    assert produced[0]["entity_id"] == item["id"]
+    assert produced[0]["workspace_type"] == "design_lesson"
+
+
 def test_chat_and_mcp_cite_a_result_identically() -> None:
     """Both surfaces call this function; there is no second interpretation."""
     spec = _Spec(citation="project_items")

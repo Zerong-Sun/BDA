@@ -51,6 +51,7 @@ def update_presentation(
 
 def create_workflow(session: Session, project: Project, payload: WorkflowCreate, user: User) -> WorkflowRun:
     graph: dict[str, Any] = {
+        "design_learning_required": True,
         "nodes": [node.model_dump(mode="json") for node in payload.nodes],
         "edges": [edge.model_dump(mode="json") for edge in payload.edges],
     }
@@ -116,7 +117,7 @@ def replace_workflow_graph(
         raise DomainError("workflow_locked", "Only draft workflows can be edited", status_code=409)
     if workflow.version != expected_version:
         raise DomainError("version_conflict", "Workflow was modified by another request", status_code=412)
-    display = {key: workflow.graph[key] for key in ("route_presentation", "localized_content") if key in workflow.graph}
+    display = {key: workflow.graph[key] for key in ("route_presentation", "localized_content", "design_learning_required") if key in workflow.graph}
     if "route_presentation" in display and payload.name.strip() != workflow.name:
         raise DomainError("workflow_presentation_rename_required", "Rename an organized route through its presentation endpoint", status_code=409)
     workflow.name = payload.name.strip()

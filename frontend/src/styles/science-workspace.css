@@ -649,7 +649,7 @@ body { line-height: 1.6; }
 }
 
 /* The reading default is the latest result; the transcript opens on demand. */
-.room-scroll--focus { height: auto; }
+.room-scroll--focus { height: min(62dvh, 680px); min-height: 240px; }
 .room-latest { min-width: 0; }
 .room-latest-heading, .room-result-links { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
 .room-latest-heading { justify-content: space-between; }
@@ -660,3 +660,13 @@ body { line-height: 1.6; }
 .room-history { border-top: 1px solid var(--border-soft); }
 .room-history-feed { display: grid; gap: .75rem; max-height: 60vh; overflow-y: auto; padding-right: .25rem; margin-top: .5rem; }
 .room-next-action { margin-top: .5rem; border-left: 2px solid var(--accent-border); padding-left: .65rem; font-size: .875rem; }
+
+/* Keep composing outside the independently scrolling answer/history surface. */
+.room-compose-panel { flex-shrink: 0; display: grid; gap: .5rem; padding: .75rem; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-surface-1); }
+.room-compose-panel .room-composer { align-items: flex-end; }
+.room-compose-panel textarea, .copilot-compose-panel textarea { min-height: 64px; max-height: 160px; resize: vertical; flex: 1; background: var(--bg-app); }
+.room-input-help { font-size: .6875rem; color: var(--text-muted); }
+@media (max-width: 640px) {
+  .room-scroll--focus { height: 52dvh; min-height: 220px; }
+  .bot-chat-surface { height: min(650px, 75dvh); min-height: 360px; }
+}

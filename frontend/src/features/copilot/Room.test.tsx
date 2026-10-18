@@ -531,3 +531,17 @@ it('opens only the newest conclusion with next step, leaving revisions and notic
   expect(await screen.findByText('Earlier repeated revision.')).toBeInTheDocument()
   expect(screen.getByText('Task has started.')).toBeInTheDocument()
 })
+
+
+it('keeps the multiline composer before a long answer and does not send on Shift+Enter', async () => {
+  stub([{ kind: 'message', id: 'm1', occurred_at: '2026-10-18T08:00:00Z', message: message({ content: 'A long saved result.' }) }])
+  renderWithProviders(<Room />)
+  const input = await screen.findByRole('textbox', { name: 'Say something in the room' })
+  const result = await screen.findByText('A long saved result.')
+  expect(input.tagName).toBe('TEXTAREA')
+  expect(input.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.change(input, { target: { value: 'First line\nSecond line' } })
+  fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+  expect(input).toHaveValue('First line\nSecond line')
+  expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+})

@@ -14,7 +14,7 @@ import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
 import { ApiState } from '../../components/ui/ApiState'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Textarea } from '../../components/ui/textarea'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { BotAvatar } from './BotAvatar'
@@ -159,6 +159,111 @@ export function Room({
         }}>{zh ? '新建对话' : 'New conversation'}</Button>
       </div>
       {newConversationProject === projectId ? <p role="status" className="mt-2 text-xs text-text-secondary">{zh ? '新对话已准备，发送下一条消息后开始。历史记录仍保留在研究室中。' : 'A new conversation is ready for your next message. Earlier records remain in this room.'}</p> : null}
+      <section className="room-compose-panel" aria-label={zh ? '发送消息' : 'Compose a message'}>
+      {error ? (
+        <Alert variant="destructive" className="mt-2">
+          <AlertDescription>{chatFailureMessage(error, language === 'zh')}</AlertDescription>
+        </Alert>
+      ) : null}
+      {recipient || unknownHandle ? (
+        <p className="room-addressee" role="status">
+          {recipient && !unknownHandle ? (
+            <>
+              <span>{zh ? '发给' : 'To'} <strong>{zh ? recipient.title_zh : recipient.title}</strong></span>
+              {addressee && assignable && onAssign && !readOnly ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onAssign((mention?.body || input).trim(), addressee.id, assignable)}
+                  disabled={!(mention?.body || input).trim()}
+                >
+                  {zh ? '交给 TA 办' : 'Hand it to them'}
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <span>
+              {zh
+                ? `团队里没有叫「${unknownHandle}」的成员，改一下再发。`
+                : `No member is called “${unknownHandle}”. Change the name to send.`}
+            </span>
+          )}
+        </p>
+      ) : null}
+      {attachedIds.length ? (
+        <div
+          className="room-attachments"
+          role="group"
+          aria-label={zh ? '随下一条消息附带' : 'Attached to your next message'}
+        >
+          <span className="room-attachments-label">{zh ? '附带' : 'Attached'}</span>
+          {attachedIds.map((id) => {
+            // An id with no label is shown as the id: hiding it would make the
+            // message carry something the person cannot see.
+            const label = attachedLabels[id] ?? id
+            return (
+              <span key={id} className="room-attachment" title={id}>
+                <span className="room-attachment-name">{label}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="room-attachment-remove"
+                  aria-label={`${zh ? '移除' : 'Remove'} ${label}`}
+                  disabled={loading}
+                  onClick={() => setAttached(attachedIds.filter((item) => item !== id), projectId, attachedLabels)}
+                >
+                  <XIcon aria-hidden="true" />
+                </Button>
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
+      <div className="room-composer">
+        <label htmlFor="room-input" className="sr-only">
+          {zh ? '在研究室里发言' : 'Say something in the room'}
+        </label>
+        <Textarea
+          rows={2}
+          aria-describedby="room-input-help"
+          id="room-input"
+          aria-label={zh ? '在研究室里发言' : 'Say something in the room'}
+          placeholder={zh ? '说明你想完成什么' : 'Describe what you want to get done'}
+          value={input}
+          disabled={readOnly || loading}
+          onChange={(event) => setSessionInput(projectId, event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            void handleSend()
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={zh ? '发送' : 'Send'}
+          disabled={readOnly || loading || !input.trim() || Boolean(unknownHandle)}
+          onClick={() => void handleSend()}
+        >
+          {loading ? (
+            <SpinnerGapIcon className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : (
+            <PaperPlaneTiltIcon aria-hidden="true" />
+          )}
+        </Button>
+      </div>
+      <p id="room-input-help" className="room-input-help">{zh ? 'Enter 发送 · Shift+Enter 换行' : 'Enter to send · Shift+Enter for a new line'}</p>
+      {readOnly ? (
+        <p className="room-readonly" role="status">
+          {zh
+            ? '只读模式：可以查看研究室，发言需要研究员权限。'
+            : 'Read-only mode: you can read the room; speaking needs researcher access.'}
+        </p>
+      ) : null}
+      </section>
       <ApiState
         isLoading={feed.isLoading}
         isError={feed.isError}
@@ -241,106 +346,7 @@ export function Room({
           </div>
         </ScrollArea>
       </ApiState>
-      {error ? (
-        <Alert variant="destructive" className="mt-2">
-          <AlertDescription>{chatFailureMessage(error, language === 'zh')}</AlertDescription>
-        </Alert>
-      ) : null}
-      {recipient || unknownHandle ? (
-        <p className="room-addressee" role="status">
-          {recipient && !unknownHandle ? (
-            <>
-              <span>{zh ? '发给' : 'To'} <strong>{zh ? recipient.title_zh : recipient.title}</strong></span>
-              {addressee && assignable && onAssign && !readOnly ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onAssign((mention?.body || input).trim(), addressee.id, assignable)}
-                  disabled={!(mention?.body || input).trim()}
-                >
-                  {zh ? '交给 TA 办' : 'Hand it to them'}
-                </Button>
-              ) : null}
-            </>
-          ) : (
-            <span>
-              {zh
-                ? `团队里没有叫「${unknownHandle}」的成员，改一下再发。`
-                : `No member is called “${unknownHandle}”. Change the name to send.`}
-            </span>
-          )}
-        </p>
-      ) : null}
-      {attachedIds.length ? (
-        <div
-          className="room-attachments"
-          role="group"
-          aria-label={zh ? '随下一条消息附带' : 'Attached to your next message'}
-        >
-          <span className="room-attachments-label">{zh ? '附带' : 'Attached'}</span>
-          {attachedIds.map((id) => {
-            // An id with no label is shown as the id: hiding it would make the
-            // message carry something the person cannot see.
-            const label = attachedLabels[id] ?? id
-            return (
-              <span key={id} className="room-attachment" title={id}>
-                <span className="room-attachment-name">{label}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="room-attachment-remove"
-                  aria-label={`${zh ? '移除' : 'Remove'} ${label}`}
-                  disabled={loading}
-                  onClick={() => setAttached(attachedIds.filter((item) => item !== id), projectId, attachedLabels)}
-                >
-                  <XIcon aria-hidden="true" />
-                </Button>
-              </span>
-            )
-          })}
-        </div>
-      ) : null}
-      <div className="room-composer">
-        <label htmlFor="room-input" className="sr-only">
-          {zh ? '在研究室里发言' : 'Say something in the room'}
-        </label>
-        <Input
-          id="room-input"
-          aria-label={zh ? '在研究室里发言' : 'Say something in the room'}
-          placeholder={zh ? '说明你想完成什么' : 'Describe what you want to get done'}
-          value={input}
-          disabled={readOnly || loading}
-          onChange={(event) => setSessionInput(projectId, event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            void handleSend()
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label={zh ? '发送' : 'Send'}
-          disabled={readOnly || loading || !input.trim() || Boolean(unknownHandle)}
-          onClick={() => void handleSend()}
-        >
-          {loading ? (
-            <SpinnerGapIcon className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-          ) : (
-            <PaperPlaneTiltIcon aria-hidden="true" />
-          )}
-        </Button>
-      </div>
-      {readOnly ? (
-        <p className="room-readonly" role="status">
-          {zh
-            ? '只读模式：可以查看研究室，发言需要研究员权限。'
-            : 'Read-only mode: you can read the room; speaking needs researcher access.'}
-        </p>
-      ) : null}
+
     </div>
   )
 }

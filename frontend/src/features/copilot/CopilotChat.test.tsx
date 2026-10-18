@@ -251,7 +251,7 @@ describe('CopilotChat', () => {
 
     expect(await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
       'data-slot',
-      'input',
+      'textarea',
     )
     expect(screen.getByRole('button', { name: 'Send message' })).toHaveAttribute(
       'data-slot',
@@ -270,6 +270,17 @@ describe('CopilotChat', () => {
       expect(reply).not.toHaveClass('max-h-[22rem]')
       expect(reply).not.toHaveClass('overflow-y-auto')
     })
+  })
+
+  it('keeps a multiline draft on Shift+Enter without sending', async () => {
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+    const input = await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })
+    fireEvent.change(input, { target: { value: 'First line\nSecond line' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(streamCopilotMessage).not.toHaveBeenCalled()
+    expect(input).toHaveValue('First line\nSecond line')
+    const scroll = document.querySelector('[data-slot="scroll-area"]')!
+    expect(input.compareDocumentPosition(scroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('does not submit Enter while an IME composition is active', async () => {

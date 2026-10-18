@@ -22,6 +22,7 @@ COPILOT_CAPABILITIES: list[dict[str, Any]] = [
         "async_execution": False,
         "execution_mode": "read",
         "chat_tools": [
+            "list_design_lessons",
             "list_project_targets",
             "list_project_candidates",
             "list_experiment_results",

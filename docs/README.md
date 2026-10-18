@@ -13,6 +13,7 @@
 ## 开始使用
 
 - [近期代码更新、集成状态与维护入口（2026-10-17）](RECENT_UPDATES_2026-10-17.md)
+- [设计学习：设计前复核与执行后反馈](design-learning.md)
 - [研究团队与结果展示：六项验证及修复清单](SIX_DIMENSION_REVIEW_2026-10-17.md)
 
 - [Public / Private 登录、注册与账号管理](ACCOUNT_ACCESS.md)
@@ -95,3 +96,5 @@
 - [Bot 工作区视觉层级复审](FRONTEND_VISUAL_REVIEW.md)
 - [六维复核与修复清单](GUIDED_PLATFORM_REVIEW.md)
 - [前端插件检查与修复](FRONTEND_PLUGIN_CHECK_2026-09-07.md)
+
+- [2026-10-18 工作台整合审阅与修复清单](INTEGRATION_REVIEW_2026-10-18.md)

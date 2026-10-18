@@ -976,6 +976,13 @@ function createStrictRoutes({ scenario, routeId }) {
   }
   const ok = (body, options) => routeResponse(200, body, options)
 
+  add('GET', `/api/v2/projects/${PROJECT_ID}/design-lessons`, {}, () => ok({ items: [] }))
+  add('GET', `/api/v2/workflow-runs/${workflowRun.id}/design-learning`, {}, () => ok({
+    required: false, state: 'missing', workflow_version: 1, fingerprint: 'a'.repeat(64), memory_digest: 'b'.repeat(64),
+    checklist: [], lessons: [], review: null, history: [], pending_feedback: [], feedback: [],
+    manual_only: false, manual_execution: false, manual_execution_complete: false,
+  }))
+
   add('GET', '/api/v2/registry/extensions', {}, () => ok(EXTENSION_CATALOG))
 
   const learningBase = { project_id: PROJECT_ID, version: 1, created_at: NOW, updated_at: NOW, created_by: 'user_browser' }

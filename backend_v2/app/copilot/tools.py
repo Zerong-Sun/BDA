@@ -78,6 +78,17 @@ def _kind_allowed(context: ToolContext, kind: str) -> None:
 
 _register(
     ToolSpec(
+        id="list_design_lessons",
+        citation="project_items",
+        description="Read prior design lessons, applicability conditions, uncertainty and the mandatory pre-design checklist. Call before planning a new design or interpreting results; follow next_offset until all lessons have been read.",
+        parameters={"type": "object", "properties": {"limit": _limit(100, 50), "offset": {"type": "integer", "minimum": 0}}, "additionalProperties": False},
+        capability="project-read", execution_mode="read", requires="project",
+        handler=lambda ctx, args: ctx.project.design_lessons(limit=_arg_int(args, "limit", 50), offset=_arg_int(args, "offset", 0)),
+    )
+)
+
+_register(
+    ToolSpec(
         id="list_project_targets",
         citation="project_items",
         description="List the project's targets with their readiness state.",

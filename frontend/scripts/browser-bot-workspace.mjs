@@ -185,7 +185,7 @@ try {
   await page.getByRole('button', { name: 'Discuss with a Bot', exact: true }).click()
   await page.getByRole('tab', { name: 'Research room', exact: true }).waitFor()
   assert.ok(page.url().includes('/bots?project=proj_browser&view=chat'))
-  await page.waitForFunction(() => document.querySelector('input[aria-label="Say something in the room"]')?.value.includes('DEMO-2'))
+  await page.waitForFunction(() => document.querySelector('textarea[aria-label="Say something in the room"]')?.value.includes('DEMO-2'))
   const drafted = await page.getByLabel('Say something in the room', { exact: true }).inputValue()
   assert.ok(drafted.includes('DEMO-1') && drafted.includes('DEMO-2'))
   assert.equal(writes.length, 0, 'Selecting a structure or Bot must not send or execute anything')
@@ -319,7 +319,7 @@ try {
   assert.ok(await zh.getByRole('button', { name: '继续此任务', exact: true }).isDisabled())
   assert.ok(await zh.getByRole('button', { name: '保存为待审核计划记录', exact: true }).isDisabled())
   await zh.getByRole('tab', { name: '研究室', exact: true }).click()
-  assert.ok(await zh.locator('.room input[placeholder]').isDisabled())
+  assert.ok(await zh.locator('.room textarea[placeholder]').isDisabled())
   checks.push('Viewer can inspect task deliveries and chat history without command controls')
 
   let streamReady
@@ -455,6 +455,27 @@ try {
   assert.ok(await team.getByRole('columnheader', { name: 'Job', exact: true }).isVisible())
   await rawDetails.click()
   checks.push('Latest answer preserves caveats and next steps while raw tool output and empty tables remain expandable')
+  // A long history must scroll inside the feed, never push the composer below it.
+  for (const width of [1440, 390]) {
+    await team.setViewportSize({ width, height: 1000 })
+    await team.locator('.room-compose-panel').scrollIntoViewIfNeeded()
+    const geometry = await team.evaluate(() => {
+      const composer = document.querySelector('.room-compose-panel').getBoundingClientRect()
+      const feed = document.querySelector('.room-scroll').getBoundingClientRect()
+      return { composer: composer.toJSON(), feed: feed.toJSON(), height: innerHeight }
+    })
+    assert.ok(geometry.composer.bottom <= geometry.feed.top + 1, 'Composer precedes the feed')
+    assert.ok(geometry.composer.top >= 0 && geometry.composer.bottom <= geometry.height, 'Composer fits the viewport')
+    assert.ok(geometry.feed.height <= 680, 'Feed height is bounded')
+    const input = team.getByLabel('Say something in the room', { exact: true })
+    await input.fill('First line')
+    await input.press('Shift+Enter')
+    await input.press('N')
+    assert.equal(await input.inputValue(), 'First line\nN')
+    await input.fill('')
+  }
+  await team.setViewportSize({ width: 1440, height: 1000 })
+  checks.push('Desktop and mobile composers precede bounded history; Shift+Enter inserts a newline without sending')
   const history = team.getByRole('button', { name: /Discussion and process history/ })
   assert.equal(await history.getAttribute('aria-expanded'), 'false')
   assert.equal(await team.getByText('Synthetic QA: evidence inspection and independent review assigned.', { exact: true }).count(), 0)

@@ -28,7 +28,7 @@ import { looksLikeCopilotResearchResult } from '../../lib/api/copilotResearch'
 import { projectText } from '../../lib/i18n/projectText'
 import { isQuestion } from './taskPresentation'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Textarea } from '../../components/ui/textarea'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
 import { Frame, FramePanel } from '../../components/reui/frame'
@@ -267,6 +267,43 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           ) : null}
         </div>
       ) : null}
+      <div className="copilot-compose-panel flex items-end gap-2 border-b p-3">
+        <label htmlFor="copilot-input" className="sr-only">
+          {t.copilot.chat.inputLabel}
+        </label>
+        <Textarea
+          rows={2}
+          id="copilot-input"
+          aria-label={t.copilot.chat.inputLabel}
+          placeholder={t.copilot.chat.inputPlaceholder}
+          className="flex-1"
+          value={input}
+          disabled={readOnly || loading}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            void handleSend()
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={t.copilot.chat.sendAriaLabel}
+          disabled={readOnly || loading || !input.trim()}
+          onClick={() => void handleSend()}
+        >
+          {loading ? (
+            <SpinnerGapIcon
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <PaperPlaneTiltIcon aria-hidden="true" />
+          )}
+        </Button>
+      </div>
       <ScrollArea className="min-h-0 flex-1" aria-label={t.copilot.chat.conversationLabel}>
         <div className="space-y-3 p-4 pr-6">
           {error ? (
@@ -390,42 +427,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           <div ref={messageEndRef} />
         </div>
       </ScrollArea>
-      <div className="flex items-center gap-2 border-t p-3">
-        <label htmlFor="copilot-input" className="sr-only">
-          {t.copilot.chat.inputLabel}
-        </label>
-        <Input
-          id="copilot-input"
-          aria-label={t.copilot.chat.inputLabel}
-          placeholder={t.copilot.chat.inputPlaceholder}
-          className="flex-1"
-          value={input}
-          disabled={readOnly || loading}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            void handleSend()
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label={t.copilot.chat.sendAriaLabel}
-          disabled={readOnly || loading || !input.trim()}
-          onClick={() => void handleSend()}
-        >
-          {loading ? (
-            <SpinnerGapIcon
-              className="animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-          ) : (
-            <PaperPlaneTiltIcon aria-hidden="true" />
-          )}
-        </Button>
-      </div>
+
     </div>
   )
 }

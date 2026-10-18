@@ -20,6 +20,7 @@ import { Choice, LearningTable, Field, Section, JsonDetails } from './learningCo
 import { LearningLifecycle } from './LearningLifecycle'
 import { FeatureExplanation, ValidationEvidence } from '../features/learning/ValidationEvidence'
 import './learning.css'
+import { DesignLessonLibrary } from '../features/learning/DesignLearning'
 
 const values = (event: FormEvent<HTMLFormElement>) => new FormData(event.currentTarget)
 const text = (data: FormData, key: string) => String(data.get(key) ?? '').trim()
@@ -120,6 +121,7 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
         ].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{evidenceLoaded ? count : '—'}</dd></div>)}
       </dl>
     </header>
+    <DesignLessonLibrary projectId={projectId} writable={writable} />
     <ol className="learning-steps" aria-label={copy('跳转到工作步骤', 'Jump to a work step')}>{[copy('目标契约', 'Goal & assay'), copy('实验数据', 'Observations'), copy('模型验证', 'Model validation'), copy('批次决策', 'Batch decisions'), copy('交接回流', 'Handoff & results'), copy('学习记录', 'Learning record'), copy('项目交付', 'Delivery')].map((label, index) => <li key={label}><Button type="button" variant="ghost" disabled={!data || (index > 0 && !study)} onClick={() => { const heading = document.getElementById(`learning-step-${String(index + 1).padStart(2, '0')}`); heading?.scrollIntoView({ block: 'start' }); heading?.focus({ preventScroll: true }) }}><span>{index + 1}</span>{label}</Button></li>)}</ol>
     {(query.isPending || access.isPending) && <p role="status">{copy('正在读取项目证据…', 'Loading project evidence…')}</p>}
     {(query.isError || access.isError) && <div role="alert"><p>{copy('项目数据加载失败，操作已暂停。', 'Project data could not be loaded. Actions are paused.')}</p><Button type="button" variant="outline" onClick={() => { void query.refetch(); void access.refetch() }}>{copy('重试', 'Retry')}</Button></div>}
