@@ -1,0 +1,21 @@
+# Other projects display review — 2026-10-19
+
+## Scope and finding
+
+Read-only browser inspection covered the remaining 11 projects: protein nanocages, flavor proteins, archived PD-1/PD-L1, INSR rescue, pain modulation, biocontrol archive, contaminant degradation, Botrytis archive, CD3 binders, enzyme scaffold repair and cannabinoid recognition.
+
+Legacy nanocage, flavor and enzyme reports use ordinary paragraphs instead of level-two section headings. Their saved conclusions were hidden behind a misleading empty-results message. The overview now shows verbatim opening paragraphs, keeps label/list pairs together and exposes explicitly authored next-stage paragraphs or input lists. A saved pause instruction takes precedence over historical next-stage suggestions. The full report remains collapsed and available. No new scientific conclusions, translations, review approvals or source records are generated.
+
+## Validation
+
+- 33 desktop page inspections and 33 mobile inspections at 390 px: no horizontal overflow.
+- 285 real project-scoped link clicks across results, team and workflow pages: all retained expected project and route parameters.
+- All 11 workspace identities, displayed report titles and finding-review counts matched their saved API records.
+- All 34 conversations represented in the 11 rooms belonged to the requested project; room pages were fully retrieved with no next cursor.
+- Botrytis has only a source index and no standalone results report or primary target. Its primary-target API returns 404; the structure page correctly renders its empty state. This is recorded separately from navigation failures.
+- 25 focused tests passed, including missing reports, index-only archives, citations, legacy prose, input lists, pause precedence and code/table exclusion. Production build and bundle gate passed; changed files passed lint.
+- Browser application writes were blocked; none were attempted. Authentication was allowed. No DeepSeek or other model calls were made.
+
+## Boundaries
+
+This verifies display, provenance and navigation, not the scientific accuracy of the saved reports or completion of outstanding scientific reviews. Private browser evidence stays outside Git. Main merge and PR approval follow-up remain paused.

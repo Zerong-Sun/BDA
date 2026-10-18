@@ -51,3 +51,30 @@ export function isNewerSavedRecord(candidate: string | null | undefined, current
   const currentTime = current ? Date.parse(current) : Number.NaN
   return Number.isFinite(candidateTime) && Number.isFinite(currentTime) && candidateTime > currentTime
 }
+
+/** Display verbatim prose for legacy notes without structured sections; never infer completion. */
+export function unsectionedReportOverview(markdown: string) {
+  let fence = ''
+  const prose = markdown.split('\n').filter(line => {
+    const marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1]
+    if (marker) { if (!fence) fence = marker[0]; else if (marker[0] === fence) fence = ''; return false }
+    return !fence
+  }).join('\n')
+  if (/^##\s+/m.test(prose)) return { excerpt: '', next: '' }
+  const blocks = prose.split(/\n\s*\n/).map(block => block.trim()).filter(block => block && !/^#|^\||^---+$/.test(block))
+  // A saved hold instruction overrides suggestions elsewhere in the historical note.
+  const hold = blocks.find(block => /^(?:用户最新指示|最新执行状态|本轮状态)[：:].*(?:暂停|停止)/.test(block))
+  const nextIndex = blocks.findIndex(block => /^(?:待[^：:\n]{0,24}补齐[：:]|下一(?:步|阶段)|Next steps?[:\s])/i.test(block) || /(?:^|[。；])下一阶段/.test(block))
+  const nextBlocks = nextIndex < 0 ? [] : [blocks[nextIndex]]
+  for (let index = nextIndex + 1; nextIndex >= 0 && index < blocks.length; index += 1) {
+    if (!/^[-*]\s/.test(blocks[index])) break
+    nextBlocks.push(blocks[index])
+  }
+  const next = hold ?? nextBlocks.join('\n\n')
+  const excerptBlocks = blocks.slice(0, 2)
+  // Keep a label and its following list together rather than showing an empty 'Completed:'.
+  if (/[：:]$/.test(excerptBlocks.at(-1) ?? '')) {
+    for (let index = 2; index < blocks.length && /^[-*]\s/.test(blocks[index]); index += 1) excerptBlocks.push(blocks[index])
+  }
+  return { excerpt: excerptBlocks.join('\n\n'), next }
+}

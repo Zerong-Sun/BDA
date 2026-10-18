@@ -54,6 +54,17 @@ describe('archived research overview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Full report and cited sources' }))
     expect(await screen.findByText('A retained source.')).toBeVisible()
   })
+  it('shows unsectioned saved status and hold instructions without requiring a generated summary', async () => {
+    respond('本轮状态：用户暂停。\n\n原始数据仍缺失，未制造数值。\n\n# Historical plan\n\n下一阶段取得材料。')
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    const results = await screen.findByRole('region', { name: 'Project results' })
+    expect(within(results).getByText('本轮状态：用户暂停。')).toBeVisible()
+    expect(within(results).getByText('原始数据仍缺失，未制造数值。')).toBeVisible()
+    const next = screen.getByRole('region', { name: 'Open questions and advancement conditions' })
+    expect(within(next).getByText('本轮状态：用户暂停。')).toBeVisible()
+    expect(screen.queryByText('下一阶段取得材料。')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Full report and cited sources' })).toHaveAttribute('aria-expanded', 'false')
+  })
   it('keeps missing report distinct from a resolved project', async () => {
     respond(null)
     renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'completed' }} />)
