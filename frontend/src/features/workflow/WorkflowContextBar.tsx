@@ -56,7 +56,7 @@ export function WorkflowContextBar({
   const runName = (run: WorkflowContextBarProps['projectWorkflowRuns'][number]) => workflowRouteName(run, language)
   const groups = groupWorkflowRoutes(projectWorkflowRuns)
   const presentation = routePresentation(activeRun)
-  const detailFields = [['method', '设计方法', 'Method'], ['objective', '目标', 'Objective'], ['evidence', '证据状态', 'Evidence'], ['next_step', '下一步', 'Next step']] as const
+  const detailFields = [['method', '设计方法', 'Method'], ['objective', '目标', 'Objective']] as const
 
   if (!activeProject) return null
 
@@ -122,16 +122,26 @@ export function WorkflowContextBar({
         </Button>
       </div>
       </FramePanel>
-      {typeof presentation.summary === 'string' ? <FramePanel className="space-y-2 border-t border-border-soft text-sm" data-testid="route-explanation">
-        <p className="text-text-secondary">{presentation.summary}</p>
-        <dl className="grid gap-2 sm:grid-cols-2">{detailFields.map(([key, zh, en]) => typeof presentation[key] === 'string' ? <div key={key}>
-          <dt className="text-xs text-text-muted">{language === 'zh' ? zh : en}</dt><dd className="break-words text-text-secondary">{String(presentation[key])}</dd>
-        </div> : null)}</dl>
-        {Array.isArray(presentation.aliases) && presentation.aliases.length > 0 ? <Accordion className="text-xs text-text-muted"><AccordionItem value="aliases">
-          <AccordionTrigger>{language === 'zh' ? '旧名称与追溯' : 'Previous names'}</AccordionTrigger>
-          <AccordionContent><p className="mt-1 break-words">{presentation.aliases.filter((value): value is string => typeof value === 'string').join(' / ')}</p></AccordionContent>
-        </AccordionItem></Accordion> : null}
-      </FramePanel> : null}
+      {activeRun ? <div className="project-summary-grid" data-testid="route-explanation">
+        <section className="project-summary-card">
+          <h2>{language === 'zh' ? '路线与现状' : 'Route and status'}</h2>
+          <p className="text-sm text-text-secondary">{typeof presentation.summary === 'string' && presentation.summary.trim() ? presentation.summary : (language === 'zh' ? '尚未保存路线总结。节点与产物见下方工作流。' : 'No route summary saved. Inspect nodes and outputs in the workflow below.')}</p>
+          <Accordion><AccordionItem value="method"><AccordionTrigger>{language === 'zh' ? '方法与目标' : 'Method and objective'}</AccordionTrigger><AccordionContent>
+            <dl className="space-y-2">{detailFields.map(([key, zh, en]) => typeof presentation[key] === 'string' ? <div key={key}><dt className="text-xs text-text-muted">{language === 'zh' ? zh : en}</dt><dd className="text-sm break-words">{String(presentation[key])}</dd></div> : null)}</dl>
+          </AccordionContent></AccordionItem></Accordion>
+          {Array.isArray(presentation.aliases) && presentation.aliases.length > 0 ? <Accordion><AccordionItem value="aliases"><AccordionTrigger>{language === 'zh' ? '旧名称与追溯' : 'Previous names'}</AccordionTrigger><AccordionContent>{presentation.aliases.filter((v): v is string => typeof v === 'string').join(' / ')}</AccordionContent></AccordionItem></Accordion> : null}
+        </section>
+        <section className="project-summary-card">
+          <h2>{language === 'zh' ? '证据与复核' : 'Evidence and review'}</h2>
+          <p className="text-sm text-text-secondary">{typeof presentation.evidence === 'string' && presentation.evidence.trim() ? presentation.evidence : (language === 'zh' ? '尚未记录证据摘要。' : 'No evidence summary recorded.')}</p>
+          <nav className="project-card-actions"><Link to={`/research?project=${encodeURIComponent(activeProject.id)}&tab=evidence`}>{language === 'zh' ? '查看证据' : 'View evidence'} →</Link><Link to={`/inbox?project=${encodeURIComponent(activeProject.id)}`}>{language === 'zh' ? '待办复核' : 'Review queue'} →</Link></nav>
+        </section>
+        <section className="project-summary-card project-summary-card--next">
+          <h2>{language === 'zh' ? '下一步' : 'Next step'}</h2>
+          <p className="text-sm text-text-secondary">{typeof presentation.next_step === 'string' && presentation.next_step.trim() ? presentation.next_step : (language === 'zh' ? '尚未记录下一步；先检查节点结果和门控。' : 'No next step recorded; inspect node results and gates first.')}</p>
+          <nav className="project-card-actions"><Link to={`/research?project=${encodeURIComponent(activeProject.id)}`}>{language === 'zh' ? '项目结果与报告' : 'Project results and reports'} →</Link></nav>
+        </section>
+      </div> : null}
     </Frame>
   )
 }

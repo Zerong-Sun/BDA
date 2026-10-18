@@ -272,19 +272,20 @@ export function Room({
       >
         <ScrollArea className="room-scroll room-scroll--focus">
           <div className="room-feed">
-            <section className="room-latest" aria-label={zh ? '最新结论与交付' : 'Latest conclusion and delivery'}>
+            <section className="room-latest project-summary-card" aria-label={zh ? '最新结论与交付' : 'Latest conclusion and delivery'}>
               <div className="room-latest-heading">
                 <h3>{zh ? '最新结论' : 'Latest conclusion'}</h3>
                 {focus.conclusion ? <time dateTime={focus.conclusion.occurred_at}>{new Date(focus.conclusion.occurred_at).toLocaleString(zh ? 'zh-CN' : 'en-GB')}</time> : null}
-              </div>
-              <div className="room-result-links">
-                <Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'goals', brief: '1' })}`}>{zh ? '项目结果与报告' : 'Project results and reports'}</Link>
-                {focus.latestTask?.task && onOpenRun ? <Button type="button" size="sm" variant="outline" onClick={() => onOpenRun(focus.latestTask!.task!.id)}>{zh ? '最近任务与复核' : 'Latest task and review'} · {roomTaskLabel(focus.latestTask.task, zh)}</Button> : null}
               </div>
               {focus.conclusion ? <>
                 <p className="room-review-state">{zh ? '本条答复自动复核：' : 'Automated review of this reply: '}{review === 'completed' ? (zh ? '已完成（不等于人工批准）' : 'Completed (not human approval)') : review === 'incomplete' ? (zh ? '未完成' : 'Incomplete') : (zh ? '未记录完成' : 'No completion recorded')}</p>
                 <RoomEntry key={focus.conclusion.id} focused entry={focus.conclusion} roster={roster} projectId={projectId} zh={zh} childTasks={[]} onOpenRun={onOpenRun} onOpenBot={onOpenBot} />
               </> : <p className="text-sm text-text-secondary">{zh ? '暂无已保存的结论。可先查看项目报告；运行中状态见下方。' : 'No saved conclusion yet. Open project reports; current activity is shown below.'}</p>}
+              <div className="room-result-links project-card-actions">
+                <Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'goals', brief: '1' })}`}>{zh ? '项目结果与报告' : 'Project results and reports'}</Link>
+                {focus.latestTask?.task && onOpenRun ? <Button type="button" size="sm" variant="outline" onClick={() => onOpenRun(focus.latestTask!.task!.id)}>{zh ? '最近任务与复核' : 'Latest task and review'} · {roomTaskLabel(focus.latestTask.task, zh)}</Button> : null}
+                <Link to={`/workflow?project=${encodeURIComponent(projectId)}`}>{zh ? '工作流与门控' : 'Workflow and gates'} →</Link>
+              </div>
             </section>
             {entries.length === 0 && !loading ? (
               <p className="room-empty" role="status">

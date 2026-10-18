@@ -709,7 +709,6 @@ function WorkflowWorkspace() {
     >
       <header className="mb-4 space-y-1">
         <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>
-        <p className="text-sm text-text-secondary">{language === 'zh' ? '连接计算步骤、检查输入与门控，追踪运行和产物。' : 'Connect computation steps, check inputs and gates, and track runs and artifacts.'}</p>
       </header>
       <WorkflowContextBar
         workflowRunId={workflowRunId}

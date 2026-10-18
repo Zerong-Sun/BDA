@@ -16,6 +16,10 @@ describe('design learning', () => {
   it('shows applicability and uncertainty without pre-approving prior experience', async () => {
     renderWithProviders(<DesignLearningPanel workflowId="w" projectId="p" workflowVersion={4} draft writable />)
     expect(await screen.findByText(/Pre-design review needed/)).toBeInTheDocument()
+    const checklist = screen.getByRole('button', { name: 'Pre-design learning checklist' })
+    expect(checklist).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/Only matched state A/)).not.toBeInTheDocument()
+    fireEvent.click(checklist)
     expect(screen.getByText(/Only matched state A/)).toBeInTheDocument()
     expect(screen.getByText(/No functional validation/)).toBeInTheDocument()
     expect(screen.getAllByRole('combobox').every(el => el.textContent?.includes('Select'))).toBe(true)
@@ -25,6 +29,9 @@ describe('design learning', () => {
     const review: memory.Review = { id: 'r', created_at: lesson.created_at, workflow_run_id: 'w', payload: { fingerprint: state.fingerprint, memory_digest: state.memory_digest, objective: 'Original objective', context: 'Original context', items: [{ key: 'identity', disposition: 'test', rationale: 'Unknown', hypothesis: 'Original hypothesis', action: 'One change', comparison: 'Matched control', readout: 'Units', decision_rule: 'Predefined rule' }], lesson_snapshots: [] } }
     vi.mocked(memory.getDesignLearning).mockResolvedValue({ ...state, state: 'frozen', review, history: [review], pending_feedback: ['identity'] })
     renderWithProviders(<DesignLearningPanel workflowId="w" projectId="p" workflowVersion={4} draft={false} writable />)
+    const feedback = await screen.findByRole('button', { name: /Result feedback/ })
+    expect(feedback).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(feedback)
     expect(await screen.findByText(/A successful run does not prove a hypothesis/)).toBeInTheDocument()
     const fields = ['Lesson title', 'Conclusion or hypothesis', 'Conditions (object, state, method, environment)', 'Limits and uncertainty', 'Specific change for the next design', 'Evidence references (one URL, citation or record ID per line)']
     for (const label of fields) fireEvent.change(screen.getByLabelText(label), { target: { value: label === 'Lesson title' ? 'Blocked by dependency' : 'Observed record reference and limited scope' } })

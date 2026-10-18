@@ -1,3 +1,4 @@
+import { Disclosure } from '../components/ui/Disclosure'
 import { useNavigate, useSearchParams, Link } from 'react-router'
 import { ArrowRightIcon, GearIcon } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
@@ -104,12 +105,11 @@ function BotProjectWorkspace() {
 
   return <section className={`bot-page${focusedTask ? ' bot-page--task' : ''}`} data-tour-id="bot-workspace">
     <header className="science-page-header">
-      <div><p className="science-eyebrow">{zh ? 'AI FOR SCIENCE / 研究协作' : 'AI FOR SCIENCE / COLLABORATION'}</p>
+      <div>
         <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '项目研究团队' : 'Project research team')}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
       {projectId && !focusedTask ? <div className="flex flex-wrap gap-2">
-        <Button variant="outline" render={<Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'methods' })}`} />}>{zh ? '已保存的讨论报告' : 'Saved discussion reports'}</Button>
         {canConfigure ? <Button type="button" variant="outline" onClick={() => setSettings(!settings)} aria-expanded={settings}><GearIcon />{zh ? '模型设置' : 'Model settings'}</Button> : null}
       </div> : null}
     </header>
@@ -146,7 +146,7 @@ function BotProjectWorkspace() {
               <TabsContent value="skills"><ProceduralSkillCatalog /></TabsContent>
             </Tabs>
           </div>
-          {!focusedTask ? <aside className="bot-context"><ProjectBriefPanel project={activeProject} compact />
+          {!focusedTask ? <aside className="bot-context"><Disclosure title={zh ? '项目背景' : 'Project background'} className="project-summary-card"><ProjectBriefPanel project={activeProject} compact /></Disclosure>
             <p className="science-eyebrow bot-materials-label">{zh ? '项目资料' : 'PROJECT MATERIALS'}</p>
             <nav aria-label={zh ? '项目资料' : 'Project materials'}>{[
               ['evidence', zh ? '文献与证据' : 'Literature & evidence'], ['structures', zh ? '结构对照' : 'Structure comparison'], ['methods', zh ? '实验方案' : 'Experiment plan'], ['timeline', zh ? '决策记录' : 'Decision record'],
