@@ -27,7 +27,7 @@ vi.mock('../../lib/api/artifacts', () => ({ listProjectArtifacts: api.artifacts 
 vi.mock('../../lib/api/registry', () => ({ listModelPlugins: async () => [], validateModelPlugin: vi.fn() }))
 vi.mock('./WorkflowContextBar', () => ({ WorkflowContextBar: () => null }))
 vi.mock('./WorkflowResourceSidebar', () => ({ WorkflowResourceSidebar: ({ artifacts, artifactReadOnly }: { artifacts: Array<{ id: string }>; artifactReadOnly: boolean }) => <div><button type="button" disabled={artifactReadOnly}>Upload project artifact</button>{artifacts.map((artifact) => <span key={artifact.id}>{artifact.id}</span>)}</div> }))
-vi.mock('./WorkflowCanvas', () => ({ WorkflowCanvas: ({ onNodeSelected }: { onNodeSelected: (id: string) => void }) => <><button onClick={() => onNodeSelected('node-1')}>Select node</button><button onClick={() => onNodeSelected('node-2')}>Select another node</button><button onClick={() => onNodeSelected('target')}>Select demo target</button></> }))
+vi.mock('./WorkflowCanvas', () => ({ WorkflowCanvas: ({ onNodeSelected, workflowRunId }: { onNodeSelected: (id: string) => void; workflowRunId: string }) => <><span>Canvas {workflowRunId}</span><button onClick={() => onNodeSelected('node-1')}>Select node</button><button onClick={() => onNodeSelected('node-2')}>Select another node</button><button onClick={() => onNodeSelected('target')}>Select demo target</button></> }))
 vi.mock('./WorkflowInspector', () => ({ WorkflowInspector: ({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) => <div><button onClick={() => onDirtyChange(true)}>Edit parameter</button><button onClick={() => onDirtyChange(false)}>Save parameter</button></div> }))
 vi.mock('./NodeBuilder', () => ({ NodeBuilder: ({ open }: { open: boolean }) => open ? <div>Manual node builder</div> : null }))
 vi.mock('../../components/ui/NextStep', () => ({ NextStep: () => <div>Next step: candidates</div> }))
@@ -238,10 +238,47 @@ describe('workflow journey', () => {
     expect(screen.queryByText('Complete route')).not.toBeInTheDocument()
   })
 
+  it('keeps the restored project canvas when the intervening project graph resolves last', async () => {
+    api.current.mockImplementation(async (id: string) => ({ ...run, id: id === 'project-a' ? 'run-a' : 'run-b', project_id: id }))
+    let release!: (value: unknown) => void
+    api.graph.mockImplementation((id: string) => id === 'run-b'
+      ? new Promise(resolve => { release = resolve })
+      : Promise.resolve({ workflow: run, nodes: [node], edges: [], layout: {} }))
+    const view = renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByText('Canvas run-a')).toBeVisible()
+    state.projectId = 'project-b'; view.rerender(<WorkflowPage />)
+    await waitFor(() => expect(api.graph).toHaveBeenCalledWith('run-b'))
+    expect(screen.queryByText('Canvas run-a')).not.toBeInTheDocument()
+    state.projectId = 'project-a'; view.rerender(<WorkflowPage />)
+    expect(await screen.findByText('Canvas run-a')).toBeVisible()
+    await act(async () => release({ workflow: { ...run, id: 'run-b', project_id: 'project-b' }, nodes: [node], edges: [], layout: {} }))
+    expect(screen.getByText('Canvas run-a')).toBeVisible()
+    expect(screen.queryByText('Canvas run-b')).not.toBeInTheDocument()
+    expect(api.create).not.toHaveBeenCalled()
+    expect(api.submit).not.toHaveBeenCalled()
+  })
+
   it('never fetches a linked workflow until its project ownership has been established', async () => {
     window.location.hash = '/workflow?project=project-a&run=foreign-run'
     renderWithProviders(<WorkflowPage />)
     expect(await screen.findByText(/The run in this link is not part of this project/)).toBeInTheDocument()
+    expect(api.graph).not.toHaveBeenCalledWith('foreign-run')
+    expect(api.preflight).not.toHaveBeenCalledWith('foreign-run')
+  })
+
+  it.each(['foreign-run', 'run-a'])('recovers failed ownership lookup without fetching unverified workflow %s', async (linkedId) => {
+    window.location.hash = `/workflow?project=project-a&run=${linkedId}`
+    api.current.mockRejectedValueOnce(new Error('Current workflow unavailable'))
+    api.runs.mockRejectedValueOnce(new Error('Project workflow list unavailable'))
+    renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByText('Project workflow list unavailable')).toBeVisible()
+    expect(screen.queryByText('Loading the current project’s workflow…')).not.toBeInTheDocument()
+    expect(api.graph).not.toHaveBeenCalledWith('foreign-run')
+    expect(api.preflight).not.toHaveBeenCalledWith('foreign-run')
+    expect(api.graph).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Retry$/ }))
+    if (linkedId === 'foreign-run') expect(await screen.findByText(/The run in this link is not part of this project/)).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Add workflow node' })).toBeEnabled()
     expect(api.graph).not.toHaveBeenCalledWith('foreign-run')
     expect(api.preflight).not.toHaveBeenCalledWith('foreign-run')
   })

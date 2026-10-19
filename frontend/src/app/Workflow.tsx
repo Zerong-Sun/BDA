@@ -700,6 +700,17 @@ function WorkflowWorkspace() {
     }
   }
 
+  // Ownership lookup failures must remain fail-closed, but recoverable. The
+  // pending guard below otherwise hides the retry action indefinitely.
+  if (!isDemoMode && projectId && linkedRunIsPending && workflowRunsQuery.isError && !workflowRunsQuery.isFetching) {
+    return <Frame variant="inverse" spacing="xs" className="bg-transparent" data-tour-id="workflow-page">
+      <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>
+      <ApiState isError error={workflowRunsQuery.error} onRetry={() => { void workflowRunsQuery.refetch(); void refetchWorkflow() }}>
+        {null}
+      </ApiState>
+    </Frame>
+  }
+
   if (!isDemoMode && projectId && (currentWorkflowLoading || linkedRunIsPending || workflowGraphLoading)) {
     return <Frame variant="inverse" spacing="xs" className="bg-transparent" data-tour-id="workflow-page">
       <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>

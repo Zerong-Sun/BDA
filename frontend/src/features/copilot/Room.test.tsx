@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useQueryClient } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -544,4 +545,41 @@ it('keeps the multiline composer before a long answer and does not send on Shift
   fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
   expect(input).toHaveValue('First line\nSecond line')
   expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+})
+
+
+it('keeps the restored project room and draft when another project feed resolves last', async () => {
+  window.location.hash = '/bots'
+  stub([])
+  useAppStore.setState({ language: 'en', copilotDraft: '', copilotSessions: {}, appMode: 'application' })
+  let release!: () => void
+  const delayed = new Promise<void>(resolve => { release = resolve })
+  let otherRequested = false
+  server.use(
+    http.get('/api/v2/projects', () => HttpResponse.json({ items: [PROJECT, { ...PROJECT, id: 'proj_other', name: 'Other project' }], next_cursor: null })),
+    http.get('/api/v2/copilot/projects/:projectId/room', async ({ params }) => {
+      if (params.projectId === 'proj_other') { otherRequested = true; await delayed }
+      const id = String(params.projectId)
+      return HttpResponse.json({ items: [{ kind: 'message', id: `message-${id}`, occurred_at: '2026-10-20T00:00:00Z', bot: 'planner', message: message({ id: `message-${id}`, content: `Conclusion for ${id}` }) }], next_cursor: null })
+    }),
+  )
+  let client!: ReturnType<typeof useQueryClient>
+  function AuditedRoom() { client = useQueryClient(); return <Room /> }
+  renderWithProviders(<AuditedRoom />)
+  expect(await screen.findByText('Conclusion for proj_test')).toBeVisible()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Say something in the room' }), { target: { value: 'Unsent project A draft' } })
+  act(() => useAppStore.getState().setActiveProjectId('proj_other'))
+  await waitFor(() => expect(otherRequested).toBe(true))
+  expect(screen.queryByText('Conclusion for proj_test')).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('')
+  act(() => useAppStore.getState().setActiveProjectId('proj_test'))
+  expect(await screen.findByText('Conclusion for proj_test')).toBeVisible()
+  await act(async () => { release(); await delayed })
+  await waitFor(() => expect(client.getQueryData(['copilot', 'room', 'proj_other', { includeArchived: false }])).toMatchObject({ pages: [{ items: [{ id: 'message-proj_other' }] }] }))
+  expect(screen.queryByText('Conclusion for proj_other')).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('Unsent project A draft')
+  for (const link of screen.getAllByRole('link')) {
+    const project = new URL(link.getAttribute('href')!, 'http://localhost').searchParams.get('project')
+    if (project) expect(project).toBe('proj_test')
+  }
 })
