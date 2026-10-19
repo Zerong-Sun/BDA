@@ -704,6 +704,12 @@ function WorkflowWorkspace() {
     return <Frame variant="inverse" spacing="xs" className="bg-transparent" data-tour-id="workflow-page">
       <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>
       <p role="status" aria-live="polite">{language === 'zh' ? '正在读取当前项目的工作流…' : 'Loading the current project’s workflow…'}</p>
+      <Frame className="min-h-96" data-tour-id="workflow-canvas" aria-busy="true" aria-label={t.shared.apiState.loadingDefault}>
+        <FramePanel className="grid gap-3 p-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="min-h-80 w-full" />
+        </FramePanel>
+      </Frame>
     </Frame>
   }
 

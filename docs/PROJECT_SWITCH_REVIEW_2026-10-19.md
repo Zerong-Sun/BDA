@@ -24,3 +24,8 @@
 - No browser page errors or application writes were observed. Authentication was permitted; model calls and research submissions were prohibited throughout. Test drafts were confined to the isolated browser.
 
 Private browser evidence and deployment backups remain outside Git. This is a frontend state/navigation verification, not a scientific validation. Main merge remains paused.
+
+## CI loading-state follow-up
+
+- The full browser matrix caught a missing canvas skeleton in the new project-loading guard. The guard correctly withheld the old workflow, but returned only a status line. It now renders a busy, accessible canvas placeholder until the current project has loaded.
+- The workflow regression asserts that the skeleton is visible while the current run is pending, disappears when the run arrives, and never exposes creation/planning controls or calls during loading. The existing 21 workflow journey checks pass.
