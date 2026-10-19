@@ -40,6 +40,27 @@ it('requires two known dates before considering progress newer than a saved repo
 
 
 describe('unsectioned legacy report excerpts', () => {
+  it('retains a hold in a heading and excludes the historical plan', () => {
+    const result = unsectionedReportOverview('# 项目已暂停\n\n用户要求暂停；以下仅为历史材料，不构成执行安排。\n\n# 历史计划\n\n下一阶段：启动计算。')
+    expect(result.next).toBe('项目已暂停')
+    expect(result.excerpt).toContain('用户要求暂停')
+    expect(result.excerpt).not.toContain('启动计算')
+  })
+  it('retains a plain prose hold over next-stage advice', () => {
+    expect(unsectionedReportOverview('当前结果：未完成。\n\n用户要求暂停，等待进一步通知。\n\n下一阶段：启动计算。').next).toBe('用户要求暂停，等待进一步通知。')
+  })
+  it('preserves preamble results and next steps when references are appended', () => {
+    expect(unsectionedReportOverview('当前结果：输入仍缺失。\n\n下一阶段：仅补齐记录。\n\n## References\nSaved source.')).toEqual({
+      excerpt: '当前结果：输入仍缺失。\n\n下一阶段：仅补齐记录。', next: '下一阶段：仅补齐记录。',
+    })
+  })
+  it('does not promote instructions or holds from historical or reference subsections', () => {
+    const result = unsectionedReportOverview('# 历史计划\n\n## Next steps\n下一步：启动旧任务。\n\n### Status\n项目已暂停。\n\n# 当前进展\n\n当前结果：等待输入。\n\n下一步：补齐输入。\n\n## References\n\n### 引用状态\n暂停旧项目。')
+    expect(result).toEqual({ excerpt: '当前结果：等待输入。\n\n下一步：补齐输入。', next: '下一步：补齐输入。' })
+  })
+  it('does not end a long code fence at a shorter fence inside it', () => {
+    expect(unsectionedReportOverview('````md\n```\n# 项目已暂停\n下一步：代码示例。\n````\n\n当前结果：输入缺失。')).toEqual({ excerpt: '当前结果：输入缺失。', next: '' })
+  })
   it('keeps the saved status, caveat and required-input list verbatim', () => {
     const result = unsectionedReportOverview('# Saved note\n\n当前结果：原始输入缺失\n\n已完成：仅来源检查，并非实验通过。\n\n待实际输入补齐：\n\n- 实际批次\n- 原始文件\n\nNot part of the next step.')
     expect(result.excerpt).toBe('当前结果：原始输入缺失\n\n已完成：仅来源检查，并非实验通过。')
@@ -58,5 +79,6 @@ describe('unsectioned legacy report excerpts', () => {
   it('does not turn code, tables or structured reports into fallback summaries', () => {
     expect(unsectionedReportOverview('```md\n下一阶段执行伪代码。\n```\n\n| table |\n|---|').excerpt).toBe('')
     expect(unsectionedReportOverview('## Methods\nProtocol only.')).toEqual({ excerpt: '', next: '' })
+    expect(unsectionedReportOverview('## Next steps\nNext step: collect inputs.')).toEqual({ excerpt: '', next: '' })
   })
 })

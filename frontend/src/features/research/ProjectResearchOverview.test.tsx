@@ -157,3 +157,39 @@ describe('archived research overview', () => {
 it('does not interpret fenced report code or reference headings as overview sections', () => {
   expect(reviewSections('## Research objective\nKeep this.\n```md\n## Not a heading\n```\n## References\nSource.')).toEqual([{ title: 'Research objective', body: 'Keep this.\n```md\n## Not a heading\n```' }])
 })
+
+describe('latest saved progress precedence', () => {
+  it('does not fill newer progress without next steps with an old report instruction', async () => {
+    respond('## Results\nOld result.\n## Next steps\nProceed with old plan.')
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'progress', title: 'Latest progress', status: 'progress_note', updated_at: '2026-10-19T00:00:00Z', content: '## Results\nCurrent result needs validation.' }], next_cursor: null })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    expect(await screen.findByText('Current result needs validation.')).toBeVisible()
+    expect(screen.queryByText('Proceed with old plan.')).not.toBeInTheDocument()
+    expect(screen.getByText(/previous report instructions are not current next steps/)).toBeVisible()
+  })
+  it.each(['# 项目已暂停\n\n用户要求暂停；以下仅为历史材料。', '用户要求暂停；以下仅为历史材料。'])('keeps current hold ahead of structured historical plans: %s', async hold => {
+    respond(`${hold}\n\n# 历史计划\n\n## Next steps\n下一阶段：启动计算。`)
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    const next = await screen.findByRole('region', { name: 'Open questions and advancement conditions' })
+    expect(within(next).getByText(/暂停/)).toBeVisible()
+    expect(within(next).queryByText('下一阶段：启动计算。')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Full report and cited sources' })).toHaveAttribute('aria-expanded', 'false')
+  })
+  it('shows preamble results and next steps while references remain collapsed', async () => {
+    respond('当前结果：输入仍缺失。\n\n下一阶段：仅补齐记录。\n\n## References\nSaved source only.')
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    const results = await screen.findByRole('region', { name: 'Project results' })
+    expect(within(results).getByText('当前结果：输入仍缺失。')).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Open questions and advancement conditions' })).getByText('下一阶段：仅补齐记录。')).toBeVisible()
+    expect(screen.queryByText('Saved source only.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Full report and cited sources' })).toHaveAttribute('aria-expanded', 'false')
+  })
+  it('does not hide newer failure prose behind an older positive report', async () => {
+    respond('## Results\nPrevious result passed.\n## Next steps\nProceed to the next stage.')
+    server.use(http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [{ id: 'new-failure', title: 'Latest failure record', status: 'progress_note', updated_at: '2026-10-19T00:00:00Z', content: '# Latest progress\n\nThe latest validation failed. Stop the next stage.' }], next_cursor: null })))
+    renderWithProviders(<ProjectResearchOverview project={{ ...project, status: 'active' }} />)
+    await screen.findByRole('button', { name: 'Read latest progress' })
+    expect(within(screen.getByRole('region', { name: 'Project results' })).getByText('The latest validation failed. Stop the next stage.')).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Open questions and advancement conditions' })).queryByText('Proceed to the next stage.')).not.toBeInTheDocument()
+  })
+})
