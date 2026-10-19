@@ -147,6 +147,28 @@ describe('ResearchPage', () => {
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
   })
 
+  it('retains focused tabs when a deep-linked project finishes loading', async () => {
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    server.use(http.get('/api/v2/projects', async () => {
+      await pending
+      return HttpResponse.json({ items: [project], next_cursor: null })
+    }))
+    renderWithProviders(<ResearchPage />)
+    const goals = within(nav()).getByRole('tab', { name: englishGroups[0] })
+    const evidence = within(nav()).getByRole('tab', { name: englishGroups[1] })
+    goals.focus()
+    fireEvent.keyDown(goals, { key: 'ArrowRight' })
+    try {
+      await waitFor(() => expect(evidence).toHaveFocus())
+    } finally {
+      release()
+    }
+    await screen.findByTestId('decision-center')
+    expect(within(nav()).getByRole('tab', { name: englishGroups[1] })).toBe(evidence)
+    expect(evidence).toHaveFocus()
+  })
+
   it('passes the confirmed brief into the decision record', async () => {
     window.location.hash = '/research?project=proj_research&tab=timeline'
     renderWithProviders(<ResearchPage />)

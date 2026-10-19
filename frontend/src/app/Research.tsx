@@ -23,7 +23,10 @@ import { isDemoProject } from '../features/tour'
 
 export function ResearchPage() {
   const { projectId } = useProjectContext()
-  return <ProjectResearchPage key={projectId} />
+  const [searchParams] = useSearchParams()
+  // Resolving a deep link must not remount focused controls. Data requests still
+  // use the validated projectId inside the page; a different project resets it.
+  return <ProjectResearchPage key={projectId || searchParams.get('project') || ''} />
 }
 
 function ProjectResearchPage() {

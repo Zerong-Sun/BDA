@@ -1,5 +1,15 @@
 # Project switching review — 2026-10-19
 
+状态：已核验记录
+
+最后核验：2026-10-19
+
+权威范围：本记录所列前端行为、修复与验收范围；不代表 main 已合并或科学结论已验证。
+
+数据来源：对应提交、自动化测试及本地浏览器验收；私有运行证据保存在仓库外。
+
+替代关系：补充近期更新与前端验收记录，不替代运行时状态及原始项目报告。
+
 ## Findings and changes
 
 - While a destination workflow was still loading, its page could briefly offer a blank workflow/route planner. The page now waits for current-run, linked-run ownership and graph loading before presenting the workspace. No creation or planning call is made by loading the page.
