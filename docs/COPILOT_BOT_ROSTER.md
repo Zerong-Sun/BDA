@@ -1,8 +1,50 @@
 # BDA Copilot Bot Roster
 
+状态：有效。
+最后核验：2026-10-16（合入前代码与本地回归）。
+权威范围：Bot 角色、任务授权边界与团队调度行为；不证明模型输出的科学正确性。
+数据来源：backend_v2/app/copilot/ 与对应本地回归测试。
+替代关系：维护当前文件；不替代原始研究记录。
+
+## Team chat coordination (2026-10-16)
+
+The project room defaults to **Project Lead / 项目负责人**. Its specialists are
+Evidence Researcher / 文献研究员, Design Scientist / 方案设计师, Compute Engineer /
+计算工程师, Data Analyst / 数据分析师 and Scientific Reviewer / 科学审阅员.
+Stable bot IDs and historical records are preserved; previous display names remain
+valid mentions through the served `aliases` field, including multi-word English names.
+
+Following [Grok Bot's coordination design](https://x.ai/news/designing-grok-bot),
+the user gives a goal to the lead in the group, can address any specialist directly,
+and can inspect actual assignments, public discussion, outcomes and decision cards.
+`start_team_task` promotes an action request into one durable root per source message;
+advice and negated requests do not start it. The original user request remains the
+write mandate. Starting a task is an audited write, excluded from read-only transports;
+an existing task marker must match the source's project, actor, conversation and goal.
+Already authorized work proceeds without requesting the same permission again.
+All members can read the shared discussion with `read_team_progress`.
+The lead delegates to specialists and the
+fixed independent reviewer, and resumes when children finish. Reviewers still cannot
+repair research records or recursively delegate.
+After chat starts a task, the background worker continues automatically. Reviewers
+receive the final delivery separately from the recorded tool evidence, with explicit
+truncation markers if either exceeds its reading limit.
+
+`request_decision` now creates a durable `decision` wait when called by a run.
+Answering or withdrawing settles that wait and re-enqueues the run through the outbox.
+Cancellation prevents revival, and neither a choice nor a delegated instruction expands
+write authorization. Existing turn and cost limits still apply; reaching them is a
+reported stop, never a claim that the scientific objective has been achieved.
+
+The room projects assistant turns from durable runs as `discussion` events, excludes
+reasoning/system/tool internals, and renders structured deliveries as readable text.
+Older discussion is paginated, and children remain visible when their parent is on
+another page. The user can open the source task for evidence. No discussion is fabricated.
+
+
 状态：活跃
 
-最后核验：2026-09-14（Asia/Shanghai；名册由 12 个合并为 6 个：researcher、planner、runner、analyst 吸收原有产出型 bot，auditor 吸收 steward；退役 id 仅用于读取历史。本轮新增 `structure-interaction` 能力（planner 独有）与 `request_decision` 工具（随 `chain-messaging` 授予全员））
+最后核验：2026-10-14（核对当前六个 bot、结构/仪器工具与注册表数量；2026-09-14 的名册合并历史保留在下文，退役 id 仅用于读取历史）
 
 权威范围：Copilot bot 名册、各 bot 的职责边界、交接协议，以及 bot 可用的 skill/MCP 清单。
 
@@ -62,12 +104,12 @@ stated in a charter; the argument and its rules are in
 
 | # | Bot | 中文 | Stance | Owns | Capabilities | Hands off to | Absorbed |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | `conductor` | 总调度 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
-| 1 | `researcher` | 研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
-| 2 | `planner` | 方案设计 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
-| 3 | `runner` | 执行与排障 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
-| 4 | `analyst` | 解读与归档 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
-| — | `auditor` | 复核 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
+| — | `conductor` | 项目负责人 | direct | Deciding which operator works next, delegating to it, and saying when the chain stops | `project-read`, `research-read`, `chain-orchestration`, `chain-messaging` | `auditor` | — |
+| 1 | `researcher` | 文献研究员 | produce | A falsifiable question, its literature with retrievable provenance, and target identity | `project-read`, `research-read`, `knowledge-authoring`, `literature-search`, `patent-search`, `druggability-assessment`, `target-intelligence`, `research-gap-repair`, `chain-messaging` | `planner` | `briefing`, `librarian`, `scout` |
+| 2 | `planner` | 方案设计师 | produce | Reading structures at residue level, pointing at them, choosing the route and drafting its compute | `project-read`, `research-read`, `structure-analysis`, `structure-interaction`, `sequence-analysis`, `workflow-planning`, `compute-drafting`, `chain-messaging` | `runner`, `analyst` | `structuralist` |
+| 3 | `runner` | 计算工程师 | produce | Carrying a confirmed run across its waits and explaining failures from recorded evidence | `project-read`, `workflow-planning`, `agent-orchestration`, `failure-diagnosis`, `chain-messaging` | `planner`, `analyst` | `medic` |
+| 4 | `analyst` | 数据分析师 | produce | Interpreting recorded results and recording what was decided on which evidence | `project-read`, `research-read`, `result-interpretation`, `sequence-analysis`, `wetlab-read`, `wetlab-authoring`, `research-trace-authoring`, `knowledge-authoring`, `chain-messaging` | `researcher`, `planner` | `archivist` |
+| — | `auditor` | 科学审阅员 | review | Ruling on claims against evidence and charter, and on a draft's declared resources | `project-read`, `research-read`, `review-audit`, `chain-messaging` | `conductor`, `planner` | `steward` |
 
 Retired ids are listed in `bots.RETIRED`. Runs and handoffs recorded under them
 are history and are not rewritten: `bots.get` resolves a retired id to its
@@ -178,25 +220,25 @@ and no module descriptor. Structures arrive as artifacts, which are already
 write-once and checksummed; a second table would only be somewhere for a copy to
 go stale.
 
-Five tools:
+Six read tools, verified against the registry on 2026-10-14:
 
 | Tool | Answers |
 | --- | --- |
 | `analyse_structure` | What is in this file: format, chains, residue counts, per-chain one-letter sequence, numbering gaps, ligands and solvent counted separately, disulfides, and a pLDDT or B-factor summary |
-| `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and its distance — the interface, as measurements |
+| `list_structure_residues` | Filter residue identities by side-chain charge convention or geometric interface membership, preserving author chain, residue number and insertion code; HIS is protonation-dependent |
+| `list_structure_contacts` | Which residues of one chain lie within a cutoff of another, with the closest atom pair and distance calculated from the source coordinates |
 | `measure_structure_interface` | How much surface two chains bury and what the contact is made of: buried area per side, the conventional interface area, per-residue burial, hydrogen bonds (donor/acceptor distance, no angle term - hydrogens are absent), salt bridges, hydrophobic fraction. Buried area is not an affinity |
 | `compare_structures` | Fit one structure onto another: C-alpha RMSD before and after the fit, the residues that moved most, and a TM-score where its formula is defined. Residues are paired by author numbering, so a file missing a loop still compares; the TM-score is evaluated on this superposition and is not TM-align |
 | `describe_structure_site` | Which residues lie within a radius of a named site (a residue, or a ligand by component code), with distances — the pocket, as measurements |
 
-`structuralist` pairs this with `project-read` and nothing else, and the pairing
-is load-bearing rather than incidental: the structure tools all take an
+`planner` pairs this with `project-read`: the structure tools all take an
 `artifact_id`, and `project-read` is the bot's only route to one. Targets carry
 `structure_artifact_id`; candidates carry both `structure_artifact_id` and
 `complex_artifact_id`, and the second is what an interface question is actually
-asked about. Drop `project-read` from this bot and it keeps three tools it can
+asked about. Drop `project-read` from this bot and it keeps structure tools it can
 never supply an argument to.
 
-All three are `execution_mode="read"` under capability `structure-analysis`, and
+All six are `execution_mode="read"` under capability `structure-analysis`, and
 therefore appear on the MCP surface automatically: an external MCP client holding
 a grant for a project can analyse that project's structures with no new transport
 code.
@@ -277,32 +319,27 @@ vocabulary is what turns it on in chat, deliberately and one at a time.
 
 ## Skill and MCP inventory
 
-“Skill” in this repository means one capability id, and the capability is what
-grants tools. After this change the full list is:
+The `wetlab-authoring` capability includes read-only `preview_bli_artifact`:
+it verifies a completed artifact's SHA-256 and previews measured-trace fitting
+separately from instrument-reported kinetics. `analyse_bli_run` saves a new
+analysis with the source hash, processing choices, plot snapshot and optional
+superseded-result link; it never rewrites raw data. Kinetic triplet sample maps
+and phase switches must be explicit. A perfect fit to instrument-derived KObs
+values is not independent experimental validation or a confidence interval.
 
-| Capability (skill) | Mode | Tools | Bots that hold it |
-| --- | --- | --- | --- |
-| `agent-orchestration` | read (async) | `await_compute_job`, `spawn_subagent` | runner |
-| `chain-orchestration` | read (async) | `list_operators`, `delegate_to_operator` | conductor |
-| `failure-diagnosis` | read | `get_compute_status`, `diagnose_compute_failure` | runner |
-| `project-read` | read | `list_project_targets`, `list_project_candidates`, `list_experiment_results`, `get_workflow_status`, `get_compute_status` | conductor, researcher, planner, runner, analyst, auditor |
-| `research-read` | read | `research_overview`, `search_research`, `get_research_items`, `get_dataset_slice`, `get_reference`, `get_reference_content`, `list_research_goals` | conductor, researcher, planner, analyst, auditor |
-| `result-interpretation` | read | `list_project_candidates`, `list_experiment_results` | analyst |
-| `review-audit` | read | `list_operator_charters`, `read_operator_work`, `review_compute_declaration` | auditor |
-| `structure-analysis` | read | `analyse_structure`, `list_structure_contacts`, `describe_structure_site` | planner |
-| `wetlab-read` | read | `list_proteins`, `compute_concentration`, `plan_dilution_series` | analyst |
-| `chain-messaging` | draft | `post_handoff`, `read_handoffs` | conductor, researcher, planner, runner, analyst, auditor |
-| `compute-drafting` | draft | `get_compute_status`, `create_compute_draft` | planner |
-| `knowledge-authoring` | draft | `search_project_knowledge`, `create_knowledge_draft` | researcher, analyst |
-| `research-trace-authoring` | draft | `attach_to_research_goal` | analyst |
-| `wetlab-authoring` | draft | `promote_candidate_to_bench`, `analyse_bli_run`, `analyse_akta_run`, `analyse_enzyme_plate` | analyst |
-| `workflow-planning` | draft | `get_workflow_status` | planner, runner |
-| `literature-search` | queue | `start_literature_search` | researcher |
-| `research-gap-repair` | queue | `resolve_research_gaps` | researcher |
-| `target-intelligence` | queue | `start_target_intelligence` | researcher |
+“Skill” means one capability id. Importing `copilot.tools` and reading
+`REGISTRY.all()` plus `COPILOT_CAPABILITIES` on 2026-10-15 gives
+22 capabilities and 59 tools: 41 read, 12 draft and 6 queue.
+`get_reference_evidence_packet` reads bounded source windows;
+`save_literature_analysis` writes an explicitly authorized, version-checked draft.
+New literature recipes use contract version 2 and require per-paper figure and
+data coverage. Existing contracts retain their saved requirements.
+Capability descriptions are in [the service guide](COPILOT_SERVICE_GUIDE.md#7-开发者能力与模型工具清单);
+the [versioned workflow guide](VERSIONED_INSTRUMENT_BOT_WORKFLOW.md) covers current
+BLI review, residue identity and report/source links.
+The six operators' ownership is listed above; a task or project grant may narrow it.
 
-Everything in that table is reachable over MCP except the two async ones.
-`agent-orchestration` and `chain-orchestration` are excluded by construction:
+MCP filters individual tools by their required execution context:
 `await_compute_job`, `spawn_subagent` and `delegate_to_operator` declare
 `requires="agent_run"`, an MCP client has no run to suspend, and `mcp.py`
 refuses to list them. `runner` and `conductor` are therefore the two operators
@@ -310,8 +347,7 @@ whose full capability set exists only inside a durable agent run — `conductor`
 can read the roster and the handover record from chat, and can only recommend an
 operator there rather than delegate to one.
 
-`chain-messaging` is a `draft` capability that an unbound MCP grant still does
-not get: `mcp.available_tools` degrades such a grant with `REGISTRY.write_ids()`,
+The write tools in `chain-messaging` are unavailable to an unbound MCP grant: `mcp.available_tools` degrades such a grant with `REGISTRY.write_ids()`,
 which is the conservative set and includes `post_handoff`. The narrower
 `user_intent_write_ids()` — the set the chat intent gate filters — is the one
 that excludes it, and it has to be asked for by name.
@@ -448,7 +484,7 @@ Each of these holds, and has a test that fails when it stops holding.
 | 13 | `diagnose_compute_failure` refuses a job id from another project | `test_compute_diagnosis.py` |
 | 14 | The new capabilities reach an external MCP client with no transport code of their own | `test_copilot_mcp.py` |
 | 15 | The chat sends a selected bot instead of a matched skill and never both; a roster that failed to load leaves the chat working, unhinted | `CopilotChat.test.tsx`, `bots/registry.test.ts` |
-| 16 | A `review` bot declaring a write capability, a `direct` bot declaring one, a stance-only capability on the wrong stance, and review or delegation aimed at a non-producer all fail at import | `test_copilot_bots.py` |
+| 16 | A `review` bot declaring a write capability, a `direct` bot declaring one, a stance-only capability on the wrong stance, and review aimed at a non-producer or delegation aimed at another director all fail at import | `test_copilot_bots.py` |
 | 17 | Every producer is reviewed by somebody, and no producer names its own reviewer | `test_copilot_bots.py` |
 | 18 | Every operator that hands off holds `chain-messaging`, so no charter names a step the platform cannot take | `test_copilot_bots.py` |
 | 19 | A delegated run is owned by the target operator and keeps the tools that define it; a subagent of the *same* operator is still bounded by its parent | `test_copilot_chain.py` |
@@ -649,3 +685,47 @@ API 只对外给 sha256，一个把明文回传给模型的工具会一行之内
 另外两条：判据会带上**是哪一行指标定的**（method 与 assessor），所以"设计模型给自己打的分"
 不会被洗成独立验证；一条不声明任何 tier 的路线（比如 structure-acquisition，它约束的是
 ensemble 大小而不是 binder 质量）会被明确拒绝，而不是返回一个读起来像"全过"的空结论。
+
+## Persistent work records
+
+All six operators can use the read-only `search_bot_records` tool through
+`project-read`. Queries require a named bot and are confined to the current
+project; `query`, `limit` and `offset` support workflow IDs, evidence IDs and text.
+The Bot responsibility page has a **Work records** tab with search and a full
+Markdown download. The endpoints are
+`GET /api/v2/copilot/projects/{project_id}/bots/{bot_id}/records` and
+`GET /api/v2/copilot/projects/{project_id}/bots/{bot_id}/records.md`.
+Both require project access. Reading never invokes a provider or rewrites history.
+
+Assistant messages and durable agent run/turn changes create transactional,
+content-addressed Markdown revisions in existing `KnowledgeEntry` rows of type
+`bot_work_record`. Failures, source IDs, timestamps, explicit workflow/evidence
+references and run outcomes are retained; private reasoning and raw tool results
+are not copied. Only the exact recorded bot owns an entry. A workflow reference
+is a reference, not proof that the bot executed or completed it. Existing imported
+Markdown notes remain historical knowledge and are not journal input.
+
+For existing installations, an authorized maintenance transaction may call
+`copilot.records.refresh_project_records(session, project_id, actor_id)` for each
+accessible project and commit. Repeating this with unchanged sources creates no
+new revision. No database migration is required. New events update records in the
+source transaction, so an uncommitted or rolled-back source has no journal entry.
+
+## Model call admission
+
+Each root task and its child bots, queued research work, repairs and reviews share
+a hard maximum of six provider requests and CNY 1 of conservative reservations.
+Continuations do not replenish either allowance. Provider requests have a 4,096
+output-token ceiling and never automatically retry HTTP/network failures. A durable
+request fingerprint prevents replay after timeouts, crashes or transaction rollback.
+Identical recent task submissions are rejected before creating another task.
+
+The internal ledger commits before network I/O and stores only hashes, call counts,
+reservations and reported token usage. Missing usage is unknown; reservations are
+not refunded. Existing tasks without a reliable ledger cannot resume as if free.
+Prices must be administrator-verified CNY peak uncached rates for the exact model
+and endpoint, checked within 30 days, in `config.bda_pricing`: `model`, `endpoint`,
+`checked_at`, `input_cny_per_million`, `output_cny_per_million`. Missing/stale prices
+block calls. Limits apply before the request; this ledger is not a provider invoice.
+Bot screens show task results and process records, without billing displays or
+editable spending limits. Reading saved records never triggers a model request.

@@ -61,7 +61,7 @@ def test_search_hits_and_untraced_excerpts_do_not_satisfy_literature():
     contract = build_contract("literature", [])
     turns = [_turn("search_research", [{"title": "Found"}]), _turn("get_reference_content", [{"title": "Found"}], 'e2')]
     assert progress(contract, turns)[1]['status'] == 'pending'
-    turns[1] = _turn('get_reference_content', [{'data': {'chunk_id': 'c', 'content_provenance': {'content_checksum_sha256': 'checksum', 'retrieval_trace_id': 'trace'}}}], 'e2')
+    turns[1] = _turn('get_reference_content', [{'data': {'chunk_id': 'c', 'content': 'Saved evidence text.', 'content_provenance': {'content_checksum_sha256': 'checksum', 'retrieval_trace_id': 'trace'}}}], 'e2')
     assert progress(contract, turns)[1]['status'] == 'completed'
     # Citing discovery alone is not enough to cover the excerpt step.
     run = SimpleNamespace(task_contract=contract)
@@ -158,7 +158,7 @@ def test_literature_steps_do_not_allow_saving_before_reading():
     from backend_v2.app.copilot.task_contracts import available_step_tools
     run = SimpleNamespace(task_contract=build_contract('literature', ['start_literature_search', 'create_knowledge_draft']),
                           allowed_tools=['start_literature_search', 'get_reference_content', 'create_knowledge_draft', 'research_overview'])
-    assert available_step_tools(run, []) == {'start_literature_search', 'research_overview'}
+    assert available_step_tools(run, []) == {'start_literature_search', 'research_overview', 'get_reference_content'}
     turns = [_turn('start_literature_search', {'status': 'succeeded'})]
     assert 'get_reference_content' in available_step_tools(run, turns)
     assert 'create_knowledge_draft' not in available_step_tools(run, turns)
@@ -204,7 +204,7 @@ def test_scientific_review_covers_all_sections_and_rejects_invented_refs(session
     run = _run(session, project, user, task_contract=build_contract('literature', []))
     for name, data, call_id in [
         ('search_research', [{'id': 'reference'}], 'e1'),
-        ('get_reference_content', [{'chunk_id': 'chunk', 'content_checksum_sha256': 'checksum', 'retrieval_trace_id': 'trace'}], 'e2'),
+        ('get_reference_content', [{'chunk_id': 'chunk', 'content': 'Saved evidence text.', 'content_checksum_sha256': 'checksum', 'retrieval_trace_id': 'trace'}], 'e2'),
     ]:
         agent_runs.append_turn(session, run, role='assistant', tool_calls=[_call(call_id, name, {})])
         agent_runs.append_turn(session, run, role='tool', content=json.dumps(data), tool_calls=[{'name': name, 'tool_call_id': call_id}])
@@ -288,3 +288,40 @@ def test_malformed_excerpt_provenance_is_pending_instead_of_crashing(provenance)
     result = {"chunk_id": "chunk", "content_provenance": provenance}
     rows = progress(build_contract("literature", []), [_turn("get_reference_content", result)])
     assert rows[1]["status"] == "pending"
+
+
+def test_identical_task_submission_is_blocked_without_a_second_run(session, monkeypatch):
+    from backend_v2.app.copilot.models import CopilotAgentRun
+    from sqlalchemy import func, select
+    project, user = _project(session)
+    payload = AgentRunCreate(project_id=project.id, goal='One bounded read-only task', authorized_writes=[])
+    first, _ = start_agent_run(session, project, user, payload)
+    assert first.max_turns == 6
+    # Runtime accounting metadata must not turn the same request into new work.
+    first.task_contract = {**first.task_contract, 'cost_mode': 'unavailable'}
+    session.flush()
+    with pytest.raises(DomainError) as exc:
+        start_agent_run(session, project, user, payload)
+    assert exc.value.error_code == 'copilot_duplicate_task'
+    assert session.scalar(select(func.count()).select_from(CopilotAgentRun)) == 1
+
+
+def test_continuation_never_replenishes_call_limit(session):
+    project, user = _project(session)
+    run = _run(session, project, user, max_turns=6)
+    agent_runs.append_turn(session, run, role='assistant', content='Need a target')
+    agent_runs.finish(session, run, status='succeeded')
+    continue_agent_run(session, run, user, 'Use the existing target')
+    assert run.max_turns == 6
+    for _ in range(5):
+        agent_runs.append_turn(session, run, role='assistant', content='Existing receipt')
+    agent_runs.finish(session, run, status='failed')
+    with pytest.raises(DomainError) as exc:
+        continue_agent_run(session, run, user, 'Try again')
+    assert exc.value.error_code == 'copilot_task_turn_limit'
+
+
+def test_task_request_cannot_raise_six_call_ceiling():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        AgentRunCreate(project_id='00000000-0000-0000-0000-000000000001', goal='A bounded request', max_turns=80)

@@ -1,20 +1,24 @@
 import { getTranslations } from '../../lib/i18n'
-import { matchBot, useCopilotBots } from './bots/registry'
+import { useCopilotBots } from './bots/registry'
 import { copilotHandoffsQueryKey } from './handoffs'
 import { getLatestCopilotMode, streamCopilotMessage, toCopilotApiMessages } from '../../lib/api/copilot'
 import { legacyCopilotIntro, useAppStore, type CopilotChatMessage } from '../../lib/store/appStore'
 import { detectReviewIntent } from '../research/reviewIntent'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { requireCopilotWrite } from './commandAccess'
 
 const MAX_COPILOT_HISTORY = 20
+const EMPTY_MESSAGES: CopilotChatMessage[] = []
 export type CopilotLoadingStage = 'idle' | 'connecting' | 'thinking' | 'tool' | 'streaming'
 
 function explainCopilotError(err: unknown): string {
-  const { t, format } = getTranslations()
+  const { t, format, language } = getTranslations()
   const e = t.copilot.errors
   const raw = err instanceof Error ? err.message : e.requestFailed
+  if (raw === 'copilot_wait_timeout') return language === 'zh'
+    ? '等待回复超时。消息可能仍在后台处理，请先查看研究室中的回复再决定是否重新发送。'
+    : 'Waiting for the reply timed out. Your message may still be processing. Check the research room before sending again.'
   if (raw.includes('Failed to fetch') || raw.includes('NetworkError')) {
     return e.connectionFailed
   }
@@ -30,8 +34,9 @@ function explainCopilotError(err: unknown): string {
 export function useCopilotChat(projectId?: string, pageContext?: string, language: 'en' | 'zh' = 'en') {
   const queryClient = useQueryClient()
   const session = useAppStore((state) => projectId ? state.copilotSessions[projectId] : undefined)
-  const legacyMessages = useAppStore((state) => state.copilotMessages)
-  const messages = session?.messages ?? legacyMessages
+  // Unscoped legacy history has no trustworthy project owner. Never attach it
+  // to whichever project happens to open first, or send it as that team's context.
+  const messages = session?.messages ?? EMPTY_MESSAGES
   const conversationId = session?.conversationId ?? null
   const setLegacyMessages = useAppStore((state) => state.setCopilotMessages)
   const setSessionMessages = useAppStore((state) => state.setCopilotSessionMessages)
@@ -43,8 +48,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   ) => {
     const state = useAppStore.getState()
     const current = projectId
-      ? state.copilotSessions[projectId]?.messages ?? state.copilotMessages
-      : state.copilotMessages
+      ? state.copilotSessions[projectId]?.messages ?? EMPTY_MESSAGES
+      : EMPTY_MESSAGES
     const resolved = typeof next === 'function' ? next(current) : next
     if (projectId) setSessionMessages(projectId, resolved)
     else setLegacyMessages(resolved)
@@ -53,15 +58,6 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     if (projectId) resetSession(projectId)
     else setLegacyMessages([])
   }
-  useEffect(() => {
-    if (!projectId) return
-    const state = useAppStore.getState()
-    const existing = state.copilotSessions[projectId]
-    if (existing) return
-    const migratedMessages = state.copilotMessages
-    setSessionMessages(projectId, migratedMessages)
-    setLegacyMessages([])
-  }, [projectId, setLegacyMessages, setSessionMessages])
   const loading = Boolean(session?.pending)
   const loadingStage: CopilotLoadingStage = session?.pending?.stage ?? 'idle'
   const loadingDetail = session?.pending?.detail ?? null
@@ -73,6 +69,11 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   // phase of work is several messages long, so component state quietly sent the
   // operator back to Auto whenever the user looked at a page.
   const bot = session?.bot ?? null
+  const mode = session?.mode ?? 'general'
+  const setSessionMode = useAppStore((state) => state.setCopilotSessionMode)
+  const setMode = (next: 'general' | 'bench') => {
+    if (projectId) setSessionMode(projectId, next)
+  }
   const setSessionBot = useAppStore((state) => state.setCopilotSessionBot)
   const setBot = (next: string | null) => {
     if (projectId) setSessionBot(projectId, next)
@@ -104,21 +105,15 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
       if (isCurrent()) setRequest(projectId, { id: requestId, stage, detail })
     }
 
-    // One narrowing hint, derived from the served roster. There used to be a
-    // second - a hand-written capability list in `skills/registry.ts` with its
-    // own bilingual triggers, consulted when no bot matched. It was a copy of
-    // the backend's capability ids maintained beside the roster that already
-    // describes the same routing, and a copy is what drifts: its `systemPrompt`
-    // field was populated for all nine entries and read by nothing. Its
-    // vocabulary now lives on the operators that own it.
-    // An address for this turn, then the operator the room is scoped to, then
-    // the served roster's own triggers. Each is a narrowing hint the server
-    // intersects with the project's capabilities; none of them can widen a turn.
-    const activeBot = options?.bot ?? bot ?? matchBot(trimmed, bots ?? [])?.id
-    const reviewIntent = detectReviewIntent(trimmed)
+    // A direct address or selected member wins. Otherwise the project lead
+    // owns the group conversation, even while the roster is loading.
+    const skill = mode === 'bench' ? 'wetlab-read' : undefined
+    const activeBot = skill ? undefined : options?.bot ?? bot ?? 'conductor'
+    const reviewIntent = !skill && detectReviewIntent(trimmed)
     const nextMessages: CopilotChatMessage[] = [
       ...usableMessages,
       {
+        id: requestId,
         role: 'user',
         content: trimmed,
         ...(reviewIntent ? { meta: { reviewIntent: true } } : {}),
@@ -132,10 +127,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
     const payload = {
       messages: toCopilotApiMessages(scopedMessages),
       project_id: projectId,
-      // `skill` stays on the request contract - an agent run, an MCP grant or
-      // another client may still narrow to one capability - and this UI simply
-      // no longer guesses one. Sending neither means the project's configured
-      // set, which is the documented undifferentiated case.
+      // Explicit calculation mode narrows the turn; never send both hints.
+      skill,
       bot: activeBot,
       conversation_id: conversationId,
       intent: reviewIntent ? 'review_section' as const : 'chat' as const,
@@ -154,7 +147,9 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         streamed += chunk
         writeMessages((prev) => {
           const copy = [...prev]
-          copy[copy.length - 1] = { role: 'assistant', content: streamed }
+          // JSON SSE sends metadata before the matching text chunk. Preserve
+          // that metadata so the final answer retains citations and tool links.
+          copy[copy.length - 1] = { ...copy[copy.length - 1], role: 'assistant', content: streamed }
           return copy
         })
       }, (stage) => {
@@ -170,6 +165,7 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         writeMessages((prev) => {
           const copy = [...prev]
           copy[copy.length - 1] = {
+            id: message.id,
             role: 'assistant',
             content: message.content,
             meta: { citations: message.citations, toolCalls: message.tool_calls },
@@ -183,6 +179,14 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
         if ((message.tool_calls ?? []).some((call) => call?.name === 'post_handoff')) {
           void queryClient.invalidateQueries({ queryKey: copilotHandoffsQueryKey(projectId ?? null) })
         }
+      }, (accepted) => {
+        if (!isCurrent()) return
+        // Remember acceptance before waiting for a reply, including when the
+        // stream later disconnects. The room uses the same id to deduplicate.
+        setConversationId(projectId, accepted.conversationId)
+        writeMessages((prev) => prev.map((message) => message.id === requestId
+          ? { ...message, id: accepted.messageId || requestId }
+          : message))
       })
       if (!isCurrent()) return
       setConversationId(projectId, accepted.conversationId)
@@ -208,7 +212,8 @@ export function useCopilotChat(projectId?: string, pageContext?: string, languag
   }
 
   return {
-    messages: usableMessages, loading, loadingStage, loadingDetail, error, send, resetMessages,
-    lastMode, bots: bots ?? [], bot, setBot,
+    messages: usableMessages, pendingMessages: loading ? messages.slice(-2) : [],
+    loading, loadingStage, loadingDetail, error, send, resetMessages,
+    lastMode, bots: bots ?? [], bot, setBot, mode, setMode,
   }
 }

@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-09-07（Asia/Shanghai；更新页面、提交、预览及 Copilot 交接说明）
+最后核验：2026-10-11（决策、科研方法、学习、实验质控、扩展中心和浅色主题）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -14,7 +14,7 @@
 
 交付目标为桌面网页版，同时覆盖新手引导与专业操作。页面布局、工作流画布、Copilot 和验收均以桌面浏览器为重点；手机端不在当前开发与交付范围内。浏览器验收默认只运行桌面用例。
 
-前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
+前端使用 React 19、TypeScript、Vite、TanStack Query、Zustand、React Flow、Mol*、Tailwind CSS 与 Zod。主要页面为 Projects、Bots、Workflow、Candidates、Results、Research、Lab、Timeline、Learning、Extensions 和无需项目的工具箱，以及全局 Copilot/Settings 抽屉。默认新手路径及 Research 四分区见[使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 项目上下文使用 UUID；一个项目可包含多个 target，并以 primary target 兼容旧的单目标视图。Candidates 在没有项目时禁止发起查询，避免空项目串数据。
 
@@ -54,13 +54,19 @@ target structure、candidate structure、script asset、实验导入和 dossier 
 
 ## 6. 科研与 Copilot
 
+本轮 [能力升级](PLATFORM_CAPABILITY_UPGRADE.md) 增加目标页决策条件、原文反证、Bot 方法包、学习评测、仪器结果审核与 `/extensions` 能力准备检查。扩展页面明确区分声明、运行证据与科研有效性，不把未来适配呈现为已可执行。
+
+文献页使用[论据工作台](LITERATURE_EVIDENCE_WORKBENCH.md)：书目目录与原文论据并列，支持按论点跨文献对照、精确摘录、解释与边界编辑、人工复核和 Markdown 导出。自动拆句仍位于旧的检索操作区；不会冒充整理完成的论据。
+
+Research 的研究笔记提供六段阅读导览：科学问题、机制与原理、技术路线、验证与风险、判断与下一步、文献依据。筛选在已加载的项目记录中完成，支持检索正文、疑点和引用；全部记录保留未知扩展章节。计数表示记录数量，不表示科学验证进度；没有匹配记录时可清除筛选或为当前环节补充依据，不能据此判定研究失败。
+
 Campaign、Literature、Intelligence、Registry、Knowledge 使用各自领域路径；Copilot 不再承载 Literature 等跨域旧接口。Copilot chat 先返回 202 conversation/message，再连接 conversation SSE；连接前后不依赖长持有数据库会话。
 
 聊天、后台 agent、任务书/决策树草案、外部检索和作业执行走异步任务；模型连接测试及路线推荐在当前 HTTP 请求中调用模型。前端按各自契约展示等待和失败，不把预测或 LLM 总结标记为实验事实，审核页面保留证据来源、置信度、限制与人工 decision。
 
 默认 Copilot 使用统一任务工作区，简单问题进入对话，连续任务预览步骤和授权；旧聊天/后台任务的切换不再作为首层入口。交付状态优先于 runner 状态，技术轮次默认折叠。
 
-各入口的实际服务、13 类能力、29 个工具及完整 Copilot HTTP 接口见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)。页面 AI、模型工具和用户确认后的执行接口有不同权限与副作用，不应混为一类服务。
+各入口的实际服务、能力权限、工具及 Copilot HTTP 接口见 [Copilot 服务指南](COPILOT_SERVICE_GUIDE.md)。页面 AI、模型工具和用户确认后的执行接口有不同权限与副作用，不应混为一类服务。
 
 ## 7. 历史 URL
 
@@ -89,3 +95,9 @@ npm run test:browser
 测试层包括单元/Zod、MSW contract、页面 vertical slice 与浏览器 smoke。关键场景覆盖 local/OIDC 登录、refresh rotation、两阶段上传、多 target、工作流 ETag/提交、job SSE、候选/实验/交付包、Campaign、Literature、Intelligence、Registry、Copilot 与 legacy URL 转换。
 
 正式构建固定 `/api/v2`。Nginx、Compose 与 Helm 不再发布旧 API 路由。
+
+## 10. 浅色主题
+
+应用配色统一由 `frontend/src/styles/science-workspace.css` 管理，`index.css` 不再重复声明浅色调色板。浅色主题使用冷灰画布 `#f5f7fa`、白色阅读与操作面板、BigoBio 酒红主色 `#861b35` 和蓝绿色数据色 `#126b79`；状态色独立表达成功、警告、错误与信息。导航选中项、项目卡片、科研决策、文献论据、Bot 对话、学习记录及实验计算使用同一组语义变量。
+
+主按钮白字与酒红底对比度为 9.45:1；辅助文字与主要背景、状态文字与浅底均超过 4.5:1，输入边界与白色背景为 3.11:1。这些是选定配色组合的检查，不代表完整无障碍审计。链接式主按钮显式继承 `--primary-foreground`，避免全局链接规则覆盖其文字颜色。主题细节仅在 `[data-theme="light"]` 下生效；深色变量和结构视图的科学配色不变。

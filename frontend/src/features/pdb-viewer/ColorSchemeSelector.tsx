@@ -24,15 +24,16 @@ export function ColorSchemeSelector({ value, onChange }: ColorSchemeSelectorProp
     <div className="grid min-w-40 gap-1">
       <Label htmlFor={id}>{t.viewer.color}</Label>
       <Select
+        items={options.map((option) => ({ value: option.id, label: option.label }))}
         value={value}
         onValueChange={(nextValue) => {
           if (nextValue) onChange(nextValue as ColorPreset)
         }}
       >
         <SelectTrigger id={id} className="w-full" aria-label={t.viewer.color}>
-          <SelectValue />
+          <SelectValue>{options.find(option => option.id === value)?.label ?? value}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent positionerClassName="z-[10000]">
           {options.map((option) => (
             <SelectItem key={option.id} value={option.id} title={option.description}>
               {option.label}

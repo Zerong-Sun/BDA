@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { AppFrame } from '../../components/ui/AppFrame'
 import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
 import { structureSourceFromCandidate } from '../pdb-viewer/types'
-import { downloadCandidateStructures } from '../../lib/api/candidates'
-import { getArtifact } from '../../lib/api/artifacts'
+import { downloadArtifact, getArtifact } from '../../lib/api/artifacts'
 import { promoteCandidateToBench } from '../../lib/api/wetlab'
 import { explainCandidate, type InterpretationReasoning } from '../../lib/api/copilot'
 import { candidateScore, candidateText, type Candidate } from '../../lib/schemas/candidate'
@@ -22,6 +21,8 @@ import { GlossaryTooltip } from '../../components/ui/GlossaryTooltip'
 import { CandidateStructureOverlay } from './CandidateStructureOverlay'
 import { CandidateConditionMetrics } from './CandidateConditionMetrics'
 import { AttachToGoalButton } from '../research/AttachToGoalButton'
+import { CreateCandidate } from './CreateCandidate'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
 
 interface CandidateDetailProps {
   candidate: Candidate | null
@@ -36,10 +37,17 @@ const metricGuideKeys = [
 ] as const
 
 export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) {
-  const { t, format } = useI18n()
+  return <CandidateDetailContent key={`${projectId}:${candidate?.id ?? 'empty'}`} candidate={candidate} projectId={projectId} />
+}
+
+function CandidateDetailContent({ candidate, projectId }: CandidateDetailProps) {
+  const { t, format, language } = useI18n()
   const showToast = useToastStore((s) => s.show)
   const uiDensity = useAppStore((s) => s.uiDensity)
   const advanced = uiDensity === 'advanced'
+  const access = useProjectAccess(projectId)
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const writable = !demo && !access.isError && access.data?.permissions.write === true && candidate?.project_id === projectId
   const [structureMode, setStructureMode] = useState<'monomer' | 'complex'>('monomer')
   const [explanation, setExplanation] = useState<InterpretationReasoning | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -49,7 +57,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const hasMonomer = Boolean(candidate?.structure_artifact_id)
   const hasComplex = Boolean(candidate?.complex_artifact_id)
   const hasStructure = hasMonomer || hasComplex
-  const selectedArtifactId = structureMode === 'complex'
+  const effectiveStructureMode = !hasMonomer && hasComplex ? 'complex' : !hasComplex ? 'monomer' : structureMode
+  const selectedArtifactId = effectiveStructureMode === 'complex'
     ? candidate?.complex_artifact_id
     : candidate?.structure_artifact_id ?? candidate?.complex_artifact_id
   const artifactQuery = useQuery({
@@ -71,7 +80,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const nextAction = candidateText(candidate, 'next_action')
 
   const structureSource = structureSourceFromCandidate(candidate, {
-    structureMode,
+    structureMode: effectiveStructureMode,
     downloadUrl: artifactQuery.data?.download_url ?? undefined,
   })
 
@@ -89,7 +98,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const hasSequence = typeof sequence === 'string' && sequence.trim().length > 0
 
   const promoteToBench = async () => {
-    if (!candidate) return
+    if (!candidate || !writable) return
     setIsPromoting(true)
     try {
       const construct = await promoteCandidateToBench(candidate.project_id, candidate.id)
@@ -107,11 +116,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
   const downloadStructure = async () => {
     setIsDownloading(true)
     try {
-      await downloadCandidateStructures(
-        candidate.project_id,
-        [candidate.id],
-        `${candidate.id}_structure.zip`,
-      )
+      if (!selectedArtifactId) throw new Error(t.candidatesExt.toasts.downloadFailed)
+      await downloadArtifact(await getArtifact(selectedArtifactId))
       showToast(t.candidatesExt.toasts.structureDownloaded, 'success')
     } catch (err) {
       const message = err instanceof Error ? err.message : t.candidatesExt.toasts.downloadFailed
@@ -151,7 +157,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           <CandidateStructureOverlay
             candidate={candidate}
             metadata={null}
-            structureMode={structureMode}
+            structureMode={effectiveStructureMode}
             projectId={projectId}
           />
         </>
@@ -161,13 +167,24 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
         </div>
       )}
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{candidate.id}</h2>
+        <h2 className="text-lg font-semibold">{candidate.properties.source === 'manual' ? candidate.name : candidate.candidate_key || candidate.id}</h2>
         <StatusPill label={decision ?? '—'} tone={statusTone(decision ?? '')} />
+      </div>
+      {candidate.properties.source !== 'manual' && candidate.name && candidate.name !== (candidate.candidate_key || candidate.id) ? (
+        <p className="mb-2 font-medium">{candidate.name}</p>
+      ) : null}
+      <div className="mb-4 space-y-2 rounded-md border border-border-soft p-3 text-sm">
+        <h3 className="font-medium">{language === 'zh' ? '设计依据与来源' : 'Design rationale & sources'}</h3>
+        <p className="whitespace-pre-wrap text-text-secondary">{candidateText(candidate, 'design_rationale') || (language === 'zh' ? '尚未补充设计依据。可记录论点、文献支持和待验证问题。' : 'No design rationale has been added. Record the claim, literature support and open questions.')}</p>
+        {Array.isArray(candidate.properties.evidence_links) ? candidate.properties.evidence_links.filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url)).map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-primary underline">{url}</a>) : null}
+        {candidate.properties.experimental_status === 'not_tested' ? <p>{language === 'zh' ? '尚未进行实验验证。' : 'Not experimentally validated.'}</p> : null}
+        <CreateCandidate key={candidate.id} projectId={projectId} candidate={candidate} onCreated={() => {}} />
+        <Link to={`/research?project=${encodeURIComponent(projectId)}&tab=references`} className="ml-3 text-primary underline">{language === 'zh' ? '查看项目文献证据' : 'Open project literature evidence'}</Link>
       </div>
       <p className="mb-4 text-sm text-text-secondary">
         {format(t.candidatesExt.detail.familyLine, {
-          family: candidate.name,
-          nextAction,
+          family: candidateText(candidate, 'family') ?? '—',
+          nextAction: nextAction ?? (language === 'zh' ? '尚未指定下一步。' : 'No next action specified.'),
         })}
       </p>
       {explanation && explanation.subject_id === candidate.id ? (
@@ -175,12 +192,21 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           <InterpretationCard reasoning={explanation} />
         </div>
       ) : null}
+      {candidateText(candidate, 'source_dataset') ? <div className="grid grid-cols-2 gap-3">
+        {[
+          ['pLDDT', candidateScore(candidate, 'plddt'), ''],
+          ['ipTM', candidateScore(candidate, 'iptm'), ''],
+          [language === 'zh' ? '跨链 PAE' : 'Cross-chain PAE', candidateScore(candidate, 'pae_interaction'), ' Å'],
+          [language === 'zh' ? 'Rosetta 界面能' : 'Rosetta interface energy', candidateScore(candidate, 'rosetta_interface_dg'), ' REU'],
+        ].filter(([,value]) => typeof value === 'number').map(([label,value,unit]) => <div key={String(label)} className="rounded-lg border border-border-soft p-3"><p className="text-xs text-text-secondary">{label}</p><p className="mt-2 text-xl font-semibold">{Number(value).toFixed(2)}<span className="text-xs font-normal">{unit}</span></p></div>)}
+      </div> : (
       <ScoreBars
         affinity={candidateScore(candidate, 'interface_score') ?? candidate.score}
         stability={candidateScore(candidate, 'plddt')}
         solubility={candidateScore(candidate, 'solubility_score')}
-        rosettaScore={candidateScore(candidate, 'rosetta_score')}
+        rosettaScore={(candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'rosetta_interface_dg'))}
       />
+      )}
       {!advanced ? (
         <p className="mt-4 rounded-md border border-border-soft bg-bg-app p-3 text-xs text-text-secondary">
           {format(t.candidatesExt.detail.simplifiedView, {
@@ -203,7 +229,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
             description={t.candidatesExt.detail.interfacePaeHelp}
             good={t.candidatesExt.detail.interfacePaeGood}
           />
-          : <span className="text-text-primary">{candidateScore(candidate, 'interface_pae') != null ? `${candidateScore(candidate, 'interface_pae')} Å` : t.candidatesExt.table.notScored}</span>
+          : <span className="text-text-primary">{(candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction')) != null ? `${(candidateScore(candidate, 'interface_pae') ?? candidateScore(candidate, 'pae_interaction'))} Å` : t.candidatesExt.table.notScored}</span>
         </div>
         <div>
           <GlossaryTooltip
@@ -211,7 +237,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
             description={t.candidatesExt.detail.rosettaHelp}
             good={t.candidatesExt.detail.rosettaGood}
           />
-          : <span className="text-text-primary">{candidateScore(candidate, 'rosetta_score') ?? t.candidatesExt.table.notScored}</span>
+          : <span className="text-text-primary">{(candidateScore(candidate, 'rosetta_score') ?? candidateScore(candidate, 'rosetta_interface_dg')) ?? t.candidatesExt.table.notScored}</span>
         </div>
         <div>
           {t.candidatesExt.detail.expressionRisk}:{' '}
@@ -233,7 +259,7 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           </div>
         ) : null}
       </div>
-      {advanced ? <CandidateConditionMetrics candidateId={candidate.id} /> : null}
+      {advanced || candidate.properties.source_dataset ? <CandidateConditionMetrics candidateId={candidate.id} /> : null}
       {advanced ? (
         <div className="mt-4 rounded-md border border-border-soft bg-bg-app p-3 text-xs text-text-secondary">
           <p className="uppercase tracking-wide text-accent">{t.candidatesExt.detail.metricGuideTitle}</p>
@@ -272,8 +298,8 @@ export function CandidateDetail({ candidate, projectId }: CandidateDetailProps) 
           type="button"
           variant="outline"
           size="sm"
-          disabled={!hasSequence || isPromoting}
-          title={hasSequence ? undefined : t.candidatesExt.detail.promoteNeedsSequence}
+          disabled={!writable || !hasSequence || isPromoting}
+          title={!writable ? (language === 'zh' ? '需要项目编辑权限；演示模式只读。' : 'Project edit access is required; demo mode is read-only.') : hasSequence ? undefined : t.candidatesExt.detail.promoteNeedsSequence}
           onClick={() => void promoteToBench()}
         >
           <FlaskIcon aria-hidden="true" />

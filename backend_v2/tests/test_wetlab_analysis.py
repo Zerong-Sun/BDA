@@ -346,6 +346,14 @@ def _candidate(session: Session, project_id: uuid.UUID):
     return candidate
 
 
+def _accept_fit(session, row):
+    from backend_v2.app.experiments.service import review_instrument_result
+
+    review_instrument_result(session, session.get(Project, row.project_id), row, session.get(User, row.created_by),
+                             expected=row.version, accept=True, rationale="Synthetic fit source and diagnostics reviewed")
+    return analysis.record_measured_metric(session, row)
+
+
 def test_a_measurement_lands_on_the_candidate_as_a_measured_metric(
     session: Session, stored
 ) -> None:
@@ -363,6 +371,9 @@ def test_a_measurement_lands_on_the_candidate_as_a_measured_metric(
         session, project_id, user_id, artifact.id,
         t_assoc=0.0, t_dissoc=120.0, candidate_id=candidate.id,
     )
+
+    assert session.scalar(select(CandidateMetric)) is None
+    _accept_fit(session, row)
 
     metric = session.scalar(
         select(CandidateMetric).where(CandidateMetric.candidate_id == candidate.id)
@@ -399,10 +410,12 @@ def test_predicted_and_measured_values_coexist_rather_than_overwrite(
     body = _fortebio_bytes()
     artifact = _artifact(session, project_id, user_id, "run.csv", body)
     stored[artifact.object_key] = body
-    analysis.analyse_bli(
+    row, _ = analysis.analyse_bli(
         session, project_id, user_id, artifact.id,
         t_assoc=0.0, t_dissoc=120.0, candidate_id=candidate.id,
     )
+
+    _accept_fit(session, row)
 
     rows = list(
         session.scalars(select(CandidateMetric).where(CandidateMetric.candidate_id == candidate.id))
@@ -424,10 +437,13 @@ def test_re_measuring_updates_in_place_rather_than_accumulating(
     artifact = _artifact(session, project_id, user_id, "run.csv", body)
     stored[artifact.object_key] = body
 
-    analysis.analyse_bli(session, project_id, user_id, artifact.id,
+    first, _ = analysis.analyse_bli(session, project_id, user_id, artifact.id,
                          t_assoc=0.0, t_dissoc=120.0, candidate_id=candidate.id)
+    _accept_fit(session, first)
     second, _ = analysis.analyse_bli(session, project_id, user_id, artifact.id,
                                      t_assoc=0.0, t_dissoc=120.0, candidate_id=candidate.id)
+
+    _accept_fit(session, second)
 
     rows = list(
         session.scalars(
@@ -466,7 +482,9 @@ def test_an_akta_run_records_peak_area_against_the_candidate(session: Session, s
     artifact = _artifact(session, project_id, user_id, "run.zip", body)
     stored[artifact.object_key] = body
 
-    analysis.analyse_akta(session, project_id, user_id, artifact.id, candidate_id=candidate.id)
+    row, _ = analysis.analyse_akta(session, project_id, user_id, artifact.id, candidate_id=candidate.id)
+
+    _accept_fit(session, row)
 
     metric = session.scalar(
         select(CandidateMetric).where(CandidateMetric.candidate_id == candidate.id)
@@ -490,6 +508,7 @@ def test_deleting_the_result_leaves_the_measurement_but_breaks_the_link(
     row, _ = analysis.analyse_bli(session, project_id, user_id, artifact.id,
                                   t_assoc=0.0, t_dissoc=120.0, candidate_id=candidate.id)
 
+    _accept_fit(session, row)
     session.delete(row)
     session.flush()
     session.expire_all()

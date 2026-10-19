@@ -19,6 +19,7 @@ from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
 from . import kernels, molviewspec
+from . import residues as residue_analysis
 
 #: A structure is coordinates, not a trajectory. A 3000-residue complex in
 #: mmCIF is a few MB; the cap is a guard against a mis-typed artifact id
@@ -48,22 +49,63 @@ def _text(artifact: Artifact) -> str:
     )
 
 
-def _run(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, work: Any) -> dict[str, Any]:
+def _provenance(artifact: Artifact) -> dict[str, Any]:
+    """Expose only interpretation metadata, never arbitrary lineage or signed URLs."""
+    lineage = artifact.lineage if isinstance(artifact.lineage, dict) else {}
+    containers = [lineage, *(lineage[key] for key in ("metadata", "context") if isinstance(lineage.get(key), dict))]
+    result: dict[str, Any] = {}
+    for container in containers:
+        for key in ("source", "method", "predicted", "synthetic", "b_factor_metric", "fixture_version", "execution"):
+            value = container.get(key)
+            if key not in result and isinstance(value, (str, bool)):
+                result[key] = value[:300] if isinstance(value, str) else value
+    if any(container.get("synthetic") is True for container in containers):
+        result["synthetic"] = True
+    return result
+
+
+def _run(
+    session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, work: Any, *, with_confidence: bool = False
+) -> dict[str, Any]:
     artifact = _artifact(session, project_id, artifact_id)
+    provenance = _provenance(artifact)
     try:
-        result = work(_text(artifact))
+        text = _text(artifact)
+        result = work(text, provenance=provenance) if with_confidence else work(text)
     except kernels.StructureFormatError as error:
         raise DomainError("structure_unreadable", str(error), status_code=422) from error
     return {
         "artifact_id": str(artifact.id),
         "filename": artifact.filename,
         "checksum_sha256": artifact.checksum_sha256,
+        "provenance": provenance,
         **result,
     }
 
 
 def analyse(session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID) -> dict[str, Any]:
-    return _run(session, project_id, artifact_id, kernels.analyse)
+    return _run(session, project_id, artifact_id, kernels.analyse, with_confidence=True)
+
+
+def residues(
+    session: Session, project_id: uuid.UUID, artifact_id: uuid.UUID, *,
+    chain: str | None = None, residue_property: str = "all", partner_chain: str | None = None,
+    interface_only: bool = False, cutoff_angstrom: float = 4.5, limit: int = residue_analysis.MAX_RESIDUES,
+) -> dict[str, Any]:
+    result = _run(
+        session, project_id, artifact_id,
+        lambda text, provenance: residue_analysis.inventory(
+            text, chain=chain, residue_property=residue_property, partner_chain=partner_chain,
+            interface_only=interface_only, cutoff_angstrom=cutoff_angstrom, limit=limit, provenance=provenance,
+        ),
+        with_confidence=True,
+    )
+    result["viewer_selection"] = {
+        "artifact_id": str(artifact_id),
+        "residues": [{key: row[key] for key in ("chain", "seq", "insertion_code", "name")} for row in result["residues"]],
+        "truncated": result["truncated"],
+    }
+    return result
 
 
 def contacts(
@@ -93,6 +135,7 @@ def superpose(
     *,
     reference_chain: str,
     mobile_chain: str,
+    pairing: str = "author_number",
 ) -> dict[str, Any]:
     """Fit one structure onto another and report how far off it lands.
 
@@ -109,6 +152,7 @@ def superpose(
             _text(mobile),
             reference_chain=reference_chain,
             mobile_chain=mobile_chain,
+            pairing=pairing,
         )
     except kernels.StructureFormatError as error:
         raise DomainError("structure_unreadable", str(error), status_code=422) from error
@@ -117,11 +161,13 @@ def superpose(
             "artifact_id": str(reference.id),
             "filename": reference.filename,
             "checksum_sha256": reference.checksum_sha256,
+            "provenance": _provenance(reference),
         },
         "mobile": {
             "artifact_id": str(mobile.id),
             "filename": mobile.filename,
             "checksum_sha256": mobile.checksum_sha256,
+            "provenance": _provenance(mobile),
         },
         **result,
     }
@@ -160,6 +206,7 @@ def site(
     *,
     chain: str | None = None,
     residue_seq: int | None = None,
+    insertion_code: str | None = None,
     ligand: str | None = None,
     radius_angstrom: float = 5.0,
 ) -> dict[str, Any]:
@@ -171,6 +218,7 @@ def site(
             text,
             chain=chain,
             residue_seq=residue_seq,
+            insertion_code=insertion_code,
             ligand=ligand,
             radius_angstrom=radius_angstrom,
         ),
@@ -217,6 +265,7 @@ def view(
         "artifact_id": str(artifact.id),
         "filename": artifact.filename,
         "checksum_sha256": artifact.checksum_sha256,
+        "provenance": _provenance(artifact),
         "format": fmt,
         "highlighted": list(residues or []),
         "scene_format": f"molviewspec/{molviewspec.MVS_VERSION}",

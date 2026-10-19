@@ -48,7 +48,7 @@ async function draft() {
 describe('DecisionTreeBootstrap', () => {
   it('refuses to draft without a prompt to draft from', () => {
     renderWithProviders(<DecisionTreeBootstrap projectId="p1" hasPrompt={false} />)
-    expect(screen.getByText(/no design prompt yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/Add a project brief before drafting/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /draft from the prompt/i })).not.toBeInTheDocument()
   })
 

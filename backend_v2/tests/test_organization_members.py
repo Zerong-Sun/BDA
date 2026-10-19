@@ -14,6 +14,7 @@ from collections.abc import Generator
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
+from backend_v2.app.core.config import get_settings
 from backend_v2.app.core.database import get_session
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.deps import current_user
@@ -41,9 +42,10 @@ def client() -> Generator[tuple[TestClient, dict[str, uuid.UUID], dict[str, uuid
         admin = User(username="org-admin", display_name="Org Admin", role="admin", enabled=True)
         member = User(username="bench-mate", display_name="Bench Mate", role="researcher", enabled=True)
         outsider = User(username="outsider", display_name="Outsider", role="researcher", enabled=True)
+        viewer = User(username="read-only", display_name="Read Only", role="viewer", enabled=True)
         organization = Organization(name="Org One")
         other = Organization(name="Org Two")
-        session.add_all([admin, member, outsider, organization, other])
+        session.add_all([admin, member, outsider, viewer, organization, other])
         session.flush()
         session.add_all(
             [
@@ -56,6 +58,7 @@ def client() -> Generator[tuple[TestClient, dict[str, uuid.UUID], dict[str, uuid
             "admin": admin.id,
             "member": member.id,
             "outsider": outsider.id,
+            "viewer": viewer.id,
             "organization": organization.id,
             "other": other.id,
         }
@@ -116,3 +119,17 @@ def test_a_missing_organization_is_a_404(client) -> None:
     api, _, _ = client
     response = api.get(f"/api/v2/organizations/{uuid.uuid4()}/members")
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("role", ["researcher", "admin", "owner"])
+def test_membership_cannot_silently_promote_a_globally_read_only_account(client, monkeypatch, role) -> None:
+    api, ids, _ = client
+    monkeypatch.setattr(get_settings(), "writes_enabled", True)
+    url = f"/api/v2/organizations/{ids['organization']}/members"
+    added = api.post(url, json={"user_id": str(ids["viewer"]), "role": "viewer"})
+    assert added.status_code == 200, added.text
+    response = api.post(url, json={"user_id": str(ids["viewer"]), "role": role})
+    assert response.status_code == 409, response.text
+    assert response.json()["error_code"] == "account_read_only"
+    members = api.get(url).json()
+    assert next(member for member in members if member["user_id"] == str(ids["viewer"]))["role"] == "viewer"

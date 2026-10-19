@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..core.database import get_session
-from ..core.pagination import decode_cursor, encode_cursor
+from ..core.pagination import decode_cursor, decode_time_cursor, encode_cursor, encode_time_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
@@ -30,15 +31,19 @@ def list_delivery(
     project_id: uuid.UUID,
     cursor: str | None = Query(default=None),
     limit: int = Query(50, ge=1, le=200),
+    order: Literal["id", "newest"] = Query(default="id"),
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> DeliveryPage:
     require_project(session, project_id, user)
-    rows = DeliveryRepository(session).list_project(project_id, decode_cursor(cursor), limit)
+    repository = DeliveryRepository(session)
+    rows = (repository.list_newest(project_id, decode_time_cursor(cursor), limit) if order == "newest"
+            else repository.list_project(project_id, decode_cursor(cursor), limit))
     page = rows[:limit]
     return DeliveryPage(
         items=[DeliveryResponse.model_validate(row) for row in page],
-        next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
+        next_cursor=((encode_time_cursor(page[-1].created_at, page[-1].id) if order == "newest" else encode_cursor(page[-1].id))
+                     if len(rows) > limit and page else None),
     )
 
 

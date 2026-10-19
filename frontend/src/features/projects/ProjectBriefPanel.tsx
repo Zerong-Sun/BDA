@@ -24,7 +24,7 @@ export function ProjectBriefPanel({ project, compact = false }: { project: Proje
     <div>
       <p className="science-eyebrow">{zh ? '研究目标' : 'RESEARCH OBJECTIVE'}</p>
       <p className="project-objective">{brief.objective || (zh ? '尚未定义研究目标。先说明希望解决的问题。' : 'Define the question this project should answer.')}</p>
-      {brief.source === 'public-package' ? <p className="mt-3 text-xs text-text-muted">{zh ? '来自公开演示包的项目简报 · 不是已完成的目标记录' : 'Brief from the public demo package · not completed goal records'}</p> : null}
+      {brief.source === 'public-package' ? <p className="mt-3 text-xs text-text-muted">{zh ? '来源：项目综述中的研究范围' : 'Source: research scope in the project report'}</p> : null}
     </div>
     {!compact ? <div className="brief-details">
       <div><h3>{zh ? '需要回答的问题' : 'Questions to answer'}</h3>
@@ -33,6 +33,6 @@ export function ProjectBriefPanel({ project, compact = false }: { project: Proje
       </div>
       {brief.deliverables.length ? <div><h3>{zh ? '预期交付' : 'Expected deliverables'}</h3><ul>{brief.deliverables.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
     </div> : null}
-    {compact ? <Button type="button" variant="outline" render={<Link to={`/research?project=${encodeURIComponent(project.id)}&tab=goals`} />}>{zh ? '查看项目简报' : 'Read project brief'}</Button> : null}
+    {compact ? <Button type="button" variant="outline" render={<Link to={`/research?project=${encodeURIComponent(project.id)}&tab=goals&brief=1`} />}>{zh ? '查看项目简报' : 'Read project brief'}</Button> : null}
   </section>
 }

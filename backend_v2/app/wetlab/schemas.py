@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -165,17 +166,27 @@ class DilutionResult(BaseModel):
 # recorded result points back at.
 
 
-class BliAnalysisRequest(BaseModel):
+class BliProcessingOptions(BaseModel):
+    sample_mapping: dict[str, str] = Field(default_factory=dict, max_length=384)
+    excluded_labels: list[str] = Field(default_factory=list, max_length=384)
+    reference_label: str | None = Field(default=None, max_length=200)
+    analysis_method: Literal["measured_global", "instrument_kobs"] = "measured_global"
+    baseline_mode: Literal["initial_point", "fitted_offset"] = "initial_point"
+    correction_note: str | None = Field(default=None, max_length=2000)
+
+
+class BliAnalysisRequest(BliProcessingOptions):
     artifact_id: uuid.UUID
     #: Which sample in the file. Defaults to the one with the most curves.
     sample_id: str | None = None
     #: Phase boundaries. Worth passing whenever the run declares them - the
     #: fallback reads them off the smoothed curve, which is fine for a look and
     #: not what you want behind a recorded number.
-    t_assoc: float | None = None
-    t_dissoc: float | None = None
+    t_assoc: float | None = Field(default=None, allow_inf_nan=False)
+    t_dissoc: float | None = Field(default=None, allow_inf_nan=False)
     #: Set to tie the measurement back to the design it tests.
     candidate_id: uuid.UUID | None = None
+    supersedes_result_id: uuid.UUID | None = None
 
 
 class AktaAnalysisRequest(BaseModel):
@@ -201,15 +212,29 @@ class AnalysisResponse(BaseModel):
     unit: str | None
     source_artifact_id: uuid.UUID
     summary: dict
+    version: int
+    qc_review: dict | None = None
 
 
-class AnalysisPreviewRequest(BaseModel):
+class AnalysisReviewRequest(BaseModel):
+    accept: bool
+    rationale: str = Field(min_length=1, max_length=2000)
+
+
+class AnalysisReviewResponse(BaseModel):
+    experiment_result_id: uuid.UUID
+    version: int
+    review: dict
+    candidate_metric_recorded: bool
+
+
+class AnalysisPreviewRequest(BliProcessingOptions):
     instrument: str = Field(pattern="^(bli|akta|enzyme)$")
     content_base64: str = Field(min_length=1, max_length=16 * 1024 * 1024)
     sample_id: str | None = Field(default=None, max_length=200)
     channel: str | None = Field(default=None, max_length=200)
-    t_assoc: float | None = Field(default=None, ge=0)
-    t_dissoc: float | None = Field(default=None, ge=0)
+    t_assoc: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    t_dissoc: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     subtract_background: bool = True
 
 

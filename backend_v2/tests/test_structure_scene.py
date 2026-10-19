@@ -54,8 +54,8 @@ def test_highlighted_residues_are_addressed_in_the_numbering_a_person_reads() ->
     components = _nodes(built["root"], "component")
     picked = [node for node in components if isinstance(node["params"]["selector"], list)]
     assert picked[0]["params"]["selector"] == [
-        {"auth_asym_id": "A", "auth_seq_id": 164},
-        {"auth_asym_id": "A", "auth_seq_id": 168},
+        {"auth_asym_id": "A", "auth_seq_id": 164, "pdbx_PDB_ins_code": ""},
+        {"auth_asym_id": "A", "auth_seq_id": 168, "pdbx_PDB_ins_code": ""},
     ]
     assert [node["params"]["type"] for node in _nodes(picked[0], "representation")] == ["ball_and_stick"]
     assert _nodes(picked[0], "label")[0]["params"]["text"] == "Hotspots"
@@ -103,8 +103,8 @@ def test_an_interface_becomes_a_scene_from_the_same_measurement_it_was_reported_
     residues = molviewspec.residues_from_contacts(contacts, chain="A")
 
     # De-duplicated: a residue contacting two partners is one residue.
-    assert residues == [{"chain": "A", "seq": 124}, {"chain": "A", "seq": 126}]
+    assert residues == [{"chain": "A", "seq": 124, "insertion_code": None}, {"chain": "A", "seq": 126, "insertion_code": None}]
     assert molviewspec.residues_from_contacts(contacts, chain="B") == [
-        {"chain": "B", "seq": 31},
-        {"chain": "B", "seq": 33},
+        {"chain": "B", "seq": 31, "insertion_code": None},
+        {"chain": "B", "seq": 33, "insertion_code": None},
     ]

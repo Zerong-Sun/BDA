@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import {
   adjacentTourStep,
   firstTourStep,
+  getTourStep,
   TOUR_SECTIONS,
   type TourSectionId,
 } from '../../features/tour/tourData'
@@ -12,6 +13,7 @@ export type AppMode = 'application' | 'demo'
 export type UiDensity = 'guided' | 'advanced'
 export type ThemePreference = 'light' | 'dark' | 'system'
 export interface CopilotChatMessage {
+  id?: string
   role: 'user' | 'assistant' | 'system'
   content: string
   meta?: {
@@ -23,6 +25,7 @@ export interface CopilotChatMessage {
 }
 
 export interface CopilotProjectSession {
+  mode?: 'general' | 'bench'
   pending?: { id: string; stage: 'connecting' | 'thinking' | 'tool' | 'streaming'; detail: string | null } | null
   error?: string | null
   /** Unsent text and source selection live only in this signed-in browser session. */
@@ -56,8 +59,6 @@ export interface CopilotTaskDraft {
   service: string | null
   preview: boolean
   writes: string[]
-  maxTurns: number
-  maxCost: string
 }
 
 export interface WorkflowSeed {
@@ -125,6 +126,7 @@ interface AppState {
   ) => void
   setCopilotConversationId: (projectId: string, conversationId: string | null) => void
   setCopilotSessionBot: (projectId: string, bot: string | null) => void
+  setCopilotSessionMode: (projectId: string, mode: 'general' | 'bench') => void
   setCopilotSessionInput: (projectId: string, input: string) => void
   setCopilotSessionRequest: (projectId: string, pending: CopilotProjectSession['pending'], error?: string | null) => void
   setCopilotTaskDraft: (projectId: string, draft: CopilotTaskDraft) => void
@@ -175,7 +177,13 @@ export const useAppStore = create<AppState>()(
       tourState: initialTourState,
       tourMenuOpen: false,
       setLanguage: (language) => set({ language }),
-      setAppMode: (appMode) => set({ appMode }),
+      setAppMode: (appMode) => set((state) => ({
+        appMode,
+        ...(appMode === 'application' && state.tourState.status === 'active' ? {
+          tourState: { ...state.tourState, status: 'paused' as const, updatedAt: new Date().toISOString() },
+          tourMenuOpen: false,
+        } : {}),
+      })),
       setUiDensity: (uiDensity) => set({ uiDensity }),
       setThemePreference: (themePreference) => set({ themePreference }),
       setActiveProjectId: (activeProjectId) => set((state) => ({
@@ -216,7 +224,11 @@ export const useAppStore = create<AppState>()(
       }),
       setCopilotSessionBot: (projectId, bot) => set((state) => {
         const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
-        return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, bot } } }
+        return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, bot, mode: 'general' } } }
+      }),
+      setCopilotSessionMode: (projectId, mode) => set((state) => {
+        const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
+        return { copilotSessions: { ...state.copilotSessions, [projectId]: { ...current, mode, bot: null } } }
       }),
       setCopilotSessionInput: (projectId, input) => set((state) => {
         const current = state.copilotSessions[projectId] ?? { conversationId: null, messages: [], bot: null }
@@ -264,6 +276,7 @@ export const useAppStore = create<AppState>()(
       startTour: (sectionId = 'projects') => {
         const first = firstTourStep(sectionId)
         set((state) => ({
+          appMode: 'demo',
           tourState: {
             ...state.tourState,
             status: 'active',
@@ -275,6 +288,7 @@ export const useAppStore = create<AppState>()(
         }))
       },
       resumeTour: () => set((state) => ({
+        appMode: 'demo',
         tourState: { ...state.tourState, status: 'active', updatedAt: new Date().toISOString() },
         tourMenuOpen: false,
       })),
@@ -308,6 +322,7 @@ export const useAppStore = create<AppState>()(
         tourMenuOpen: true,
       })),
       restartTour: () => set({
+        appMode: 'demo',
         tourState: { ...initialTourState, status: 'active', updatedAt: new Date().toISOString() },
         tourMenuOpen: false,
       }),
@@ -321,7 +336,7 @@ export const useAppStore = create<AppState>()(
         tourMenuOpen: false,
       })),
       setTourMenuOpen: (tourMenuOpen) => set({ tourMenuOpen }),
-      resetAuthenticatedState: () => set({
+      resetAuthenticatedState: () => set((state) => ({
         appMode: 'application',
         activeProjectId: '',
         copilotMessages: [],
@@ -335,11 +350,23 @@ export const useAppStore = create<AppState>()(
         targetIntakeOpen: false,
         deletingProjectId: null,
         workflowSeed: null,
+        tourState: state.tourState.status === 'active'
+          ? { ...state.tourState, status: 'paused', updatedAt: new Date().toISOString() }
+          : state.tourState,
         tourMenuOpen: false,
-      }),
+      })),
     }),
     {
       name: 'bda-app-store',
+      merge: (persistedState, currentState) => {
+        const restored = { ...currentState, ...persistedState as Partial<AppState> }
+        // The tour persists its position, while operating mode is session-only.
+        // Restore that active tour's read-only context before pages render.
+        // Paused/completed tours must not switch a normal workspace into demo.
+        const activeTour = restored.tourState?.status === 'active'
+          && getTourStep(restored.tourState.sectionId, restored.tourState.stepId)
+        return { ...restored, appMode: activeTour ? 'demo' : currentState.appMode }
+      },
       partialize: (state) => ({
         language: state.language,
         uiDensity: state.uiDensity,

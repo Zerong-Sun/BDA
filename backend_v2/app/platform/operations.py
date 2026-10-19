@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..compute.models import OutboxEvent
@@ -21,6 +22,13 @@ def enqueue_operation(
     organization_id: uuid.UUID | None = None,
     payload: dict | None = None,
 ) -> Operation:
+    from ..copilot.call_guard import current_scope_id
+
+    # This field is server-owned. Never let caller payloads choose a new budget.
+    event_payload = {key: value for key, value in (payload or {}).items() if key != "_llm_call_scope"}
+    scope_id = current_scope_id()
+    if scope_id is not None:
+        event_payload["_llm_call_scope"] = scope_id
     operation = Operation(
         project_id=project_id,
         organization_id=organization_id,
@@ -37,7 +45,7 @@ def enqueue_operation(
             topic=topic,
             aggregate_id=resource_id,
             payload={
-                **(payload or {}),
+                **event_payload,
                 "operation_id": str(operation.id),
                 **({"project_id": str(project_id)} if project_id else {}),
                 **({"organization_id": str(organization_id)} if organization_id else {}),
@@ -48,8 +56,10 @@ def enqueue_operation(
 
 
 def mark_operation_running(session: Session, operation_id: uuid.UUID) -> None:
-    operation = session.get(Operation, operation_id)
-    if operation is None or operation.status in {"succeeded", "failed", "cancelled"}:
+    operation = session.scalar(
+        select(Operation).where(Operation.id == operation_id).with_for_update().execution_options(populate_existing=True)
+    )
+    if operation is None or operation.status in {"running", "succeeded", "failed", "cancelled"}:
         return
     operation.status = "running"
     operation.started_at = operation.started_at or datetime.now(UTC)
@@ -64,7 +74,9 @@ def finish_operation(
     error: Exception | None = None,
 ) -> None:
     session.flush()
-    operation = session.get(Operation, operation_id, with_for_update=True, populate_existing=True)
+    operation = session.scalar(
+        select(Operation).where(Operation.id == operation_id).with_for_update().execution_options(populate_existing=True)
+    )
     if operation is None or operation.status in {"succeeded", "failed", "cancelled"}:
         return
     operation.finished_at = datetime.now(UTC)

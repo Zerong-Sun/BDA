@@ -16,6 +16,7 @@ from backend_v2.app.research.package_import import import_research_package
 from backend_v2.app.research.schemas import ResearchPackageImportCreate
 from backend_v2.app.workflows.schemas import WorkflowCreate, WorkflowEdgeInput, WorkflowNodeInput
 from backend_v2.app.workflows.service import create_workflow
+from backend_v2.tests.scientific_gate_helpers import review_test_design
 from sqlalchemy import select
 
 pytestmark = pytest.mark.skipif(os.getenv("BDA_V2_RUN_DB_TESTS") != "1", reason="PostgreSQL integration test disabled")
@@ -66,6 +67,7 @@ def test_dag_dispatches_only_dependency_ready_jobs() -> None:
             ),
             user,
         )
+        review_test_design(session, project, workflow, user)
         submission, jobs = create_submission(
             session,
             workflow=workflow,

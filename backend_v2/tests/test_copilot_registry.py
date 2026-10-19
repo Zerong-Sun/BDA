@@ -174,3 +174,24 @@ def test_a_default_session_can_reach_the_wet_bench() -> None:
     available = tools_for_capabilities(normalize_capabilities(None))
     assert {"list_proteins", "compute_concentration", "plan_dilution_series"} <= available
     assert "list_research_goals" in available
+
+
+def test_validation_feedback_limits_count_and_omits_parameter_values_and_dynamic_keys() -> None:
+    import json
+
+    registry = ToolRegistry()
+    registry.register(ToolSpec(
+        id="bounded-feedback", description="", capability="project-read", execution_mode="read", requires="project",
+        parameters={"type": "object", "properties": {
+            "entries": {"type": "object", "additionalProperties": {"type": "string", "maxLength": 3}},
+        }}, handler=lambda _ctx, _args: pytest.fail("An invalid tool must not execute"),
+    ))
+    arguments = {"entries": {f"SENSITIVE-KEY-{index}": "PRIVATE-VALUE" for index in range(20)}}
+    with pytest.raises(DomainError) as raised:
+        registry.execute("bounded-feedback", ToolContext(project=object()), arguments)
+    details = raised.value.errors
+    assert len(details) == 5
+    assert details == [{"path": "/entries/*", "constraint": "maxLength", "limit": 3}] * 5
+    serialized = json.dumps({"detail": raised.value.detail, "errors": details})
+    assert "SENSITIVE-KEY" not in serialized and "PRIVATE-VALUE" not in serialized
+    assert len(serialized) < 700

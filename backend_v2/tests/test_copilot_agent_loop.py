@@ -186,8 +186,10 @@ def test_the_conversation_is_rebuilt_from_rows_and_nothing_else(
 
     assert conversation[0]["role"] == "system"
     assert conversation[1] == {"role": "user", "content": "quantify the eluate"}
-    assert conversation[2]["content"] == "I checked the library."
-    assert conversation[3] == {
+    assert conversation[2]["role"] == "system"
+    assert conversation[2]["content"].startswith("Current run and finalization: ")
+    assert conversation[3]["content"] == "I checked the library."
+    assert conversation[4] == {
         "role": "tool",
         "tool_call_id": "call_a",
         "name": "list_proteins",
@@ -213,7 +215,7 @@ def test_a_tool_result_is_persisted_before_the_next_provider_call(
     roles = [turn.role for turn in agent_runs.transcript(session, run)]
     assert roles == ["assistant", "tool", "assistant"]
     # The second call saw the tool result, which means it came back out of a row.
-    assert seen[1][-1]["role"] == "tool"
+    assert any(message.get("tool_call_id") == "call_1" and message["role"] == "tool" for message in seen[1])
     assert run.status == "succeeded"
 
 
@@ -421,9 +423,9 @@ def test_the_budget_stops_the_run_before_the_call_it_could_not_afford(
     agent_loop.drive(session, run, _provider(session))
 
     assert run.status == "failed"
-    assert run.error is not None and "turn limit" in run.error
-    # One provider call spent two turns (assistant + tool); the second was never made.
-    assert len(calls) == 1
+    assert run.error is not None and "model call limit" in run.error
+    # Two provider calls are allowed; tool transcript rows do not consume model calls.
+    assert len(calls) == 2
 
 
 def test_a_run_only_offers_the_model_the_tools_it_may_use(session: Session) -> None:

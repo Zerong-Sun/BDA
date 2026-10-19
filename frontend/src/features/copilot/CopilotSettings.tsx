@@ -1,3 +1,4 @@
+import { taskErrorMessage } from './deliveryDisplay'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -267,7 +268,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
                     sample: test.data.sample ?? t.copilot.settings.connectionOk,
                   })
                 : format(t.copilot.settings.connectionFailed, {
-                    reason: test.data.reason ?? t.copilot.settings.unknownError,
+                    reason: taskErrorMessage(test.data.reason ?? t.copilot.settings.unknownError, language === 'zh'),
                   })}
             </AlertDescription>
           </Alert>

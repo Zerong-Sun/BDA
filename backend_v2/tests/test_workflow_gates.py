@@ -189,9 +189,12 @@ def test_layout_cannot_rewire_execution(env):
     from backend_v2.app.workflows.schemas import WorkflowLayoutUpdate
     from backend_v2.app.workflows.service import update_layout
 
-    w = WorkflowRun(version=1, graph={"edges": [{"source": "a", "target": "b"}]})
-    update_layout(w, WorkflowLayoutUpdate(nodes=[], edges=[{"source": "b", "target": "a"}]), 1)
+    w = WorkflowRun(version=1, graph={"nodes": [{"key": "a"}], "edges": [{"source": "a", "target": "b"}]})
+    layout_nodes = [{"id": "a", "position": {"x": 10, "y": 20}, "width": 360}]
+    update_layout(w, WorkflowLayoutUpdate(nodes=layout_nodes, edges=[{"source": "b", "target": "a"}]), 1)
     assert w.graph["edges"] == [{"source": "a", "target": "b"}]
+    assert w.graph["layout"]["nodes"] == layout_nodes
+    assert w.graph["nodes"][0]["position"] == {"x": 10, "y": 20}
 
 
 def test_repair_draft_repeatable_and_rollback(env):
@@ -223,7 +226,7 @@ class MemoryStorage:
         self.files[key] = body
 
 
-def runtime_fixture(env, mode="automatic", threshold=80, optional=False):
+def runtime_fixture(env, mode="automatic", threshold=80, optional=False, target_configuration=None, target_schema=None):
     from backend_v2.app.artifacts.models import Artifact
     from backend_v2.app.compute.models import JobEvent
     from backend_v2.app.compute.parsers.base import ParsedOutputs
@@ -274,6 +277,18 @@ def runtime_fixture(env, mode="automatic", threshold=80, optional=False):
         ]
     )
     s.flush()
+    if target_configuration:
+        from backend_v2.app.workflows.repository import WorkflowRepository
+
+        target_node = next(n for n in WorkflowRepository(s).nodes(w.id) if n.node_key == "b")
+        target_node.configuration = target_configuration
+    if target_schema:
+        consumer.parameter_schema = target_schema
+    s.flush()
+    if mode == "automatic":
+        from backend_v2.tests.scientific_gate_helpers import approve_test_gate
+
+        approve_test_gate(env, w)
     submission, jobs = create_submission(
         s,
         workflow=w,
@@ -450,6 +465,7 @@ def test_inherited_standard_precedes_branch_top_n(env):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, w, _, source, target, gate, storage = runtime_fixture(env, threshold=0)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "output_policy": {"configured": True, "rules": {"conditions": [{"metric": "score", "op": "gte", "value": 80}]}},
@@ -459,7 +475,8 @@ def test_inherited_standard_precedes_branch_top_n(env):
         },
     }
     run_gate(s, gate, storage)
-    assert len(gate.selected_ids) == 1
+    assert sum(d["passed"] for d in gate.decisions) == 1
+    assert not gate.selected_ids
     assert next(d for d in gate.decisions if d["passed"])["metrics"]["score"] == 90
 
 
@@ -467,6 +484,7 @@ def test_gate_script_failure_is_not_empty_result(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     _, _, _, _, _, gate, storage = runtime_fixture(env)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "edge": {**gate.snapshot["edge"], "gate": {"configured": True, "script": "raise RuntimeError('broken')"}},
@@ -500,6 +518,7 @@ def test_script_screening_happens_before_top_n(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, _, _, _, _, gate, storage = runtime_fixture(env, threshold=0)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "edge": {
@@ -514,7 +533,8 @@ def test_script_screening_happens_before_top_n(env, monkeypatch):
         ],
     )
     run_gate(s, gate, storage)
-    assert len(gate.selected_ids) == 1
+    assert sum(d["passed"] for d in gate.decisions) == 1
+    assert not gate.selected_ids
     assert next(d for d in gate.decisions if d["passed"])["metrics"]["score"] == 40
 
 
@@ -597,6 +617,7 @@ def test_empty_inherited_standard_does_not_run_branch_script(env, monkeypatch):
     from backend_v2.app.workflows.gate_runtime import run_gate
 
     s, _, _, _, _, gate, storage = runtime_fixture(env)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "output_policy": {"configured": True, "rules": {"conditions": [{"metric": "score", "value": 999}]}},
@@ -607,7 +628,7 @@ def test_empty_inherited_standard_does_not_run_branch_script(env, monkeypatch):
         lambda *args: pytest.fail("Empty branch must not execute a script"),
     )
     run_gate(s, gate, storage)
-    assert gate.status == "empty"
+    assert gate.status == "previewed" and not any(d["passed"] for d in gate.decisions)
 
 
 def test_incomplete_coordinates_are_pending_data_not_zero_helices(monkeypatch):
@@ -755,3 +776,30 @@ def test_preflight_warns_when_a_queue_contradicts_the_plugin(env):
 
     # A queue nobody registered says nothing, rather than guessing from its name.
     assert queue_capability_warnings(s, [_node("v3-64")], {"design": plugin}) == []
+
+
+def test_model_change_invalidates_adjacent_data_gate_approval_but_preserves_review(env):
+    from backend_v2.app.workflows.models import WorkflowRun
+    from backend_v2.app.workflows.schemas import WorkflowNodeUpdate
+    from backend_v2.app.workflows.service import update_node
+
+    s = env['session']
+    policy = {'mode': 'automatic', 'configured': True, 'rules': {'conditions': [{'metric': 'score', 'op': 'lt', 'value': 1}]}, 'script_preview_id': str(uuid.uuid4())}
+    workflow = WorkflowRun(project_id=env['project'].id, name='model change', created_by=env['user'].id,
+                           graph={'nodes': [{'key': 'a'}], 'edges': [
+                               {'source': 'a', 'target': 'b', 'gate': policy},
+                               {'source': 'a', 'target': 'c', 'gate': {'mode': 'dependency', 'configured': True}},
+                               {'source': 'b', 'target': 'c', 'gate': policy}]})
+    s.add(workflow)
+    s.flush()
+    node = _node(workflow, 'a', env['producer'], [])
+    s.add(node)
+    s.flush()
+    update_node(workflow, node, WorkflowNodeUpdate(parameters={'x': 1}), workflow.version)
+    assert workflow.graph['edges'][0]['gate']['configured']
+    update_node(workflow, node, WorkflowNodeUpdate(model_plugin_id=env['consumer'].id), workflow.version)
+    changed, ordering, unrelated = workflow.graph['edges']
+    assert changed['gate']['configured'] is False
+    assert changed['gate']['script_preview_id'] is None
+    assert changed['gate']['rules'] == policy['rules']
+    assert ordering['gate']['configured'] and unrelated['gate']['configured']

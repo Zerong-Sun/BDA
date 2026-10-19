@@ -28,37 +28,40 @@ def literature_ingest(document_id: str) -> dict:
 
     with session_scope() as session:
         row = session.get(LiteratureDocument, uuid.UUID(document_id))
+        if row is None:
+            return {"document_id": document_id, "status": "missing"}
         if row and row.status == "pending":
             content = row.abstract or ""
+            content_kind = "provided_abstract" if content.strip() else "metadata_only"
             if row.artifact_id:
                 artifact = session.get(Artifact, row.artifact_id)
                 if artifact and artifact.project_id == row.project_id and artifact.status == "available":
                     if artifact.content_type in {"text/plain", "text/markdown", "application/json"}:
                         raw = ObjectStorage().read_bytes(artifact.object_key, max_bytes=10 * 1024 * 1024)
                         content = raw.decode("utf-8", errors="strict")
+                        content_kind = "uploaded_text" if content.strip() else "metadata_only"
             paragraphs = [item.strip() for item in re.split(r"\n\s*\n", content) if item.strip()]
-            if not paragraphs and row.title:
-                paragraphs = [row.title]
             checksum = hashlib.sha256("\n\n".join(paragraphs).encode()).hexdigest()
             index_document_content(
                 session,
                 row,
                 paragraphs,
-                content_kind="uploaded_text" if row.artifact_id else "provided_abstract",
+                content_kind=content_kind,
                 content_checksum_sha256=checksum,
                 retrieval_trace_id=None,
             )
             row.metadata_json = {
                 **(row.metadata_json or {}),
                 "content_provenance": {
-                    "content_kind": "uploaded_text" if row.artifact_id else "provided_abstract",
-                    "content_checksum_sha256": checksum,
+                    "content_kind": content_kind,
+                    "content_checksum_sha256": checksum if paragraphs else None,
                     "analysis_status": "pending_human_review",
                 },
             }
-            row.status = "available"
+            row.status = "available" if paragraphs else "metadata_only"
             row.version += 1
-    return {"document_id": document_id, "status": "available"}
+        result_status = row.status
+    return {"document_id": document_id, "status": result_status}
 
 
 def _retrieval_trace_values(
@@ -118,7 +121,9 @@ def literature_search(search_run_id: str) -> dict:
     from ..research.evidence_tools import EvidenceToolService, titles_match
 
     parsed = uuid.UUID(search_run_id)
-    with session_scope() as session:
+    from ..copilot.call_guard import call_scope
+
+    with call_scope(f"literature-search:{parsed}"), session_scope() as session:
         run = session.get(LiteratureSearchRun, parsed)
         if run is None:
             return {"search_run_id": search_run_id, "status": "missing"}
@@ -405,13 +410,25 @@ def literature_search(search_run_id: str) -> dict:
         retrieval_trace_id: str | None = None
         raw_artifact_id: uuid.UUID | None = None
         license_text = ""
+        evidence_packet = None
         if fetch_full_text and result["pmcid"] and result["is_open_access"]:
             try:
                 full_text = tools.get_europe_pmc_full_text(result["pmcid"])
                 paragraphs, xml_metadata = extract_europe_pmc_full_text(full_text.content)
+                from .evidence_packets import discover_pmc_media, extract_packet
+                media_catalog = discover_pmc_media(result["pmcid"])
+                evidence_packet = extract_packet(full_text.content, media_urls=media_catalog["urls"])
+                evidence_packet["media_catalog"] = media_catalog
+                evidence_packet["license_code"] = media_catalog.get("license_code")
+                evidence_packet["retracted"] = media_catalog.get("is_retracted")
                 content_checksum = str(xml_metadata["content_checksum_sha256"])
                 license_text = str(xml_metadata.get("license_text") or "")
-                object_key = f"projects/{project_id}/literature/documents/{document_id}/{result['pmcid']}.xml"
+                # A later retrieval must never replace the bytes behind an older
+                # artifact or citation. Each source snapshot has its own key.
+                object_key = (
+                    f"projects/{project_id}/literature/documents/{document_id}/"
+                    f"{content_checksum}/{result['pmcid']}.xml"
+                )
                 ObjectStorage().put_bytes(object_key, full_text.content, "application/xml")
                 with session_scope() as session:
                     artifact = Artifact(
@@ -452,7 +469,7 @@ def literature_search(search_run_id: str) -> dict:
                     session.add(trace)
                     session.flush()
                     retrieval_trace_id = str(trace.id)
-                content_kind = "open_access_full_text"
+                content_kind = str(xml_metadata["content_kind"])
             except (RuntimeError, ValueError, ET.ParseError) as exc:
                 gaps += 1
                 audit = tools.audits[-1]
@@ -474,6 +491,11 @@ def literature_search(search_run_id: str) -> dict:
             paragraphs = [result["abstract"]]
             content_kind = "database_abstract"
             content_checksum = text_checksum(paragraphs)
+            # A successful XML response can still contain no usable text. Its
+            # artifact remains on the full-text trace, not on this abstract's
+            # distinct source snapshot.
+            raw_artifact_id = None
+            license_text = ""
             with session_scope() as session:
                 trace = LiteratureRetrievalTrace(
                     project_id=project_id,
@@ -498,13 +520,26 @@ def literature_search(search_run_id: str) -> dict:
                 retrieval_trace_id = str(trace.id)
 
         with session_scope() as session:
-            document = session.get(LiteratureDocument, document_id)
+            from .models import LiteratureChunk
+
+            document = session.scalar(
+                select(LiteratureDocument).where(LiteratureDocument.id == document_id).with_for_update()
+            )
             if document is None:
                 continue
+            has_chunks = session.scalar(
+                select(LiteratureChunk.id).where(LiteratureChunk.document_id == document_id).limit(1)
+            ) is not None
+            # Existing chunks/claims/evidence are addressable records. Relabelling
+            # their text with the latest fetch's checksum makes old citations false.
+            # Keep that snapshot, and expose the new retrieval separately until an
+            # explicit versioned re-index can preserve both sets of references.
+            provenance_key = "latest_retrieval_provenance" if has_chunks else "content_provenance"
             document.metadata_json = {
                 **(document.metadata_json or {}),
                 "verification_status": verification_status,
-                "content_provenance": {
+                provenance_key: {
+                    "search_run_id": search_run_id,
                     "content_kind": content_kind,
                     "content_checksum_sha256": content_checksum or None,
                     "retrieval_trace_id": retrieval_trace_id,
@@ -517,9 +552,32 @@ def literature_search(search_run_id: str) -> dict:
                     "analysis_status": "pending_human_review",
                 },
             }
-            if raw_artifact_id:
+            if raw_artifact_id and not has_chunks:
                 document.artifact_id = raw_artifact_id
-            if paragraphs:
+            # Keep the curated packet and its original anchors when the same
+            # source is fetched again. A changed source is a separate revision.
+            from .evidence_packets import empty_packet
+            if evidence_packet is None:
+                evidence_packet = empty_packet(content_kind=content_kind)
+                evidence_packet["gaps"].extend(["full_text_not_recovered", "figures_and_tables_not_recovered"])
+                evidence_packet["passages"] = [
+                    {"id": f"retrieved-paragraph-{i + 1}", "section": content_kind, "text": p, "figure_table_refs": []}
+                    for i, p in enumerate(paragraphs)
+                ]
+            evidence_packet.update(
+                document_id=str(document.id), source_sha256=content_checksum or None,
+                raw_content_artifact_id=str(raw_artifact_id) if raw_artifact_id else None,
+                retrieval_trace_id=retrieval_trace_id,
+                source_url=f"https://pmc.ncbi.nlm.nih.gov/articles/{result['pmcid']}/" if result.get("pmcid") else "",
+            )
+            previous_packet = (document.metadata_json or {}).get("evidence_packet")
+            if not previous_packet:
+                document.metadata_json = {**document.metadata_json, "evidence_packet": evidence_packet}
+            elif previous_packet.get("source_sha256") != evidence_packet.get("source_sha256"):
+                document.metadata_json = {**document.metadata_json, "latest_evidence_packet": evidence_packet}
+            if has_chunks:
+                document.status = "available"
+            elif paragraphs:
                 index_document_content(
                     session,
                     document,

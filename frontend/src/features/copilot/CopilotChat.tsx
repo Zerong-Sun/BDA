@@ -1,3 +1,6 @@
+import { taskErrorMessage } from './deliveryDisplay'
+import { ToolEvidenceLazy } from './ToolEvidenceLazy'
+import { botDisplayText } from './bots/displayText'
 import { useCallback, useEffect, useRef } from 'react'
 import { useCopilotReadOnly } from './commandAccess'
 import { ApiState } from '../../components/ui/ApiState'
@@ -9,8 +12,9 @@ import {
   SpinnerGapIcon,
   WarningIcon,
 } from '@phosphor-icons/react'
-import { CopilotCitations } from './CopilotCitations'
+import { ReviewMarkdown } from '../research/ReviewMarkdown'
 import { CopilotLoadingBubble } from './CopilotLoadingBubble'
+import { ChatModeSwitch } from './ChatModeSwitch'
 import { useCopilotChat } from './useCopilotChat'
 import { byStance, reviewersOf, successorsOf } from './bots/registry'
 import { getCopilotConfig } from '../../lib/api/copilot'
@@ -24,7 +28,7 @@ import { looksLikeCopilotResearchResult } from '../../lib/api/copilotResearch'
 import { projectText } from '../../lib/i18n/projectText'
 import { isQuestion } from './taskPresentation'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Textarea } from '../../components/ui/textarea'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '../../components/reui/alert'
 import { Frame, FramePanel } from '../../components/reui/frame'
@@ -59,6 +63,8 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     bots,
     bot,
     setBot,
+    mode,
+    setMode,
   } = useCopilotChat(projectId, pageContext, language)
   const readOnly = useCopilotReadOnly()
   const input = useAppStore((state) => state.copilotSessions[projectId]?.input ?? '')
@@ -110,7 +116,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
     const trimmed = input.trim()
     if (!trimmed || loading || readOnly) return
     setInput('')
-    if (onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
+    if (mode !== 'bench' && onTaskRequested && !isQuestion(trimmed) && /帮我|请.*(?:调研|生成|起草)|research|prepare|draft|plan|检索|调研/i.test(trimmed)) { onTaskRequested(trimmed); return }
     await send(trimmed)
   }
 
@@ -160,7 +166,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
             ? format(t.copilot.chat.projectContext, { projectId })
             : t.copilot.chat.selectProjectHint}
         </span>
-        {bots.length > 0 && !externalRoster ? (
+        {bots.length > 0 && !externalRoster && mode !== 'bench' ? (
           <Select
             value={bot ?? AUTO_BOT}
             onValueChange={(next) => setBot(next === AUTO_BOT ? null : next)}
@@ -206,6 +212,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           <ArrowCounterClockwiseIcon aria-hidden="true" />
         </Button>
       </div>
+      <ChatModeSwitch mode={mode} onChange={setMode} disabled={readOnly || loading || !projectId} />
       {/* What the selected operator refuses, who checks it, and where it hands
           on. All of it was in the roster response already and none of it reached
           the screen, which made selecting one a gesture rather than a decision.
@@ -213,8 +220,8 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           show and the row would be permanent chrome. */}
       {activeBotSpec && !externalRoster ? (
         <div className="shrink-0 border-b bg-muted/40 px-4 py-2">
-          <p className="text-xs font-medium text-foreground">{activeBotSpec.summary}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{activeBotSpec.charter}</p>
+          <p className="text-xs font-medium text-foreground">{botDisplayText(activeBotSpec, language).summary}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{botDisplayText(activeBotSpec, language).charter}</p>
           {reviewers.length > 0 ? (
             <p className="mt-1 text-[11px] text-muted-foreground">
               {t.copilot.chat.reviewedBy}{' '}
@@ -260,13 +267,50 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           ) : null}
         </div>
       ) : null}
+      <div className="copilot-compose-panel flex items-end gap-2 border-b p-3">
+        <label htmlFor="copilot-input" className="sr-only">
+          {t.copilot.chat.inputLabel}
+        </label>
+        <Textarea
+          rows={2}
+          id="copilot-input"
+          aria-label={t.copilot.chat.inputLabel}
+          placeholder={t.copilot.chat.inputPlaceholder}
+          className="flex-1"
+          value={input}
+          disabled={readOnly || loading}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            void handleSend()
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={t.copilot.chat.sendAriaLabel}
+          disabled={readOnly || loading || !input.trim()}
+          onClick={() => void handleSend()}
+        >
+          {loading ? (
+            <SpinnerGapIcon
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <PaperPlaneTiltIcon aria-hidden="true" />
+          )}
+        </Button>
+      </div>
       <ScrollArea className="min-h-0 flex-1" aria-label={t.copilot.chat.conversationLabel}>
         <div className="space-y-3 p-4 pr-6">
           {error ? (
             <Alert variant="destructive">
               <WarningIcon aria-hidden="true" />
               <AlertTitle>{t.copilot.chat.failedTitle}</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{taskErrorMessage(error, language === 'zh')}</AlertDescription>
             </Alert>
           ) : null}
           {degradedMode ? (
@@ -340,7 +384,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                 className={message.role === 'user' ? 'ml-8' : 'mr-8'}
               >
                 <FramePanel className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                  {message.content ||
+                  {(message.content ? message.role === 'assistant' ? <ReviewMarkdown presentation="chat" citations={message.meta?.citations} projectId={projectId}>{message.content}</ReviewMarkdown> : message.content : null) ||
                     (loading && message.role === 'assistant' ? (
                       <CopilotLoadingBubble
                         stage={activeLoadingStage}
@@ -350,9 +394,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
                     ) : (
                       ''
                     ))}
-                  {message.role === 'assistant' && message.meta?.citations?.length ? (
-                    <CopilotCitations citations={message.meta.citations} projectId={projectId} />
-                  ) : null}
+                  {message.role === 'assistant' ? <ToolEvidenceLazy calls={message.meta?.toolCalls} projectId={projectId} /> : null}
                   {showSaveButton ? (
                     <SaveToReviewButton
                       projectId={projectId}
@@ -385,42 +427,7 @@ export function CopilotChat({ pageContext, initialQuestion, onTaskRequested, ext
           <div ref={messageEndRef} />
         </div>
       </ScrollArea>
-      <div className="flex items-center gap-2 border-t p-3">
-        <label htmlFor="copilot-input" className="sr-only">
-          {t.copilot.chat.inputLabel}
-        </label>
-        <Input
-          id="copilot-input"
-          aria-label={t.copilot.chat.inputLabel}
-          placeholder={t.copilot.chat.inputPlaceholder}
-          className="flex-1"
-          value={input}
-          disabled={readOnly || loading}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            void handleSend()
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label={t.copilot.chat.sendAriaLabel}
-          disabled={readOnly || loading || !input.trim()}
-          onClick={() => void handleSend()}
-        >
-          {loading ? (
-            <SpinnerGapIcon
-              className="animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-          ) : (
-            <PaperPlaneTiltIcon aria-hidden="true" />
-          )}
-        </Button>
-      </div>
+
     </div>
   )
 }

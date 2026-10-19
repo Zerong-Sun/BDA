@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { readRoomApiV2CopilotProjectsProjectIdRoomGet } from '../../lib/api/generated'
 import type { RoomEvent } from '../../lib/api/generated'
 import { LIVE_RUN_STATUSES } from '../../lib/api/agentRuns'
@@ -20,30 +20,33 @@ import { LIVE_RUN_STATUSES } from '../../lib/api/agentRuns'
 export const copilotRoomQueryKey = (projectId: string | null) =>
   ['copilot', 'room', projectId] as const
 
-/** A task entry that can still move on its own, so the room keeps looking. */
+/** Pending messages also need a polling backstop after a reload or SSE loss. */
 function isLiveEntry(entry: RoomEvent): boolean {
-  return Boolean(entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
+  return entry.message?.status === 'pending'
+    || Boolean(entry.task && (LIVE_RUN_STATUSES as readonly string[]).includes(entry.task.status))
 }
 
-export function useCopilotRoom(projectId: string | null, limit = 100) {
-  return useQuery({
+export function useCopilotRoom(projectId: string | null, limit = 100, includeArchived = false) {
+  const query = useInfiniteQuery({
     // The project id is part of the key because a room belongs to one project
     // and nothing else; a shared key would show one project's chain in another.
-    queryKey: copilotRoomQueryKey(projectId),
+    queryKey: [...copilotRoomQueryKey(projectId), { includeArchived }],
     enabled: Boolean(projectId),
-    queryFn: async () => {
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
       const { data } = await readRoomApiV2CopilotProjectsProjectIdRoomGet<true>({
         throwOnError: true,
         path: { project_id: projectId as string },
-        query: { limit },
+        query: { limit, cursor: pageParam, include_archived: includeArchived },
       })
-      return data.items
+      return data
     },
-    // Messages arrive over the chat stream and are refetched when a turn ends.
-    // A task moves because a worker moved it, with nothing to stream here, so a
-    // room holding a live task polls - and stops as soon as none is live.
-    refetchInterval: (query) => (query.state.data ?? []).some(isLiveEntry) ? 4000 : false,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    // Keep discovering discussion even if active tasks have moved off the loaded
+    // pages or another tab starts work; visible active tasks use a faster cadence.
+    refetchInterval: (query) => (query.state.data?.pages ?? []).some((page) => page.items.some(isLiveEntry)) ? 4000 : 15000,
   })
+  return { ...query, data: query.data?.pages.flatMap((page) => page.items) }
 }
 
 /**
@@ -73,5 +76,6 @@ export function childTasksByParent(entries: readonly RoomEvent[]): Map<string, R
 
 /** Top-level entries: everything except the delegated children nested above. */
 export function topLevelEntries(entries: readonly RoomEvent[]): RoomEvent[] {
-  return entries.filter((entry) => !entry.task?.parent_run_id)
+  const present = new Set(entries.flatMap((entry) => entry.task ? [entry.task.id] : []))
+  return entries.filter((entry) => !entry.task?.parent_run_id || !present.has(entry.task.parent_run_id))
 }

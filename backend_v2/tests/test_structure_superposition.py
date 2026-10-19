@@ -132,3 +132,50 @@ def test_the_largest_deviations_are_listed_worst_first() -> None:
     deviations = [item["deviation_angstrom"] for item in result["largest_deviations"]]
     assert deviations == sorted(deviations, reverse=True)
     assert result["largest_deviations"][0]["seq"] == 8
+
+
+def _sequence_chain(sequence, *, offset=0, drop=None):
+    from Bio.Data.IUPACData import protein_letters_1to3
+    lines = []
+    for index, amino in enumerate(sequence, start=1):
+        if index in (drop or set()):
+            continue
+        x, y, z = index * 3.8, (index % 3) * 1.2, (index % 2) * 0.7
+        lines.append(f"ATOM  {index:>5} CA   {protein_letters_1to3[amino].upper()} A{index + offset:>4}    "
+                     f"{x:>8.3f}{y:>8.3f}{z:>8.3f}  1.00 20.00           C")
+    return '\n'.join(lines) + '\nEND\n'
+
+
+def test_explicit_sequence_alignment_handles_renumbered_constructs_with_missing_loop():
+    sequence = 'ACDEFGHIKLMNPQRSTVWY'
+    result = kernels.superpose(_sequence_chain(sequence), _sequence_chain(sequence, offset=500, drop={8, 9}),
+                               reference_chain='A', mobile_chain='A', pairing='sequence_alignment')
+    assert result['paired_residue_count'] == 18
+    assert result['rmsd_angstrom'] == pytest.approx(0.0, abs=1e-6)
+    assert result['reference_coverage'] == 0.9
+    assert result['mobile_coverage'] == 1.0
+    assert result['alignment']['paired_sequence_identity'] == 1.0
+    assert result['residue_correspondence'][0]['mobile_seq'] == 501
+    assert 8 not in result['paired_residue_numbers']
+    assert 'Not TM-align' in result['tm_score_note']
+
+
+def test_sequence_alignment_refuses_ambiguous_repeated_segments():
+    with pytest.raises(kernels.StructureFormatError, match='ambiguous'):
+        kernels.superpose(_sequence_chain('AAAAAA'), _sequence_chain('AAAAA', offset=500),
+                          reference_chain='A', mobile_chain='A', pairing='sequence_alignment')
+
+
+def test_sequence_alignment_reports_mismatches_without_claiming_homology():
+    result = kernels.superpose(_sequence_chain('ACDEFGHIK'), _sequence_chain('ACDEWGHIK', offset=500),
+                               reference_chain='A', mobile_chain='A', pairing='sequence_alignment')
+    assert result['alignment']['paired_sequence_identity'] == pytest.approx(8 / 9, abs=0.0001)
+    assert 'proof of homology' in result['alignment']['limitations']
+
+
+def test_pairing_is_explicit_and_bounded():
+    with pytest.raises(kernels.StructureFormatError, match='Pairing must'):
+        kernels.superpose(REFERENCE, REFERENCE, reference_chain='A', mobile_chain='A', pairing='guess')
+    with pytest.raises(kernels.StructureFormatError, match='4-million-cell'):
+        kernels.superpose(_sequence_chain('ACDE' * 501), _sequence_chain('ACDE' * 501),
+                          reference_chain='A', mobile_chain='A', pairing='sequence_alignment')

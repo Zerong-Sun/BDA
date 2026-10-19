@@ -14,7 +14,12 @@ class IdentityRepository:
         self.session = session
 
     def user_by_username(self, username: str) -> User | None:
-        return self.session.scalar(select(User).where(User.username == username, User.enabled.is_(True)))
+        return self.session.scalar(
+            select(User)
+            .where(User.username == username, User.enabled.is_(True))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
 
     def user_by_username_any_status(self, username: str) -> User | None:
         return self.session.scalar(select(User).where(User.username == username))
@@ -23,18 +28,22 @@ class IdentityRepository:
         return self.session.get(User, user_id)
 
     def user_by_oidc(self, issuer: str, subject: str) -> User | None:
-        return self.session.scalar(
-            select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject)
-        )
+        return self.session.scalar(select(User).where(User.oidc_issuer == issuer, User.oidc_subject == subject))
 
     def add_refresh_session(self, item: RefreshSession) -> None:
         self.session.add(item)
 
     def active_refresh_session(self, token_hash: str, now: datetime) -> RefreshSession | None:
         return self.session.scalar(
-            select(RefreshSession).where(
+            select(RefreshSession)
+            .where(
                 RefreshSession.token_hash == token_hash,
                 RefreshSession.revoked_at.is_(None),
                 RefreshSession.expires_at > now,
-            ).with_for_update().execution_options(populate_existing=True)
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
+
+    def refresh_session(self, token_hash: str) -> RefreshSession | None:
+        return self.session.scalar(select(RefreshSession).where(RefreshSession.token_hash == token_hash))

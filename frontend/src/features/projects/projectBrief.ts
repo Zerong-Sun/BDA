@@ -1,5 +1,6 @@
 import type { Project } from '../../lib/api/projects'
 import { projectText } from '../../lib/i18n/projectText'
+import { resolveStoredText } from '../../lib/i18n/localizedText'
 
 export interface ProjectBrief {
   objective: string
@@ -40,7 +41,9 @@ export function projectBrief(project: Project, language: 'zh' | 'en'): ProjectBr
   }
   return {
     source: 'project',
-    objective: prompt || projectText(project, 'summary', language).trim(),
+    objective: authoredPrompt
+      ? resolveStoredText(project.localized_content?.prompt, language, prompt)
+      : projectText(project, 'summary', language).trim(),
     questions: [],
     deliverables: [],
   }

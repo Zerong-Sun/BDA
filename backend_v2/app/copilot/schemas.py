@@ -117,6 +117,7 @@ class SkillResponse(BaseModel):
 
 
 class BotResponse(BaseModel):
+    aliases: list[str] = Field(default_factory=list)
     id: str
     title: str
     title_zh: str
@@ -240,6 +241,17 @@ class RoomTask(BaseModel):
     updated_at: datetime
 
 
+class RoomDiscussion(BaseModel):
+    run_id: uuid.UUID
+    content: str
+    parent_run_id: uuid.UUID | None = None
+    is_delivery: bool = False
+    next_action: str | None = None
+    # The task review is attached only when this turn matches its saved delivery.
+    scientific_review: str | None = None
+    task_status: str | None = None
+
+
 class RoomEvent(BaseModel):
     """One entry in the room, carrying exactly the record it came from.
 
@@ -249,7 +261,7 @@ class RoomEvent(BaseModel):
     that an unsupported claim and a cited answer are the same kind of thing.
     """
 
-    kind: Literal["message", "handoff", "task", "decision"]
+    kind: Literal["message", "handoff", "task", "decision", "discussion"]
     id: uuid.UUID
     occurred_at: datetime
     #: The operator this entry belongs to: the speaker, the sender of a
@@ -260,6 +272,7 @@ class RoomEvent(BaseModel):
     handoff: HandoffResponse | None = None
     task: RoomTask | None = None
     decision: DecisionRequestResponse | None = None
+    discussion: RoomDiscussion | None = None
 
 
 class RoomPage(BaseModel):
@@ -344,13 +357,18 @@ class AgentRunCreate(BaseModel):
     skills: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
         default_factory=list, max_length=20
     )
+    #: Procedural SKILL.md packages, never authorization capabilities. None
+    #: chooses service defaults; [] explicitly opts out. Frozen on the run.
+    procedural_skills: list[Annotated[str, Field(min_length=1, max_length=64)]] | None = Field(
+        default=None, max_length=3
+    )
     #: A roster bot id. Mutually exclusive with `skills`, and narrowing only:
     #: the run gets `bot.capabilities & project.enabled_skills`.
     bot: str | None = Field(default=None, min_length=1, max_length=80)
     service_kind: Literal["brief", "literature", "planning", "execution", "interpretation", "custom"] = "custom"
     # Exact tool ids are an explicit scope request, intersected with project permissions.
     authorized_writes: list[Annotated[str, Field(min_length=1, max_length=80)]] | None = Field(default=None, max_length=20)
-    max_turns: int = Field(default=24, ge=1, le=200)
+    max_turns: int = Field(default=6, ge=1, le=6)
     max_cost_usd_cents: int | None = Field(default=None, ge=0, le=1_000_000)
 
 

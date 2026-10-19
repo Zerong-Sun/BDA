@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..literature.evidence_notes import reading_context
 from ..literature.models import (
     LiteratureChunk,
     LiteratureClaim,
@@ -17,6 +19,7 @@ from ..literature.models import (
     LiteratureSearchRun,
 )
 from ..projects.models import Project
+from ..research.models import ResearchBrief
 from ..research.workspace import build_research_workspace
 
 SENSITIVE_KEYS = {"download_url", "object_key", "credential_ref", "api_key", "token"}
@@ -57,6 +60,17 @@ class ResearchContextService:
         self.session = session
         self.project_id = project.id
         self.workspace = _sanitize(build_research_workspace(session, project).model_dump(mode="json"))
+        # Bibliographic discovery must not inject an entire paper collection into
+        # the model context. Full packets are read explicitly through bounded windows.
+        for reference in self.workspace.get("references", []):
+            metadata = reference.get("metadata") or {}
+            for key in ("evidence_packet", "latest_evidence_packet"):
+                saved = metadata.get(key)
+                if isinstance(saved, dict):
+                    metadata[key] = {"schema": saved.get("schema"), "source_sha256": saved.get("source_sha256"),
+                                     "coverage_status": saved.get("coverage_status"),
+                                     "counts": {name: len(saved.get(name) or []) for name in ("arguments", "figures", "tables", "data", "supplements", "passages")},
+                                     "read_tool": "get_reference_evidence_packet"}
         self._documents = {
             row.id: row
             for row in session.scalars(
@@ -66,6 +80,16 @@ class ResearchContextService:
             )
         }
         self._items = self._flatten()
+        # The preferred review is only one brief. Selected progress notes and
+        # later corrections must remain readable without replacing that review.
+        review_id = (self.workspace.get("review_document") or {}).get("id")
+        self._items.extend({
+            "kind": "research_brief", "id": str(row.id), "label": row.title,
+            "data": _sanitize({"id": str(row.id), "title": row.title, "content": row.content,
+                "review_status": row.status, "scope": row.scope, "version": row.version,
+                "updated_at": row.updated_at.isoformat(), "content_kind": "project_record"}),
+        } for row in session.scalars(select(ResearchBrief).where(ResearchBrief.project_id == project.id)
+            .order_by(ResearchBrief.created_at.desc(), ResearchBrief.id.desc())) if str(row.id) != review_id)
         self._items.extend(self._literature_evidence_items())
 
     def research_overview(self) -> dict[str, Any]:
@@ -82,7 +106,18 @@ class ResearchContextService:
             if review
             else None,
             "counts": self.workspace.get("counts", {}),
+            "counts_scope": {
+                "research_targets": (
+                    "Candidate records whose candidate_kind is research_target, not biological Target records. "
+                    "A zero count does not mean the project has no target; inspect project.primary_target "
+                    "and use list_project_targets for the full biological target inventory."
+                ),
+            },
+            "primary_target_present": project.get("primary_target") is not None,
             "available_kinds": sorted({item["kind"] for item in self._items}),
+            "recent_briefs": [{"id": item["id"], "title": item["label"],
+                "review_status": item["data"]["review_status"], "updated_at": item["data"]["updated_at"]}
+                for item in self._items if item["kind"] == "research_brief"][:5],
         }
 
     def search_research(
@@ -134,6 +169,43 @@ class ResearchContextService:
                 return reference
         return None
 
+    @staticmethod
+    def _reference_excerpt(reference: dict[str, Any], chunk: LiteratureChunk) -> dict[str, Any]:
+        return {
+            "kind": "literature_excerpt",
+            "id": str(chunk.id),
+            "label": _text(reference.get("title")) or f"Literature chunk {chunk.position}",
+            "data": {
+                "document_id": str(chunk.document_id),
+                "ref_id": reference.get("ref_id"),
+                "title": reference.get("title"),
+                "url": reference.get("url"),
+                "chunk_id": str(chunk.id),
+                "position": chunk.position,
+                "content": chunk.content,
+                "chunk_version": chunk.version,
+                "review_status": (reference.get("metadata") or {}).get("review_status", "pending_review"),
+                "content_provenance": (reference.get("metadata") or {}).get("content_provenance") or {},
+            },
+        }
+
+    def get_reference_excerpt(self, chunk_id: str) -> dict[str, Any] | None:
+        """Resolve one saved excerpt by identity, without treating position as an offset."""
+        try:
+            identifier = uuid.UUID(chunk_id)
+        except (ValueError, TypeError, AttributeError):
+            return None
+        chunk = self.session.scalar(
+            select(LiteratureChunk)
+            .join(LiteratureDocument, LiteratureChunk.document_id == LiteratureDocument.id)
+            .where(LiteratureChunk.id == identifier, LiteratureDocument.project_id == self.project_id)
+        )
+        if chunk is None:
+            return None
+        reference = next((item for item in self.workspace.get("references", [])
+                          if str(item.get("document_id")) == str(chunk.document_id)), None)
+        return self._reference_excerpt(reference, chunk) if reference is not None else None
+
     def get_reference_content(
         self,
         reference_id: str,
@@ -150,35 +222,62 @@ class ResearchContextService:
                 break
         if document_id is None:
             return []
+        window_offset = max(0, offset)
+        total_count = int(self.session.scalar(
+            select(func.count(LiteratureChunk.id))
+            .where(LiteratureChunk.document_id == uuid.UUID(document_id))
+        ) or 0)
         chunks = list(
             self.session.scalars(
                 select(LiteratureChunk)
                 .where(LiteratureChunk.document_id == uuid.UUID(document_id))
                 .order_by(LiteratureChunk.position)
-                .offset(max(0, offset))
+                .offset(window_offset)
                 .limit(max(1, min(limit, 50)))
             )
         )
-        provenance = ((reference or {}).get("metadata") or {}).get("content_provenance") or {}
-        return [
-            {
-                "kind": "literature_excerpt",
-                "id": str(chunk.id),
-                "label": _text((reference or {}).get("title")) or f"Literature chunk {chunk.position}",
-                "data": {
-                    "document_id": document_id,
-                    "ref_id": (reference or {}).get("ref_id"),
-                    "title": (reference or {}).get("title"),
-                    "url": (reference or {}).get("url"),
-                    "chunk_id": str(chunk.id),
-                    "position": chunk.position,
-                    "content": chunk.content,
-                    "review_status": ((reference or {}).get("metadata") or {}).get("review_status", "pending_review"),
-                    "content_provenance": provenance,
-                },
-            }
+        rows: list[dict[str, Any]] = [
+            self._reference_excerpt(reference or {}, chunk)
             for chunk in chunks
         ]
+        if rows:
+            next_offset = window_offset + len(rows)
+            has_more = next_offset < total_count
+            # Keep the list contract, and attach window metadata to one real
+            # excerpt rather than manufacturing a citable row for an empty page.
+            rows[0]["data"]["read_window"] = {
+                "scope": "saved_indexed_chunks",
+                "offset": window_offset,
+                "returned_count": len(rows),
+                "total_count": total_count,
+                "has_more": has_more,
+                "next_offset": next_offset if has_more else None,
+                "truncated": window_offset > 0 or has_more,
+            }
+        return rows
+
+    def get_reference_evidence_packet(
+        self, reference_id: str, *, section: str = "arguments", offset: int = 0, limit: int = 5,
+        revision: str = "current",
+    ) -> dict[str, Any]:
+        from ..literature.evidence_packets import packet_window
+
+        reference = next((r for r in self.workspace.get("references", [])
+                          if reference_id in {str(r.get("document_id")), str(r.get("ref_id"))}), None)
+        if reference is None:
+            raise ValueError("reference_not_found_in_project")
+        document = self._documents.get(uuid.UUID(str(reference["document_id"])))
+        if document is None:
+            raise ValueError("reference_not_found_in_project")
+        key = "latest_evidence_packet" if revision == "latest" else "evidence_packet"
+        packet = (document.metadata_json or {}).get(key)
+        if not isinstance(packet, dict):
+            return {"document_id": str(document.id), "status": "not_extracted", "gaps": ["evidence_packet_not_saved"], "items": []}
+        window = _sanitize(packet_window(packet, section, offset, limit))
+        window["window_sha256"] = hashlib.sha256(json.dumps(window["items"], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        return {"document_id": str(document.id), "document_version": document.version, "title": document.title,
+                "revision": revision, "newer_source_available": bool((document.metadata_json or {}).get("latest_evidence_packet")),
+                **window}
 
     def grounding_packet(
         self,
@@ -188,8 +287,11 @@ class ResearchContextService:
         max_chars: int = 28_000,
     ) -> str:
         """Return a bounded packet of the exact saved excerpts behind citations."""
+        from .citations import dedupe
+
+        catalog = dedupe(citations)
         ordered = sorted(
-            citations,
+            catalog,
             key=lambda item: 0 if item.get("workspace_type") == "literature_excerpt" else 1,
         )
         seen: set[str] = set()
@@ -198,6 +300,24 @@ class ResearchContextService:
         used_chars = 0
         for citation in ordered:
             if citation.get("source_type") != "scientific_literature":
+                continue
+            if citation.get("workspace_type") == "literature_packet":
+                try:
+                    window = self.get_reference_evidence_packet(
+                        str(citation.get("document_id") or ""), section=str(citation.get("packet_section") or ""),
+                        offset=int(citation.get("packet_offset", 0)), limit=int(citation.get("packet_limit", 5)),
+                        revision=str(citation.get("packet_revision") or "current"),
+                    )
+                except (ValueError, TypeError):
+                    continue
+                if window.get("source_sha256") != citation.get("content_checksum_sha256") or window.get("window_sha256") != citation.get("window_sha256"):
+                    continue
+                serialized = json.dumps(window, ensure_ascii=False)
+                if used_chars + len(serialized) > max_chars or len(packet) >= max_chunks:
+                    continue
+                packet.append({**window, "citation_markers": [f"[cite:{i}]" for i, c in enumerate(catalog, 1) if c == citation],
+                               "scope": "Saved source/interpretation rows; model drafts and caption-only readings remain explicitly unreviewed."})
+                used_chars += len(serialized)
                 continue
             chunk_id = str(citation.get("chunk_id") or "")
             if not chunk_id or chunk_id in seen:
@@ -216,13 +336,30 @@ class ResearchContextService:
                 break
             excerpt = chunk.content[: min(1600, remaining)]
             provenance = (document.metadata_json or {}).get("content_provenance") or {}
-            search_run_id = str((document.metadata_json or {}).get("search_run_id") or "")
+            # Never repair a historical source/fragment mismatch by silently
+            # placing the current document checksum on the old citation.
+            if citation.get("document_id") and str(citation["document_id"]) != str(document.id):
+                continue
+            if not citation.get("content_checksum_sha256") or citation["content_checksum_sha256"] != provenance.get("content_checksum_sha256"):
+                continue
+            search_run_id = str(provenance.get("search_run_id") or (document.metadata_json or {}).get("search_run_id") or "")
             if search_run_id:
                 search_run_ids.add(search_run_id)
             packet.append(
                 {
                     "document_id": str(document.id),
                     "chunk_id": str(chunk.id),
+                    # The review packet is filtered and reordered. Keep the
+                    # answer-local catalogue numbers instead of making a new
+                    # implicit numbering from packet positions. Several source
+                    # records can legitimately point to the same saved chunk.
+                    "citation_markers": [
+                        f"[cite:{index}]" for index, source in enumerate(catalog, 1)
+                        if source.get("source_type") == "scientific_literature"
+                        and str(source.get("chunk_id") or "") == str(chunk.id)
+                        and (not source.get("document_id") or str(source["document_id"]) == str(document.id))
+                        and source.get("content_checksum_sha256") == provenance.get("content_checksum_sha256")
+                    ],
                     "title": document.title,
                     "content_kind": provenance.get("content_kind"),
                     "content_checksum_sha256": provenance.get("content_checksum_sha256"),
@@ -261,14 +398,48 @@ class ResearchContextService:
             {
                 "scope": (
                     "Exact saved literature excerpts used by the draft. These remain pending human review. "
-                    "Anything not supported here must be removed, parameterized, or labeled as a hypothesis."
+                    "Use only the supplied citation_markers for these excerpts; packet order is not citation numbering. "
+                    "Project records support operational status only, not independent scientific validation. "
+                    "Unsupported scientific claims must be removed, parameterized, or labeled as a hypothesis."
                 ),
                 "searches": searches,
                 "items": packet,
+                "project_records": self._project_records_for_review(catalog),
             },
             ensure_ascii=False,
             default=str,
         )
+
+    def _project_records_for_review(self, citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Keep cited progress corrections in a literature review without upgrading them to paper evidence."""
+        wanted = [
+            (str(c.get("workspace_type")), str(c.get("entity_id")))
+            for c in citations if c.get("source_type") == "research_workspace"
+        ]
+        if not wanted:
+            return []
+        available = {(item["kind"], item["id"]): item for item in self._items}
+        records: list[dict[str, Any]] = []
+        remaining = 12_000
+        # Keep selection/citation order: a selected correction must not lose its
+        # budget to a larger, older canonical review earlier in the workspace.
+        for key in dict.fromkeys(wanted):
+            item = available.get(key)
+            if item is None or item["kind"] not in {
+                "project", "review_document", "research_brief", "method",
+            }:
+                continue
+            content = json.dumps(item["data"], ensure_ascii=False, default=str)
+            allowance = min(6000, remaining)
+            if allowance <= 0:
+                break
+            records.append({
+                "entity_id": item["id"], "kind": item["kind"], "label": item["label"],
+                "record": content[:allowance], "truncated": len(content) > allowance,
+                "evidence_scope": "project record; not independent scientific validation",
+            })
+            remaining -= min(len(content), allowance)
+        return records
 
     def build_context(
         self,
@@ -302,6 +473,7 @@ class ResearchContextService:
             "coverage": {
                 "retrieved": len(selected),
                 "available": len(self._items),
+                "unavailable_selected_ids": sorted(selected_ids - {item["id"] for item in selected}),
                 "note": "Only retrieved items may be used as factual evidence. Request another page if needed.",
             },
         }
@@ -355,15 +527,16 @@ class ResearchContextService:
 
     def _literature_evidence_items(self) -> list[dict[str, Any]]:
         rows = self.session.execute(
-            select(LiteratureEvidence, LiteratureClaim, LiteratureDocument)
+            select(LiteratureEvidence, LiteratureClaim, LiteratureDocument, LiteratureChunk)
             .join(LiteratureClaim, LiteratureClaim.id == LiteratureEvidence.claim_id)
             .join(LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id)
+            .outerjoin(LiteratureChunk, LiteratureChunk.id == LiteratureClaim.chunk_id)
             .where(LiteratureDocument.project_id == self.project_id)
             .order_by(LiteratureDocument.created_at, LiteratureClaim.created_at)
             .limit(2000)
         ).all()
         items: list[dict[str, Any]] = []
-        for evidence, claim, document in rows:
+        for evidence, claim, document, chunk in rows:
             metadata = document.metadata_json or {}
             source_ref = evidence.source_ref or {}
             ref_id = str(metadata.get("ref_id") or document.external_id or document.id)
@@ -378,7 +551,7 @@ class ResearchContextService:
                         "chunk_id": str(claim.chunk_id) if claim.chunk_id else None,
                         "ref_id": ref_id,
                         "title": document.title,
-                        "url": metadata.get("url"),
+                        "url": source_ref.get("url") or metadata.get("url"),
                         "claim": claim.claim,
                         "excerpt": evidence.content,
                         "evidence_type": evidence.evidence_type,
@@ -387,6 +560,7 @@ class ResearchContextService:
                         "source_ref": source_ref,
                         "content_provenance": metadata.get("content_provenance") or {},
                         "verification_status": metadata.get("verification_status"),
+                        **reading_context(claim, evidence, chunk, document),
                     },
                 }
             )
@@ -409,9 +583,32 @@ class ResearchContextService:
             "evidence_grade": data.get("evidence_grade") if isinstance(data, dict) else None,
             "review_status": data.get("review_status") if isinstance(data, dict) else None,
         }
+        if item["kind"] == "reference" and isinstance(data, dict):
+            abstract = str(data.get("abstract") or "")
+            citation.update({
+                "document_id": item["id"],
+                "reference_ids": [data["ref_id"]] if data.get("ref_id") else [],
+                # A bibliography result exposes at most its abstract. A full-text
+                # artifact elsewhere in the document does not mean this tool read it.
+                "content_kind": "provided_abstract" if abstract else "metadata_only",
+                "excerpt": abstract[:1600],
+                "excerpt_truncated": len(abstract) > 1600,
+                "verification_status": data.get("verification_status"),
+            })
         if item["kind"] in {"literature_evidence", "literature_excerpt"} and isinstance(data, dict):
             provenance = data.get("content_provenance") or {}
             source_ref = data.get("source_ref") or {}
+            snapshot_keys = ("content_kind", "content_checksum_sha256", "retrieval_trace_id")
+            snapshot_matches = (not source_ref or bool(source_ref.get("content_checksum_sha256"))) and all(
+                not source_ref.get(key) or source_ref[key] == provenance.get(key)
+                for key in snapshot_keys
+            )
+            # Enrich only the same snapshot. Older evidence can carry a frozen
+            # checksum while the document was historically overwritten; pairing
+            # it with today's artifact or retrieval time would be misleading.
+            snapshot = dict(provenance) if snapshot_matches else {}
+            snapshot.update({key: value for key, value in source_ref.items() if value is not None})
+            excerpt = str(data.get("content") or data.get("excerpt") or "")
             citation.update(
                 {
                     "source_type": "scientific_literature",
@@ -419,14 +616,23 @@ class ResearchContextService:
                     "claim_id": data.get("claim_id"),
                     "chunk_id": data.get("chunk_id"),
                     "reference_ids": [data.get("ref_id")] if data.get("ref_id") else [],
-                    "content_kind": provenance.get("content_kind") or source_ref.get("content_kind"),
-                    "content_checksum_sha256": (
-                        provenance.get("content_checksum_sha256") or source_ref.get("content_checksum_sha256")
-                    ),
-                    "retrieval_trace_id": (
-                        provenance.get("retrieval_trace_id") or source_ref.get("retrieval_trace_id")
-                    ),
+                    "content_kind": snapshot.get("content_kind"),
+                    "content_checksum_sha256": snapshot.get("content_checksum_sha256"),
+                    "retrieval_trace_id": snapshot.get("retrieval_trace_id"),
                     "verification_status": data.get("verification_status"),
+                    "chunk_position": data.get("position", source_ref.get("chunk_position")),
+                    "chunk_version": data.get("chunk_version", source_ref.get("chunk_version")),
+                    "excerpt": excerpt[:1600],
+                    "excerpt_truncated": len(excerpt) > 1600,
+                    "excerpt_checksum_sha256": (
+                        hashlib.sha256(excerpt.encode()).hexdigest() if excerpt else None
+                    ),
+                    "retrieved_at": snapshot.get("retrieved_at"),
+                    "raw_content_artifact_id": snapshot.get("raw_content_artifact_id"),
+                    **{key: data[key] for key in (
+                        "project_argument", "evidence_relation", "interpretation", "limitations", "anchor_status", "locator"
+                    ) if key in data},
+                    **({"paper_claim": data.get("claim")} if data.get("project_argument") else {}),
                 }
             )
         return citation

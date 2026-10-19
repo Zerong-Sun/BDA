@@ -62,6 +62,79 @@ describe('CopilotChat', () => {
     vi.clearAllMocks()
   })
 
+  it('never imports unscoped legacy history or another project into a new project team', async () => {
+    const foreign = [{ role: 'assistant' as const, content: 'Other project private result' }]
+    useAppStore.setState({
+      copilotMessages: [{ role: 'assistant', content: 'Unscoped legacy private result' }],
+      copilotSessions: { other_project: { conversationId: 'other-conversation', bot: 'analyst', messages: foreign } },
+    })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    expect(screen.queryByText('Other project private result')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unscoped legacy private result')).not.toBeInTheDocument()
+    fireEvent.change(input, { target: { value: 'Current project progress' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0]).toMatchObject({
+      project_id: 'proj_test', conversation_id: null, bot: 'conductor',
+      messages: [{ role: 'user', content: 'Current project progress' }],
+    })
+    expect(useAppStore.getState().copilotSessions.other_project.messages).toEqual(foreign)
+    expect(useAppStore.getState().copilotMessages[0].content).toBe('Unscoped legacy private result')
+  })
+
+  it('offers persistent calculation mode without sending conflicting bot hints or creating a research task', async () => {
+    const taskRequested = vi.fn()
+    const view = renderWithProviders(<CopilotChat externalRoster onTaskRequested={taskRequested} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Lab calculations' }))
+    expect(screen.getByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.change(screen.getByLabelText('Ask the Copilot a question'), { target: { value: 'Plan a dilution of 1 µM to 10 nM, 1000 µL final volume.' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0]).toMatchObject({ skill: 'wetlab-read', bot: undefined, intent: 'chat' })
+    expect(taskRequested).not.toHaveBeenCalled()
+    view.unmount()
+    renderWithProviders(<CopilotChat externalRoster />)
+    expect(await screen.findByRole('button', { name: 'Lab calculations' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Research chat' }))
+    expect(useAppStore.getState().copilotSessions.proj_test.mode).toBe('general')
+  })
+
+  it('preserves the accepted conversation and unlocks input when waiting times out', async () => {
+    vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, _chunk, _status, _message, accepted) => {
+      accepted?.({ conversationId: 'accepted-conversation', messageId: 'accepted-message' })
+      throw new Error('copilot_wait_timeout')
+    })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    fireEvent.change(input, { target: { value: 'Hello' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(useAppStore.getState().copilotSessions.proj_test?.pending).toBeNull())
+    const session = useAppStore.getState().copilotSessions.proj_test
+    expect(session.conversationId).toBe('accepted-conversation')
+    expect(session.messages[0]).toMatchObject({ id: 'accepted-message', content: 'Hello' })
+    expect(session.error).toContain('may still be processing')
+    expect(input).toBeEnabled()
+    expect(streamCopilotMessage).toHaveBeenCalledOnce()
+  })
+
+  it('retains source links when the SSE message metadata arrives before its text chunk', async () => {
+    vi.mocked(streamCopilotMessage).mockImplementationOnce(async (_payload, onChunk, _onStatus, onMessage) => {
+      const content = 'Saved project observation. [cite:1]'
+      // This is the order used by the real JSON message SSE transport.
+      onMessage?.({ content, citations: [{ source_type: 'external', label: 'Saved source', url: 'https://example.test/source' }], tool_calls: [{ name: 'get_reference_content' }] })
+      onChunk(content)
+      return { conversationId: 'citation-conversation', messageId: 'citation-message' }
+    })
+    renderWithProviders(<CopilotChat />)
+    fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), { target: { value: 'Read the saved source.' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(screen.getByRole('link', { name: 'View source 1' })).toBeInTheDocument())
+    const message = useAppStore.getState().copilotSessions.proj_test.messages.at(-1)
+    expect(message?.meta?.citations).toHaveLength(1)
+    expect(message?.meta?.toolCalls).toEqual([{ name: 'get_reference_content' }])
+  })
+
   it('keeps one conversation across drawer/page remounts', async () => {
     const rendered = renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
@@ -178,7 +251,7 @@ describe('CopilotChat', () => {
 
     expect(await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })).toHaveAttribute(
       'data-slot',
-      'input',
+      'textarea',
     )
     expect(screen.getByRole('button', { name: 'Send message' })).toHaveAttribute(
       'data-slot',
@@ -199,6 +272,17 @@ describe('CopilotChat', () => {
     })
   })
 
+  it('keeps a multiline draft on Shift+Enter without sending', async () => {
+    renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
+    const input = await screen.findByRole('textbox', { name: 'Ask the Copilot a question' })
+    fireEvent.change(input, { target: { value: 'First line\nSecond line' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(streamCopilotMessage).not.toHaveBeenCalled()
+    expect(input).toHaveValue('First line\nSecond line')
+    const scroll = document.querySelector('[data-slot="scroll-area"]')!
+    expect(input.compareDocumentPosition(scroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('does not submit Enter while an IME composition is active', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
@@ -215,7 +299,7 @@ describe('CopilotChat', () => {
   it('localizes citation origins and secures external links', async () => {
     useAppStore.setState({
       language: 'zh',
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: '给出来源' },
         {
           role: 'assistant',
@@ -229,18 +313,21 @@ describe('CopilotChat', () => {
             ],
           },
         },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/research; project_id=proj_test" />)
 
     expect(await screen.findByText('引用结果')).toBeInTheDocument()
-    const citation = await screen.findByRole('link')
-    expect(citation).toHaveAccessibleName('来源 1 外部')
+    expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '参考资料（1）' }))
+    expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '[1] 来源 1' }))
+    const citation = await screen.findByRole('link', { name: '打开原始来源 · 来源 1' })
+    expect(screen.getByText('外部参考来源')).toBeInTheDocument()
     expect(citation).toHaveAttribute('target', '_blank')
     expect(citation).toHaveAttribute('rel', expect.stringContaining('noopener'))
     expect(citation).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
-    expect(citation.querySelector('[data-slot="badge"]')).toBeInTheDocument()
   })
 
   it('shows the active tool while Copilot is preparing a streamed answer', async () => {
@@ -269,10 +356,10 @@ describe('CopilotChat', () => {
 
   it('sanitizes persisted empty assistant placeholders before calling the API', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: 'Earlier question' },
         { role: 'assistant', content: '' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
@@ -298,10 +385,10 @@ describe('CopilotChat', () => {
 
   it('hides save-to-review on generic workflow chat', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: 'Explain candidate ranking' },
         { role: 'assistant', content: 'Candidate A is ranked first because of composite score.' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
@@ -313,14 +400,14 @@ describe('CopilotChat', () => {
 
   it('shows save-to-review when a review section prompt was used', async () => {
     useAppStore.setState({
-      copilotMessages: [
+      copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         {
           role: 'user',
           content: '请完善结合策略章节',
           meta: { reviewTrack: 'binding_strategy' },
         },
         { role: 'assistant', content: 'Binding strategy draft with supporting evidence.' },
-      ],
+      ] } },
     })
 
     renderWithProviders(<CopilotChat pageContext="route=/research; research_tab=evidence; project_id=proj_test" />)
@@ -370,18 +457,7 @@ describe('CopilotChat', () => {
     expect(payload?.skill).toBeUndefined()
   })
 
-  it('sends unhinted when the roster is unavailable', async () => {
-    // The picker is absent and the chat still works. A roster that failed to
-    // load must not take the copilot down with it.
-    //
-    // It used to fall back to a client-side skill guess here. That is gone with
-    // the hand-written skill registry, and the change is a widening in this one
-    // failure mode: the turn now carries no hint and gets the project's
-    // configured set - the documented undifferentiated case, and the same thing
-    // a message matching no trigger has always got. It is not a permission
-    // change, because the server intersects whatever arrives with that set
-    // either way; it is the loss of an incidental narrowing that only ever
-    // applied when the roster request had failed.
+  it('keeps the project lead as default when the roster is unavailable', async () => {
     renderWithProviders(<CopilotChat pageContext="route=/workflow; project_id=proj_test" />)
 
     fireEvent.change(await screen.findByLabelText('Ask the Copilot a question'), {
@@ -391,7 +467,7 @@ describe('CopilotChat', () => {
 
     await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalled())
     const payload = vi.mocked(streamCopilotMessage).mock.calls.at(-1)?.[0]
-    expect(payload?.bot).toBeUndefined()
+    expect(payload?.bot).toBe('conductor')
     expect(payload?.skill).toBeUndefined()
     expect(screen.queryByRole('combobox', { name: 'Copilot bot' })).not.toBeInTheDocument()
   })
@@ -459,7 +535,7 @@ describe('CopilotChat', () => {
     fireEvent.pointerUp(conductor, { button: 0 })
     fireEvent.click(conductor)
 
-    expect(await screen.findByText('You route work; you do not do it.')).toBeInTheDocument()
+    expect(await screen.findByText(/Start durable coordination from the team chat/)).toBeInTheDocument()
     expect(screen.getByText('May delegate to')).toBeInTheDocument()
     // ...and the named operator is a control, not prose: selecting it is the
     // action a reader wants next.

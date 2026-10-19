@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useQueryClient } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -79,6 +80,65 @@ function stub(items: unknown[]) {
 }
 
 describe('Room', () => {
+  it('shows real background discussion and opens its evidence', async () => {
+    stub([{ kind: 'discussion', id: 'turn-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'PD-L1 route comparison is ready for review.' } }])
+    const onOpenRun = vi.fn()
+    renderWithProviders(<Room onOpenRun={onOpenRun} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
+    expect(await screen.findByText('PD-L1 route comparison is ready for review.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open task and evidence' }))
+    expect(onOpenRun).toHaveBeenCalledWith('run-1')
+  })
+
+  it('keeps a delegated task visible when its parent is on an older page', async () => {
+    stub([{ kind: 'task', id: 'child-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      task: task({ id: 'child-1', parent_run_id: 'older-parent', goal: 'Check PD-L1 geometry' }) }])
+    renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
+    expect(await screen.findByText('Check PD-L1 geometry')).toBeInTheDocument()
+  })
+
+  it('recovers a pending server reply after a reload without a local chat stream', async () => {
+    stub([])
+    useAppStore.setState({ copilotSessions: {}, copilotMessages: [] })
+    let reads = 0
+    server.use(http.get('/api/v2/copilot/projects/:projectId/room', () => {
+      reads += 1
+      const user = { kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: null,
+        message: message({ id: 'm1', role: 'user', content: 'Reloaded question', status: reads === 1 ? 'pending' : 'completed' }) }
+      const answer = { kind: 'message', id: 'm2', occurred_at: '2026-09-14T08:01:00Z', bot: 'planner',
+        message: message({ id: 'm2', content: 'Reply recovered from the server.' }) }
+      return HttpResponse.json({ items: reads === 1 ? [user] : [answer, user], next_cursor: null })
+    }))
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Reloaded question')).toBeInTheDocument()
+    expect(await screen.findByText('Reply recovered from the server.', {}, { timeout: 6000 })).toBeInTheDocument()
+    expect(reads).toBe(2)
+  }, 10_000)
+
+  it('replaces the accepted echo by id while keeping the reply placeholder and repeated messages', async () => {
+    stub(['m1', 'm2'].map((id) => ({
+      kind: 'message', id, occurred_at: '2026-09-14T08:00:00Z', bot: null,
+      message: message({ id, role: 'user', content: 'hi', status: 'pending' }),
+    })))
+    useAppStore.setState({ copilotSessions: { proj_test: {
+      conversationId: 'c1', bot: null, pending: { id: 'turn-1', stage: 'thinking', detail: null },
+      messages: [
+        { role: 'assistant', content: 'Old reply must not be echoed.' },
+        { id: 'm2', role: 'user', content: 'hi' },
+        { role: 'assistant', content: '' },
+      ],
+    } } })
+    renderWithProviders(<Room />)
+    await waitFor(() => expect(screen.getAllByText('hi')).toHaveLength(2))
+    expect(screen.getByText('Replying')).toBeInTheDocument()
+    expect(screen.getByRole('status')).not.toBeEmptyDOMElement()
+    expect(screen.queryByText('Old reply must not be echoed.')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Say something in the room')).toBeDisabled()
+    useAppStore.setState({ copilotSessions: {} })
+  })
+
   it('receives a project question as an unsent editable draft and consumes it once', async () => {
     stub([])
     useAppStore.setState({ copilotDraft: 'Compare the selected structures using their evidence.' })
@@ -92,12 +152,89 @@ describe('Room', () => {
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('My revised question, still unsent.'))
   })
 
+  it.each([
+    ['en', 'This turn reached its call limit'],
+    ['zh', '本轮已达到调用限制'],
+  ] as const)('explains a stored allowance failure in %s and allows a new question', async (language, explanation) => {
+    useAppStore.setState({ language })
+    stub([{ kind: 'message', id: 'failure', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      status: 'failed', content: 'Copilot provider failed; no scientific conclusion was generated.',
+      error: 'The task allowance cannot cover another request.',
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText(new RegExp(explanation))).toBeInTheDocument()
+    expect(screen.queryByText(/Copilot provider failed/)).not.toBeInTheDocument()
+    expect(screen.queryByText('The task allowance cannot cover another request.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry|重试/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: language === 'zh' ? '在研究室里发言' : 'Say something in the room' })).toBeEnabled()
+    useAppStore.setState({ language: 'en' })
+  })
+
+  it('uses stored error codes while keeping raw exceptions out of the room', async () => {
+    stub([{ kind: 'message', id: 'failure', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      status: 'failed', content: 'Raw exception at https://private.invalid',
+      error: 'Authentication failed: token=private-token at https://private.invalid', context: { error_code: 'llm_budget_exhausted' },
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText(/This turn reached its call limit/)).toBeInTheDocument()
+    expect(screen.queryByText(/private-token|private.invalid|Raw exception/)).not.toBeInTheDocument()
+  })
+
+  it('retains a partial draft and distinguishes its incomplete review from a failed reply', async () => {
+    stub([{ kind: 'message', id: 'partial', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      content: 'Saved draft with evidence; final review is incomplete.',
+      context: { delivery_status: 'partial', review_status: 'not_completed', stop_reason: 'llm_budget_exhausted' },
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Saved draft with evidence; final review is incomplete.')).toBeVisible()
+    expect(screen.getByText(/partially completed · review incomplete/)).toBeVisible()
+    expect(screen.queryByText(/could not answer/)).not.toBeInTheDocument()
+  })
+
+  it('prepares a fresh conversation without resending or removing server history', async () => {
+    stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message() }])
+    useAppStore.setState({ copilotSessions: { proj_test: { conversationId: 'old-conversation', messages: [], bot: 'planner', input: 'A narrower question', mode: 'bench' } } })
+    renderWithProviders(<Room />)
+    await screen.findByText('Two routes fit.')
+    fireEvent.click(screen.getByRole('button', { name: 'New conversation' }))
+    expect(useAppStore.getState().copilotSessions.proj_test.conversationId).toBeNull()
+    expect(useAppStore.getState().copilotSessions.proj_test.pending).toBeUndefined()
+    expect(useAppStore.getState().copilotSessions.proj_test.mode).toBe('bench')
+    expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('A narrower question')
+    expect(screen.getByText('Two routes fit.')).toBeVisible()
+    expect(screen.getByText(/Earlier records remain in this room/)).toBeVisible()
+    useAppStore.setState({ copilotSessions: {} })
+  })
+
   it('names the operator that produced a message', async () => {
     stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message() }])
     renderWithProviders(<Room />)
 
     expect(await screen.findByText('Planner')).toBeInTheDocument()
     expect(screen.getByText('Two routes fit.')).toBeInTheDocument()
+  })
+
+  it('shows persisted canonical selections and highlighted views as exact residue links after loading the room', async () => {
+    const residues = [{ chain: 'B', seq: 46, insertion_code: null, name: 'LYS' }, { chain: 'B', seq: 54, insertion_code: 'A', name: 'ARG' }]
+    stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner', message: message({
+      content: 'Geometric contacts from predicted coordinates.',
+      tool_calls: [
+        { name: 'list_structure_residues', status: 'completed', result: { artifact_id: 'artifact-one', filename: 'model.pdb', viewer_selection: { artifact_id: 'artifact-one', residues } } },
+        { name: 'render_structure_view', status: 'completed', result: { artifact_id: 'artifact-one', filename: 'model.pdb', highlighted: residues } },
+      ],
+    }) }])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Geometric contacts from predicted coordinates.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tool call details' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Tool call details' }))
+    const selections = await screen.findAllByRole('link', { name: 'Open structure and residues in Results' })
+    expect(selections).toHaveLength(2)
+    for (const selection of selections) {
+      const query = new URLSearchParams(selection.getAttribute('href')!.split('?')[1])
+      expect(query.get('project')).toBe('proj_test')
+      expect(query.get('artifact')).toBe('artifact-one')
+      expect(JSON.parse(query.get('residues')!)).toEqual(residues)
+    }
   })
 
   it('leaves an unattributed turn unattributed rather than defaulting it to a bot', async () => {
@@ -122,6 +259,7 @@ describe('Room', () => {
       },
     ])
     renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
 
     expect(await screen.findByText('Draft is ready.')).toBeInTheDocument()
     expect(screen.getByText('The queue forces a GPU')).toBeInTheDocument()
@@ -146,7 +284,7 @@ describe('Room', () => {
     stub([])
     renderWithProviders(<Room />)
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/appears here/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Tell the project lead/i)
   })
 
   it('offers a retry when the feed cannot be read', async () => {
@@ -177,7 +315,7 @@ describe('Room addressing', () => {
     // per project - typing first would write it under the empty project key and
     // lose it as soon as the real one arrives. Waiting for the loaded room is
     // how a person reaches the composer too.
-    await screen.findByText(/appears here/i)
+    await screen.findByText(/Tell the project lead/i)
     const input = await screen.findByLabelText('Say something in the room')
     fireEvent.change(input, { target: { value: text } })
     return { onAssign }
@@ -269,6 +407,7 @@ describe('Room decisions', () => {
   it('shows what was decided and offers no further choice once it is settled', async () => {
     stub([decisionEntry({ status: 'answered', answer: 'hot3', version: 2 })])
     renderWithProviders(<Room />)
+    fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history \(1\)/ }))
 
     expect(await screen.findByText('Decided: Target I126/L128/A132')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Choose:/ })).not.toBeInTheDocument()
@@ -329,4 +468,118 @@ describe('Room attachments', () => {
     expect(await screen.findByLabelText('Say something in the room')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Attached to your next message' })).not.toBeInTheDocument()
   })
+})
+
+
+it('keeps cleaned messages out by default and provides a labelled audit view', async () => {
+  stub([])
+  const requests: string[] = []
+  server.use(http.get('/api/v2/copilot/projects/:projectId/room', ({ request }) => {
+    const includeArchived = new URL(request.url).searchParams.get('include_archived')
+    requests.push(includeArchived ?? '')
+    return HttpResponse.json({ items: includeArchived === 'true' ? [{
+      kind: 'message', id: 'old-launch', occurred_at: '2026-09-14T08:00:00Z', bot: 'planner',
+      message: message({ id: 'old-launch', content: 'Old launch notice', context: { chat_archive: { archived: true } } }),
+    }] : [], next_cursor: null })
+  }))
+  renderWithProviders(<Room />)
+  await waitFor(() => expect(requests).toContain('false'))
+  expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: /Discussion and process history/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Show archived messages' }))
+  expect(await screen.findByText('Old launch notice')).toBeInTheDocument()
+  expect(screen.getByText(/archived history/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Hide archived messages' }))
+  await waitFor(() => expect(screen.queryByText('Old launch notice')).not.toBeInTheDocument())
+})
+
+
+it('folds tool output in the latest answer while keeping the conclusion, next step and original citation numbers', async () => {
+  stub([{ kind: 'message', id: 'm1', occurred_at: '2026-09-14T08:00:00Z', message: message({
+    content: '**Work performed**\n\nget_compute_status → {"jobs": []}\n\n## Conclusion\nNo validated result yet.[cite:2]\n\n## Next steps\nCheck the sample identity.',
+    citations: [{ title: 'First source' }, { title: 'Second source' }],
+  }) }])
+  renderWithProviders(<Room />)
+  expect(await screen.findByText('No validated result yet.')).toBeInTheDocument()
+  expect(screen.getByText('Check the sample identity.')).toBeInTheDocument()
+  expect(screen.queryByText(/get_compute_status/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Tool output and process records' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('link', { name: 'View source 2' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Tool output and process records' }))
+  expect(await screen.findByText(/get_compute_status/)).toBeVisible()
+})
+
+it('opens only the newest conclusion with next step, leaving revisions and notices in history', async () => {
+  stub([
+    { kind: 'task', id: 'run-1', occurred_at: '2026-09-14T08:30:00Z', task: task({ status: 'failed', delivery_state: 'blocked' }) },
+    { kind: 'discussion', id: 'final', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'Latest evidence remains a draft.\n\nCheck the missing sequence.', is_delivery: true, next_action: 'Check the missing sequence.', scientific_review: null } },
+    { kind: 'discussion', id: 'revision', occurred_at: '2026-09-14T08:15:00Z', bot: 'planner',
+      discussion: { run_id: 'run-1', content: 'Earlier repeated revision.', is_delivery: true } },
+    { kind: 'message', id: 'notice', occurred_at: '2026-09-14T08:10:00Z', message: message({ id: 'notice', content: 'Task has started.', tool_calls: [{ name: 'start_team_task', status: 'completed' }] }) },
+  ])
+  const onOpenRun = vi.fn()
+  renderWithProviders(<Room onOpenRun={onOpenRun} />)
+  expect(await screen.findByText('Latest evidence remains a draft.')).toBeInTheDocument()
+  expect(screen.getAllByText('Check the missing sequence.')).toHaveLength(1)
+  expect(screen.getByText(/Automated review of this reply: No completion recorded/)).toBeInTheDocument()
+  expect(screen.queryByText('Earlier repeated revision.')).not.toBeInTheDocument()
+  expect(screen.queryByText('Task has started.')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Latest task and review.*Blocked/ }))
+  expect(onOpenRun).toHaveBeenCalledWith('run-1')
+  fireEvent.click(screen.getByRole('button', { name: /Discussion and process history/ }))
+  expect(await screen.findByText('Earlier repeated revision.')).toBeInTheDocument()
+  expect(screen.getByText('Task has started.')).toBeInTheDocument()
+})
+
+
+it('keeps the multiline composer before a long answer and does not send on Shift+Enter', async () => {
+  stub([{ kind: 'message', id: 'm1', occurred_at: '2026-10-18T08:00:00Z', message: message({ content: 'A long saved result.' }) }])
+  renderWithProviders(<Room />)
+  const input = await screen.findByRole('textbox', { name: 'Say something in the room' })
+  const result = await screen.findByText('A long saved result.')
+  expect(input.tagName).toBe('TEXTAREA')
+  expect(input.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.change(input, { target: { value: 'First line\nSecond line' } })
+  fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+  expect(input).toHaveValue('First line\nSecond line')
+  expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+})
+
+
+it('keeps the restored project room and draft when another project feed resolves last', async () => {
+  window.location.hash = '/bots'
+  stub([])
+  useAppStore.setState({ language: 'en', copilotDraft: '', copilotSessions: {}, appMode: 'application' })
+  let release!: () => void
+  const delayed = new Promise<void>(resolve => { release = resolve })
+  let otherRequested = false
+  server.use(
+    http.get('/api/v2/projects', () => HttpResponse.json({ items: [PROJECT, { ...PROJECT, id: 'proj_other', name: 'Other project' }], next_cursor: null })),
+    http.get('/api/v2/copilot/projects/:projectId/room', async ({ params }) => {
+      if (params.projectId === 'proj_other') { otherRequested = true; await delayed }
+      const id = String(params.projectId)
+      return HttpResponse.json({ items: [{ kind: 'message', id: `message-${id}`, occurred_at: '2026-10-20T00:00:00Z', bot: 'planner', message: message({ id: `message-${id}`, content: `Conclusion for ${id}` }) }], next_cursor: null })
+    }),
+  )
+  let client!: ReturnType<typeof useQueryClient>
+  function AuditedRoom() { client = useQueryClient(); return <Room /> }
+  renderWithProviders(<AuditedRoom />)
+  expect(await screen.findByText('Conclusion for proj_test')).toBeVisible()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Say something in the room' }), { target: { value: 'Unsent project A draft' } })
+  act(() => useAppStore.getState().setActiveProjectId('proj_other'))
+  await waitFor(() => expect(otherRequested).toBe(true))
+  expect(screen.queryByText('Conclusion for proj_test')).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('')
+  act(() => useAppStore.getState().setActiveProjectId('proj_test'))
+  expect(await screen.findByText('Conclusion for proj_test')).toBeVisible()
+  await act(async () => { release(); await delayed })
+  await waitFor(() => expect(client.getQueryData(['copilot', 'room', 'proj_other', { includeArchived: false }])).toMatchObject({ pages: [{ items: [{ id: 'message-proj_other' }] }] }))
+  expect(screen.queryByText('Conclusion for proj_other')).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: 'Say something in the room' })).toHaveValue('Unsent project A draft')
+  for (const link of screen.getAllByRole('link')) {
+    const project = new URL(link.getAttribute('href')!, 'http://localhost').searchParams.get('project')
+    if (project) expect(project).toBe('proj_test')
+  }
 })

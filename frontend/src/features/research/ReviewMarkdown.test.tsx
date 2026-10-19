@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import { ReviewMarkdown } from './ReviewMarkdown'
 
 const LONG = [
@@ -73,5 +74,117 @@ describe('ReviewMarkdown', () => {
     const table = container.querySelector('table')
     expect(table).not.toBeNull()
     expect(container.querySelector('th')?.textContent).toBe('Task')
+  })
+})
+
+describe('traceable inline citations', () => {
+  afterEach(cleanup)
+  const citation = { entity_id: 'chunk-one', label: 'Saved paper', url: 'https://example.org/paper', document_id: 'doc-one', chunk_id: 'chunk-one', content_kind: 'database_abstract', content_checksum_sha256: 'a'.repeat(64), retrieval_trace_id: 'trace-one', excerpt: 'The measured result.', review_status: 'pending_review' }
+
+  it('keeps consulted sources behind one compact control without adding document headings', () => {
+    const { container } = render(<ReviewMarkdown citations={[citation, { ...citation, entity_id: 'other', label: 'Methods' }]}>{'The answer remains the main content.'}</ReviewMarkdown>)
+    expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Methods')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reference materials (2)' }))
+    expect(screen.getByRole('button', { name: '[2] Methods' })).toBeVisible()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    for (const icon of container.querySelectorAll('svg')) expect(icon).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('deduplicates identical records while every original citation number opens its saved evidence', () => {
+    render(<ReviewMarkdown citations={[citation, { ...citation }, { ...citation, excerpt: 'A different passage.' }]}>{'First.[cite:1] Repeated.[cite:2] Different passage.[cite:3]'}</ReviewMarkdown>)
+    expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(screen.getByRole('link', { name: 'View source 2' }))
+    expect(screen.getByRole('button', { name: '[1, 2] Saved paper' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('The measured result.')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View source 1' })).toHaveAttribute('href', screen.getByRole('link', { name: 'View source 2' }).getAttribute('href'))
+    fireEvent.click(screen.getByRole('link', { name: 'View source 3' }))
+    expect(screen.getByRole('button', { name: '[3] Saved paper' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('A different passage.')).toBeVisible()
+  })
+
+  it('links only an explicit marker at its original position and opens its exact evidence', () => {
+    const { container } = render(<ReviewMarkdown citations={[citation]}>{'Supported result.[cite:1] Unverified hypothesis.'}</ReviewMarkdown>)
+    const paragraph = container.querySelector('p')!
+    expect(paragraph.textContent).toBe('Supported result.[1] Unverified hypothesis.')
+    const marker = screen.getByRole('link', { name: 'View source 1' })
+    fireEvent.click(marker)
+    const detail = document.getElementById(marker.getAttribute('href')!.slice(1))!
+    expect(detail.querySelector('button')).toHaveAttribute('aria-expanded', 'true')
+    expect(detail).toHaveTextContent('Database abstract')
+    expect(detail).toHaveTextContent('The measured result.')
+    expect(detail).toHaveTextContent('a'.repeat(64))
+    expect(container.querySelectorAll('sup')).toHaveLength(1)
+  })
+
+  it('opens a compact source group and its exact source from an inline citation', () => {
+    const scroll = vi.fn()
+    const previousScroll = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scroll
+    try {
+      render(<ReviewMarkdown compactCitations citations={[citation, { ...citation, entity_id: 'second', label: 'Second paper' }]}>{'Supported result.[cite:2]'}</ReviewMarkdown>)
+      expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByTestId('citation-details')).not.toBeInTheDocument()
+      const hash = window.location.hash
+      const marker = screen.getByRole('link', { name: 'View source 2' })
+      fireEvent.click(marker)
+      expect(screen.getByRole('button', { name: 'Reference materials (2)' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('button', { name: '[1] Saved paper' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByText('The measured result.')).toBeInTheDocument()
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
+      expect(scroll.mock.contexts[0]).toBe(document.getElementById(marker.getAttribute('href')!.slice(1)))
+      expect(window.location.hash).toBe(hash)
+      fireEvent.click(screen.getByRole('button', { name: 'Reference materials (2)' }))
+      fireEvent.click(screen.getByRole('link', { name: 'View source 2' }))
+      expect(screen.getByRole('button', { name: '[2] Second paper' })).toHaveAttribute('aria-expanded', 'true')
+    } finally {
+      HTMLElement.prototype.scrollIntoView = previousScroll
+    }
+  })
+
+  it('never assigns consulted sources to unmarked sentences or invents missing references', () => {
+    const { container } = render(<ReviewMarkdown citations={[citation]}>{'No mapping. Unknown [cite:9]. Code `[cite:1]`.'}</ReviewMarkdown>)
+    expect(container.querySelector('sup')).toBeNull()
+    expect(container).toHaveTextContent('Unknown [cite:9]')
+    expect(container.querySelector('code')).toHaveTextContent('[cite:1]')
+  })
+
+  it('does not turn authored links into citation markers by matching their URL', () => {
+    const { container } = render(<ReviewMarkdown citations={[citation]}>{'[Ordinary link](#bda-citation-1) Supported.[cite:1]'}</ReviewMarkdown>)
+    expect(screen.getByRole('link', { name: 'Ordinary link' }).closest('sup')).toBeNull()
+    expect(container.querySelectorAll('sup')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'View source 1' })).toHaveTextContent('[1]')
+  })
+
+  it('resolves legacy evidence tags only when every provenance field agrees', () => {
+    const tag = `[document_id=doc-one; chunk_id=chunk-one; content_kind=database_abstract; content_checksum_sha256=${'a'.repeat(64)}; retrieval_trace_id=trace-one]`
+    const { container } = render(<ReviewMarkdown citations={[citation]}>{`Result.${tag} Other.${tag.replace('trace-one', 'wrong-trace')}`}</ReviewMarkdown>)
+    expect(container.querySelectorAll('sup')).toHaveLength(1)
+    expect(container).toHaveTextContent('retrieval_trace_id=wrong-trace')
+  })
+
+  it('does not offer unsafe external citation links', () => {
+    render(<ReviewMarkdown citations={[{ ...citation, url: 'javascript:alert(1)' }]}>{'Result.[cite:1]'}</ReviewMarkdown>)
+    expect(screen.queryByRole('link', { name: /Open original source/ })).not.toBeInTheDocument()
+  })
+
+  it('resolves the public bibliography numbering without guessing array positions', () => {
+    const citations = [9, 10, 11, 36, 37].map((number) => ({ ...citation, entity_id: `R${number}`, bibliography_number: String(number) }))
+    const { container } = render(<ReviewMarkdown citations={citations}>{'Pain.[9–11] Structure.[36,37] Missing.[41–44]'}</ReviewMarkdown>)
+    expect(container.querySelectorAll('sup')).toHaveLength(5)
+    expect(container.querySelector('p')).toHaveTextContent('Pain.[1][2][3] Structure.[4][5] Missing.[41–44]')
+  })
+
+  it('keeps project navigation and source metadata in the same citation detail', () => {
+    const source = { ...citation, source_type: 'research_workspace', workspace_type: 'structure', label: "{'zh': '结构来源', 'en': 'Structure source'}" }
+    render(<MemoryRouter><ReviewMarkdown citations={[source]} projectId="project/one">{'Result.[cite:1]'}</ReviewMarkdown></MemoryRouter>)
+    fireEvent.click(screen.getByRole('link', { name: 'View source 1' }))
+    expect(screen.getByRole('button', { name: '[1] Structure source' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'View project material' })).toHaveAttribute('href', '/research?tab=structures&project=project%2Fone')
+    expect(screen.getByRole('link', { name: 'Open original source · Structure source' })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByText('The measured result.')).toBeInTheDocument()
+    expect(screen.getAllByTestId('citation-details')).toHaveLength(1)
   })
 })

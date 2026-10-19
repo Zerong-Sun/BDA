@@ -63,19 +63,21 @@ def _text(value: object) -> str:
 
 
 def _localized(value: object, fallback: object = "") -> LocalizedResearchText:
-    default = _text(fallback)
+    # Artifact lineage may already store a bilingual name/role/method. Keep its
+    # locales instead of turning the dictionary into a visible Python repr.
+    base = _localized(fallback) if isinstance(fallback, dict) else LocalizedResearchText(default=_text(fallback))
     if isinstance(value, dict):
         raw_default = value.get("default")
-        zh_value = value.get("zh") or value.get("zh-CN")
-        en_value = value.get("en")
-        default = _text(raw_default or default or zh_value or en_value)
+        zh_value = value.get("zh") or value.get("zh-CN") or base.zh
+        en_value = value.get("en") or base.en
+        default = _text(raw_default or base.default or zh_value or en_value)
         return LocalizedResearchText(
             zh=_text(zh_value) or None,
             en=_text(en_value) or None,
             default=default,
         )
-    raw = _text(value) or default
-    return LocalizedResearchText(default=raw)
+    raw = _text(value) or base.default
+    return LocalizedResearchText(zh=base.zh, en=base.en, default=raw)
 
 
 def _strings(value: object) -> list[str]:
@@ -463,6 +465,8 @@ def _knowledge(rows: list[KnowledgeEntry]) -> tuple[list[ResearchWorkspaceKnowle
     methods: list[ResearchWorkspaceKnowledge] = []
     datasets: list[ResearchWorkspaceKnowledge] = []
     for row in rows:
+        if row.entry_type == "bot_work_record":
+            continue  # System journal revisions have a dedicated reader, never scientific methods.
         source = row.source or {}
         localized = source.get("localized_content", {})
         key = _text(source.get("entry_key") or row.entry_type)
@@ -559,7 +563,7 @@ def build_research_workspace(session: Session, project: Project) -> ResearchWork
     )
     knowledge = list(
         session.scalars(
-            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id).order_by(KnowledgeEntry.created_at)
+            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id, KnowledgeEntry.entry_type != "bot_work_record").order_by(KnowledgeEntry.created_at)
         )
     )
     target = session.get(Target, project.primary_target_id) if project.primary_target_id else None

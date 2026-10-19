@@ -109,12 +109,17 @@ async def http_error_handler(request: Request, exc: HTTPException) -> JSONRespon
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
+    if request.url.path.startswith("/api/v2/auth/"):
+        # Pydantic's input can contain the entire request (including passwords and
+        # one-use codes) for model/extra-field errors. Never reflect it to clients.
+        errors = [{key: value for key, value in error.items() if key not in {"input", "ctx"}} for error in errors]
     return problem_response(
         request,
         status=422,
         code="validation_error",
         detail="Request validation failed",
-        errors=exc.errors(),
+        errors=errors,
     )
 
 

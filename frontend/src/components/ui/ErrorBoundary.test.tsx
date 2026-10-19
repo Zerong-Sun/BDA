@@ -39,8 +39,8 @@ describe('ErrorBoundary', () => {
     const { container } = renderWithProviders(<AppShell />)
 
     const shell = container.querySelector('[data-slot="app-shell"]')
-    const content = shell?.querySelector(':scope > div')
     const main = shell?.querySelector('main')
+    const content = main?.parentElement
     expect(shell).toHaveClass('flex', 'min-h-screen', 'min-w-0', 'flex-col')
     expect(content).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
     expect(main).toHaveClass('min-h-0', 'min-w-0', 'flex-1', 'overflow-y-auto')

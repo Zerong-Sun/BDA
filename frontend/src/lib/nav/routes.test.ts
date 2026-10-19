@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchRoutes, type NavTranslationKey } from './routes'
+import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchGroups, workbenchRoutes, type NavTranslationKey } from './routes'
 
 /**
  * The registry exists to stop two copies of the route list drifting. These
@@ -24,7 +24,7 @@ describe('route registry', () => {
     for (const route of PRIMARY_ROUTES) {
       expect(behind).not.toContain(route)
     }
-    expect(behind).toContain('/workflow')
+    expect(PRIMARY_ROUTES).toContain('/workflow')
     expect(behind).toContain('/results')
   })
 
@@ -34,6 +34,20 @@ describe('route registry', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })
 
+  it('gives lab tools one supporting destination and keeps history and FAQ out of the main route registry', () => {
+    expect(PRIMARY_ROUTES).not.toContain('/tools')
+    expect(APP_ROUTES.map((route) => route.to)).not.toContain('/timeline')
+    expect(APP_ROUTES.map((route) => route.to)).not.toContain('/faq')
+    expect(workbenchGroups(false).map((group) => [group.label, group.routes.map((route) => route.to)])).toEqual([
+      ['Computational design', ['/candidates']],
+      ['Experimental learning', ['/lab', '/learning', '/results']],
+      ['Platform', ['/tools', '/extensions']],
+    ])
+    expect(workbenchGroups(false).flatMap((group) => group.routes)).toEqual(workbenchRoutes())
+    expect(routeLabel('tools', true, () => '')).toBe('实验工具')
+    expect(routeLabel('tools', false, () => '')).toBe('Lab tools')
+  })
+
   it('words the two routes whose navigation label differs from their page title', () => {
     // The translator is never consulted for these two: `t.nav` has no entry
     // for them, which is the reason the overrides exist.
@@ -41,9 +55,9 @@ describe('route registry', () => {
       throw new Error('t.nav was asked for a key it does not carry')
     }
 
-    expect(routeLabel('inbox', false, translate)).toBe('Decisions')
+    expect(routeLabel('inbox', false, translate)).toBe('Review queue')
     expect(routeLabel('bots', false, translate)).toBe('Research team')
-    expect(routeLabel('inbox', true, translate)).toBe('待我决定')
+    expect(routeLabel('inbox', true, translate)).toBe('待办复核')
     expect(routeLabel('bots', true, translate)).toBe('研究团队')
   })
 

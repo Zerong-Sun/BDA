@@ -14,14 +14,21 @@ of the loop that only just arrived.
 
 from __future__ import annotations
 
+import json
+import re
 import uuid
 from typing import Any
 
 from sqlalchemy import select
 
+from ..wetlab.schemas import BliAnalysisRequest
+from . import bench_tools, instrument_tools
+from .handoffs import MAX_CLAIMS, MAX_OPEN_QUESTIONS, MAX_REFS, MAX_TEXT
 from .registry import REGISTRY, ToolContext, ToolSpec
 
 _EMPTY_OBJECT: dict[str, Any] = {"type": "object", "properties": {}, "additionalProperties": False}
+
+instrument_tools.register(REGISTRY)
 
 
 def _limit(maximum: int = 50, default_max: int = 50) -> dict[str, Any]:
@@ -68,6 +75,17 @@ def _kind_allowed(context: ToolContext, kind: str) -> None:
 
 
 # --- Project data (read) -----------------------------------------------------
+
+_register(
+    ToolSpec(
+        id="list_design_lessons",
+        citation="project_items",
+        description="Read prior design lessons, applicability conditions, uncertainty and the mandatory pre-design checklist. Call before planning a new design or interpreting results; follow next_offset until all lessons have been read.",
+        parameters={"type": "object", "properties": {"limit": _limit(100, 50), "offset": {"type": "integer", "minimum": 0}}, "additionalProperties": False},
+        capability="project-read", execution_mode="read", requires="project",
+        handler=lambda ctx, args: ctx.project.design_lessons(limit=_arg_int(args, "limit", 50), offset=_arg_int(args, "offset", 0)),
+    )
+)
 
 _register(
     ToolSpec(
@@ -325,7 +343,14 @@ _register(
     ToolSpec(
         id="get_reference_content",
         citation="research_items",
-        description="Read saved excerpts and evidence for one reference.",
+        description=(
+            "Read a page of saved excerpts for one reference. The first row's "
+            "data.read_window reports offset, returned_count, total_count, has_more, "
+            "next_offset and truncation. Page length is not the total: follow "
+            "next_offset to read more. Counts cover saved indexed chunks, not proof "
+            "that the complete publication was retrieved. An empty list means no "
+            "accessible chunks in this window, not that the publication has no content."
+        ),
         parameters={
             "type": "object",
             "properties": {
@@ -342,6 +367,36 @@ _register(
         handler=_get_reference_content,
     )
 )
+
+
+def _get_reference_evidence_packet(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    if ctx.allowed_kinds is not None and not ({"literature_evidence", "literature_excerpt", "reference"} & ctx.allowed_kinds):
+        raise ValueError("research_kind_not_enabled")
+    return ctx.research.get_reference_evidence_packet(
+        _arg_str(args, "reference_id"), section=_arg_str(args, "section", "arguments"),
+        offset=_arg_int(args, "offset", 0), limit=_arg_int(args, "limit", 5),
+        revision=_arg_str(args, "revision", "current"),
+    )
+
+
+_register(ToolSpec(
+    id="get_reference_evidence_packet",
+    citation="literature_packet",
+    description=("Read a bounded page of project arguments, original figures/captions, table cells, "
+                 "reported quantitative data, supplement inventory or source passages for one paper. "
+                 "Read every relevant section and follow read_window.next_offset. Missing or unreviewed "
+                 "content is a gap, not a negative result. Figure captions do not mean pixels or supplements "
+                 "were reviewed. Values require source anchors, units, conditions and uncertainty. "
+                 "A newer source revision does not overwrite curated current evidence."),
+    parameters={"type": "object", "properties": {
+        "reference_id": {"type": "string"},
+        "section": {"type": "string", "enum": ["arguments", "figures", "tables", "data", "supplements", "passages"]},
+        "revision": {"type": "string", "enum": ["current", "latest"]},
+        "offset": {"type": "integer", "minimum": 0}, "limit": _limit(20, 5),
+    }, "required": ["reference_id", "section"], "additionalProperties": False},
+    capability="research-read", execution_mode="read", requires="research",
+    handler=_get_reference_evidence_packet,
+))
 
 
 # --- Writes ------------------------------------------------------------------
@@ -618,6 +673,28 @@ _register(
     )
 )
 
+_register(ToolSpec(
+    id="save_literature_analysis",
+    description=("Save a pending-review evidence analysis for one paper, after reading its evidence packet. "
+                 "analysis_json is a JSON object containing project_relevance, paper_claim; arguments "
+                 "(project_argument, paper_claim, relation supports/contradicts/context/insufficient, "
+                 "interpretation, limitations, source_ids); data (measure, value, unit, condition, comparator, "
+                 "n, uncertainty, source_id, source_quote); figure_notes (id, panels, use, limits); and gaps. "
+                 "Use null for unreported data fields. Values and quotes must occur verbatim at the saved "
+                 "source_id. Existing evidence cards and prior analysis versions are preserved."),
+    parameters={"type": "object", "properties": {
+        "document_id": {"type": "string"}, "expected_version": {"type": "integer", "minimum": 1},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "analysis_json": {"type": "string", "maxLength": 80000},
+    }, "required": ["document_id", "expected_version", "source_sha256", "analysis_json"], "additionalProperties": False},
+    capability="knowledge-authoring", execution_mode="draft", requires="actions", audit=True,
+    defer_with=("get_reference_evidence_packet", "get_reference_content"),
+    handler=lambda ctx, args: ctx.actions.save_literature_analysis(
+        _arg_str(args, "document_id"), _arg_int(args, "expected_version", 0),
+        _arg_str(args, "source_sha256"), _arg_str(args, "analysis_json"),
+    ),
+))
+
 _register(
     ToolSpec(
         id="create_knowledge_draft",
@@ -681,6 +758,21 @@ _register(
 # The agent can work the bench rather than only read about it. Sequences are not
 # reachable from here: `list_proteins` returns the same redacted projection the
 # API does, so no tool result can carry plaintext into a model prompt.
+
+_register(ToolSpec(
+    id="calculate_bench",
+    description=(
+        "Run the same validated scalar calculators as Lab tools: A260/A280 concentrations, mass/molar conversion, "
+        "solution mass, single/serial dilution, insert/vector ratio, copy number and RPM/RCF. "
+        "Pure calculation, no project writes or sequence access. Results include units, formula, assumptions and sources. "
+        "Use only supplied inputs; ask for missing sample type, blank, dilution and absorbance basis first. "
+        "For instrument-normalized 1 cm absorbance set path_length_cm=1; never apply its physical path again."
+        " For dilution, concentration_unit is the stock unit; set target_concentration_unit to the target's own unit. "
+        "The server converts these units before checking feasibility; 1 uM to 10 nM is a valid dilution."
+    ),
+    parameters=bench_tools.parameters(), capability="wetlab-read", execution_mode="read",
+    requires="session", handler=bench_tools.run,
+))
 
 
 def _list_proteins(ctx: ToolContext, args: dict[str, Any]) -> Any:
@@ -846,20 +938,28 @@ def _analyse_instrument_file(kind: str):
     def handler(ctx: ToolContext, args: dict[str, Any]) -> Any:
         import uuid as _uuid
 
+        from ..core.problem import DomainError
+        from ..identity.models import User
+        from ..projects.service import require_project_permission
         from ..wetlab import analysis
 
         artifact_id = _uuid.UUID(_arg_str(args, "artifact_id"))
         project_id, user_id = _project_of(ctx), _user_of(ctx)
+        user = ctx.session.get(User, user_id)
+        if user is None or not user.enabled:
+            raise DomainError("forbidden", "An enabled user is required to record an analysis", status_code=403)
+        require_project_permission(ctx.session, project_id, user, "experiment")
         candidate = args.get("candidate_id")
         candidate_id = _uuid.UUID(str(candidate)) if candidate else None
 
         if kind == "bli":
+            options = BliAnalysisRequest.model_validate(args).model_dump(
+                exclude={"artifact_id", "candidate_id"}
+            )
             row, summary = analysis.analyse_bli(
                 ctx.session, project_id, user_id, artifact_id,
-                sample_id=_arg_str(args, "sample_id") or None,
-                t_assoc=args.get("t_assoc"),
-                t_dissoc=args.get("t_dissoc"),
                 candidate_id=candidate_id,
+                **options,
             )
         elif kind == "akta":
             row, summary = analysis.analyse_akta(
@@ -873,8 +973,21 @@ def _analyse_instrument_file(kind: str):
                 subtract_background=bool(args.get("subtract_background", True)),
                 candidate_id=candidate_id,
             )
+        if kind == "bli":
+            # Full traces remain in the saved result for plots and exports. A
+            # model only needs their provenance and numerical/QC summary.
+            summary = {
+                **summary,
+                "curves": [
+                    {key: value for key, value in curve.items() if not key.endswith("points")}
+                    | {"displayed_measured_points": len(curve.get("points", []))}
+                    for curve in summary.get("curves", [])
+                ],
+            }
         return {
             "experiment_result_id": str(row.id),
+            "source_artifact_id": str(artifact_id),
+            "version": row.version,
             "experiment_type": row.experiment_type,
             "value": row.value,
             "unit": row.unit,
@@ -890,21 +1003,12 @@ _register(
     ToolSpec(
         id="analyse_bli_run",
         description=(
-            "Fit KD from an uploaded ForteBio BLI export and record the result. "
-            "Pass t_assoc/t_dissoc when the run declares them; the fallback "
-            "infers the phase boundary from the curve."
+            "Analyse an uploaded BLI export and save a new, traceable result version. "
+            "Preview the file first. Triplet kinetic exports require explicit phase "
+            "times for measured fitting. Instrument kinetics are a separate evidence "
+            "kind, not an independent refit. Raw data is never modified."
         ),
-        parameters={
-            "type": "object",
-            "properties": {
-                **_ARTIFACT_ARG,
-                "sample_id": {"type": "string"},
-                "t_assoc": {"type": "number"},
-                "t_dissoc": {"type": "number"},
-            },
-            "required": ["artifact_id"],
-            "additionalProperties": False,
-        },
+        parameters={**BliAnalysisRequest.model_json_schema(), "additionalProperties": False},
         capability="wetlab-authoring",
         execution_mode="draft",
         requires="session",
@@ -1101,7 +1205,7 @@ def _spawn_subagent(ctx: ToolContext, args: dict[str, Any]) -> Any:
         allowed_tools=requested or list(parent.allowed_tools or []),
         conversation_id=parent.conversation_id,
         parent_run_id=parent.id,
-        max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
+        max_turns=min(_arg_int(args, "max_turns", 6), parent.max_turns),
     )
     agent_runs.enqueue_first_step(ctx.session, child)
     return {
@@ -1146,7 +1250,7 @@ _register(
             "properties": {
                 "goal": {"type": "string"},
                 "tools": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
-                "max_turns": {"type": "integer", "minimum": 1, "maximum": 24},
+                "max_turns": {"type": "integer", "minimum": 1, "maximum": 6},
             },
             "required": ["goal"],
             "additionalProperties": False,
@@ -1163,6 +1267,8 @@ _register(
 
 
 # --- Structure (read) --------------------------------------------------------
+from . import structure_tools as _structure_tools  # noqa: E402,F401
+
 # Residue-level reads over an uploaded structure artifact. All three are
 # measurements: they report what the coordinates say and never what it means.
 # `structures.service` does the artifact lookup and the project check, so these
@@ -1202,6 +1308,7 @@ def _structure_handler(kind: str):
             artifact_id,
             chain=_arg_str(args, "chain") or None,
             residue_seq=int(residue) if residue is not None else None,
+            insertion_code=args.get("insertion_code"),
             ligand=_arg_str(args, "ligand") or None,
             radius_angstrom=float(args.get("radius_angstrom") or 5.0),
         )
@@ -1269,6 +1376,7 @@ def _compare_structures(ctx: ToolContext, args: dict[str, Any]) -> Any:
         uuid.UUID(_arg_str(args, "mobile_artifact_id")),
         reference_chain=_arg_str(args, "reference_chain"),
         mobile_chain=_arg_str(args, "mobile_chain"),
+        pairing=str(args.get("pairing", "author_number")),
     )
 
 
@@ -1280,8 +1388,9 @@ _register(
             "RMSD over C-alpha atoms before and after the fit, the residues "
             "that moved most, and a TM-score when the chain is long enough for "
             "its formula. Residues are paired by author numbering, so the two "
-            "files must use the same numbering; a file missing a loop still "
-            "compares correctly. Use it for a design against its prediction, or "
+            "files must use the same numbering by default. Set pairing=sequence_alignment "
+            "explicitly for renumbered constructs; ambiguous sequence alignments are rejected. "
+            "Inspect coverage, correspondence and sequence identity. Use it for a design against its prediction, or "
             "a prediction against a solved structure. The TM-score is evaluated "
             "on this superposition and is not a TM-align result."
         ),
@@ -1292,6 +1401,7 @@ _register(
                 "mobile_artifact_id": {"type": "string"},
                 "reference_chain": {"type": "string"},
                 "mobile_chain": {"type": "string"},
+                "pairing": {"type": "string", "enum": ["author_number", "sequence_alignment"], "default": "author_number"},
             },
             "required": [
                 "reference_artifact_id",
@@ -1354,6 +1464,7 @@ _register(
                 "artifact_id": {"type": "string"},
                 "chain": {"type": "string"},
                 "residue_seq": {"type": "integer"},
+                "insertion_code": {"type": "string", "maxLength": 4, "description": "Author insertion code; empty string selects no insertion. Required when residue_seq is ambiguous."},
                 "ligand": {"type": "string"},
                 "radius_angstrom": {"type": "number", "minimum": 0.5, "maximum": 12, "default": 5.0},
             },
@@ -1468,9 +1579,10 @@ def _read_handoffs(ctx: ToolContext, args: dict[str, Any]) -> Any:
 _CLAIM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "statement": {"type": "string"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
         "evidence_ref": {
             "type": "string",
+            "maxLength": MAX_TEXT,
             "description": (
                 "The artifact, job, result, reference or goal id this rests on. "
                 "A claim with none is recorded as unsupported."
@@ -1488,20 +1600,23 @@ _register(
         description=(
             "Leave a structured handover for the next operator: what you did, the "
             "claims you are making with the evidence behind each one, what you "
-            "could not settle, and the ids the next operator needs. Append-only."
+            "could not settle, and the ids the next operator needs. Append-only. "
+            "Each summary, claim statement, evidence reference, open question and ref "
+            f"is limited to {MAX_TEXT} characters. Oversized input is rejected before saving; "
+            "shorten it and retry. Text is never truncated."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "to_bot": {"type": "string"},
-                "summary": {"type": "string"},
-                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": 20},
+                "summary": {"type": "string", "minLength": 1, "maxLength": MAX_TEXT},
+                "claims": {"type": "array", "items": _CLAIM_SCHEMA, "maxItems": MAX_CLAIMS},
                 "open_questions": {
                     "type": "array",
-                    "items": {"type": "string"},
-                    "maxItems": 20,
+                    "items": {"type": "string", "maxLength": MAX_TEXT},
+                    "maxItems": MAX_OPEN_QUESTIONS,
                 },
-                "refs": {"type": "array", "items": {"type": "string"}, "maxItems": 40},
+                "refs": {"type": "array", "items": {"type": "string", "maxLength": MAX_TEXT}, "maxItems": MAX_REFS},
             },
             "required": ["to_bot", "summary"],
             "additionalProperties": False,
@@ -1565,15 +1680,45 @@ def _list_operator_charters(ctx: ToolContext, args: dict[str, Any]) -> Any:
     ]
 
 
+_REVIEW_TOOL_RESULT_CHARS = 8_000
+_REVIEW_TOOL_RESULTS_CHARS = 32_000
+
+
 def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
     """What an operator actually called, not what it said it did.
 
     The gap between the two is the whole subject of review, so this returns the
-    recorded tool calls rather than the assistant text around them.
+    recorded tool calls and their bounded results, not unrelated conversation.
+    Tool output lives in turn.content; turn.tool_calls only identifies its call.
     """
     from . import agent_runs
+    from .models import CopilotAgentRun
 
-    run = agent_runs.require_run(ctx.session, uuid.UUID(_arg_str(args, "run_id")))
+    requested_run_id = _arg_str(args, "run_id")
+    prefix_resolution = False
+    try:
+        exact_id = uuid.UUID(requested_run_id)
+    except ValueError:
+        if re.fullmatch(r"[0-9a-fA-F]{8,31}", requested_run_id) is None:
+            raise ValueError("copilot_agent_run_id_invalid_use_full_uuid_or_at_least_8_hex_prefix") from None
+        # UUID bounds are portable to PostgreSQL UUID and SQLite's canonical
+        # hex storage. Keep the indexed ID column intact, and scope the query
+        # before resolving; another project's match must never influence it.
+        lower = uuid.UUID(hex=requested_run_id.ljust(32, "0"))
+        upper = uuid.UUID(hex=requested_run_id.ljust(32, "f"))
+        matches = list(ctx.session.scalars(select(CopilotAgentRun).where(
+            CopilotAgentRun.project_id == _project_of(ctx),
+            CopilotAgentRun.id >= lower,
+            CopilotAgentRun.id <= upper,
+        ).limit(2)))
+        if not matches:
+            raise ValueError("copilot_agent_run_not_found") from None
+        if len(matches) != 1:
+            raise ValueError("copilot_agent_run_prefix_ambiguous_use_full_uuid") from None
+        run = matches[0]
+        prefix_resolution = True
+    else:
+        run = agent_runs.require_run(ctx.session, exact_id)
     if run.project_id != _project_of(ctx):
         # Same shape as a missing run: whether a run exists in another project
         # is not this project's to learn.
@@ -1581,17 +1726,54 @@ def _read_operator_work(ctx: ToolContext, args: dict[str, Any]) -> Any:
 
     turns = agent_runs.turns_for(ctx.session, run, limit=_arg_int(args, "limit", 40))
     calls: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    remaining_chars = _REVIEW_TOOL_RESULTS_CHARS
     for turn in turns:
         for call in turn.tool_calls or []:
             calls.append({"sequence": turn.sequence, "role": turn.role, **dict(call)})
+        if turn.role != "tool":
+            continue
+        metadata = (turn.tool_calls or [{}])[0]
+        content = turn.content or ""
+        allowance = min(_REVIEW_TOOL_RESULT_CHARS, remaining_chars)
+        truncated = len(content) > allowance
+        evidence: dict[str, Any] = {
+            "sequence": turn.sequence,
+            "tool_call_id": metadata.get("tool_call_id"),
+            "name": metadata.get("name"),
+            "result": None,
+            "content_chars": len(content),
+            "truncated": truncated,
+            "parse_error": None,
+        }
+        if truncated:
+            # A fragment is not a JSON result and must never look like one.
+            evidence["content_preview"] = content[:allowance]
+        else:
+            try:
+                evidence["result"] = json.loads(content)
+            except (ValueError, RecursionError):
+                evidence["parse_error"] = "invalid_json"
+                evidence["content_preview"] = content
+        remaining_chars -= min(len(content), allowance)
+        results.append(evidence)
+    outcome_text = json.dumps(run.outcome or {}, ensure_ascii=False)
+    outcome_truncated = len(outcome_text) > _REVIEW_TOOL_RESULTS_CHARS
     return {
         "run_id": str(run.id),
+        **({"requested_run_id": requested_run_id, "run_id_resolution": "unique_project_prefix"}
+           if prefix_resolution else {}),
         "bot": run.bot,
         "goal": run.goal,
         "status": run.status,
         "turn_count": run.turn_count,
         "allowed_tools": list(run.allowed_tools or []),
+        "outcome": None if outcome_truncated else (run.outcome or {}),
+        "outcome_preview": outcome_text[:_REVIEW_TOOL_RESULTS_CHARS] if outcome_truncated else None,
+        "outcome_truncated": outcome_truncated,
         "tool_calls": calls,
+        "tool_results": results,
+        "transcript_truncated": len(turns) < run.turn_count,
     }
 
 
@@ -1619,12 +1801,16 @@ _register(
         id="read_operator_work",
         description=(
             "What an operator's run actually called and what came back, turn by "
-            "turn. Use this rather than its summary: the summary is the thing "
-            "under review."
+            "turn, together with its final outcome (the claims under review). "
+            "Compare the outcome against the tool results; the outcome is not evidence. "
+            "Tool results and outcome are bounded; truncation or parse errors "
+            "mean the evidence is incomplete, not verified."
         ),
         parameters={
             "type": "object",
-            "properties": {"run_id": {"type": "string"}, "limit": _limit(100, 40)},
+            "properties": {"run_id": {"type": "string", "description":
+                "Use the full run UUID. A hex prefix of at least 8 characters is accepted only when unique in this project; the response returns its full UUID."},
+                "limit": _limit(100, 40)},
             "required": ["run_id"],
             "additionalProperties": False,
         },
@@ -1665,6 +1851,96 @@ def _list_operators(ctx: ToolContext, args: dict[str, Any]) -> Any:
         }
         for bot in roster.all_bots()
     ]
+
+
+def _start_team_task(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    """Promote the user's chat request to durable coordination, once per message."""
+    from ..audit.service import record_audit
+    from .models import CopilotAgentRun, CopilotConversation, CopilotMessage
+    from .schemas import AgentRunCreate
+    from .service import start_agent_run
+
+    if _bot_of(ctx) != "conductor":
+        raise ValueError("copilot_delegation_not_allowed")
+    if ctx.agent_run is not None:
+        return {"run_id": str(ctx.agent_run.id), "status": ctx.agent_run.status,
+                "next_action": "delegate_to_operator"}
+    actions = ctx.actions
+    source = ctx.session.scalar(select(CopilotMessage).where(
+        CopilotMessage.id == actions.source_message_id).with_for_update())
+    conversation = ctx.session.get(CopilotConversation, source.conversation_id) if source else None
+    if (source is None or source.role != "user" or conversation is None
+            or conversation.project_id != ctx.project_id
+            or actions.request_text != source.content
+            or str((source.context or {}).get("_requested_by") or conversation.created_by) != str(ctx.user_id)):
+        raise ValueError("copilot_team_request_required")
+    actions._require_explicit("start_team_task")
+    existing = (source.context or {}).get("team_run_id")
+    try:
+        existing_id = uuid.UUID(str(existing)) if existing else None
+    except ValueError as exc:
+        raise ValueError("copilot_team_request_required") from exc
+    run = ctx.session.get(CopilotAgentRun, existing_id) if existing_id else None
+    if run is not None and (
+        run.project_id != ctx.project_id or run.created_by != ctx.user_id
+        or run.conversation_id != conversation.id or run.goal != source.content
+        or run.bot != "conductor" or run.parent_run_id is not None
+    ):
+        raise ValueError("copilot_team_request_required")
+    if run is None:
+        run, _ = start_agent_run(ctx.session, actions.project, actions.user, AgentRunCreate(
+            project_id=ctx.project_id, conversation_id=conversation.id,
+            goal=source.content, bot="conductor", max_turns=6,
+        ))
+        source.context = {**(source.context or {}), "team_run_id": str(run.id)}
+        source.version += 1
+        record_audit(ctx.session, action="copilot.team.start", entity_type="copilot_agent_run",
+            entity_id=run.id, project_id=ctx.project_id, organization_id=actions.project.organization_id,
+            actor_id=ctx.user_id, payload={"source_message_id": str(source.id)})
+        ctx.session.flush()
+    return {"run_id": str(run.id), "bot": run.bot, "status": run.status,
+            "goal": run.goal, "continuation": "background_worker",
+            "next_action": "Acknowledge this run and end the chat turn. The background worker continues "
+                           "automatically; the user does not need to send another message. "
+                           "Follow the team's progress in the research room."}
+
+
+_register(ToolSpec(
+    id="start_team_task",
+    description=("Start durable team coordination for the user's current project goal. "
+                 "Use only when the user asks you to carry out work, not for advice or status. "
+                 "The server preserves the original request and starts at most one task per message. "
+                 "Inside an existing run use delegate_to_operator instead."),
+    parameters=_EMPTY_OBJECT, capability="chain-orchestration", execution_mode="draft",
+    requires="actions", needs_operator=True, audit=True, handler=_start_team_task,
+))
+
+
+def _read_team_progress(ctx: ToolContext, args: dict[str, Any]) -> Any:
+    from . import room
+    from .delivery_context import room_preview
+    from .models import CopilotAgentRun
+    from .schemas import RoomEvent
+
+    project_id = _project_of(ctx)
+    active = ctx.session.scalars(select(CopilotAgentRun).where(
+        CopilotAgentRun.project_id == project_id,
+        CopilotAgentRun.status.in_(("running", "awaiting_tasks")),
+    ).order_by(CopilotAgentRun.created_at.desc()).limit(31))
+    entries, next_cursor = room.events(ctx.session, project_id=project_id, limit=30)
+    return room_preview({
+        "active_tasks": [{"run_id": str(run.id), "bot": run.bot, "goal": run.goal,
+                          "status": run.status} for run in active],
+        "recent_activity": [RoomEvent.model_validate(entry).model_dump(mode="json") for entry in entries],
+        "recent_activity_truncated": next_cursor is not None,
+    })
+
+
+_register(ToolSpec(
+    id="read_team_progress", description="Read this project's active team tasks and recent public discussion before reporting progress or planning the next assignment.",
+    parameters=_EMPTY_OBJECT, capability="chain-messaging", execution_mode="read",
+    requires="session", handler=_read_team_progress,
+))
 
 
 def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
@@ -1714,7 +1990,7 @@ def _delegate_to_operator(ctx: ToolContext, args: dict[str, Any]) -> Any:
         allowed_tools=sorted(tools_for_capabilities(resolved)),
         conversation_id=parent.conversation_id,
         parent_run_id=parent.id,
-        max_turns=min(_arg_int(args, "max_turns", 8), parent.max_turns),
+        max_turns=min(_arg_int(args, "max_turns", 6), parent.max_turns),
         bot=target,
     )
     agent_runs.enqueue_first_step(ctx.session, child)
@@ -1761,7 +2037,7 @@ _register(
                     "type": "string",
                     "description": "What to produce, and what would make the step finished.",
                 },
-                "max_turns": {"type": "integer", "minimum": 1, "maximum": 24},
+                "max_turns": {"type": "integer", "minimum": 1, "maximum": 6},
             },
             "required": ["bot", "instruction"],
             "additionalProperties": False,
@@ -1896,7 +2172,10 @@ def _request_decision(ctx: ToolContext, args: dict[str, Any]) -> Any:
         recommended=_arg_str(args, "recommended") or None,
         run_id=getattr(run, "id", None),
     )
-    return decisions.to_json(row)
+    result = decisions.to_json(row)
+    if run is not None:
+        result["resource_id"] = str(row.id)
+    return result
 
 
 _DECISION_OPTION_SCHEMA: dict[str, Any] = {
@@ -1951,6 +2230,7 @@ _register(
             "additionalProperties": False,
         },
         capability="chain-messaging",
+        awaits="decision",
         execution_mode="draft",
         requires="session",
         # Copilot bookkeeping, like a handover: it changes no research record,
@@ -2079,6 +2359,14 @@ _RESIDUE_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+_VIEW_RESIDUE_SCHEMA = {
+    **_RESIDUE_SCHEMA,
+    "properties": {
+        **_RESIDUE_SCHEMA["properties"],
+        "insertion_code": {"type": ["string", "null"], "maxLength": 4, "description": "Author insertion code; null or empty string means no insertion."},
+    },
+}
+
 _register(
     ToolSpec(
         id="render_structure_view",
@@ -2087,12 +2375,14 @@ _register(
             "scene the viewer renders. Use it to make 'the interface I mean' "
             "unambiguous before arguing about it. It shows; it concludes "
             "nothing - the residues you pass are the ones you already measured."
+            " Read measurement results before choosing residues; call this in a subsequent turn, "
+            "not in the same batch as those measurements. A label applies to every highlighted residue."
         ),
         parameters={
             "type": "object",
             "properties": {
                 "artifact_id": {"type": "string"},
-                "residues": {"type": "array", "items": _RESIDUE_SCHEMA, "maxItems": 200},
+                "residues": {"type": "array", "items": _VIEW_RESIDUE_SCHEMA, "maxItems": 200},
                 "title": {"type": "string", "maxLength": 200},
                 "label": {
                     "type": "string",
@@ -2107,6 +2397,7 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_render_structure_view,
+        defer_with=("analyse_structure", "list_structure_residues", "list_structure_contacts", "measure_structure_interface", "describe_structure_site"),
     )
 )
 
@@ -2339,9 +2630,15 @@ def _triage_candidates(ctx: ToolContext, args: dict[str, Any]) -> Any:
         "tier_order": list(tiers),
         "verdicts": verdicts,
         "reading_note": (
-            "A criterion is pass, fail or missing. Missing means nothing has "
-            "measured it - not that the design failed - so a design with "
-            "missing criteria has not been rejected by this route."
+            "A criterion is pass, fail or missing. Missing means the supplied "
+            "metrics contain no value - not that the design failed. Whether "
+            "it was measured elsewhere is unknown. Preserve each criterion's "
+            "method and assessor, including nulls; missing criteria do not "
+            "reject a design by this route. criteria_tier names the tier behind "
+            "the top-level criteria and counts; tier_assessments contains every "
+            "tier's comparisons. A recorded value that misses a threshold is "
+            "fail, not unassessable. Tier outcomes describe these supplied metrics, "
+            "not experimental validation."
         ),
     }
 
@@ -2352,7 +2649,7 @@ _register(
         description=(
             "Judge named candidates against a design route's declared "
             "acceptance tiers and say, per criterion, whether the recorded "
-            "metrics pass, fail, or were never measured. The thresholds are "
+            "metrics pass, fail, or have no recorded value. The thresholds are "
             "the route's own; this applies them rather than inventing any. "
             "A missing measurement is reported as missing and blocks a tier "
             "without condemning the design. Up to 25 candidates per call."
@@ -2378,5 +2675,22 @@ _register(
         execution_mode="read",
         requires="session",
         handler=_triage_candidates,
+    )
+)
+
+
+_register(
+    ToolSpec(
+        id="search_bot_records",
+        description="Read a named Bot's persistent work journal in this project. Use for what-you-did / workflow-history questions. Source bot identity and status are authoritative; workflow references do not prove execution. Paginate with offset when matched exceeds returned items.",
+        parameters={"type": "object", "properties": {
+            "bot_id": {"type": "string"}, "query": {"type": "string"},
+            "limit": _limit(50, 20), "offset": {"type": "integer", "minimum": 0},
+        }, "required": ["bot_id"], "additionalProperties": False},
+        capability="project-read", execution_mode="read", requires="project",
+        handler=lambda ctx, args: ctx.project.search_bot_records(
+            _arg_str(args, "bot_id"), _arg_str(args, "query"),
+            limit=_arg_int(args, "limit", 20), offset=_arg_int(args, "offset", 0),
+        ),
     )
 )

@@ -278,7 +278,7 @@ def test_no_tool_can_answer_a_decision_request(session: Session) -> None:
     """
     chain_tools = {spec.id for spec in REGISTRY.all() if spec.capability == "chain-messaging"}
 
-    assert chain_tools == {"post_handoff", "read_handoffs", "request_decision"}
+    assert chain_tools == {"post_handoff", "read_handoffs", "read_team_progress", "request_decision"}
     assert not any("answer" in spec.id or "settle" in spec.id for spec in REGISTRY.all())
 
 

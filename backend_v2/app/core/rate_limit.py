@@ -57,6 +57,21 @@ def enforce_login_quota(client_ip: str, username: str) -> None:
     _consume(f"bda:rate:login:{client_ip}:{digest}", get_settings().rate_limit_login)
 
 
+def enforce_account_quota(client_ip: str) -> None:
+    """Bound credential hashing and signup attempts even when usernames vary."""
+    _consume(f"bda:rate:account:{get_settings().auth_realm}:{client_ip}", get_settings().rate_limit_login)
+
+
+def enforce_public_calculator_quota(client_ip: str) -> None:
+    settings = get_settings()
+    _consume(f"bda:rate:public-calculator:{settings.auth_realm}:{client_ip}", settings.rate_limit_expensive)
+
+
+def enforce_public_workspace_quota(client_ip: str) -> None:
+    settings = get_settings()
+    _consume(f"bda:rate:public-workspace:{settings.auth_realm}:{client_ip}", settings.public_workspace_read_limit)
+
+
 def enforce_project_quota(user_id: uuid.UUID, organization_id: uuid.UUID, action: str) -> None:
     expensive = action in {"compute", "research_import", "autopilot"}
     category = "expensive" if expensive else "write"

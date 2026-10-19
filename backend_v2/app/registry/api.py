@@ -17,6 +17,15 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_roles
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
+from .extensions import (
+    ExtensionAssessment,
+    ExtensionAssessmentCreate,
+    ExtensionCatalog,
+    ModelQualificationSummary,
+    assess_extension,
+    extension_catalog,
+    model_assessment,
+)
 from .models import (
     ComputeNode,
     LLMProvider,
@@ -69,6 +78,30 @@ from .service import (
 
 router = APIRouter(prefix="/registry", tags=["registry"])
 settings = get_settings()
+
+
+@router.get("/extensions", response_model=ExtensionCatalog)
+def get_extension_catalog(
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> ExtensionCatalog:
+    return extension_catalog(session)
+
+
+@router.post("/extensions/{extension_id}/assessments", response_model=ExtensionAssessment,
+             openapi_extra={"x-permission": "registry.extension.assess"})
+def assess_extension_configuration(
+    extension_id: str, payload: ExtensionAssessmentCreate,
+    session: Session = Depends(get_session), user: User = Depends(require_roles("admin")),
+) -> ExtensionAssessment:
+    """Inspect a proposed configuration; no persistence, network or execution."""
+    return assess_extension(session, extension_id, payload)
+
+
+@router.get("/model-plugins/{plugin_id}/qualification", response_model=ModelQualificationSummary)
+def get_model_qualification(
+    plugin_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> ModelQualificationSummary:
+    return model_assessment(_resource(session, ModelPlugin, plugin_id, "model_plugin_not_found"))
 
 
 def _plugin_catalog() -> PluginManifestCatalog:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 TargetKind = Literal["protein", "small_molecule"]
 
@@ -122,6 +122,15 @@ class HotspotResidue(BaseModel):
     #: The residue name when the caller knows it. "A164" and "A164 ARG" read
     #: differently to somebody checking the set against a structure.
     name: str | None = Field(default=None, max_length=8)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_unsupported_insertion(cls, value: Any) -> Any:
+        # Unknown fields are otherwise ignored by Pydantic before the domain
+        # service can see them, silently changing A:52A into A:52.
+        if isinstance(value, dict) and any(str(value.get(key) or "").strip() for key in ("insertion_code", "insertionCode")):
+            raise ValueError("Hotspot design parameters do not support insertion codes; provide an explicitly mapped, renumbered construct.")
+        return value
 
 
 class HotspotSetResponse(BaseModel):

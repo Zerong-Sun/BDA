@@ -12,8 +12,8 @@ This module does that interleaving and nothing else.
 owns it, so the room cannot become a second way to record work - which is what
 would make the record and its display disagree.
 
-**It invents no dialogue.** The only communication between operators that exists
-is a handover row and a delegated child run. Both are rendered as what they are.
+**It invents no dialogue.** Public assistant turns, handovers and delegated runs
+are rendered from their recorded rows, with the originating operator attached.
 A model asked to narrate the chain would produce something that reads better and
 is not the record; there is no code here that could emit such a line, which is
 the point.
@@ -34,6 +34,7 @@ and the inbox is where "waiting on you" is answered.
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -46,6 +47,7 @@ from .decisions import to_json_model as decision_to_json_model
 from .handoffs import to_json_model as handoff_to_json_model
 from .models import (
     CopilotAgentRun,
+    CopilotAgentTurn,
     CopilotConversation,
     CopilotDecisionRequest,
     CopilotHandoff,
@@ -108,12 +110,52 @@ def _task_entry(run: CopilotAgentRun) -> dict[str, Any]:
     }
 
 
+def _discussion_text(content: str) -> str:
+    """Render structured deliveries as their public text, never private reasoning."""
+    try:
+        delivery = json.loads(content.removeprefix("```json").removesuffix("```").strip())
+    except (ValueError, TypeError):
+        return content
+    if not isinstance(delivery, dict) or not isinstance(delivery.get("summary"), str):
+        return content
+    parts = [delivery["summary"]]
+    sections = delivery.get("sections", {})
+    if isinstance(sections, dict):
+        parts.extend(f"### {name}\n\n{value}" for name, value in sections.items() if isinstance(value, str) and value)
+    missing = delivery.get("missing", [])
+    if isinstance(missing, list):
+        parts.extend(f"- {item}" for item in missing if isinstance(item, str) and item)
+    if isinstance(delivery.get("next_action"), str) and delivery["next_action"]:
+        parts.append(delivery["next_action"])
+    return "\n\n".join(parts)
+
+
+def _discussion_entry(turn: CopilotAgentTurn, run: CopilotAgentRun) -> dict[str, Any]:
+    try:
+        parsed = json.loads(turn.content.removeprefix("```json").removesuffix("```").strip())
+    except (ValueError, TypeError):
+        parsed = None
+    delivery = parsed if isinstance(parsed, dict) and isinstance(parsed.get("summary"), str) else {}
+    outcome = run.outcome if isinstance(run.outcome, dict) else {}
+    # A review on a different revision must never certify this saved draft.
+    matches = bool(delivery) and all(delivery.get(key) == outcome.get(key) for key in
+                                    ("summary", "sections", "missing", "next_action"))
+    return {
+        "run_id": turn.run_id, "content": _discussion_text(turn.content),
+        "parent_run_id": run.parent_run_id, "is_delivery": bool(delivery.get("summary", "").strip()),
+        "next_action": delivery.get("next_action") if isinstance(delivery.get("next_action"), str) else None,
+        "scientific_review": outcome.get("scientific_review") if matches and isinstance(outcome.get("scientific_review"), str) else None,
+        "task_status": run.status,
+    }
+
+
 def events(
     session: Session,
     *,
     project_id: uuid.UUID,
     limit: int = DEFAULT_LIMIT,
     cursor: str | None = None,
+    include_archived: bool = False,
 ) -> tuple[list[dict[str, Any]], str | None]:
     """The room's entries, newest first, with the cursor for the next page.
 
@@ -126,11 +168,15 @@ def events(
     after = decode_time_cursor(cursor)
 
     conversations = select(CopilotConversation.id).where(CopilotConversation.project_id == project_id)
+    messages = select(CopilotMessage).where(
+        CopilotMessage.conversation_id.in_(conversations),
+        CopilotMessage.role.in_(VISIBLE_ROLES),
+    )
+    if not include_archived:
+        # Filter before paging; original rows remain available for audit.
+        messages = messages.where(CopilotMessage.context["chat_archive"]["archived"].as_boolean().is_not(True))
     message_query = _keyset(
-        select(CopilotMessage).where(
-            CopilotMessage.conversation_id.in_(conversations),
-            CopilotMessage.role.in_(VISIBLE_ROLES),
-        ),
+        messages,
         CopilotMessage.created_at,
         CopilotMessage.id,
         after,
@@ -158,6 +204,22 @@ def events(
     ).order_by(CopilotDecisionRequest.created_at.desc(), CopilotDecisionRequest.id.desc()).limit(size + 1)
 
     entries: list[dict[str, Any]] = []
+    # Public messages from durable work belong in the same room. Reasoning,
+    # system prompts and raw tool output stay out of this conversational feed.
+    discussion_query = _keyset(
+        select(CopilotAgentTurn, CopilotAgentRun).join(
+            CopilotAgentRun, CopilotAgentRun.id == CopilotAgentTurn.run_id,
+        ).where(
+            CopilotAgentRun.project_id == project_id,
+            CopilotAgentTurn.role == "assistant",
+            CopilotAgentTurn.content != "",
+        ), CopilotAgentTurn.created_at, CopilotAgentTurn.id, after,
+    ).order_by(CopilotAgentTurn.created_at.desc(), CopilotAgentTurn.id.desc()).limit(size + 1)
+    for turn, run in session.execute(discussion_query):
+        entries.append({
+            "kind": "discussion", "id": turn.id, "occurred_at": turn.created_at,
+            "bot": run.bot, "discussion": _discussion_entry(turn, run),
+        })
     for message in session.scalars(message_query):
         entries.append(
             {

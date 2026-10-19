@@ -1,6 +1,12 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
+import { flushSync } from 'react-dom'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useI18n } from '../../lib/i18n'
+import { CitationDetails } from './CitationDetails'
+import { groupCitations } from './citationGroups'
+import { remarkCitationMarkers, type CitationRecord } from './citationMarkers'
 
 /**
  * Long-form research prose (project reviews, methods, validation notes) is
@@ -59,16 +65,26 @@ function headingText(node: React.ReactNode): string {
   return ''
 }
 
-export function ReviewMarkdown({ children }: { children: string }) {
+export function ReviewMarkdown({ children, citations = [], projectId, compactCitations = true, presentation = 'document' }: { children: string; citations?: readonly CitationRecord[]; projectId?: string; compactCitations?: boolean; presentation?: 'document' | 'chat' }) {
+  const { language } = useI18n()
+  const [sourcesOpen, setSourcesOpen] = useState(false)
   const prefix = `review-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const sourceGroups = groupCitations(citations)
   const headings = sectionHeadings(children)
   const idByHeading = new Map(headings.map((heading, index) => [heading, `${prefix}-section-${index + 1}`]))
-  const showToc = headings.length >= TOC_THRESHOLD
+  const showToc = presentation !== 'chat' && headings.length >= TOC_THRESHOLD
+  const emphasis = (content: React.ReactNode) => {
+    if (presentation !== 'chat') return undefined
+    const text = headingText(content).replace(/^[\d\s.、:：()（）-]+/, '')
+    if (/^(?:结论|当前进展|一句话结论|Conclusion\b|Summary\b)/i.test(text)) return 'conclusion'
+    if (/^(?:下一步|下一个|建议下一步|Next steps?\b|Next action\b)/i.test(text)) return 'next-step'
+    return undefined
+  }
 
   return (
-    <div className={PROSE}>
+    <div className={`${PROSE}${presentation === 'chat' ? ' review-markdown--chat' : ''}`}>
       {showToc ? (
-        <nav aria-label="Sections" className="mb-4 border border-border-soft bg-surface-2 p-3">
+        <nav aria-label={language === 'zh' ? '章节' : 'Sections'} className="mb-4 border border-border-soft bg-surface-2 p-3">
           <ol className="!ml-4 grid gap-0.5 text-xs sm:grid-cols-2">
             {headings.map((heading) => (
               <li key={heading}>
@@ -85,10 +101,30 @@ export function ReviewMarkdown({ children }: { children: string }) {
         </nav>
       ) : null}
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, [remarkCitationMarkers, { citations }]]}
         components={{
+          p: ({ children: content }) => <p data-chat-emphasis={emphasis(content)}>{content}</p>,
+          h1: ({ children: content }) => <h1 data-chat-emphasis={emphasis(content)}>{content}</h1>,
+          h3: ({ children: content }) => <h3 data-chat-emphasis={emphasis(content)}>{content}</h3>,
+          a: ({ href, children: content, node }) => {
+            const match = node?.properties['data-bda-citation'] === true ? href?.match(/^#bda-citation-(\d+)$/) : null
+            if (!match || !citations[Number(match[1]) - 1]) return <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{content}</a>
+            const index = Number(match[1])
+            const sourceNumber = sourceGroups.find(group => group.numbers.includes(index))?.numbers[0] ?? index
+            const id = `${prefix}-source-${sourceNumber}`
+            return <sup><a href={`#${id}`} aria-label={`${language === 'zh' ? '查看来源' : 'View source'} ${index}`} onClick={(event) => {
+              event.preventDefault()
+              // Mount the compact source list before locating the exact source.
+              // The source's own disclosure can then open without changing the app hash.
+              if (compactCitations && !sourcesOpen) flushSync(() => setSourcesOpen(true))
+              const detail = document.getElementById(id)
+              const trigger = detail?.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')
+              if (trigger?.getAttribute('aria-expanded') === 'false') trigger.click()
+              detail?.scrollIntoView?.({ block: 'nearest' })
+            }}>{content}</a></sup>
+          },
           h2: ({ children: content, ...props }) => (
-            <h2 {...props} id={idByHeading.get(headingText(content))}>
+            <h2 {...props} id={idByHeading.get(headingText(content))} data-chat-emphasis={emphasis(content)}>
               {content}
             </h2>
           ),
@@ -96,6 +132,14 @@ export function ReviewMarkdown({ children }: { children: string }) {
       >
         {children}
       </ReactMarkdown>
+      {compactCitations && citations.length ? (
+        <Accordion className="mt-2" value={sourcesOpen ? ['sources'] : []} onValueChange={value => setSourcesOpen(value.includes('sources'))}>
+          <AccordionItem value="sources" className="border-0">
+            <AccordionTrigger heading={false} className="py-1.5">{language === 'zh' ? `参考资料（${sourceGroups.length}）` : `Reference materials (${sourceGroups.length})`}</AccordionTrigger>
+            <AccordionContent><CitationDetails citations={citations} prefix={prefix} projectId={projectId} /></AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : <CitationDetails citations={citations} prefix={prefix} projectId={projectId} />}
     </div>
   )
 }

@@ -116,6 +116,17 @@ def test_extra_csv_cells_are_row_errors() -> None:
     assert error is not None and "columns" in error["message"]
 
 
+@pytest.mark.parametrize("values,column", [
+    ({"experiment_type": "learning_assay"}, "experiment_type"),
+    ({"batch_key": "learning:closed-batch"}, "batch_key"),
+    ({"result_metadata": {"learning": {}}}, "result_metadata"),
+])
+def test_generic_file_import_cannot_bypass_learning_ingestion(values, column) -> None:
+    prepared, error = _coerce_experiment_row({"experiment_type": "measurement", **values}, 1)
+    assert prepared is None
+    assert error is not None and error["column"] == column
+
+
 @pytest.mark.parametrize("header", [b"value,value", b"experiment_type,"])
 def test_invalid_csv_headers_are_rejected(header) -> None:
     with pytest.raises(ValueError, match="experiment_headers"):

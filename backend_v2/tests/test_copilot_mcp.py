@@ -532,3 +532,84 @@ def test_an_unbound_grant_is_offered_no_compute_draft(session: Session) -> None:
 
     assert "get_compute_status" in names
     assert "create_compute_draft" not in names
+
+
+def test_project_resource_namespace_cannot_bypass_research_capability(session: Session):
+    from backend_v2.app.knowledge.models import KnowledgeEntry
+
+    project, user = _project(session)
+    dataset = KnowledgeEntry(project_id=project.id, created_by=user.id, title="Research-only dataset",
+                             content="Scoped evidence", entry_type="search_log", source={"data": [{"value": 7}]})
+    session.add(dataset)
+    session.flush()
+    grant, _ = _grant(session, project, user, capabilities=["project-read"])
+    with pytest.raises(DomainError) as denied:
+        mcp.read_resource(session, grant, f"bda://research/dataset/{dataset.id}")
+    assert denied.value.status_code == 403
+    with pytest.raises(DomainError) as invalid:
+        mcp.read_resource(session, grant, f"bda://project/dataset/{dataset.id}")
+    assert invalid.value.status_code == 404
+
+    research_grant, _ = _grant(session, project, user, capabilities=["research-read"])
+    found = mcp.read_resource(session, research_grant, f"bda://research/dataset/{dataset.id}")
+    assert found["payload"]["data"] == [{"value": 7}]
+
+
+def test_literature_excerpt_and_evidence_citation_links_read_back_exact_entities(session: Session):
+    from backend_v2.app.copilot.citations import citation_uri
+    from backend_v2.app.copilot.research_context import ResearchContextService
+    from backend_v2.app.literature.models import (
+        LiteratureChunk,
+        LiteratureClaim,
+        LiteratureDocument,
+        LiteratureEvidence,
+    )
+
+    project, user = _project(session)
+    document = LiteratureDocument(project_id=project.id, title="Saved evidence", source="synthetic_test",
+                                  metadata_json={"content_provenance": {"content_kind": "database_abstract",
+                                      "content_checksum_sha256": "a" * 64, "retrieval_trace_id": "trace-1"}})
+    session.add(document)
+    session.flush()
+    chunk = LiteratureChunk(document_id=document.id, position=7, content="KD = 1 nM in this assay.")
+    session.add(chunk)
+    session.flush()
+    claim = LiteratureClaim(document_id=document.id, chunk_id=chunk.id, claim="Recorded assay result")
+    session.add(claim)
+    session.flush()
+    evidence = LiteratureEvidence(claim_id=claim.id, evidence_type="excerpt", content=chunk.content)
+    session.add(evidence)
+    session.flush()
+    context = ResearchContextService(session, project)
+    grant, _ = _grant(session, project, user, capabilities=["research-read"])
+    excerpt_item = context.get_reference_content(str(document.id))[0]
+    evidence_item = context.get_research_items("literature_evidence", ids=[str(evidence.id)])[0]
+    for item in (excerpt_item, evidence_item):
+        uri = citation_uri(context.citation_for_item(item))
+        found = mcp.read_resource(session, grant, uri)["payload"]
+        assert found["id"] == item["id"]
+        assert found["kind"] == item["kind"]
+        assert found["data"]["chunk_id"] == str(chunk.id)
+        assert found["data"]["content_provenance"]["content_checksum_sha256"] == "a" * 64
+        assert found["data"].get("content", found["data"].get("excerpt")) == chunk.content
+
+    other_project, other_user = _project(session)
+    other_grant, _ = _grant(session, other_project, other_user, capabilities=["research-read"])
+    for item in (excerpt_item, evidence_item):
+        with pytest.raises(DomainError) as missing:
+            mcp.read_resource(session, other_grant, citation_uri(context.citation_for_item(item)))
+        assert missing.value.status_code == 404
+
+
+def test_unknown_literature_kind_does_not_resolve_as_reference(session: Session):
+    from backend_v2.app.literature.models import LiteratureDocument
+
+    project, user = _project(session)
+    document = LiteratureDocument(project_id=project.id, title="A reference", source="synthetic_test")
+    session.add(document)
+    session.flush()
+    grant, _ = _grant(session, project, user, capabilities=["research-read"])
+    with pytest.raises(DomainError) as missing:
+        mcp.read_resource(session, grant, f"bda://literature/invented_kind/{document.id}")
+    assert missing.value.status_code == 404
+    assert mcp.read_resource(session, grant, f"bda://literature/reference/{document.id}")["payload"]["document_id"] == str(document.id)

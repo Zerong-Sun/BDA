@@ -181,3 +181,24 @@ describe('registry availability', () => {
     expect(await findPluginCard('Recovered model')).toBeInTheDocument()
   })
 })
+
+
+describe('manual research steps', () => {
+  it('adds a pending manual review with no model registry or fabricated completion', async () => {
+    api.listModelPlugins.mockRejectedValue(new Error('Registry offline'))
+    const onAdd = vi.fn().mockResolvedValue(undefined)
+    renderWithProviders(<NodeBuilder open onClose={vi.fn()} onAdd={onAdd} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Manual review step' }))
+    expect(screen.getByRole('button', { name: 'Add card to workflow' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Review step name'), { target: { value: 'Review substrate identity' } })
+    fireEvent.change(screen.getByLabelText('Inputs, sources and acceptance criteria'), { target: { value: 'Match the source sequence and verified paper before release.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add card to workflow' }))
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ nodeType: 'manual_review', resource: 'manual' }),
+      'Review substrate identity', [],
+      expect.objectContaining({ review_status: 'pending_review', acceptance_criteria: 'Match the source sequence and verified paper before release.' }),
+    ))
+    expect(onAdd.mock.calls[0][0].pluginId).toBeUndefined()
+    expect(onAdd.mock.calls[0][3].status).toBeUndefined()
+  })
+})

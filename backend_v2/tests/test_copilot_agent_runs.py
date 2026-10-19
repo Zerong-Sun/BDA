@@ -183,7 +183,7 @@ def test_the_turn_limit_stops_a_run_before_the_next_call(session: Session) -> No
     agent_runs.append_turn(session, run, role="assistant")
     allowed, why = agent_runs.within_budget(session, run)
     assert allowed is False
-    assert "turn limit" in why
+    assert "model call limit" in why
 
 
 def test_the_cost_limit_stops_a_run_before_the_next_call(session: Session) -> None:
@@ -342,9 +342,8 @@ def test_a_child_is_charged_to_itself_and_counted_on_the_parent(session: Session
     assert agent_runs.tree_cost_usd_cents(session, child) == 5
 
 
-def test_the_turn_limit_stays_per_run(session: Session) -> None:
-    """Turns measure one agent's reasoning. A parent that spent its allowance
-    thinking should not thereby silence a subagent that has barely started."""
+def test_the_call_limit_is_shared_with_subagents(session: Session) -> None:
+    """Delegation cannot multiply a task call allowance."""
     ids = _project(session)
     parent = _run(session, ids=ids, max_turns=1)
     child = agent_runs.create_run(
@@ -354,7 +353,7 @@ def test_the_turn_limit_stays_per_run(session: Session) -> None:
     agent_runs.append_turn(session, parent, role="assistant")
 
     assert agent_runs.within_budget(session, parent)[0] is False
-    assert agent_runs.within_budget(session, child)[0] is True
+    assert agent_runs.within_budget(session, child)[0] is False
 
 
 def test_an_operation_is_something_a_run_can_wait_on(session: Session) -> None:

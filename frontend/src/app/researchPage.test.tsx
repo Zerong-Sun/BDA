@@ -17,6 +17,9 @@ vi.mock('../features/research/ResearchWorkspacePanel', () => ({
 vi.mock('../components/ui/NextStep', () => ({
   NextStep: () => <div data-testid="next-step" />,
 }))
+vi.mock('../features/research/ResearchDecisionCenter', () => ({
+  ResearchDecisionCenter: () => <div data-testid="decision-center" />,
+}))
 
 const project = {
   id: 'proj_research',
@@ -47,6 +50,8 @@ vi.mock('../features/timeline/ProjectTimeline', () => ({
 function installHandlers() {
   server.use(
     http.get('/api/v2/projects', () => HttpResponse.json({ items: [project], next_cursor: null })),
+    http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ project: { id: project.id }, review_document: null })),
+    http.get('/api/v2/projects/:id/research-briefs', () => HttpResponse.json({ items: [], next_cursor: null })),
   )
 }
 
@@ -66,6 +71,32 @@ describe('ResearchPage', () => {
     useAppStore.setState({ language: 'en' })
   })
 
+  it('renders the project brief at the destination used by research team links', async () => {
+    window.location.hash = '/research?project=proj_research&tab=goals&brief=1'
+    renderWithProviders(<ResearchPage />)
+    const brief = await screen.findByRole('region', { name: 'Project brief' })
+    expect(within(brief).getByText('A confirmed research brief.')).toBeInTheDocument()
+    expect(screen.getAllByRole('region', { name: 'Project brief' })).toHaveLength(1)
+  })
+
+  it('prioritizes the saved research summary for archived projects and folds planning controls', async () => {
+    server.use(
+      http.get('/api/v2/projects', () => HttpResponse.json({ items: [{ ...project, status: 'archived' }], next_cursor: null })),
+      http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+        project: { id: project.id },
+        review_document: { id: 'saved-report', title: { en: 'Saved study' }, content: { en: '## Research objective\nThe historical research question.\n## Findings\nThe historical result.' }, status: 'accepted', version: 1 },
+      })),
+    )
+    renderWithProviders(<ResearchPage />)
+    await waitFor(() => expect(screen.getByText('The historical research question.')).toBeVisible())
+    expect(screen.getByText('The historical result.')).toBeVisible()
+    expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByTestId('decision-center')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('next-step')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Structured questions and decision definitions' }))
+    expect(await screen.findByTestId('decision-center')).toBeVisible()
+  })
+
   it('defaults to goals and presents four stages with accessible controls', () => {
     renderWithProviders(<ResearchPage />)
     expect(within(nav()).getAllByRole('tab')).toHaveLength(4)
@@ -74,6 +105,29 @@ describe('ResearchPage', () => {
     }
     expect(within(nav()).getByRole('tab', { name: englishGroups[0] })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('navigation', { name: 'Evidence categories' })).not.toBeInTheDocument()
+  })
+
+  it('shows saved outcomes for an active project without treating it as completed or hiding its goals', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+      project: { id: project.id },
+      review_document: { id: 'saved-report', title: { en: 'Stage report' }, content: { en: '## Research objective\nAn ongoing question.\n## Results\nA recorded stage result.' }, status: 'accepted', version: 1 },
+    })))
+    renderWithProviders(<ResearchPage />)
+    await waitFor(() => expect(screen.getByText('A recorded stage result.')).toBeVisible())
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Project results, reports & review')
+    expect(within(nav()).getByRole('tab', { name: 'Results & reports' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('Completed project · saved research record')).not.toBeInTheDocument()
+    expect(screen.getByTestId('next-step')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage questions and goal tree' }))
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
+  })
+
+  it('keeps report load failures visible while allowing access to existing goals', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({ detail: 'unavailable' }, { status: 503 })))
+    renderWithProviders(<ResearchPage />)
+    expect(await screen.findByText(/The project report could not be loaded/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage questions and goal tree' }))
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
   })
 
   it('supports keyboard navigation between stages and evidence subcategories', async () => {
@@ -93,10 +147,69 @@ describe('ResearchPage', () => {
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
   })
 
+  it('retains focused tabs when a deep-linked project finishes loading', async () => {
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    server.use(http.get('/api/v2/projects', async () => {
+      await pending
+      return HttpResponse.json({ items: [project], next_cursor: null })
+    }))
+    renderWithProviders(<ResearchPage />)
+    const goals = within(nav()).getByRole('tab', { name: englishGroups[0] })
+    const evidence = within(nav()).getByRole('tab', { name: englishGroups[1] })
+    goals.focus()
+    fireEvent.keyDown(goals, { key: 'ArrowRight' })
+    try {
+      await waitFor(() => expect(evidence).toHaveFocus())
+    } finally {
+      release()
+    }
+    await screen.findByTestId('decision-center')
+    expect(within(nav()).getByRole('tab', { name: englishGroups[1] })).toBe(evidence)
+    expect(evidence).toHaveFocus()
+  })
+
   it('passes the confirmed brief into the decision record', async () => {
     window.location.hash = '/research?project=proj_research&tab=timeline'
     renderWithProviders(<ResearchPage />)
     await waitFor(() => expect(screen.getByTestId('research-timeline-view')).toHaveTextContent('true'))
+  })
+
+  it('preserves the project and browser history when changing research tabs', async () => {
+    window.location.hash = '/research?project=proj_research&tab=methods'
+    renderWithProviders(<ResearchPage />)
+    await screen.findByTestId('research-workspace-view')
+    fireEvent.click(within(nav()).getByRole('tab', { name: 'Decision record' }))
+    expect(window.location.hash).toContain('project=proj_research')
+    expect(window.location.hash).toContain('tab=timeline')
+    window.history.back()
+    await waitFor(() => expect(window.location.hash).toContain('tab=methods'))
+    expect(within(nav()).getByRole('tab', { name: 'Experiment plan' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows one research title and keeps goal management explicitly expandable', async () => {
+    renderWithProviders(<ResearchPage />)
+    await screen.findByTestId('decision-center')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(en.research.page.title)
+    expect(screen.queryByText(project.name)).not.toBeInTheDocument()
+    expect(screen.queryByText(project.prompt)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Research team' })).not.toBeInTheDocument()
+    const manage = screen.getByRole('button', { name: 'Manage questions and goal tree' })
+    expect(manage).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('research-goals-view')).not.toBeInTheDocument()
+    fireEvent.click(manage)
+    expect(await screen.findByTestId('research-goals-view')).toBeVisible()
+  })
+
+  it('opens literature research as a project-scoped draft in the unified task workspace', async () => {
+    window.location.hash = '/research?project=proj_research&tab=references'
+    renderWithProviders(<ResearchPage />)
+    const link = await screen.findByRole('link', { name: 'Prepare AI literature task' })
+    const url = new URL(link.getAttribute('href')!.slice(1), 'https://local.test')
+    expect(url.pathname).toBe('/bots')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ project: project.id, draft_project: project.id, service: 'literature', view: 'tasks', from: 'references' })
+    expect(url.searchParams.get('draft')).toContain('Prepare drafts only')
+    expect(screen.queryByRole('textbox', { name: 'Task goal' })).not.toBeInTheDocument()
   })
 
   it.each([
@@ -159,5 +272,7 @@ describe('ResearchPage without a project', () => {
 
     expect(screen.getAllByText(en.research.projectNotice)).toHaveLength(1)
     expect(screen.queryByTestId('research-workspace-view')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Prepare AI literature task' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Manage questions and goal tree' })).not.toBeInTheDocument()
   })
 })

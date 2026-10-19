@@ -1,13 +1,18 @@
 import type { ReactNode } from 'react'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { ApiState } from '@/components/ui/ApiState'
 import { ProjectChooser } from './ProjectChooser'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 
 export function ProjectRequired({ children }: { children: ReactNode }) {
   const { t } = useI18n()
-  const { hasProject, projectsLoading, hasStaleProjectReference } = useProjectContext()
+  const { hasProject, projectsLoading, projectsError, projectsQueryError, refetchProjects, hasStaleProjectReference } = useProjectContext()
+
+  if (projectsError) {
+    return <ApiState isError error={projectsQueryError} onRetry={() => void refetchProjects()}>{null}</ApiState>
+  }
 
   if (projectsLoading) {
     return (
