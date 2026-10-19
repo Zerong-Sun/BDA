@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { findingReviewCounts, isNewerSavedRecord, reviewOverview, splitObjectiveQuestions, unsectionedReportOverview } from './reviewOverview'
 
 describe('saved report overview', () => {
+  it('keeps authored readiness decisions among advancement conditions, not results', () => {
+    const overview = reviewOverview('## Results\nSaved finding.\n## 当前准备判定\n当前资源尚未齐备。最有价值的下一步是补齐输入。')
+    expect(overview.findings.map(section => section.body)).toEqual(['Saved finding.'])
+    expect(overview.unresolved.map(section => section.body)).toEqual(['当前资源尚未齐备。最有价值的下一步是补齐输入。'])
+    expect(unsectionedReportOverview('## 当前准备判定\n项目暂停，等待输入。\n## Next steps\nDo not revive this plan.').next).toBe('项目暂停，等待输入。')
+  })
   it('prioritizes explicit results and never treats arbitrary methods as results', () => {
     const overview = reviewOverview('## Research objective\nScope\n## Methods\nProtocol only\n## Structure analysis\nMechanism\n## Results\nRecorded outcome\n## Open questions\nStill unresolved')
     expect(overview.findings.map(section => section.body)).toEqual(['Recorded outcome'])

@@ -20,6 +20,27 @@ function respond(content: string | null = report, references: Record<string, unk
 beforeEach(() => { useAppStore.setState({ language: 'en' }); respond() })
 afterEach(cleanup)
 describe('archived research overview', () => {
+  it('surfaces archive maintenance instructions without presenting its index as a results report', async () => {
+    server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
+      project: { id: project.id },
+      review_document: { id: 'index', title: { zh: '项目条目索引', en: 'Project entry index' }, content: { en: '# Archived source index\n## Next steps\nRemain archived; retain traceability only.' }, status: 'progress_note', version: 1, updated_at: '2026-10-16T00:00:00Z' },
+      review_sections: [], references: [], structures: [],
+    })))
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    const next = await screen.findByRole('region', { name: 'Open questions and advancement conditions' })
+    expect(within(next).getByText('Remain archived; retain traceability only.')).toBeVisible()
+    expect(within(next).getByText(/Source: maintenance instructions in the archive index/)).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Project results' })).getByText(/Only an archive index is recorded/)).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Read full report' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Archive source index' })).toHaveAttribute('aria-expanded', 'false')
+  })
+  it('shows current readiness and its next step even without a next-steps heading', async () => {
+    respond('## Results\nRecorded checks.\n## 当前准备判定\n当前资源未齐备。最有价值的下一步是补齐输入。')
+    renderWithProviders(<ProjectResearchOverview project={project} />)
+    const next = await screen.findByRole('region', { name: 'Open questions and advancement conditions' })
+    expect(within(next).getByText('当前资源未齐备。最有价值的下一步是补齐输入。')).toBeVisible()
+    expect(within(next).queryByText(/no separate open-questions/)).not.toBeInTheDocument()
+  })
   it('keeps an index-only archive accessible without presenting it as a results report', async () => {
     server.use(http.get('/api/v2/projects/:id/research-workspace', () => HttpResponse.json({
       project: { id: project.id },

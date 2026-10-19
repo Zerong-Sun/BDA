@@ -4,7 +4,7 @@ import { reviewSections } from './reviewSections'
 export function reviewOverview(markdown: string) {
   const sections = reviewSections(markdown)
   const objectives = sections.filter(section => /objective|research questions?|研究目标|研究问题|决策问题/i.test(section.title))
-  const unresolved = sections.filter(section => /uncertainty|conflict|limits?|limitation|gat(?:e|ing)|next|open questions?|争议|矛盾|局限|下一步|闸门|待验证|未解决/i.test(section.title))
+  const unresolved = sections.filter(section => /uncertainty|conflict|limits?|limitation|gat(?:e|ing)|next|open questions?|readiness|当前准备判定|争议|矛盾|局限|下一步|闸门|待验证|未解决/i.test(section.title))
   const candidates = sections.filter(section => !objectives.includes(section) && !unresolved.includes(section) && !/route|method|design plan|路线|方法|方案/i.test(section.title))
   const results = candidates.filter(section => /conclusions?|results?|findings|summary|结论|结果|发现|成果|总结/i.test(section.title))
   const findings = results.length ? results : candidates.filter(section => /structure|signaling|mechanism|结构|信号|机制/i.test(section.title))
@@ -61,7 +61,7 @@ function currentProseBlocks(markdown: string, preambleOnly = false) {
   const excluded = () => headings.some(({ level, title }) =>
     /histor(?:y|ical)|previous|archiv|历史|过往|归档|references?|sources?|参考|引用|来源/i.test(title)
     || (preambleOnly && level >= 2)
-    || (level >= 2 && !/results?|findings|conclusions?|summary|status|progress|next|pause|hold|stop|结果|结论|发现|总结|状态|进展|下一|暂停|停止/.test(title.toLowerCase())))
+    || (level >= 2 && !/results?|findings|conclusions?|summary|status|progress|next|pause|hold|stop|结果|结论|发现|总结|状态|进展|下一|暂停|停止|准备判定/.test(title.toLowerCase())))
   const flush = () => {
     const text = paragraph.join('\n').trim()
     if (text && !excluded() && !/^\||^---+$/.test(text)) blocks.push(text)

@@ -31,6 +31,8 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
   const indexDocument = savedDocument && Object.values(savedDocument.title).some(title => typeof title === 'string' && isProjectIndex(title)) ? savedDocument : undefined
   const report = indexDocument ? undefined : savedDocument
   const content = report ? workspaceText(report.content, language) : ''
+  const indexContent = indexDocument ? workspaceText(indexDocument.content, language) : ''
+  const indexConditions = reviewOverview(indexContent).unresolved
   const { objectives, findings, unresolved } = reviewOverview(content)
   const fallback = unsectionedReportOverview(content)
   const preferProgress = Boolean(progress && (!report || isNewerSavedRecord(progress.updated_at, report.updated_at)))
@@ -39,10 +41,12 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
   const displayedFindings = preferProgress ? progressFindings : findings
   const progressFallback = unsectionedReportOverview(progress?.content ?? '')
   const unsectionedProgress = preferProgress && !progressFindings.length ? progressFallback.excerpt : undefined
-  const currentHold = savedReportHold(preferProgress ? progress?.content ?? '' : content)
-  const displayedUnresolved = currentHold ? [] : preferProgress ? progressConditions : unresolved
-  const currentFallback = preferProgress ? progressFallback : fallback
+  const currentHold = savedReportHold(preferProgress ? progress?.content ?? '' : content || indexContent)
+  const displayedUnresolved = currentHold ? [] : preferProgress ? progressConditions : indexDocument ? indexConditions : unresolved
+  const currentFallback = preferProgress ? progressFallback : indexDocument ? unsectionedReportOverview(indexContent) : fallback
   const nextExcerpt = currentHold || currentFallback.next
+  const nextRecord = preferProgress ? progress : report || indexDocument
+  const nextSource = preferProgress ? (zh ? '来源：最新已保存进展' : 'Source: latest saved progress') : indexDocument ? (zh ? '来源：归档索引中的维护安排' : 'Source: maintenance instructions in the archive index') : (zh ? '来源：已保存报告' : 'Source: saved report')
   const dateLabel = (value: string) => Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-GB', { dateStyle: 'medium', timeZone: 'Asia/Shanghai' }).format(new Date(value)) : (zh ? '日期未记录' : 'Date not recorded')
   const brief = projectBrief(project, language)
   const objectiveParts = objectives.map(section => splitObjectiveQuestions(section.body, section.title))
@@ -90,8 +94,8 @@ export function ProjectResearchOverview({ project }: { project: Project }) {
       </div>
       <section aria-label={zh ? '遗留问题与推进条件' : 'Open questions and advancement conditions'} className="project-summary-card project-summary-card--next space-y-3">
         <h2 className="font-semibold">{zh ? '下一步与推进条件' : 'Next step and advancement conditions'}</h2>
-        {displayedUnresolved.length ? <p className="text-xs text-text-muted">{progressConditions.length && progress ? `${zh ? '来源：进展记录' : 'Source: progress record'} · ${dateLabel(progress.updated_at)}` : report ? `${zh ? '来源：已保存报告' : 'Source: saved report'} · ${dateLabel(report.updated_at)}` : null}</p> : null}
-        {displayedUnresolved.length ? <div className="grid items-start gap-5 lg:grid-cols-2">{displayedUnresolved.map(section => <section key={section.title} className="min-w-0 space-y-2"><h3 className="text-sm font-medium">{section.title}</h3>{progressConditions.length ? <><p className="text-xs text-text-muted">{zh ? '来源：最新已保存进展' : 'Source: latest saved progress'}</p><ReviewMarkdown>{section.body}</ReviewMarkdown></> : prose(section.body)}</section>)}</div> : nextExcerpt ? <div className="space-y-2"><p className="text-xs text-text-muted">{preferProgress ? (zh ? '来源：最新已保存进展' : 'Source: latest saved progress') : (zh ? '来源：已保存报告中的安排' : 'Source: instructions in the saved report')} · {preferProgress && progress ? dateLabel(progress.updated_at) : report ? dateLabel(report.updated_at) : ''}</p>{preferProgress ? <ReviewMarkdown compactCitations>{nextExcerpt}</ReviewMarkdown> : prose(nextExcerpt)}</div> : <p className="text-sm text-text-secondary">{preferProgress ? (zh ? '最新进展未明确当前推进条件，请查看完整记录；旧报告中的安排未作为当前下一步。' : 'The latest progress does not specify current advancement conditions. Read the full record; previous report instructions are not current next steps.') : (zh ? '报告未单列遗留问题；这不代表所有问题已经解决。' : 'The report has no separate open-questions section; this does not imply all questions are resolved.')}</p>}
+        {displayedUnresolved.length ? <p className="text-xs text-text-muted">{nextSource} · {nextRecord ? dateLabel(nextRecord.updated_at) : ''}</p> : null}
+        {displayedUnresolved.length ? <div className="grid items-start gap-5 lg:grid-cols-2">{displayedUnresolved.map(section => <section key={section.title} className="min-w-0 space-y-2"><h3 className="text-sm font-medium">{section.title}</h3>{progressConditions.length ? <><p className="text-xs text-text-muted">{zh ? '来源：最新已保存进展' : 'Source: latest saved progress'}</p><ReviewMarkdown>{section.body}</ReviewMarkdown></> : prose(section.body)}</section>)}</div> : nextExcerpt ? <div className="space-y-2"><p className="text-xs text-text-muted">{nextSource} · {nextRecord ? dateLabel(nextRecord.updated_at) : ''}</p>{preferProgress ? <ReviewMarkdown compactCitations>{nextExcerpt}</ReviewMarkdown> : prose(nextExcerpt)}</div> : <p className="text-sm text-text-secondary">{preferProgress ? (zh ? '最新进展未明确当前推进条件，请查看完整记录；旧报告中的安排未作为当前下一步。' : 'The latest progress does not specify current advancement conditions. Read the full record; previous report instructions are not current next steps.') : (zh ? '报告未单列遗留问题；这不代表所有问题已经解决。' : 'The report has no separate open-questions section; this does not imply all questions are resolved.')}</p>}
         <nav className="project-card-actions" aria-label={zh ? '下一步入口' : 'Next step actions'}>
           <Link to={`/workflow?project=${encodeURIComponent(project.id)}`}>{zh ? '查看工作流与门控' : 'Workflow and gates'} →</Link>
           <Link to={`/bots?project=${encodeURIComponent(project.id)}&view=tasks`}>{zh ? '查看任务与交付' : 'Tasks and deliverables'} →</Link>

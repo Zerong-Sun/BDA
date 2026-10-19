@@ -29,3 +29,9 @@ Legacy nanocage, flavor and enzyme reports use ordinary paragraphs instead of le
 ## Boundaries
 
 This verifies display, provenance and navigation, not the scientific accuracy of the saved reports or completion of outstanding scientific reviews. Private browser evidence stays outside Git. Main merge and PR approval follow-up remain paused.
+
+## Latest-record follow-up
+
+All 13 selectable projects were checked in both visit orders (26 selector transitions). Saved report identity, latest progress source, next-step text and review counts stayed consistent with each project's baseline. Project-scoped links retained the destination ID, report details reset to collapsed, and no page errors were observed. Three projects had newer progress notes; their summaries used those notes without reviving the older report's instructions. The existing paused project retained its authored hold.
+
+Two presentation omissions were found and fixed: an authored “当前准备判定” section now appears with advancement conditions, and an archive-only index can show its maintenance instructions with an explicit archive-index source label. The index still does not count as a scientific results report. Three regression cases cover these paths; the complete frontend suite passed 1,364 tests. Private browser evidence and saved-record snapshots remain outside Git; no model calls or research submissions were made.
