@@ -1,0 +1,16 @@
+# Project switching review — 2026-10-19
+
+## Findings and changes
+
+- While a destination workflow was still loading, its page could briefly offer a blank workflow/route planner. The page now waits for current-run, linked-run ownership and graph loading before presenting the workspace. No creation or planning call is made by loading the page.
+- Research pages now explicitly remount their temporary state by project, matching the team/workflow components. The application shell already isolates project pages; this local boundary also protects the research component when embedded independently. An initially suspected evidence-search leak was a test timing artifact: once the selector update settled, the old deployed shell cleared it. This was not a confirmed cross-project data leak.
+
+## Verification
+
+- Chromium used the actual selector for 78 checks across 13 projects, three surfaces and both visit orders. Reports, latest team messages and workflow card/node snapshots matched each project's own cached baseline. Project-scoped links retained the selected project.
+- Delayed destination requests showed loading without old content. Releasing old-project requests after switching did not change destination team messages, report or existing workflow graph.
+- A typed, unsent team draft did not carry to another project. Back/forward restored the matching project/run, selector changes removed old run/node parameters, and a foreign workflow link was rejected in favor of the current project's run.
+- 49 focused/regression tests passed across seven files, covering research state, workflow loading, late responses, ownership checks, team and project lifecycle behavior. Production build and changed-file lint passed.
+- No browser page errors or application writes were observed. Authentication was permitted; model calls and research submissions were prohibited throughout. Test drafts were confined to the isolated browser.
+
+Private browser evidence and deployment backups remain outside Git. This is a frontend state/navigation verification, not a scientific validation. Main merge remains paused.

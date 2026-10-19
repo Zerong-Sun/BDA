@@ -22,6 +22,11 @@ import { useAppStore, type Language } from '../lib/store/appStore'
 import { isDemoProject } from '../features/tour'
 
 export function ResearchPage() {
+  const { projectId } = useProjectContext()
+  return <ProjectResearchPage key={projectId} />
+}
+
+function ProjectResearchPage() {
   const { language, t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')

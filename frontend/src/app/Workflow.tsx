@@ -700,6 +700,13 @@ function WorkflowWorkspace() {
     }
   }
 
+  if (!isDemoMode && projectId && (currentWorkflowLoading || linkedRunIsPending || workflowGraphLoading)) {
+    return <Frame variant="inverse" spacing="xs" className="bg-transparent" data-tour-id="workflow-page">
+      <h1 className="text-2xl font-semibold">{t.nav.workflow}</h1>
+      <p role="status" aria-live="polite">{language === 'zh' ? '正在读取当前项目的工作流…' : 'Loading the current project’s workflow…'}</p>
+    </Frame>
+  }
+
   return (
     <Frame
       variant="inverse"

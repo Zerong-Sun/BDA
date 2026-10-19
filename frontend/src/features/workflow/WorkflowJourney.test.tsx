@@ -65,6 +65,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('workflow journey', () => {
+  it('shows loading instead of an empty route planner while the new project run is pending', async () => {
+    let resolve!: (value: typeof run) => void
+    api.current.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+    renderWithProviders(<WorkflowPage />)
+    expect(await screen.findByText('Loading the current project’s workflow…')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Create a blank workflow manually' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plan routes' })).not.toBeInTheDocument()
+    await act(async () => resolve(run))
+    expect(await screen.findByRole('button', { name: 'Add workflow node' })).toBeEnabled()
+    expect(api.create).not.toHaveBeenCalled()
+    expect(api.plan).not.toHaveBeenCalled()
+  })
+
   it('reopens an empty saved draft for editing without forcing another creation', async () => {
     state.ready = false
     api.graph.mockResolvedValue({ workflow: run, nodes: [], edges: [], layout: {} })
