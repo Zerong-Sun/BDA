@@ -41,7 +41,7 @@ describe('ErrorBoundary', () => {
     const shell = container.querySelector('[data-slot="app-shell"]')
     const main = shell?.querySelector('main')
     const content = main?.parentElement
-    expect(shell).toHaveClass('flex', 'min-h-screen', 'min-w-0', 'flex-col')
+    expect(shell).toHaveClass('workspace-shell', 'flex', 'min-w-0', 'flex-col')
     expect(content).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
     expect(main).toHaveClass('min-h-0', 'min-w-0', 'flex-1', 'overflow-y-auto')
   })

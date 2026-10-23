@@ -77,7 +77,8 @@ function DecisionInbox() {
 
   return <section className="bot-page inbox-page" data-tour-id="decision-inbox">
     <header className="science-page-header">
-      <div><h1>{zh ? '待办复核' : 'Review queue'}</h1>
+      <div>
+        <h1>{zh ? '待我决定' : 'Needs your decision'}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，查看等待你决定的事项。' : 'Choose a project to see what is waiting on you.')}</p>
       </div>
     </header>
@@ -87,7 +88,8 @@ function DecisionInbox() {
           <Link to={`/research?project=${project}`}>{zh ? '查看项目结果与报告' : 'Project results & reports'}<ArrowRightIcon aria-hidden="true" /></Link>
           <Link to={`/bots?project=${project}&view=tasks`}>{zh ? '全部任务与交付' : 'All tasks & deliverables'}<ArrowRightIcon aria-hidden="true" /></Link>
         </nav>
-        {readOnly ? <p className="inbox-intro">{zh ? '只读模式：可查看，确认需要研究员权限。' : 'Read-only: researcher access is required to confirm decisions.'}</p> : null}
+        <p className="inbox-intro">{zh ? '选择待办，查看依据并作出决定。' : 'Choose an item to review the evidence and decide.'}
+          {readOnly ? (zh ? ' 当前为只读模式，可以查看，确认需要研究员权限。' : ' You are in read-only mode: you can inspect these, but settling them needs researcher access.') : null}</p>
         {loaded && total === 0 ? <p role="status" className="inbox-clear">{zh ? '目前没有需要你决定的事项。' : 'Nothing needs your decision right now.'}</p> : null}
         <div className="inbox-grid">
           <InboxSection label={zh ? '交付物待你审核' : 'Ready for your review'} count={runs.isSuccess ? toReview.length : null} query={runs}

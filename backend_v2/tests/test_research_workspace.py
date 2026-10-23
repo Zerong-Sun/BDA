@@ -41,6 +41,17 @@ def finding(
     )
 
 
+@pytest.mark.parametrize('kind', ['dataset', 'data_table'])
+def test_general_data_entries_are_visible_in_the_data_workspace(kind: str) -> None:
+    entry = SimpleNamespace(id=uuid.uuid4(), entry_type=kind, title='Measured values', content='Original table',
+                            source={'artifact_id': str(uuid.uuid4()), 'data': [{'value': 0, 'passed': False}]}, version=1)
+    methods, datasets = workspace._knowledge([entry])
+    assert methods == []
+    assert len(datasets) == 1
+    assert datasets[0].data == [{'value': 0, 'passed': False}]
+    assert datasets[0].source['artifact_id'] == entry.source['artifact_id']
+
+
 def test_review_sources_are_available_as_references_without_literature_rows() -> None:
     pubmed = "https://pubmed.ncbi.nlm.nih.gov/23268147/"
     rows = [

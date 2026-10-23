@@ -15,8 +15,7 @@ function SavedAnalysisTitle({ item }: { item: SavedAnalysis }) {
   const { language } = useI18n()
   const copy = (cn: string, en: string) => language === 'zh' ? cn : en
   const status = String(item.record.qc_review?.status ?? 'unreviewed')
-  const id = item.record.experiment_result_id.slice(0, 8)
-  if (item.analysis?.instrument !== 'bli') return <>{item.label} · {status} · {id}</>
+  if (item.analysis?.instrument !== 'bli') return <>{item.label} · {status}</>
   const { summary } = item.analysis
   const processing = summary.processing ?? {}
   const method = processing.analysis_method ?? summary.selected_method
@@ -38,7 +37,7 @@ function SavedAnalysisTitle({ item }: { item: SavedAnalysis }) {
   return <span className="min-w-0 space-y-1 text-left">
     <span className="block font-medium">{summary.sample_id} · KD {kd} {item.record.unit ?? 'nM'} · {status}</span>{' '}
     <span className="block text-xs font-normal text-text-secondary">{methodLabel} · {baseline} · {reference}</span>{' '}
-    <span className="block break-all text-xs font-normal text-text-muted">{item.label} · {item.record.analysis_version} · {id}</span>
+    <span className="block break-all text-xs font-normal text-text-muted">{item.label}</span>
   </span>
 }
 

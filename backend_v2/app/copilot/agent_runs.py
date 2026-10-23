@@ -40,7 +40,10 @@ _LIVE = {"running", "awaiting_tasks"}
 
 
 def require_run(session: Session, run_id: uuid.UUID, *, for_update: bool = False) -> CopilotAgentRun:
-    run = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.id == run_id).with_for_update()) if for_update else session.get(CopilotAgentRun, run_id)
+    run = session.scalar(
+        select(CopilotAgentRun).where(CopilotAgentRun.id == run_id)
+        .with_for_update().execution_options(populate_existing=True)
+    ) if for_update else session.get(CopilotAgentRun, run_id)
     if run is None:
         raise DomainError("agent_run_not_found", "Agent run was not found", status_code=404)
     return run

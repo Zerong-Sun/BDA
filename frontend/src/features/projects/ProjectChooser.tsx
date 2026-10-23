@@ -40,6 +40,7 @@ interface ProjectChooserProps {
   compact?: boolean
   creating?: boolean
   onCreatingChange?: (creating: boolean) => void
+  onCreated?: () => void
 }
 
 const PROJECT_TYPE_OPTIONS = [
@@ -59,6 +60,7 @@ export function ProjectChooser({
   compact = false,
   creating: creatingProp,
   onCreatingChange,
+  onCreated,
 }: ProjectChooserProps) {
   const { t, format, language } = useI18n()
   const resolvedTitle = title ?? t.projects.projectChooser.defaultTitle
@@ -112,6 +114,7 @@ export function ProjectChooser({
       setSummary('')
       setPrompt('')
       generatePrompt.reset()
+      onCreated?.()
     },
   })
 

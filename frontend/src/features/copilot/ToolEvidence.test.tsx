@@ -15,6 +15,9 @@ it('links structure selections to Results with exact insertion codes and project
   expect(url.searchParams.get('artifact')).toBe('artifact-1')
   expect(JSON.parse(url.searchParams.get('residues')!)).toEqual(residues)
   expect(screen.getByText('A:52A LYS')).toBeInTheDocument()
+  expect(screen.queryByText(/"checksum_sha256"/)).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Complete tool output and provenance' }))
+  expect(screen.getByText(/"checksum_sha256": "abc"/)).toBeVisible()
 })
 it.each([undefined, 'A', null])('preserves render_structure_view highlighted residues and insertion code %s without viewer_selection', (insertionCode) => {
   const highlighted = [{ chain: 'B', seq: 46, name: 'LYS' }, { chain: 'B', seq: 54, name: 'ARG', ...(insertionCode !== undefined ? { insertion_code: insertionCode } : {}) }]

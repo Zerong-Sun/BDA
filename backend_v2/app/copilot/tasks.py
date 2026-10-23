@@ -404,8 +404,9 @@ def copilot_agent_step(run_id: str) -> dict:
         candidate = session.get(CopilotAgentRun, parsed)
         if candidate is not None and candidate.parent_run_id:
             agent_runs.require_run(session, candidate.parent_run_id, for_update=True)
-        # Lock the run for the whole of this stay. Two workers driving one
-        # transcript would interleave turns, and the transcript is the state.
+        # Serialize one step, then release the row for cancellation and readers.
+        # Holding this lock for the entire model loop prevents a user's cancel
+        # from taking effect until the task has already finished.
         run = session.scalar(
             select(CopilotAgentRun).where(CopilotAgentRun.id == parsed)
             .with_for_update().execution_options(populate_existing=True)
@@ -428,7 +429,7 @@ def copilot_agent_step(run_id: str) -> dict:
                 )
             ) or 0
             with call_scope(f"copilot-agent:{root.id}", max_calls=root.max_turns, initial_calls=int(prior_calls)):
-                status = agent_loop.drive(session, run, provider)
+                status = agent_loop.drive(session, run, provider, max_steps=1)
         except Exception as exc:
             agent_runs.finish(session, run, status="failed", error=str(exc)[:2000])
             agent_loop.settle_parent(session, run)

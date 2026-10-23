@@ -66,8 +66,8 @@ export const TOUR_SECTIONS: TourSection[] = [
         { title: 'Project library', body: 'Find a project and open its brief. Start real work by creating a project in application mode.' },
         { title: '项目库', body: '找到项目，打开任务书。正式开始研究时，在应用模式中新建项目。' }),
       step('projects', 'main-navigation', '/projects', 'main-navigation', 'button',
-        { title: 'Main navigation', body: 'Start with Research or Research team. Workbenches opens Workflow, Candidates, Lab and Results.' },
-        { title: '主导航', body: '从“研究”或“研究团队”开始。“工作台”中可打开工作流、候选物、实验台和结果。' }),
+        { title: 'Main navigation', body: 'Start with Research or Research team. The grouped navigation lists each workbench; on smaller screens, use Switch page.' },
+        { title: '主导航', body: '从“研究”或“研究团队”开始。分组导航可进入各个工作台；窄屏时使用“切换页面”。' }),
     ],
   },
   {
@@ -166,11 +166,11 @@ export const TOUR_SECTIONS: TourSection[] = [
     description: { en: 'Learn assistant context, modes, appearance, and connections.', zh: '了解助手上下文、模式、外观与连接。' },
     steps: [
       step('copilot-settings', 'copilot-drawer', '/projects', 'copilot-drawer', 'button',
-        { title: 'Project-aware Copilot', body: 'Copilot receives the current page and project context. You remain in control of any submission or external action.' },
-        { title: '感知项目的 Copilot', body: 'Copilot 会获得当前页面和项目上下文，任何提交或外部操作仍由您控制。' }, 'copilot'),
+        { title: 'Project-aware Copilot', body: 'Open Bot from the top bar. Start a task, or use Decisions & parameters to inspect recorded work, tool calls and limits.' },
+        { title: '感知项目的 Copilot', body: '从顶栏直接打开 Bot。可发起任务，或通过“决策与参数”核查执行记录、工具调用和额度。' }, 'copilot'),
       step('copilot-settings', 'settings-drawer', '/projects', 'settings-drawer', 'button',
-        { title: 'Application settings', body: 'Switch operating mode, inspect connections, change appearance, configure Copilot, open Guide, or restart this tour.' },
-        { title: '应用设置', body: '可切换运行模式、检查连接、调整外观、配置 Copilot、打开 Guide 或重新开始本导览。' }, 'settings'),
+        { title: 'Application settings', body: 'Use Preferences for appearance and help, Model for project model configuration, and Connections for services and administration.' },
+        { title: '应用设置', body: '“偏好与帮助”管理外观和导览，“模型配置”管理项目模型，“连接与管理”检查服务及管理设置。' }, 'settings'),
     ],
   },
   {

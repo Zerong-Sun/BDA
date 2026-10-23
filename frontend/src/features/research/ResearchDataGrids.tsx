@@ -3,12 +3,16 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
 import { DownloadSimpleIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { getArtifact } from '../../lib/api/artifacts'
+import { safeCitationUrl } from './citationMarkers'
 import type {
   ResearchWorkspaceKnowledge,
   ResearchWorkspaceTarget,
@@ -22,6 +26,7 @@ import {
 import { DataGridColumnHeader } from '../../components/reui/data-grid/data-grid-column-header'
 import { DataGridScrollArea } from '../../components/reui/data-grid/data-grid-scroll-area'
 import { DataGridTable } from '../../components/reui/data-grid/data-grid-table'
+import { DataGridPagination } from '../../components/reui/data-grid/data-grid-pagination'
 import {
   Frame,
   FrameHeader,
@@ -62,12 +67,14 @@ type DatasetRow = {
 }
 
 function numberValue(value: unknown): string {
-  return typeof value === 'number' || typeof value === 'string' ? String(value) : '—'
+  if (value == null || value === '') return '—'
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
 function localizedDatasetCell(value: unknown, language: ResearchLanguage): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return resolveStoredText(value, language)
+    const localized = Object.keys(value).every((key) => ['en', 'zh', 'default'].includes(key))
+    return (localized ? resolveStoredText(value, language) : '') || numberValue(value)
   }
   return numberValue(value)
 }
@@ -83,6 +90,14 @@ function datasetColumnId(sourceKey: string): string {
     character.codePointAt(0)?.toString(16) ?? '0'
   )).join('_')
   return `dataset_${encoded || 'empty'}`
+}
+
+function DatasetSource({ artifactId, language, label }: { artifactId: string; language: ResearchLanguage; label?: string }) {
+  const source = useQuery({ queryKey: ['artifact', artifactId], queryFn: () => getArtifact(artifactId), staleTime: 30_000, retry: false })
+  const href = safeCitationUrl(source.data?.download_url)
+  const zh = language === 'zh'
+  if (source.isError) return <span role="status" className="text-xs text-danger">{zh ? '原始文件链接读取失败' : 'Source file link unavailable'}</span>
+  return href ? <a className="inline-flex items-center gap-1 break-all text-sm text-accent underline" href={href} target="_blank" rel="noopener noreferrer"><DownloadSimpleIcon aria-hidden="true" />{label || (zh ? '下载原始文件' : 'Download source file')}</a> : <span role="status" className="text-xs text-text-muted">{zh ? '正在读取原始文件链接…' : 'Loading source file link…'}</span>
 }
 
 export function DatasetDataGrid({
@@ -143,11 +158,15 @@ export function DatasetDataGrid({
     columns,
     state: { sorting },
     onSortingChange: setSorting,
+    initialState: { pagination: { pageSize: 25 } },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getRowId: (row) => row.id,
   })
   const title = workspaceText(dataset.title, language)
+  const sourceArtifactId = typeof dataset.source?.artifact_id === 'string' ? dataset.source.artifact_id : null
+  const files = Array.isArray(dataset.source?.files) ? dataset.source.files.map(rowRecord).filter((f) => typeof f.artifact_id === 'string') : []
 
   const download = () => {
     const blob = new Blob([JSON.stringify(dataset.data, null, 2)], { type: 'application/json' })
@@ -164,10 +183,11 @@ export function DatasetDataGrid({
       <FramePanel className="min-w-0 p-0">
         <FrameHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b">
           <div className="flex min-w-0 items-center gap-2">
-            <FrameTitle className="truncate">{title}</FrameTitle>
+            <FrameTitle className="truncate" title={title}>{title}</FrameTitle>
             {renderAskCopilot(dataset.id, 'dataset', title)}
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-2">
+            {sourceArtifactId ? <DatasetSource artifactId={sourceArtifactId} language={language} /> : null}
             <label className="relative min-w-52 flex-1 sm:max-w-72">
               <MagnifyingGlassIcon
                 aria-hidden="true"
@@ -206,6 +226,14 @@ export function DatasetDataGrid({
                 <DataGridTable />
               </DataGridScrollArea>
             </DataGridContainer>
+            {rows.length > 25 ? <DataGridPagination
+              className="px-4 py-3"
+              sizes={[25, 50, 100]}
+              rowsPerPageLabel={language === 'zh' ? '每页行数' : 'Rows per page'}
+              previousPageLabel={language === 'zh' ? '上一页' : 'Go to previous page'}
+              nextPageLabel={language === 'zh' ? '下一页' : 'Go to next page'}
+              info={language === 'zh' ? '第 {from}–{to} 行，共 {count} 行' : '{from} - {to} of {count}'}
+            /> : null}
           </DataGrid>
         </div>
         <Accordion
@@ -213,6 +241,7 @@ export function DatasetDataGrid({
           onValueChange={setAdvancedOpen}
           className="border-t px-4"
         >
+          {files.length ? <AccordionItem value="source-files" className="border-0"><AccordionTrigger className="py-3 text-primary">{language === 'zh' ? '相关原始文件与参数包' : 'Associated source files and parameter packages'} ({files.length})</AccordionTrigger><AccordionContent><ul className="grid gap-2">{files.map((file) => <li key={String(file.artifact_id)}><DatasetSource artifactId={String(file.artifact_id)} language={language} label={typeof file.filename === 'string' ? file.filename : undefined} /></li>)}</ul></AccordionContent></AccordionItem> : null}
           <AccordionItem value="json" className="border-0">
             <AccordionTrigger className="py-3 text-primary">
               {labels.advancedJson}

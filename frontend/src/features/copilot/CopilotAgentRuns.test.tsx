@@ -56,7 +56,7 @@ function runReturns(run: Record<string, unknown>, turns: Record<string, unknown>
 }
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
-beforeEach(() => { sessionStorage.clear(); useAppStore.setState({ appMode: 'application', language: 'en' }) })
+beforeEach(() => { sessionStorage.clear(); window.location.hash = '#/'; useAppStore.setState({ appMode: 'application', language: 'en', copilotTaskDrafts: {} }) })
 
 describe('agent run panel', () => {
   it('copies collapsed sections with remaining work and incomplete review, and reports clipboard failure', async () => {
@@ -353,6 +353,25 @@ describe('agent run panel', () => {
     await waitFor(() => expect(headers).toEqual(['W/"3"']))
   })
 
+  it('waits for cancellation confirmation and reloads a task that finished during the request', async () => {
+    runReturns(RUN)
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    server.use(http.post('/api/v2/copilot/agent-runs/:runId/cancellations', async () => {
+      await pending
+      const completed = { ...RUN, status: 'succeeded', version: 4 }
+      runReturns(completed)
+      return HttpResponse.json({ run: completed, cancelled_runs: 0 })
+    }))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await screen.findByText(/Cancellation requested. The current call may need to finish/)
+    expect(screen.getByRole('button', { name: /Cancelling/ })).toBeDisabled()
+    release()
+    await screen.findByRole('button', { name: 'Continue this task' })
+    expect(screen.queryByRole('button', { name: /Cancelling/ })).not.toBeInTheDocument()
+  })
+
   it('goes back to the list without losing it', async () => {
     listReturns([RUN])
     runReturns(RUN)
@@ -363,5 +382,76 @@ describe('agent run panel', () => {
 
     const list = await screen.findByRole('list')
     expect(within(list).getByText(/Fold the top three/)).toBeInTheDocument()
+  })
+
+  it('locks continuation inputs while sending and preserves them after an exhausted-budget response', async () => {
+    runReturns({ ...RUN, status: 'failed', task_contract: { service_kind: 'brief', authorized_writes: ['create_knowledge_draft'] } })
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    const bodies: unknown[] = []
+    server.use(http.post('/api/v2/copilot/agent-runs/:runId/continuations', async ({ request }) => {
+      bodies.push(await request.json())
+      await pending
+      return HttpResponse.json({ detail: 'Start a new task after reviewing the results.' }, { status: 409 })
+    }))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const input = await screen.findByRole('textbox', { name: 'Add information or revise the request' })
+    fireEvent.change(input, { target: { value: 'Keep the UI checklist concise.' } })
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue this task' }))
+    await waitFor(() => expect(bodies).toEqual([{ message: 'Keep the UI checklist concise.', authorized_writes: [] }]))
+    expect(input).toBeDisabled()
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Prepare a new attempt' })).toBeDisabled()
+    fireEvent.submit(input.closest('form')!)
+    release()
+    expect(await screen.findByText('Start a new task after reviewing the results.')).toBeInTheDocument()
+    expect(bodies).toHaveLength(1)
+    expect(input).toBeEnabled()
+    expect(input).toHaveValue('Keep the UI checklist concise.')
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.queryByText(/12 more turns/)).not.toBeInTheDocument()
+  })
+
+  it.each(['failed', 'cancelled'])('prepares a %s task as a reviewed draft without starting or carrying write grants', async (status) => {
+    runReturns({ ...RUN, status, bot: 'researcher', max_cost_usd_cents: 0, task_contract: { service_kind: 'brief', authorized_writes: ['create_knowledge_draft'], procedural_skills: [{ id: 'method-1' }] } })
+    let writes = 0
+    server.use(http.post('/api/v2/copilot/agent-runs', () => { writes++; return HttpResponse.json({}) }))
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    const prepare = await screen.findByRole('button', { name: 'Prepare a new attempt' })
+    if (status === 'failed') fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Use only saved UI notes.' } })
+    else expect(screen.queryByRole('button', { name: 'Continue this task' })).not.toBeInTheDocument()
+    fireEvent.click(prepare)
+    expect(useAppStore.getState().copilotTaskDrafts['project-1']).toEqual({
+      goal: status === 'failed' ? `${RUN.goal}\n\nAdditional requirements:\nUse only saved UI notes.` : RUN.goal,
+      bot: 'researcher', service: 'brief', preview: true, writes: [], maxTurns: 12,
+      maxCost: '0', proceduralSkills: ['method-1'], retrySource: 'run-1',
+    })
+    expect(window.location.hash).toBe('#/bots?project=project-1&view=tasks')
+    expect(writes).toBe(0)
+  })
+
+  it('keeps existing drafts until replacement is chosen and isolates other projects', async () => {
+    const existing = { goal: 'Unsent UI review', bot: null, service: null, preview: false, writes: [], maxTurns: 4, maxCost: '' }
+    useAppStore.setState({ copilotTaskDrafts: { 'project-1': existing, 'project-2': existing } })
+    runReturns({ ...RUN, status: 'failed', task_contract: { service_kind: 'brief' } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Prepare a new attempt' }))
+    expect(useAppStore.getState().copilotTaskDrafts['project-1']).toEqual(existing)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep existing draft' }))
+    expect(screen.queryByRole('button', { name: 'Replace draft and review' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare a new attempt' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Replace draft and review' }))
+    expect(useAppStore.getState().copilotTaskDrafts['project-1'].goal).toBe(RUN.goal)
+    expect(useAppStore.getState().copilotTaskDrafts['project-1'].proceduralSkills).toEqual([])
+    expect(useAppStore.getState().copilotTaskDrafts['project-2']).toEqual(existing)
+  })
+
+  it('prevents a read-only user from changing continuation grants or preparing a retry', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    runReturns({ ...RUN, status: 'failed', task_contract: { service_kind: 'brief', authorized_writes: ['create_knowledge_draft'] } })
+    renderWithProviders(<AgentRunDetail runId="run-1" projectId="project-1" onBack={() => {}} />)
+    expect(await screen.findByRole('button', { name: 'Prepare a new attempt' })).toBeDisabled()
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-disabled', 'true')
   })
 })

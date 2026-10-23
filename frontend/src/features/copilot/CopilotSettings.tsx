@@ -58,6 +58,9 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
   const baseUrl = baseUrlDraft ?? config?.llm_api_base ?? ''
   const model = modelDraft ?? config?.llm_model ?? ''
   const systemPrompt = promptDraft ?? config?.system_prompt ?? ''
+  const dirty = baseUrl.trim() !== (config?.llm_api_base ?? '') ||
+    model.trim() !== (config?.llm_model ?? '') ||
+    systemPrompt.trim() !== (config?.system_prompt ?? '') || Boolean(apiKey.trim())
 
   const save = useMutation({
     mutationFn: () => {
@@ -69,18 +72,28 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
         ...(apiKey.trim() ? { llm_api_key: apiKey.trim() } : {}),
       })
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setApiKey('')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['copilot-config', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['copilot-task-readiness', projectId] }),
+      ])
       setBaseUrlDraft(null)
       setModelDraft(null)
       setPromptDraft(null)
-      void queryClient.invalidateQueries({ queryKey: ['copilot-config'] })
+      test.reset()
     },
   })
   const test = useMutation({ mutationFn: () => { requireCopilotWrite(); return testCopilotConfig(projectId) } })
   const mutationPending = save.isPending || test.isPending
-  const canSave = !readOnly && Boolean(projectId && (config?.api_key_configured || (config?.browser_api_key_allowed && apiKey.trim() && baseUrl.trim() && model.trim())))
-  const canTest = !readOnly && Boolean(config?.api_key_configured)
+  const canSave = !readOnly && !isLoading && !isError && Boolean(projectId && baseUrl.trim() && model.trim() &&
+    (config?.api_key_configured || (config?.browser_api_key_allowed && apiKey.trim())))
+  const canTest = !readOnly && !isLoading && !isError && !dirty && Boolean(config?.api_key_configured)
+  const changeDraft = (update: () => void) => {
+    update()
+    save.reset()
+    test.reset()
+  }
   const saveConfiguration = save.mutate
   const testConfiguration = test.mutate
   const publishSave = useCallback(() => {
@@ -140,7 +153,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
         {!isLoading && !isError ? (
           <div className="grid gap-3">
             <p className="text-sm" role="status">{config?.api_key_configured
-              ? (language === 'zh' ? `当前模型：${model} · ${config.inherited_provider ? '继承平台配置' : '项目专属配置'}` : `Model: ${model} · ${config.inherited_provider ? 'Platform default' : 'Project configuration'}`)
+              ? (language === 'zh' ? `当前模型：${config.llm_model} · ${config.inherited_provider ? '继承平台配置' : '项目专属配置'}` : `Model: ${config.llm_model} · ${config.inherited_provider ? 'Platform default' : 'Project configuration'}`)
               : (language === 'zh' ? '尚无可用模型。请管理员设置唯一的平台默认模型，或在高级设置中配置项目模型。' : 'No model is ready. Ask an administrator to configure one platform default, or configure a project model in advanced settings.')}</p>
             <Button type="button" variant="outline" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced}>
               {language === 'zh' ? '高级模型设置' : 'Advanced model settings'}
@@ -150,10 +163,10 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
             <div className="grid gap-1">
               <Label htmlFor="copilot-api-base">{t.copilot.settings.apiBaseLabel}</Label>
               <Input
-                disabled={readOnly || !config?.browser_api_key_allowed}
+                disabled={readOnly || mutationPending || !config?.browser_api_key_allowed}
                 id="copilot-api-base"
                 value={baseUrl}
-                onChange={(event) => setBaseUrlDraft(event.target.value)}
+                onChange={(event) => changeDraft(() => setBaseUrlDraft(event.target.value))}
               />
             </div>
             <div className="grid gap-1">
@@ -163,18 +176,19 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
               <Textarea
                 id="copilot-project-prompt"
                 readOnly={readOnly}
+                disabled={mutationPending}
                 className="min-h-24"
                 value={systemPrompt}
-                onChange={(event) => setPromptDraft(event.target.value)}
+                onChange={(event) => changeDraft(() => setPromptDraft(event.target.value))}
               />
             </div>
             <div className="grid gap-1">
               <Label htmlFor="copilot-model">{t.copilot.settings.modelLabel}</Label>
               <Input
-                disabled={readOnly || !config?.browser_api_key_allowed}
+                disabled={readOnly || mutationPending || !config?.browser_api_key_allowed}
                 id="copilot-model"
                 value={model}
-                onChange={(event) => setModelDraft(event.target.value)}
+                onChange={(event) => changeDraft(() => setModelDraft(event.target.value))}
               />
             </div>
             {config?.browser_api_key_allowed ? <div className="grid gap-1">
@@ -186,7 +200,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
               </Label>
               <Input
                 id="copilot-api-key"
-                disabled={readOnly}
+                disabled={readOnly || mutationPending}
                 type="password"
                 autoComplete="off"
                 placeholder={
@@ -195,20 +209,21 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
                     : t.copilot.settings.apiKeyPlaceholderNew
                 }
                 value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
+                onChange={(event) => changeDraft(() => setApiKey(event.target.value))}
               />
             </div> : null}
             </> : null}
           </div>
         ) : null}
 
+        {dirty ? <p role="status" className="mt-3 text-sm text-text-secondary">{language === 'zh' ? '配置有未保存的修改。请先保存，再测试实际生效的模型。' : 'Save your changes before testing the active model configuration.'}</p> : null}
         {!hideActions ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
               disabled={mutationPending || !canSave}
-              onClick={() => save.mutate()}
+              onClick={publishSave}
             >
               {save.isPending ? (
                 <SpinnerGapIcon
@@ -225,7 +240,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
               variant="outline"
               size="sm"
               disabled={mutationPending || !canTest}
-              onClick={() => test.mutate()}
+              onClick={publishTest}
             >
               {test.isPending ? (
                 <SpinnerGapIcon

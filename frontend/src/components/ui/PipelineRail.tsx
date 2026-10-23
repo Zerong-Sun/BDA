@@ -54,15 +54,15 @@ export function PipelineRail() {
   }
 
   return (
-    <nav aria-label={t.pipeline.eyebrow} className="workspace-pipeline sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-[1480px] items-center gap-4 overflow-x-auto px-4 py-2 lg:px-6">
+    <nav aria-label={t.pipeline.eyebrow} className="workspace-pipeline border-b bg-background">
+      <div className="mx-auto flex max-w-[1480px] items-center gap-3 overflow-x-auto px-4 py-1 lg:px-6">
         <Stepper
           value={selectedIndex + 1}
           onValueChange={(step) => {
             const target = stages[step - 1]
             if (target && target.state !== 'locked') navigate(`${target.path}${query}`)
           }}
-          className="min-w-[42rem]"
+          className="min-w-[36rem]"
         >
           <StepperNav>
             {stages.map((stage, index) => (
@@ -88,7 +88,7 @@ export function PipelineRail() {
                   </StepperIndicator>
                   <span className="min-w-0 text-left">
                     <StepperTitle className="truncate">{t.nav[stage.navKey]}</StepperTitle>
-                    <span className="block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span className="sr-only">
                       {index === routeIndex ? t.pipeline.currentBadge : stateCaption(stage.state)}
                     </span>
                   </span>

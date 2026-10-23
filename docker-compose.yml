@@ -98,6 +98,7 @@ services:
         BDA_V2_BUILD_REVISION: local
         BDA_V2_SCHEMA_REVISION: 0078_design_memory
         BDA_V2_REQUIRED_WORKER_QUEUES: dispatch,poll,collect,maintenance,research,copilot,scheduler
+        BDA_V2_LSF_SUBMITTER_USER_IDS: ${BDA_V2_LSF_SUBMITTER_USER_IDS:-[]}
         # Mask the retired shared scheduler credential if an old .env still has it.
         BDA_V2_SCHEDULER_DATABASE_URL: ""
     command: >-

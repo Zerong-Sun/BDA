@@ -15,6 +15,12 @@ identifiers, URLs, roles, and verification status are retained. The demo fixture
 coordinates were created for software migration and rendering tests; they are
 not deposited experimental structures or outputs of a validated design model.
 
+Trusted catalog imports also install four authored question/answer examples. The
+room labels them as static editorial demonstrations. They execute no model calls,
+tools or jobs, and do not claim independent scientific review. Reimporting preserves
+the installed conversation and any edits. User projects that adopted the package
+do not receive these examples.
+
 ## Synthetic classification
 
 The candidate IDs `a0172`, `b1923`, and `c4361`, every candidate metric, and all

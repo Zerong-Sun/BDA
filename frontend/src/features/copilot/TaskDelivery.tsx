@@ -50,7 +50,7 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
   const [copyState, setCopyState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
   const record = useMutation({ mutationFn: () => { requireCopilotWrite(); return saveTaskDecisionRecord(run.id, run.version) }, onSuccess: (data) => {
     client.setQueryData(['agent-run', run.project_id, run.id], data)
-    void client.invalidateQueries({ queryKey: ['timeline', run.project_id] })
+    void client.invalidateQueries({ queryKey: ['project-timeline', run.project_id] })
   }, onError: () => { void client.invalidateQueries({ queryKey: ['agent-run', run.project_id, run.id] }) } })
   const prepareBrief = useMutation({ mutationFn: () => getProjectOverview(run.project_id), onSuccess: (data) => {
     const sections = run.outcome?.sections as Record<string, string> | undefined
@@ -139,6 +139,6 @@ export function TaskDelivery({ run }: { run: AgentRun }) {
       <Button type="button" variant="ghost" onClick={() => setBrief(null)}>{zh ? '取消编辑' : 'Cancel edit'}</Button>
     </form> : null}
     {record.error || prepareBrief.error || applyBrief.error ? <p role="alert" className="text-sm text-destructive">{taskErrorMessage(record.error ?? prepareBrief.error ?? applyBrief.error, zh)}</p> : null}
-    <Link className="block pt-1 text-sm text-primary" to={`${base}&tab=timeline`}>{zh ? '查看项目决策树' : 'Open the project decision tree'}</Link>
+    <Link className="block pt-1 text-sm text-primary" to={`${base}&tab=timeline${outcome.decision_record_id ? `&timeline_view=timeline&timeline_entry=${encodeURIComponent(outcome.decision_record_id)}` : ''}`}>{outcome.decision_record_id ? (zh ? '查看已保存的计划记录' : 'Open saved plan record') : (zh ? '查看项目决策树' : 'Open the project decision tree')}</Link>
   </section>
 }

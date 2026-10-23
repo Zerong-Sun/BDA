@@ -2,6 +2,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ApiState } from '../components/ui/ApiState'
+import { WorkspaceNavigation } from '../components/ui/WorkspaceNavigation'
 import { Topbar } from '../components/ui/Topbar'
 import { WorkflowProgress } from './experiments/WorkflowProgress'
 import { CandidateStructureOverlay } from './candidates/CandidateStructureOverlay'
@@ -114,6 +115,7 @@ describe('Stage 6 vertical slice', () => {
     renderWithProviders(
       <>
         <Topbar />
+        <WorkspaceNavigation />
         <WorkflowProgress projectQuery="?project=proj_vertical" overview={blockedOverview} hasProject />
         <TargetStructureOverlay target={target} readiness={readiness} projectId="proj_vertical" />
         <CandidateStructureOverlay

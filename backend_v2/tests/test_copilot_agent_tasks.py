@@ -258,10 +258,90 @@ def test_a_run_still_thinking_when_the_worker_stops_is_handed_on(wired, monkeypa
         run_id = run.id
 
     monkeypatch.setattr(agent_loop, "provider_for", lambda session, run: object())
-    monkeypatch.setattr(agent_loop, "drive", lambda session, run, provider, **_: run.status)
+    steps = []
+    def drive(session, run, provider, *, max_steps):
+        steps.append(max_steps)
+        return run.status
+    monkeypatch.setattr(agent_loop, "drive", drive)
 
     assert copilot_tasks.copilot_agent_step.run(str(run_id))["status"] == "running"
+    assert steps == [1], "Release the run lock after one step so cancellation can interleave."
     assert sent == [("bda_v2.copilot_agent_step", [str(run_id)])]
+
+
+@pytest.mark.parametrize("settled", [False, True])
+def test_cancel_refreshes_progress_committed_while_waiting_for_the_step(wired, monkeypatch, settled):
+    from backend_v2.app.copilot import api
+    from fastapi import Response
+
+    factory, _ = wired
+    with factory() as session:
+        project_id, user_id = _project(session)
+        run = agent_runs.create_run(session, project_id=project_id, user_id=user_id,
+                                   goal="Review saved UI notes", allowed_tools=["list_proteins"])
+        session.commit()
+        version = run.version
+        user = session.get(User, user_id)
+        original_require = agent_runs.require_run
+        monkeypatch.setattr(api, "_require_run", lambda *_: run)
+
+        def progress_then_lock(db, run_id, *, for_update=False):
+            if for_update:
+                # Model the commit that became visible after waiting for a lock,
+                # while the cancellation session still holds the old identity.
+                db.execute(CopilotAgentRun.__table__.update().where(CopilotAgentRun.id == run_id).values(
+                    version=version + 1, turn_count=1, status="succeeded" if settled else "running",
+                    outcome={"status": "partial", "summary": "Recorded result"},
+                ))
+            return original_require(db, run_id, for_update=for_update)
+
+        monkeypatch.setattr(agent_runs, "require_run", progress_then_lock)
+        result = api.cancel_agent_run(run.id, Response(), f'W/"{version}"', session, user)
+        session.commit()
+        assert result.cancelled_runs == (0 if settled else 1)
+        assert run.status == ("succeeded" if settled else "cancelled")
+        assert run.version == version + (1 if settled else 2)
+        assert run.turn_count == 1
+        if settled:
+            assert run.outcome["summary"] == "Recorded result"
+
+
+def test_cancel_rejects_a_version_already_stale_on_arrival(wired, monkeypatch):
+    from backend_v2.app.copilot import api
+    from backend_v2.app.core.problem import DomainError
+    from fastapi import Response
+
+    factory, _ = wired
+    with factory() as session:
+        project_id, user_id = _project(session)
+        run = agent_runs.create_run(session, project_id=project_id, user_id=user_id,
+                                   goal="Review saved UI notes", allowed_tools=["list_proteins"])
+        session.commit()
+        monkeypatch.setattr(api, "_require_run", lambda *_: run)
+        with pytest.raises(DomainError) as error:
+            api.cancel_agent_run(run.id, Response(), f'W/"{run.version - 1}"', session, session.get(User, user_id))
+        assert error.value.status_code == 412
+        assert run.status == "running"
+
+
+def test_cancel_of_an_already_finished_run_does_not_wait_for_a_new_continuation(wired, monkeypatch):
+    from backend_v2.app.copilot import api
+    from fastapi import Response
+
+    factory, _ = wired
+    with factory() as session:
+        project_id, user_id = _project(session)
+        run = agent_runs.create_run(session, project_id=project_id, user_id=user_id,
+                                   goal="Review saved UI notes", allowed_tools=["list_proteins"])
+        run.status = "succeeded"
+        session.commit()
+        monkeypatch.setattr(api, "_require_run", lambda *_: run)
+        def no_lock(*args, **kwargs):
+            pytest.fail("An already terminal task must not wait for a later execution.")
+        monkeypatch.setattr(agent_runs, "require_run", no_lock)
+        result = api.cancel_agent_run(run.id, Response(), f'W/"{run.version}"', session, session.get(User, user_id))
+        assert result.cancelled_runs == 0
+        assert run.status == "succeeded"
 
 
 def _operation(session: Session, project_id: uuid.UUID, user_id: uuid.UUID, status: str):

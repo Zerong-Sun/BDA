@@ -29,9 +29,8 @@ import { Textarea } from '../../components/ui/textarea'
 /**
  * The bench's protein library.
  *
- * Constructs are listed by fingerprint, never by sequence: the server does not
- * return one. The notice says so out loud, because a scientist who cannot find
- * the sequence column needs to know that is the design and not a failure.
+ * The server returns fingerprints, not sequences. Expose those identifiers on
+ * demand while keeping names and measured properties readable by default.
  */
 export function ProteinLibrary({ projectId }: { projectId: string }) {
   const { t, language } = useI18n()
@@ -45,6 +44,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
   const [sequence, setSequence] = useState('')
   const [fasta, setFasta] = useState('')
   const [importOpen, setImportOpen] = useState<string[]>([])
+  const [showFingerprints, setShowFingerprints] = useState(false)
 
   // Keyed on the project: constructs must never leak between projects through
   // a shared cache entry.
@@ -165,6 +165,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
+    state: { columnVisibility: { fingerprint: showFingerprints } },
   })
 
   const importSummary = addBatch.data
@@ -173,10 +174,13 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
     <Frame dense>
       <FrameHeader>
         <FrameTitle>{copy.title}</FrameTitle>
-        <p className="text-sm text-text-secondary">{copy.sequenceNotice}</p>
       </FrameHeader>
 
       <div className="space-y-4 p-4">
+        <Button type="button" size="sm" variant="ghost" aria-pressed={showFingerprints} onClick={() => setShowFingerprints((visible) => !visible)}>
+          {showFingerprints ? (language === 'zh' ? '隐藏序列标识' : 'Hide sequence identifiers') : (language === 'zh' ? '查看序列标识' : 'Show sequence identifiers')}
+        </Button>
+        {showFingerprints ? <p className="text-sm text-text-secondary">{copy.sequenceNotice}</p> : null}
         <Input
           type="text"
           value={search}

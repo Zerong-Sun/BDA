@@ -31,7 +31,7 @@ from .schemas import (
     ResearchWorkspaceTarget,
 )
 
-DATASET_KEYS = {"identifiers", "search_log", "field_dictionary", "ontology_relations"}
+DATASET_KEYS = {"identifiers", "search_log", "field_dictionary", "ontology_relations", "dataset", "data_table"}
 METHOD_KEYS = {"methods", "search_strategy", "database_schema", "validation_report"}
 KNOWLEDGE_TITLES = {
     "methods": {"zh": "研究方法", "en": "Methods", "default": "Methods"},

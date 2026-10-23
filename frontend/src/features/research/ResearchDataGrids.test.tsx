@@ -6,6 +6,8 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { ResearchWorkspacePanel } from './ResearchWorkspacePanel'
 
 const getWorkspace = vi.hoisted(() => vi.fn())
+const getArtifact = vi.hoisted(() => vi.fn())
+vi.mock('../../lib/api/artifacts', () => ({ getArtifact }))
 
 vi.mock('../../lib/api/researchWorkspace', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/api/researchWorkspace')>()
@@ -93,9 +95,43 @@ describe('research data grids', () => {
     useAppStore.setState({ language: 'en' })
     getWorkspace.mockReset()
     getWorkspace.mockResolvedValue(workspaceFixture())
+    getArtifact.mockResolvedValue({ download_url: 'https://files.example.test/source.csv' })
   })
 
   afterEach(cleanup)
+
+  it('paginates large datasets and searches all rows from a later page', async () => {
+    const fixture = workspaceFixture()
+    const rows = Array.from({ length: 60 }, (_, index) => ({ sample: `sample-${String(index).padStart(3, '0')}` }))
+    fixture.datasets[0].data = rows
+    fixture.datasets[0].display_data = rows
+    getWorkspace.mockResolvedValue(fixture)
+    renderWithProviders(<ResearchWorkspacePanel view="data" />)
+    expect(await screen.findByText('sample-024')).toBeVisible()
+    expect(screen.queryByText('sample-025')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
+    expect(await screen.findByText('sample-025')).toBeVisible()
+    expect(screen.queryByText('sample-000')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: /search dataset/i }), { target: { value: 'sample-059' } })
+    expect(await screen.findByText('sample-059')).toBeVisible()
+    expect(screen.getByText('1 - 1 of 1')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Go to next page' })).not.toBeInTheDocument()
+  })
+
+  it('shows boolean, array and nested values and resolves a fresh original-file link', async () => {
+    const fixture = workspaceFixture()
+    fixture.datasets[0].display_data = [{ passed: false, seeds: [1, 2], metrics: { score: 0.7 }, count: 0, mixed: { en: 'label', count: 2 } }]
+    fixture.datasets[0].source = { artifact_id: 'source-artifact' }
+    getWorkspace.mockResolvedValue(fixture)
+    renderWithProviders(<ResearchWorkspacePanel view="data" />)
+    expect(await screen.findByText('false')).toBeInTheDocument()
+    expect(screen.getByText('[1,2]')).toBeInTheDocument()
+    expect(screen.getByText('{"score":0.7}')).toBeInTheDocument()
+    expect(screen.getByText('{"en":"label","count":2}')).toBeInTheDocument()
+    expect(screen.getByText('0')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Download source file' })).toHaveAttribute('href', 'https://files.example.test/source.csv')
+    expect(getArtifact).toHaveBeenCalledWith('source-artifact')
+  })
 
   it('renders target and arbitrary-key dataset rows through ReUI data grids with stable ids', async () => {
     renderWithProviders(<ResearchWorkspacePanel view="data" />)

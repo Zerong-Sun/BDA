@@ -70,7 +70,7 @@ describe('AlphaFoldResults', () => {
     )
 
     expect(screen.getByText('AlphaFold structure confidence')).toBeInTheDocument()
-    expect(screen.getByText('Available predictions · 1')).toBeInTheDocument()
+    expect(screen.getByText('Predictions available').parentElement).toHaveTextContent(/Predictions available\s*1/)
     expect(screen.getAllByText('76.46')).toHaveLength(2)
     expect(screen.getByText(/Prediction metrics do not establish experimental binding activity/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'PDB' })).toBeInTheDocument()

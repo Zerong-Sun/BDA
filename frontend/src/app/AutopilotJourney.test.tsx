@@ -35,7 +35,7 @@ afterEach(cleanup)
 async function prepare() {
   fireEvent.change(screen.getByLabelText('Research request'), { target: { value: 'Review binder candidates and prepare the next study' } })
   fireEvent.click(screen.getByRole('button', { name: 'Generate structured preview' }))
-  await screen.findByText(/"stages"/)
+  await screen.findByRole('button', { name: 'Inspect plan data' })
   fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Reviewed plan' } })
   fireEvent.change(screen.getByLabelText('GPU-hour hard limit'), { target: { value: '1' } })
 }
@@ -47,6 +47,22 @@ async function confirm() {
 }
 
 describe('autopilot review and execution boundaries', () => {
+  it('shows the default stages and budget while keeping raw plan data on demand', async () => {
+    api.draft.mockResolvedValueOnce({ ...draft, draft: { ...draft.draft, normalized_spec: { schema_version: 'autopilot-spec-v1' } } })
+    renderWithProviders(<AutopilotPage />)
+    await prepare()
+    expect(screen.getByText('Research and evidence')).toBeVisible()
+    expect(screen.getByText('Planning')).toBeVisible()
+    expect(screen.getByText('Compute')).toBeVisible()
+    expect(screen.getByText('Review')).toBeVisible()
+    expect(screen.getByText(/This preview uses the default research sequence/)).toBeVisible()
+    expect(screen.getByLabelText('GPU-hour hard limit')).toBeVisible()
+    expect(screen.queryByText(/"schema_version"/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect plan data' }))
+    expect(screen.getByText(/"schema_version"/)).toBeVisible()
+    expect(api.confirm).not.toHaveBeenCalled()
+  })
+
   it.each(['loading', 'viewer', 'demo'])('prevents draft creation when access is %s', (state) => {
     context.accessLoaded = state !== 'loading'
     context.canOperate = state !== 'viewer'
@@ -106,6 +122,10 @@ describe('autopilot review and execution boundaries', () => {
     await waitFor(() => expect(api.refresh).toHaveBeenCalledWith('campaign-a'))
     expect(screen.getByRole('button', { name: 'Start confirmed plan' })).toBeDisabled()
     expect(api.start).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Request accepted')).toBeVisible()
+    expect(screen.queryByText('op-a')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Request details' }))
+    expect(screen.getByText('op-a')).toBeVisible()
   })
 
   it('clears the prior project campaign and rejects a late confirmation after switching project', async () => {

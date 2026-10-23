@@ -859,7 +859,7 @@ function WorkflowWorkspace() {
       <Dialog open={confirmRun} onOpenChange={(open) => !startWorkflow.isPending && setConfirmRun(open)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader><DialogTitle>{language === 'zh' ? '确认提交计算任务' : 'Review compute submission'}</DialogTitle>
-            <DialogDescription>{language === 'zh' ? '确认后将创建作业并交给后台执行。脚本中的预览标识会在提交时替换为真实任务标识。' : 'Confirmation creates jobs for the worker to execute. Preview identifiers are replaced by real job identifiers at submission.'}</DialogDescription>
+            <DialogDescription>{language === 'zh' ? '确认后将创建作业并交给后台执行。' : 'Confirmation creates jobs for the worker to execute.'}</DialogDescription>
           </DialogHeader>
           <p className="text-sm">{language === 'zh' ? '执行后端' : 'Backend'}: {String(workflowPreflight.data?.checks.compute_backend ?? '—')} · {language === 'zh' ? '默认队列' : 'Default queue'}: {String(workflowPreflight.data?.checks.queue ?? '—')}</p>
           {submissionPreview.isPending ? <p role="status">{language === 'zh' ? '正在准备提交预览…' : 'Preparing submission preview…'}</p> : null}
@@ -921,7 +921,9 @@ function WorkflowWorkspace() {
               {visiblePreflightBlockers.map((blocker, index) => (
                 <li key={`${blocker.code}-${blocker.node_key ?? blocker.port ?? index}`}>
                   {blocker.node_key ? `${blocker.node_key}: ` : ''}
-                  {blocker.message}
+                  {blocker.code === 'lsf_account_not_assigned' && language === 'zh'
+                    ? '尚未分配启明/LSF连接。项目权限不等于计算账号授权；请使用自己的计算部署，或由管理员配置获授权的实验室连接。'
+                    : blocker.message}
                 </li>
               ))}
             </ul>

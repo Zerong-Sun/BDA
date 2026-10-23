@@ -50,9 +50,9 @@ function ExtensionInspector({ entry, catalog, canAssess }: { entry: ExtensionEnt
     [zh ? '规划成本' : 'Planning cost', data.effort],
   ]
   return <section className="min-w-0 space-y-4 rounded-lg border border-border p-4" aria-label={zh ? '扩展详情' : 'Extension details'}>
-    <div><h2 className="text-lg font-semibold">{zh ? data.title_zh : data.title}</h2><p className="mt-1 text-sm text-text-secondary">{zh ? data.description_zh : data.description}</p><p className="mt-1 text-xs text-text-muted">v{data.version} · {data.function_ids.join(' · ')}</p></div>
+    <div><h2 className="text-lg font-semibold">{zh ? data.title_zh : data.title}</h2><p className="mt-1 text-sm text-text-secondary">{zh ? data.description_zh : data.description}</p></div>
     <dl className="space-y-3 text-sm">{values.map(([label, value]) => <div key={label}><dt className="font-medium">{label}</dt><dd className="mt-1 text-text-secondary">{value}</dd></div>)}</dl>
-    <Disclosure title={zh ? '集成要求与参考' : 'Integration requirements and references'}><ul className="space-y-2 py-2 text-sm">{data.requirements.map((requirement) => <li key={requirement.id}><strong>{zh ? requirement.title_zh : requirement.title}</strong><p className="text-text-secondary">{requirement.boundary}</p></li>)}</ul><ul className="space-y-1 text-xs">{data.sources.map((source) => <li key={source}><a href={source} target="_blank" rel="noopener noreferrer" className="break-all underline">{source.replace('https://github.com/', '')}</a></li>)}</ul></Disclosure>
+    <Disclosure title={zh ? '集成要求与参考' : 'Integration requirements and references'}><p className="text-xs text-text-muted">v{data.version} · {data.function_ids.join(' · ')}</p><ul className="space-y-2 py-2 text-sm">{data.requirements.map((requirement) => <li key={requirement.id}><strong>{zh ? requirement.title_zh : requirement.title}</strong><p className="text-text-secondary">{requirement.boundary}</p></li>)}</ul><ul className="space-y-1 text-xs">{data.sources.map((source) => <li key={source}><a href={source} target="_blank" rel="noopener noreferrer" className="break-all underline">{source.replace('https://github.com/', '')}</a></li>)}</ul></Disclosure>
     <AssessmentResult value={assessment.data ?? entry.assessment} />
     {data.adapter !== 'builtin' ? <form className="space-y-3 border-t border-border pt-4" onSubmit={(event) => { event.preventDefault(); if (canAssess) assessment.mutate() }}>
       <h3 className="font-medium">{zh ? '检查拟选配置' : 'Inspect a proposed configuration'}</h3>
@@ -89,7 +89,7 @@ export function ExtensionCenter() {
   const entries = catalog.data?.extensions.filter(({ manifest }) => `${manifest.title} ${manifest.title_zh} ${manifest.description} ${manifest.function_ids.join(' ')}`.toLowerCase().includes(filter.toLowerCase())) ?? []
   const current = catalog.data?.extensions.find((item) => item.manifest.id === selected)
   return <section className="space-y-5 p-4 md:p-6" data-testid="extension-center">
-    <header className="science-page-header"><div><p className="science-eyebrow">{zh ? '平台能力 / 集成与验收' : 'PLATFORM / INTEGRATION & QUALIFICATION'}</p><h1>{zh ? '扩展中心' : 'Extension center'}</h1><p>{zh ? '从现有登记检查可用条件，把长期方案转为具体的集成与验收要求。' : 'Inspect recorded prerequisites and turn future options into concrete integration and acceptance requirements.'}</p></div><Button type="button" variant="outline" onClick={() => void catalog.refetch()}>{zh ? '刷新登记状态' : 'Refresh registry state'}</Button></header>
+    <header className="science-page-header"><div><h1>{zh ? '扩展中心' : 'Extension center'}</h1></div><Button type="button" variant="outline" onClick={() => void catalog.refetch()}>{zh ? '刷新登记状态' : 'Refresh registry state'}</Button></header>
     <p className="text-sm text-text-secondary">{zh ? '本页不探测主机。已配置不代表已运行，已运行不代表科研有效；正式提交继续使用工作流预检和现有确认流程。' : 'This page never probes hosts. Configured does not mean observed to run, and runtime proof does not establish scientific validity. Submission retains workflow preflight and confirmation.'}</p>
     {catalog.isPending ? <p role="status">{zh ? '读取扩展与模型登记…' : 'Loading extension and model records…'}</p> : null}
     {catalog.error ? <p role="alert">{catalog.error instanceof Error ? catalog.error.message : String(catalog.error)}</p> : null}
@@ -103,7 +103,7 @@ export function ExtensionCenter() {
       <section aria-label={zh ? '模型资格与运行依据' : 'Model qualification and runtime evidence'} className="space-y-3 border-t border-border pt-5"><h2 className="font-semibold">{zh ? '模型资格与运行依据' : 'Model qualification and runtime evidence'}</h2>
         {!catalog.data.models.length ? <p className="text-sm text-text-secondary">{zh ? '尚未登记模型插件。' : 'No model plugins are registered.'}</p> : null}
         <div className="grid gap-3 xl:grid-cols-2">{catalog.data.models.map((model) => <article key={model.id} className="min-w-0 space-y-2 rounded-lg border border-border p-3 text-sm"><h3 className="font-medium">{model.name} · {model.plugin_version}</h3><p className="text-xs text-text-secondary">{model.enabled ? (zh ? '已启用' : 'Enabled') : (zh ? '已禁用' : 'Disabled')} · {model.manifest_pinned ? (zh ? '清单已锁定' : 'Pinned manifest') : (zh ? '未锁定清单' : 'Unpinned manifest')} · {model.runtime_proof_current ? (zh ? '运行指纹一致' : 'Current runtime proof') : (zh ? '运行尚未证实／指纹已变化' : 'Runtime unproven or changed')}</p><ul className="list-disc space-y-1 pl-4">{[...model.blockers, ...model.warnings].map((message) => <li key={message}>{message}</li>)}</ul></article>)}</div>
-        <Link to="/workflow" className="text-sm underline">{zh ? '前往工作流查看具体提交预检' : 'Open workflow submission preflight'}</Link>
+        <Link to="/workflow" className="inline-flex min-h-11 items-center text-sm underline">{zh ? '前往工作流查看具体提交预检' : 'Open workflow submission preflight'}</Link>
       </section>
     </> : null}
   </section>

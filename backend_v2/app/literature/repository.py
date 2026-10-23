@@ -79,6 +79,7 @@ class LiteratureRepository:
             .join(LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id)
             .where(LiteratureDocument.project_id == project_id)
             .where(LiteratureClaim.attributes["curation_kind"].as_string().is_distinct_from(NOTE_KIND))
+            .where(LiteratureClaim.attributes["source_quality"]["status"].as_string().is_distinct_from("excluded"))
         )
         if after:
             query = query.where(LiteratureClaim.id > after)

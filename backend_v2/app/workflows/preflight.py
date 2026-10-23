@@ -107,7 +107,7 @@ def workflow_backend(workflow: WorkflowRun, override: str | None = None) -> str:
 
 
 def evaluate_preflight(
-    session: Session, workflow: WorkflowRun, *, compute_backend: str | None = None
+    session: Session, workflow: WorkflowRun, *, compute_backend: str | None = None, user=None
 ) -> tuple[list[dict], list[dict], dict]:
     """Returns (blockers, warnings, checks)."""
     settings = get_settings()
@@ -116,6 +116,11 @@ def evaluate_preflight(
     nodes = WorkflowRepository(session).nodes(workflow.id)
     blockers: list[dict] = []
     warnings: list[dict] = []
+    if backend == "lsf" and user is not None:
+        from ..compute.access import lsf_access_blocker
+        issue = lsf_access_blocker(user)
+        if issue:
+            blockers.append(issue)
 
     from ..design_memory.service import blockers as design_learning_blockers
     blockers.extend(design_learning_blockers(session, workflow))

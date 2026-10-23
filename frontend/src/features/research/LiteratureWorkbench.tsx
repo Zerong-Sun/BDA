@@ -41,6 +41,7 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
   const visibleReferences = references.filter((reference) => (!gapsOnly || !hasNote(reference.document_id)) &&
     `${workspaceText(reference.title, language)} ${reference.authors ?? ''} ${reference.ref_id} ${reference.doi ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const selected = visibleReferences.find((reference) => reference.document_id === selectedId) ?? visibleReferences[0]
+  const retracted = String(selected?.metadata?.pub_type ?? '').toLowerCase().includes('retracted publication')
   const filteredNotes = allNotes.filter((note) => evidenceFilter === 'all' || (evidenceFilter === 'conflicts' ? note.relation === 'contradicts' : note.review_status === 'pending' || note.anchor_status !== 'matched'))
   const visibleNotes = filteredNotes.filter((note) => noteMatches(note, search))
   const displayedNotes = mode === 'papers' ? filteredNotes.filter((note) => note.document_id === selected?.document_id) : visibleNotes
@@ -99,6 +100,8 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
             {selected.doi ? <a className="text-xs text-primary hover:underline" href={safeCitationUrl(`https://doi.org/${selected.doi}`)} target="_blank" rel="noopener noreferrer">DOI {selected.doi}</a> : null}
             {canWrite ? <Button type="button" variant="outline" onClick={() => setEditor({ reference: selected })}>{zh ? '添加论点与原文' : 'Add argument & passage'}</Button> : null}</div>
           {canWrite ? <EvidenceSourceRetrieval key={`retrieve-${selected.document_id}`} projectId={projectId} reference={selected} /> : null}
+          {retracted ? <p role="alert" className="rounded border border-danger p-3 text-sm">{zh ? '此论文已撤稿。保留原始来源供历史核对，不作为当前正向论据。请同时阅读撤稿通知。' : 'This paper is retracted. It is retained for historical inspection and must not support current positive claims. Read the retraction notice.'}</p> : null}
+          {selected.metadata?.project_scope_status === 'excluded' ? <p role="status" className="rounded border border-warning p-3 text-sm">{zh ? '已排除出本项目论据：' : 'Excluded from this project’s evidence: '}{String(selected.metadata.project_scope_reason || (zh ? '主题不适用，原始记录保留供核对。' : 'Topic is not applicable. The original record is retained.'))}</p> : null}
           <LiteratureSourceDetails key={`source-${selected.document_id}`} projectId={projectId} documentId={selected.document_id} metadata={selected.metadata ?? {}} abstract={selected.abstract} />
           <LiteratureEvidencePacket key={`evidence-packet-${selected.document_id}`} documentId={selected.document_id} metadata={selected.metadata ?? {}} />
         </div>

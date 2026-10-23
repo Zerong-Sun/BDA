@@ -188,14 +188,8 @@ export function AlphaFoldResults({
     <article className="mb-5 overflow-hidden rounded-lg border border-border-soft bg-surface-1">
       <div className="border-b border-border-soft p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-text-primary">{copy.title}</h2>
-            <p className="mt-1 text-sm text-text-secondary">{zh ? '查看结构置信度、界面指标与可追溯的原始结果。' : 'Review structural confidence, interface metrics and traceable source files.'}</p>
-          </div>
+          <h2 className="text-base font-semibold text-text-primary">{copy.title}</h2>
           {!summaryOnly ? <Button type="button" size="sm" variant="outline" onClick={() => setDetailedColumns(value => !value)}>{detailedColumns ? (zh ? '核心指标' : 'Core metrics') : (zh ? '完整指标' : 'All metrics')}</Button> : null}
-          <span className="rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs text-text-secondary">
-            {zh ? `可用预测 · ${rows.length} 条` : `Available predictions · ${rows.length}`}
-          </span>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -217,7 +211,7 @@ export function AlphaFoldResults({
           </div>
         </div>
 
-        <div className="mt-4 rounded-md border border-border-soft bg-surface-2 p-3 text-sm text-text-secondary">
+        <div className="mt-4 text-sm text-text-secondary">
           <p>
             {copy.analysis
               .replace('{confident}', String(confidentCount))

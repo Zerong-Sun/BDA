@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Disclosure } from '@/components/ui/Disclosure'
 import { StatusPills } from '../../components/ui/StatusPill'
 import type { Project } from '../../lib/api/projects'
 import { useI18n } from '../../lib/i18n'
@@ -237,15 +237,15 @@ export function ActiveProjectPanel({
               </Alert>
             ) : null}
             {targetQuery.data.structure.latest_revision?.options ? (
-              <ScrollArea className="mt-3 h-48 rounded border border-border-soft">
-                <pre className="whitespace-pre-wrap p-2 text-[11px] text-text-secondary">
+              <Disclosure title={language === 'zh' ? '查看结构准备参数' : 'Inspect structure preparation parameters'}>
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs text-text-secondary">
                   {JSON.stringify(
                     targetQuery.data.structure.latest_revision.options,
                     null,
                     2,
                   )}
                 </pre>
-              </ScrollArea>
+              </Disclosure>
             ) : null}
           </div>
         ) : null}

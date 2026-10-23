@@ -18,7 +18,8 @@ import { useCopilotBots } from '../features/copilot/bots/registry'
 import { botDisplayText } from '../features/copilot/bots/displayText'
 import { botHref } from '../features/copilot/bots/workbenches'
 import { BotRoster } from '../features/copilot/BotRoster'
-import { managesProject, useProjectAccess } from '../lib/hooks/useProjectAccess'
+import { useProjectAccess } from '../lib/hooks/useProjectAccess'
+import { useCopilotReadOnly } from '../features/copilot/commandAccess'
 import { currentRole } from '../features/research/jsonHelpers'
 import { BotAvatar } from '../features/copilot/BotAvatar'
 import { ProjectBriefPanel } from '../features/projects/ProjectBriefPanel'
@@ -36,9 +37,10 @@ function BotProjectWorkspace() {
   const [search, setSearch] = useSearchParams()
   const navigate = useNavigate()
   const [settings, setSettings] = useState(false)
-  // Model configuration is a project manager's decision; researchers and viewers work with the model they are given.
+  // The config API requires project-write permission, as in application settings.
   const access = useProjectAccess(projectId)
-  const canConfigure = managesProject(access.data) || currentRole() === 'admin'
+  const readOnly = useCopilotReadOnly()
+  const canConfigure = !readOnly && (access.data?.permissions.write === true || currentRole() === 'admin')
   const bots = useCopilotBots()
   const selectedEntities = useAppStore((s) => s.copilotSelectedEntityIds)
   const selectedId = useAppStore((s) => s.copilotSessions[projectId]?.bot ?? null)
@@ -106,7 +108,7 @@ function BotProjectWorkspace() {
   return <section className={`bot-page${focusedTask ? ' bot-page--task' : ''}`} data-tour-id="bot-workspace">
     <header className="science-page-header">
       <div>
-        <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '项目研究团队' : 'Project research team')}</h1>
+        <h1>{focusedTask ? (zh ? '任务详情' : 'Task details') : (zh ? '研究团队' : 'Research team')}</h1>
         <p>{activeProject ? projectText(activeProject, 'name', language) : (zh ? '选择项目，让对话有上下文。' : 'Choose a project to give the conversation context.')}</p>
       </div>
       {projectId && !focusedTask ? <div className="flex flex-wrap gap-2">
@@ -129,7 +131,7 @@ function BotProjectWorkspace() {
               <TabsContent value="tasks">
                 {search.get('from') ? <Button type="button" variant="link" render={<Link to={`/research?${new URLSearchParams({ project: projectId, tab: normalizeResearchTab(search.get('from')) })}`} />}>{zh ? '返回研究资料' : 'Back to research materials'}</Button> : null}
                 {incomingGoal && savedTaskDraft?.goal.trim() ? <section className="m-4 grid gap-3 border border-border p-4" aria-label={zh ? '传入的文献任务草稿' : 'Incoming literature task draft'}><p className="text-sm">{zh ? '已有未提交的任务草稿。选择保留，或改用这份文献调研草稿；此步骤不会启动任务。' : 'An unsent task draft already exists. Keep it or replace it with this literature draft; this does not start a task.'}</p><p className="whitespace-pre-wrap text-sm text-muted-foreground">{incomingGoal}</p><div className="flex flex-wrap gap-2"><Button type="button" onClick={acceptIncomingDraft}>{zh ? '使用文献调研草稿' : 'Use literature draft'}</Button><Button type="button" variant="outline" onClick={() => clearIncomingDraft(true)}>{zh ? '保留当前草稿' : 'Keep current draft'}</Button></div></section> : null}
-                <CopilotWorkspace pageContext={context} initialService={requestedService} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} />
+                <CopilotWorkspace pageContext={context} initialService={requestedService} ignoreDraft rememberDraft openRunId={search.get('run')} onRunChange={selectRun} onConfigureModel={canConfigure ? () => setSettings(true) : undefined} />
               </TabsContent>
               <TabsContent value="room">
                 {selected ? <div className="bot-selected-header"><BotAvatar id={selected.id} stance={selected.stance} /><div><h2>{name(selected)}</h2><p>{botDisplayText(selected, language).summary}</p>

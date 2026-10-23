@@ -25,7 +25,7 @@ export function ToolEvidence({ calls = [], projectId, content }: { calls?: unkno
     const artifactQuery = new URLSearchParams({ project: projectId })
     if (artifactId) artifactQuery.set('artifact', artifactId)
     if (selection) artifactQuery.set('residues', JSON.stringify(selection.residues))
-    return <section key={index} className="space-y-2 rounded border border-border-soft bg-surface-1 p-3" aria-label={zh ? '工具证据' : 'Tool evidence'}>
+    return <section key={index} className="space-y-2 border-t border-border-soft pt-3" aria-label={zh ? '工具证据' : 'Tool evidence'}>
       <h4 className="text-sm font-semibold">{entry.name?.replaceAll('_', ' ')}{output.filename ? ` · ${output.filename}` : ''}</h4>
       {output.evidence_kind ? <p className="text-xs text-text-secondary">{output.evidence_kind}</p> : null}
       {output.interpretation ? <p className="text-sm">{output.interpretation}</p> : null}
@@ -37,7 +37,6 @@ export function ToolEvidence({ calls = [], projectId, content }: { calls?: unkno
         {output.knowledge_entry_id ? <Button size="sm" variant="outline" render={<Link to={`/research?${new URLSearchParams({ project: projectId, tab: 'methods', knowledge: output.knowledge_entry_id })}`} />}>{zh ? '打开已保存的讨论报告' : 'Open saved discussion report'}</Button> : null}
       </div>
       {output.knowledge_entry_id && output.status ? <p className="text-xs text-text-secondary">{zh ? '记录状态' : 'Recorded status'}: {output.status.replaceAll('_', ' ')}</p> : null}
-      {output.checksum_sha256 ? <p className="break-all font-mono text-xs">SHA-256: {output.checksum_sha256}</p> : null}
       <Disclosure title={zh ? '完整工具结果与来源' : 'Complete tool output and provenance'}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(entry.result, null, 2)}</pre></Disclosure>
     </section>
   })}</div>

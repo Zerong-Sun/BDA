@@ -1,8 +1,7 @@
-import { Link, NavLink, useLocation, useNavigate } from 'react-router'
-import clsx from 'clsx'
-import { DotsThreeIcon, PulseIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, WrenchIcon } from '@phosphor-icons/react'
+import { useRef } from 'react'
+import { NavLink, useNavigate } from 'react-router'
+import { DotsThreeIcon, PulseIcon, FoldersIcon, ChatCircleIcon, FlaskIcon, GearIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
-import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, workbenchGroups, type AppRoute } from '../../lib/nav/routes'
 import { CommandPalette } from './CommandPalette'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
@@ -15,9 +14,8 @@ import { StatusPill } from './StatusPill'
 import { statusTone } from './statusTone'
 import { Button } from './Button'
 import { BigoBioLogo } from './BigoBioLogo'
-import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { StatusBadge } from './statusBadge'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from './dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -26,33 +24,18 @@ import {
   SelectValue,
 } from './select'
 
-// The route list moved to `lib/nav/routes.ts` when the command palette began
-// needing the same one: two copies of "which routes exist and what they are
-// called" drift silently, because renaming one of them breaks nothing.
-const mobileRoutes = APP_ROUTES.filter(route => PRIMARY_ROUTES.includes(route.to))
-
 export function Topbar() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, activityOpen, setActivityOpen } = useAppStore()
+  const utilitiesRef = useRef<HTMLButtonElement>(null)
+  const openUtility = (open: () => void) => {
+    // The menu item unmounts on selection. Give the drawer a stable focus return target.
+    utilitiesRef.current?.focus()
+    open()
+  }
+  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, activityOpen, setActivityOpen, setTourMenuOpen } = useAppStore()
   const { t, language } = useI18n()
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
-  const zh = language === 'zh'
-  const workflowResource = new URLSearchParams(location.search).get('resource')
-  const coreLinks = [
-    { resource: 'plugins', label: zh ? '模型插件' : 'Models & plugins' },
-    { resource: 'scripts', label: zh ? '脚本' : 'Scripts' },
-  ]
-  const coreHref = (resource: string) => {
-    const params = new URLSearchParams(location.pathname === '/workflow' ? location.search : projectQuery)
-    if (projectId) params.set('project', projectId)
-    if (resource) params.set('resource', resource)
-    else params.delete('resource')
-    return `/workflow${params.size ? `?${params}` : ''}`
-  }
-  const activeWorkbench = APP_ROUTES.find((route) => !PRIMARY_ROUTES.includes(route.to) && location.pathname === route.to)
-  const navLabel = (key: AppRoute['key']) => routeLabel(key, zh, (item) => t.nav[item])
 
   return (
     <>
@@ -106,37 +89,43 @@ export function Topbar() {
         </div>
 
         <div className="topbar-actions flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
-          <HelpMenu />
+          <div className="topbar-help"><HelpMenu /></div>
           <div className="science-mobile-utilities">
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon" />} aria-label={language === 'zh' ? '更多工作区操作' : 'More workspace actions'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
+              <DropdownMenuTrigger render={<Button ref={utilitiesRef} type="button" variant="ghost" size="icon" />} aria-label={language === 'zh' ? '更多工作区操作' : 'More workspace actions'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="science-utility-menu w-64">
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => setCopilotOpen(!copilotOpen)}><ChatCircleIcon aria-hidden="true" />{t.copilot.drawer.toggleTitle}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActivityOpen(!activityOpen)}><PulseIcon aria-hidden="true" />{t.operations.toggleTitle}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}><GearIcon aria-hidden="true" />{t.shared.applicationSettings}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openUtility(() => setActivityOpen(!activityOpen))}><PulseIcon aria-hidden="true" />{t.operations.toggleTitle}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openUtility(() => setSettingsOpen(true))}><GearIcon aria-hidden="true" />{t.shared.applicationSettings}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => openUtility(() => setTourMenuOpen(true))}>{language === 'zh' ? '界面导览' : 'Interface tour'}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => navigate(`/guide${projectQuery}`)}>{t.pipeline.workflowGuide}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => navigate(`/faq${projectQuery}`)}>{t.nav.faq}</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          <Button
+            type="button"
+            data-tour-id="copilot-launcher"
+            aria-label={t.copilot.drawer.toggleTitle}
+            aria-expanded={copilotOpen}
+            aria-haspopup="dialog"
+            title={t.copilot.drawer.toggleTitle}
+            variant={copilotOpen ? 'secondary' : 'outline'}
+            className="copilot-launcher"
+            onClick={() => setCopilotOpen(!copilotOpen)}
+          >
+            <ChatCircleIcon aria-hidden="true" />
+            <span className="hidden sm:inline">Bot</span>
+          </Button>
+          <CommandPalette />
           <div className="science-desktop-utilities">
           <span className="hidden sm:inline-flex">
             <StatusBadge
               status={appMode === 'application' ? 'info' : 'warning'}
-              label={isPublicVisitor() ? (zh ? 'Public · 只读' : 'Public · Read only') : appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
+              label={appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
             />
           </span>
-          <Button
-            type="button"
-            aria-label={t.copilot.drawer.toggleTitle}
-            title={t.copilot.drawer.toggleTitle}
-            variant={copilotOpen ? 'secondary' : 'ghost'}
-            size="icon-sm"
-            onClick={() => setCopilotOpen(!copilotOpen)}
-          >
-            <ChatCircleIcon className="h-4 w-4" />
-          </Button>
-          <CommandPalette />
           <ActivityIndicatorButton />
           <Button
             type="button"
@@ -153,50 +142,8 @@ export function Topbar() {
         </div>
       </header>
 
-      {/* Core tools remain visible at every width and while scrolling. */}
-      <nav
-        data-tour-id="main-navigation"
-        aria-label={t.shared.mainNavigation}
-        className="science-navigation flex flex-wrap gap-1 border-b border-border-soft bg-bg-app px-3 py-2"
-      >
-        {mobileRoutes.map((route) => (
-          <NavLink
-            key={route.to}
-            data-nav-route={route.to}
-            to={route.to === '/workflow' ? coreHref('') : `${route.to}${projectQuery}`}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center gap-2 shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
-                isActive
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
-              )
-            }
-          >
-            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/inbox' ? <ListChecksIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : route.to === '/tools' ? <FlaskIcon aria-hidden="true" /> : null}
-            {navLabel(route.key)}
-          </NavLink>
-        ))}
-        <div className="flex items-stretch">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" aria-current={activeWorkbench ? 'true' : undefined} />}><WrenchIcon aria-hidden="true" />{activeWorkbench ? navLabel(activeWorkbench.key) : zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{zh ? '工作流资源' : 'Workflow resources'}</DropdownMenuLabel>
-                {coreLinks.map(({ resource, label }) => <DropdownMenuItem key={resource} render={<Link to={coreHref(resource)} />} aria-current={location.pathname === '/workflow' && workflowResource === resource ? 'page' : undefined}>{label}</DropdownMenuItem>)}
-              </DropdownMenuGroup>
-              {workbenchGroups(zh).map((group) => <DropdownMenuGroup key={group.key}>
-                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-                {group.routes.map((route) => (
-                  <DropdownMenuItem key={route.to} onClick={() => navigate(`${route.to}${projectQuery}`)}>{navLabel(route.key)}</DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>)}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </nav>
-      </div>
       <BackendHealthBanner />
+      </div>
     </>
   )
 }

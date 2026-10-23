@@ -13,6 +13,7 @@ import { Disclosure } from '../../components/ui/Disclosure'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore, type CopilotTaskDraft } from '../../lib/store/appStore'
+import { ApiError } from '../../lib/api/client'
 import { assessTaskReadiness, getTaskReadiness, isLive, listAgentRuns, listTaskServices, startAgentRun } from '../../lib/api/agentRuns'
 import { AgentRunDetail } from './CopilotAgentRuns'
 import { CopilotChat } from './CopilotChat'
@@ -30,6 +31,7 @@ interface WorkspaceProps {
   rememberDraft?: boolean
   openRunId?: string | null
   onRunChange?: (id: string | null) => void
+  onConfigureModel?: () => void
 }
 
 export function CopilotWorkspace({ initialGoal = '', ignoreDraft = false, rememberDraft = false, ...props }: WorkspaceProps) {
@@ -37,7 +39,7 @@ export function CopilotWorkspace({ initialGoal = '', ignoreDraft = false, rememb
   return <ProjectTaskWorkspace key={projectId} projectId={projectId} initialGoal={initialGoal} ignoreDraft={ignoreDraft} rememberDraft={rememberDraft} {...props} />
 }
 
-function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialService, ignoreDraft, rememberDraft, openRunId, onRunChange }: WorkspaceProps & { projectId: string; initialGoal: string }) {
+function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialService, ignoreDraft, rememberDraft, openRunId, onRunChange, onConfigureModel }: WorkspaceProps & { projectId: string; initialGoal: string }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const mounted = useRef(true)
@@ -50,7 +52,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const readOnly = useCopilotReadOnly()
   const [localDraft, setLocalDraft] = useState<CopilotTaskDraft>({ goal: initialGoal, bot: null, service: null, preview: Boolean(initialService), writes: [] })
   const savedDraft = useAppStore((s) => s.copilotTaskDrafts[projectId])
-  const { goal, bot: chosenBot, service: chosenService, preview, writes } = rememberDraft ? savedDraft ?? localDraft : localDraft
+  const { goal, bot: chosenBot, service: chosenService, preview, writes, proceduralSkills = null, retrySource } = rememberDraft ? savedDraft ?? localDraft : localDraft
   const updateDraft = (patch: Partial<CopilotTaskDraft>) => {
     if (rememberDraft) {
       const state = useAppStore.getState()
@@ -65,7 +67,6 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   const runId = onRunChange ? openRunId : localRunId
   const setRunId = onRunChange ?? setLocalRunId
   const [question, setQuestion] = useState<string | null>(null)
-  const [proceduralSkills, setProceduralSkills] = useState<string[] | null>(null)
   const [chat, setChat] = useState(Boolean(draft))
   const services = useQuery({ queryKey: ['copilot-task-services'], queryFn: listTaskServices, enabled: Boolean(projectId) })
   const readiness = useQuery({ queryKey: ['copilot-task-readiness', projectId], queryFn: () => getTaskReadiness(projectId), enabled: Boolean(projectId) })
@@ -108,6 +109,9 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     return matchesState && text.includes(taskSearch.trim().toLocaleLowerCase())
   }).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
   const error = start.error ?? assess.error ?? services.error ?? readiness.error ?? runs.error
+  const duplicateTask = start.error instanceof ApiError && start.error.payload
+    && typeof start.error.payload === 'object' && 'error_code' in start.error.payload
+    && start.error.payload.error_code === 'copilot_duplicate_task'
   const requestTask = (text: string) => { { const suggested = suggestAssignee(text, owners); updateDraft({ goal: text, bot: suggested?.bot.id ?? null, service: suggested?.service ?? null, writes: [], preview: true }) }; setChat(false); setQuestion(null) }
   if (!projectId) return <div className="space-y-3 p-4"><p>{zh ? '先创建或选择项目，助手就能围绕你的目标开展工作。' : 'Create or choose a project to work toward a research goal.'}</p>
     <Button type="button" render={<Link to="/projects" />}>{zh ? '创建或选择项目' : 'Choose a project'}</Button>
@@ -115,6 +119,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
   if (runId) return <AgentRunDetail key={runId} runId={runId} projectId={projectId} onBack={() => setRunId(null)} />
   if (chat || draft) return <div className="flex min-h-0 flex-1 flex-col"><Button type="button" variant="ghost" onClick={() => { useAppStore.getState().setCopilotDraft(''); setChat(false); setQuestion(null) }}>{zh ? '返回当前任务' : 'Back to tasks'}</Button><CopilotChat pageContext={pageContext} initialQuestion={question ?? undefined} onTaskRequested={requestTask} /></div>
   return <div className="task-workspace space-y-4 overflow-y-auto p-4">
+    {retrySource ? <p role="status" className="text-sm">{zh ? '已准备新的尝试，尚未执行。新任务最多调用模型 6 次；请在目标中说明本次调整，并检查方法和写入授权。后端可能拒绝目标和工具配置相同的重复任务。' : 'New attempt prepared, not started. New tasks make up to 6 model calls. Describe the changes in the goal and review methods and write permissions. The backend may reject duplicates with the same goal and tool configuration.'} <Link className="underline" to={`/bots?${new URLSearchParams({ project: projectId, view: 'tasks', run: retrySource })}`}>{zh ? '查看原任务' : 'View original task'}</Link></p> : null}
     {readOnly ? <p role="status" className="text-sm text-text-secondary">{zh ? '只读模式：可以查看任务与交付物。' : 'Read-only mode: you can inspect tasks and deliverables.'}</p> : null}
     <section className="task-deliveries space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">{zh ? '任务与交付物（按负责人）' : 'Tasks and deliverables by owner'}</h4><Button type="button" variant="outline" size="sm" onClick={() => goalInput.current?.focus()}>{zh ? '新建任务' : 'New task'}</Button></div>
       {rootRuns.length ? <div className="space-y-2">
@@ -158,7 +163,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
       </div></div>
       <p className="text-sm">{zh ? service.deliverable_zh : service.deliverable}</p>
       <ol className="list-decimal space-y-1 pl-5 text-sm">{service.steps.map((s, i) => <li key={i}>{String(zh ? s.title_zh : s.title)}</li>)}</ol>
-      <ProceduralSkillSelector serviceKind={kind ?? 'custom'} value={proceduralSkills} onChange={setProceduralSkills} disabled={readOnly || start.isPending} />
+      <ProceduralSkillSelector serviceKind={kind ?? 'custom'} value={proceduralSkills} onChange={(value) => updateDraft({ proceduralSkills: value })} disabled={readOnly || start.isPending} />
       {ownerWrites.map((tool) => <label key={tool} className="flex items-start gap-2 text-sm"><Checkbox checked={writes.includes(tool)} onCheckedChange={(checked) => updateDraft({ writes: checked ? [...writes, tool] : writes.filter((v) => v !== tool) })} />
         {tool === 'start_literature_search' ? (zh ? '允许发起外部文献检索并摄取结果' : 'Allow external literature search and ingestion') : (zh ? '允许保存待审核研究笔记' : 'Allow saving research notes for review')}</label>)}
       <p className="text-xs text-text-secondary">{writes.length ? (zh ? '将在本项目内执行以上勾选操作。' : 'Checked actions will run in this project.') : (zh ? '当前只读取已有资料并生成答复。' : 'Reads existing data and prepares an answer.')} {zh ? '工作流运行仍需检查并确认提交。' : 'Workflow execution still requires review and confirmation.'}</p>
@@ -168,6 +173,8 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
         <p className="mt-2 text-xs text-text-secondary">{zh ? '高级运行保留独立的方案确认；完整无人值守闭环尚未开放。' : 'Advanced execution has its own plan confirmation. Unattended end-to-end execution is not available.'}</p>
       </Disclosure>
       {!qualified ? <div role="status" className="space-y-2 text-sm"><p>{zh ? '此模型尚未通过本服务的任务检查。检查会调用模型，验证结构、引用和工具协议，不执行实验操作。' : 'This model needs task checks. These call the model to check structure, citations and tool protocol, without experiment actions.'}</p>
+        {readiness.data?.checked_at && readiness.data.reason ? <p>{zh ? '检查未通过：' : 'Checks did not pass: '}{readiness.data.reason === 'DomainError' ? (zh ? '模型调用被阻止。请打开模型设置，测试连接以查看具体原因（例如凭据、模型单价或额度），解决后重新检查。' : 'The model call was blocked. Open model settings and test the connection for the cause (such as credentials, pricing or allowance), then check again.') : readiness.data.reason}</p> : null}
+        {onConfigureModel ? <Button type="button" variant="outline" onClick={onConfigureModel}>{zh ? '配置或诊断模型' : 'Configure or diagnose model'}</Button> : null}
         <Button type="button" variant="outline" disabled={!readiness.data?.model || assess.isPending || readOnly} onClick={() => assess.mutate()}>{assess.isPending ? (zh ? '检查中…' : 'Checking…') : (zh ? '检查模型任务能力' : 'Check model task capabilities')}</Button>
         {readiness.data?.checked_at ? <p>{Object.entries(readiness.data.checks ?? {}).map(([name, passed]) => `${name}: ${passed ? '✓' : '×'}`).join(' · ')}</p> : null}</div> : null}
       <Button type="button" disabled={!assignee || !qualified || !goal.trim() || start.isPending || readOnly} onClick={() => start.mutate()}>{start.isPending ? (zh ? '启动中…' : 'Starting…') : (zh ? '按以上计划开始' : 'Start this plan')}</Button>
@@ -175,6 +182,7 @@ function ProjectTaskWorkspace({ projectId, pageContext, initialGoal, initialServ
     {preview && !(assignee && service) && !services.isError && !bots.isError ? <p role="status" className="text-sm text-text-secondary">{services.isLoading || bots.isLoading ? (zh ? '加载负责人与任务类型…' : 'Loading task owners…') : (zh ? '暂时没有负责人承接这项任务，请选择其他负责人或开始对话。' : 'No owner is available for this task. Choose another owner or start a conversation.')}</p> : null}
     {services.isError || bots.isError || readiness.isError || runs.isError ? <Button type="button" variant="outline" onClick={() => { if (services.isError) void services.refetch(); if (bots.isError) void bots.refetch(); if (readiness.isError) void readiness.refetch(); if (runs.isError) void runs.refetch() }}>{zh ? '重新加载任务工作区' : 'Reload task workspace'}</Button> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{taskErrorMessage(error, zh)}</p> : null}
+    {duplicateTask ? <p role="status" className="text-sm">{zh ? '此请求没有创建新任务。草稿已保留；请查看已有结果，或在任务目标中说明本次需要修正的内容，再检查计划。只调整额度可能仍被判为重复。' : 'No new task was created. Your draft is retained. Review the existing result, or describe what needs correcting in the task goal and review the plan again. Changing only the allowance may still count as a duplicate.'}</p> : null}
     <Button type="button" variant="ghost" onClick={() => setChat(true)}>{zh ? '询问或解释一个问题' : 'Ask or explain a question'}</Button>
 
   </div>
