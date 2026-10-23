@@ -73,3 +73,5 @@ PostgreSQL 隔离库全量测试 3,101 项通过、11 项按夹具可用性跳�
 浏览器基础矩阵 90/90、工作区断点 19/19、Bot 交互 8/8 通过；加入大表分页后，研究页 9/9 场景再次通过。模拟 API 用于界面回归，实际项目另行检查静态演示标签、表格行和授权下载。真实计算站点与个人连接器未在本轮验收。
 
 工作区使用固定侧栏与窄屏页面菜单；设置将即时外观偏好和需要保存的项目模型配置分开。终止任务可准备新草稿，保留原记录并清空写入授权；取消请求在每一步之间获得执行锁，读取最新状态后处理，保留已经完成的结果。新任务仍遵循当前平台最多六次模型调用的限制。
+
+本轮依赖扫描同时覆盖运行和开发依赖。已更新 Vite 8.3.5、Vitest 4.1.12、certifi 2026.10.19 与 OpenTelemetry 1.45.1，并重新生成带哈希的 Python 锁文件及可供 npm 10/11 安装的前端锁文件。对应修复依据：[Vite 公告](https://github.com/advisories/GHSA-rq7h-c2jc-7f22)、[Vitest 公告](https://github.com/advisories/GHSA-qxg6-89mg-rqv8)、[certifi 公告](https://github.com/advisories/GHSA-6q48-6c7w-9gw2)、[OpenTelemetry 公告](https://github.com/advisories/GHSA-xcq7-p3pf-p88h)。扫描结果按 2026-10-24 的漏洞库记录，不能代替后续持续更新。
