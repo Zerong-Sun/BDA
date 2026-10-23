@@ -454,6 +454,8 @@ function RoomEntry({
   if (!message) return null
   const archive = message.context?.chat_archive
   const archived = typeof archive === 'object' && archive !== null && 'archived' in archive && archive.archived === true
+  const editorial = message.context?.editorial_demo
+  const isEditorialDemo = typeof editorial === 'object' && editorial !== null && 'static' in editorial && editorial.static === true
   const mine = message.role === 'user'
   const bot = resolveBot(message.bot, roster)
   return (
@@ -461,10 +463,11 @@ function RoomEntry({
       {!mine && bot ? <BotAvatar id={bot.id} stance={bot.stance} /> : null}
       <div className="room-entry-body">
         <p className="room-speaker">
-          {mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
+          {isEditorialDemo ? (mine ? (zh ? '演示提问' : 'Example question') : (zh ? '编辑版示例' : 'Edited example')) : mine ? (zh ? '你' : 'You') : speakerName(message.bot, roster, zh)}
           {archived ? ` · ${zh ? '已清理历史' : 'archived history'}` : ''}
           {message.status === 'failed' ? ` · ${zh ? '未能回答' : 'could not answer'}` : message.context?.delivery_status === 'partial' ? ` · ${zh ? '部分完成' : 'partially completed'}${message.context.review_status === 'not_completed' ? (zh ? ' · 复核未完成' : ' · review incomplete') : ''}` : ''}
         </p>
+        {isEditorialDemo && !mine ? <p className="text-xs text-text-muted">{zh ? '预设演示内容 · 未执行工具或计算 · 科研判断待复核' : 'Authored demonstration · No tools or compute executed · Scientific review pending'}</p> : null}
         <div className="room-text">{mine ? message.content : message.status === 'failed' ? <p role="status">{chatFailureMessage(`${typeof message.context?.error_code === 'string' ? message.context.error_code : ''} ${message.error ?? ''}`, zh)}</p> : focused ? <LatestAnswer content={message.content} citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId} zh={zh} /> : <ReviewMarkdown presentation="chat" citations={(message.citations ?? []) as Array<Record<string, unknown>>} projectId={projectId}>{message.content}</ReviewMarkdown>}</div>
         {!mine ? focused ? message.tool_calls?.some(call => call && typeof call === 'object' && 'result' in call) ? <Disclosure title={zh ? '工具调用详情' : 'Tool call details'}><ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /></Disclosure> : null : <ToolEvidenceLazy calls={message.tool_calls} projectId={projectId} /> : null}
       </div>

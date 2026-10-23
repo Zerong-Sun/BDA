@@ -20,6 +20,7 @@ from ..projects.models import Project
 from ..registry.site_runtime import resolve_plugin_runtime
 from ..workflows.models import WorkflowNode, WorkflowRun
 from ..workflows.repository import WorkflowRepository
+from .access import lsf_target_snapshot, require_lsf_access
 from .binding import BindingError, resolve_artifact_bindings, resolve_pending_inputs
 from .models import ComputeDraft, IdempotencyRecord, Job, JobSubmission
 from .repository import ComputeRepository
@@ -48,6 +49,7 @@ def create_compute_draft(session: Session, payload: ComputeDraftCreate, user: Us
 
 
 def confirm_draft(session: Session, row: ComputeDraft, project: Project, user: User) -> ComputeDraft:
+    require_lsf_access(user, row.backend)
     if row.status != "draft":
         return row
     row.status = "confirmed"
@@ -204,11 +206,12 @@ def create_submission(
         executable_ids = {node.id for node in nodes if node.execution_mode != "manual"}
         if set(payload.review_fingerprints) != executable_ids:
             raise DomainError("preview_incomplete", "Review every executable node before submitting", status_code=412)
-    _record_lineage(session, workflow, nodes)
     settings = get_settings()
     from ..workflows.preflight import workflow_backend
 
     backend = workflow_backend(workflow, payload.compute_backend)
+    require_lsf_access(user, backend)
+    _record_lineage(session, workflow, nodes)
     if settings.is_production and backend == "demo":
         raise DomainError("demo_compute_forbidden", "Demo compute cannot run in production", status_code=409)
     # Refuse LSF before doing any work when no cluster is configured; the deployment
@@ -223,7 +226,7 @@ def create_submission(
     # a known blocker is how unvalidated commands used to reach the cluster.
     from ..workflows.preflight import evaluate_preflight
 
-    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend=backend)
+    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend=backend, user=user)
     if blockers:
         raise DomainError(
             "workflow_preflight_failed",
@@ -317,6 +320,7 @@ def create_submission(
             model_plugin=node.model_plugin,
             timeout_at=None,
             runtime_spec={
+                **({"lsf_target": lsf_target_snapshot(), "compute_actor_id": str(user.id)} if backend == "lsf" else {}),
                 "parameters": node.parameters,
                 "node_key": node.node_key,
                 "image": resolved_runtime["image"] if resolved_runtime else node.container_image,
@@ -571,6 +575,9 @@ def request_cancel(session: Session, job: Job, project: Project, user: User) -> 
 
 
 def retry_job(session: Session, job: Job, project: Project, user: User) -> Job:
+    require_lsf_access(user, job.compute_backend)
+    if job.compute_backend == "lsf" and job.runtime_spec.get("lsf_target") != lsf_target_snapshot():
+        raise DomainError("lsf_retry_site_changed", "Review a new workflow before retrying work against a different or unrecorded cluster identity", status_code=409)
     if job.status not in {"failed", "cancelled"}:
         raise DomainError("job_not_retryable", "Only failed or cancelled jobs can be retried", status_code=409)
     attempt_number = job.attempt_number + 1

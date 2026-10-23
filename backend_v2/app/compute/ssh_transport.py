@@ -60,11 +60,12 @@ class SSHTransport(Protocol):
 class KeySSHTransport:
     """Non-interactive key auth over the system ssh client."""
 
-    def __init__(self, host: str, *, key_path: str | None, connect_timeout: int, port: int | None = None) -> None:
+    def __init__(self, host: str, *, key_path: str | None, connect_timeout: int, port: int | None = None, username: str | None = None) -> None:
         self.host = host
         self.key_path = key_path
         self.connect_timeout = connect_timeout
         self.port = port
+        self.username = username
 
     def _argv(self) -> list[str]:
         argv = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={self.connect_timeout}"]
@@ -72,6 +73,8 @@ class KeySSHTransport:
             argv.extend(["-i", self.key_path])
         if self.port:
             argv.extend(["-p", str(self.port)])
+        if self.username:
+            argv.extend(["-l", self.username])
         return argv
 
     def run(self, command: str, *, check: bool = True, timeout: int = 60) -> SSHResult:

@@ -80,6 +80,20 @@ function stub(items: unknown[]) {
 }
 
 describe('Room', () => {
+  it('distinguishes editorial examples from a real user and an executing bot', async () => {
+    stub([
+      { kind: 'message', id: 'example-q', occurred_at: '2026-10-24T00:00:00Z', bot: null,
+        message: message({ id: 'example-q', role: 'user', bot: null, content: 'Example question content', context: { editorial_demo: { static: true } } }) },
+      { kind: 'message', id: 'example-a', occurred_at: '2026-10-24T00:00:01Z', bot: null,
+        message: message({ id: 'example-a', bot: null, content: 'Example answer content', context: { editorial_demo: { static: true } } }) },
+    ])
+    renderWithProviders(<Room />)
+    expect(await screen.findByText('Edited example')).toBeInTheDocument()
+    expect(screen.getByText('Authored demonstration · No tools or compute executed · Scientific review pending')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Discussion and process history/ }))
+    expect(await screen.findByText('Example question')).toBeInTheDocument()
+  })
+
   it('shows real background discussion and opens its evidence', async () => {
     stub([{ kind: 'discussion', id: 'turn-1', occurred_at: '2026-09-14T08:20:00Z', bot: 'planner',
       discussion: { run_id: 'run-1', content: 'PD-L1 route comparison is ready for review.' } }])

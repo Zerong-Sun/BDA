@@ -346,7 +346,7 @@ def workflow_preflight(
     user: User = Depends(current_user),
 ) -> WorkflowPreflightResponse:
     workflow = _workflow(session, workflow_id, user)
-    blockers, warnings, checks = evaluate_preflight(session, workflow)
+    blockers, warnings, checks = evaluate_preflight(session, workflow, user=user)
     return WorkflowPreflightResponse(
         workflow_run_id=workflow.id,
         allowed=not blockers,
@@ -367,6 +367,8 @@ def preview_node_script(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> ScriptPreviewResponse:
+    from ..compute.access import require_lsf_access
+    require_lsf_access(user, payload.compute_backend)
     node = WorkflowRepository(session).node(node_id)
     if node is None:
         raise DomainError("workflow_node_not_found", "Workflow node was not found", status_code=404)

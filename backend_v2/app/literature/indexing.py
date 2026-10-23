@@ -15,6 +15,19 @@ SENTENCE_SPLIT = re.compile(r"(?<=[.!?。！？])\s+")
 WHITESPACE = re.compile(r"\s+")
 
 
+def is_source_sentence(value: str) -> bool:
+    """Exclude reference-number debris while retaining the complete source chunk.
+
+    This is a text-quality check, never scientific acceptance. Short scientific
+    statements, numbers with units and non-Latin text remain valid candidates.
+    """
+    letters = [character for character in value if character.isalpha()]
+    return len(letters) >= 5 and (
+        len(re.findall(r"[^\W\d_]+", value, re.UNICODE)) >= 2
+        or any("\u3400" <= character <= "\u9fff" for character in letters)
+    )
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -96,6 +109,7 @@ def index_document_content(
         if value
     }
     counts = {"chunks": 0, "claims": 0, "evidence": 0}
+    seen_sentences: set[str] = set()
     for position, paragraph in enumerate(paragraphs[:500]):
         normalized = WHITESPACE.sub(" ", paragraph).strip()
         if not normalized:
@@ -108,6 +122,9 @@ def index_document_content(
             continue
         sentences = [item.strip() for item in SENTENCE_SPLIT.split(normalized) if item.strip()]
         for sentence_index, sentence in enumerate(sentences[:20]):
+            if not is_source_sentence(sentence) or sentence in seen_sentences:
+                continue
+            seen_sentences.add(sentence)
             claim = LiteratureClaim(
                 document_id=document.id,
                 chunk_id=chunk.id,
@@ -119,6 +136,7 @@ def index_document_content(
                     "content_checksum_sha256": content_checksum_sha256,
                     "identifiers": identifiers,
                     "analysis_status": "pending_human_review",
+                    "extraction_method": "source_sentence_candidate",
                 },
             )
             session.add(claim)

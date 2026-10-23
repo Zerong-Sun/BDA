@@ -60,6 +60,10 @@ class ResearchContextService:
         self.session = session
         self.project_id = project.id
         self.workspace = _sanitize(build_research_workspace(session, project).model_dump(mode="json"))
+        # Keep off-topic records inspectable in the library without using them
+        # as this project's grounding. Classification never deletes a source.
+        self.workspace["references"] = [row for row in self.workspace.get("references", [])
+                                        if (row.get("metadata") or {}).get("project_scope_status") != "excluded"]
         # Bibliographic discovery must not inject an entire paper collection into
         # the model context. Full packets are read explicitly through bounded windows.
         for reference in self.workspace.get("references", []):
@@ -76,6 +80,7 @@ class ResearchContextService:
             for row in session.scalars(
                 select(LiteratureDocument)
                 .where(LiteratureDocument.project_id == project.id)
+                .where(LiteratureDocument.metadata_json["project_scope_status"].as_string().is_distinct_from("excluded"))
                 .order_by(LiteratureDocument.created_at)
             )
         }
@@ -532,6 +537,8 @@ class ResearchContextService:
             .join(LiteratureDocument, LiteratureDocument.id == LiteratureClaim.document_id)
             .outerjoin(LiteratureChunk, LiteratureChunk.id == LiteratureClaim.chunk_id)
             .where(LiteratureDocument.project_id == self.project_id)
+            .where(LiteratureDocument.metadata_json["project_scope_status"].as_string().is_distinct_from("excluded"))
+            .where(LiteratureClaim.attributes["source_quality"]["status"].as_string().is_distinct_from("excluded"))
             .order_by(LiteratureDocument.created_at, LiteratureClaim.created_at)
             .limit(2000)
         ).all()

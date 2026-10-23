@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import uuid
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,33 @@ def test_pd1_demo_import_is_idempotent_and_evidence_closed(domain_client) -> Non
         for operation_id in first.json()["pdb_operation_ids"]
     ]
     assert sum(bool(operation["progress"]["attach_to_target"]) for operation in operations) == 1
+    room = client.get(f"/api/v2/copilot/projects/{project['id']}/room").json()
+    examples = [item['message'] for item in room['items'] if item.get('message') and item['message']['context'].get('editorial_demo')]
+    assert len(examples) == 8
+    assert all(m['context']['editorial_demo']['static'] and not m['tool_calls'] and m['bot'] is None for m in examples)
+
+
+def test_catalog_reimport_preserves_edits_to_installed_editorial_examples(domain_client) -> None:
+    from backend_v2.app.copilot.models import CopilotConversation, CopilotMessage
+    from sqlalchemy import select
+
+    client, ids = domain_client
+    descriptor = client.get('/api/v2/research-packages').json()[0]
+    payload = {'organization_id': str(ids['organization']), 'package_id': descriptor['package_id'],
+               'version': descriptor['version'], 'checksum': descriptor['checksum']}
+    first = client.post('/api/v2/research-package-imports', json=payload)
+    assert first.status_code == 201
+    project_id = uuid.UUID(first.json()['projects'][0]['project_id'])
+    with ids['session_factory']() as session:
+        conversation_id = session.scalar(select(CopilotConversation.id).where(CopilotConversation.project_id == project_id))
+        message = session.scalar(select(CopilotMessage).where(CopilotMessage.conversation_id == conversation_id).order_by(CopilotMessage.created_at))
+        assert message
+        message_id = message.id
+        message.content = 'An explicitly edited demonstration question.'
+        session.commit()
+    assert client.post('/api/v2/research-package-imports', json=payload).status_code == 201
+    with ids['session_factory']() as session:
+        assert session.get(CopilotMessage, message_id).content == 'An explicitly edited demonstration question.'
 
 
 @pytest.mark.parametrize(

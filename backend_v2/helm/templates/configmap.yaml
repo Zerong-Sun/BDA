@@ -36,6 +36,7 @@ data:
   {{- end }}
   BDA_V2_LLM_LOCAL_SECRET_DIR: {{ .Values.config.llmSecretDir | quote }}
   BDA_V2_LSF_SSH_HOST: {{ .Values.config.lsf.sshHost | quote }}
+  BDA_V2_LSF_SUBMITTER_USER_IDS: {{ .Values.config.lsf.submitterUserIds | toJson | quote }}
   BDA_V2_LSF_SSH_PORT: {{ .Values.config.lsf.sshPort | quote }}
   BDA_V2_LSF_REMOTE_ROOT: {{ .Values.config.lsf.remoteRoot | quote }}
   BDA_V2_LSF_QUEUE: {{ .Values.config.lsf.queue | quote }}

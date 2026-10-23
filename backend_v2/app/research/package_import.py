@@ -888,6 +888,9 @@ def import_research_package(
             trusted_package=trusted_package,
         )
         counts["knowledge"] += _upsert_knowledge(session, project, package, key, source)
+        if trusted_package and package_id == "pd1-demo-v1" and not adopted:
+            from ..copilot.editorial import install_pd1_examples
+            install_pd1_examples(session, project, user)
         if not adopted:
             assert target is not None  # only the `adopted` branch can leave target unset
             operations = _structure_operations(session, project, target, source, package, user)

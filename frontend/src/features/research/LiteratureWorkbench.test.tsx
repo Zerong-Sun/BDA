@@ -38,6 +38,23 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('literature evidence workbench', () => {
+  it('prominently identifies a retracted publication without mislabelling a retraction notice', async () => {
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={[{ ...references[0], metadata: { pub_type: 'Journal Article; Retracted Publication' } }]} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('This paper is retracted')
+    cleanup()
+    renderWithProviders(<LiteratureWorkbench projectId="project-two" references={[{ ...references[0], metadata: { pub_type: 'Retraction Notice; Retraction of Publication' } }]} />)
+    await screen.findByText('Original source records')
+    expect(screen.queryByText(/This paper is retracted/)).not.toBeInTheDocument()
+  })
+
+  it('keeps excluded sources inspectable and explains their project scope', async () => {
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={[{ ...references[0], metadata: {
+      project_scope_status: 'excluded', project_scope_reason: 'Unrelated sensor study',
+    } }]} />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Excluded from this project’s evidence: Unrelated sensor study')
+    expect(screen.getByText('Original source records')).toBeInTheDocument()
+  })
+
   it('shows original language, linked paper, author claim, inference and limits without expanding metadata', async () => {
     useAppStore.setState({ language: 'zh' })
     renderWithProviders(<LiteratureWorkbench projectId="project-one" references={references} />)

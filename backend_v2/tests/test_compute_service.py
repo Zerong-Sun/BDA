@@ -30,6 +30,36 @@ from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 
+@pytest.mark.parametrize('role', ['admin', 'researcher', 'viewer'])
+def test_public_lsf_requires_account_assignment_before_submission_or_retry(compute_session, monkeypatch, role):
+    from backend_v2.app.compute import access
+    from backend_v2.app.compute.models import ComputeDraft, JobSubmission
+    from backend_v2.app.core.config import get_settings
+    from backend_v2.app.workflows.preflight import evaluate_preflight
+    from sqlalchemy import func
+
+    session, user, project, workflow = compute_session
+    user.role = role
+    settings = get_settings().model_copy(update={'deployment_kind': 'public', 'lsf_submitter_user_ids': [],
+                                                 'lsf_ssh_host': 'cluster.example', 'lsf_remote_root': '/scratch/bda'})
+    monkeypatch.setattr(access, 'get_settings', lambda: settings)
+    monkeypatch.setattr(compute_service, 'get_settings', lambda: settings)
+    with pytest.raises(DomainError) as failure:
+        create_submission(session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend='lsf'),
+                          idempotency_key='unassigned-account', user=user)
+    assert failure.value.error_code == 'lsf_account_not_assigned'
+    assert session.scalar(select(func.count(JobSubmission.id))) == 0
+    assert session.scalar(select(func.count(Job.id))) == 0
+    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend='lsf', user=user)
+    assert any(issue['code'] == 'lsf_account_not_assigned' for issue in blockers)
+    draft = ComputeDraft(project_id=project.id, backend='lsf', name='Draft', created_by=user.id, status='draft')
+    with pytest.raises(DomainError, match='assigned LSF connection'):
+        compute_service.confirm_draft(session, draft, project, user)
+    assert draft.status == 'draft'
+    with pytest.raises(DomainError, match='assigned LSF connection'):
+        retry_job(session, Job(compute_backend='lsf', status='failed', runtime_spec={}), project, user)
+
+
 @pytest.mark.parametrize("count", [100, 205])
 def test_terminal_job_stream_drains_pages_with_equal_timestamps(compute_session, monkeypatch, count) -> None:
     session, user, project, workflow = compute_session
@@ -56,6 +86,29 @@ def test_terminal_job_stream_drains_pages_with_equal_timestamps(compute_session,
     assert len(test_events) == count
     assert {event["id"] for event in test_events} == expected
     assert received[-1]["event"] == "done"
+
+
+def test_lsf_submission_freezes_its_identity_and_refuses_retry_after_a_site_change(compute_session, monkeypatch):
+    from backend_v2.app.compute import access
+    from backend_v2.app.core.config import get_settings
+    from backend_v2.app.workflows import preflight
+
+    session, user, project, workflow = compute_session
+    settings = get_settings().model_copy(update={'lsf_ssh_host': 'first.example', 'lsf_remote_root': '/scratch/first',
+                                                 'lsf_ssh_user': 'alice', 'lsf_submitter_user_ids': [user.id]})
+    monkeypatch.setattr(access, 'get_settings', lambda: settings)
+    monkeypatch.setattr(compute_service, 'get_settings', lambda: settings)
+    monkeypatch.setattr(preflight, 'get_settings', lambda: settings)
+    _, jobs = create_submission(session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend='lsf'),
+                                idempotency_key='frozen-site', user=user)
+    assert all(job.runtime_spec['lsf_target']['lsf_ssh_host'] == 'first.example' for job in jobs)
+    assert all(job.runtime_spec['compute_actor_id'] == str(user.id) for job in jobs)
+    settings.lsf_ssh_host = 'second.example'
+    jobs[0].status = 'failed'
+    with pytest.raises(DomainError) as failure:
+        retry_job(session, jobs[0], project, user)
+    assert failure.value.error_code == 'lsf_retry_site_changed'
+    assert jobs[0].runtime_spec['lsf_target']['lsf_ssh_host'] == 'first.example'
 
 
 @pytest.mark.parametrize("limit", [1, 2, 3, 10])

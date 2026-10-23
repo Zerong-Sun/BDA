@@ -193,6 +193,7 @@ def _build_transport(settings) -> SSHTransport:
         key_path=settings.lsf_ssh_key_path,
         connect_timeout=settings.lsf_connect_timeout_seconds,
         port=settings.lsf_ssh_port if settings.lsf_ssh_port != 22 else None,
+        username=settings.lsf_ssh_user,
     )
 
 

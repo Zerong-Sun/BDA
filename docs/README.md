@@ -17,6 +17,7 @@
 - [研究团队与结果展示：六项验证及修复清单](SIX_DIMENSION_REVIEW_2026-10-17.md)
 
 - [Public / Private 登录、注册与账号管理](ACCOUNT_ACCESS.md)
+- [公开版本准备、完整流程与个人计算接入方案](PUBLIC_RELEASE_READINESS.md)
 
 - [全平台能力升级与接入账本](PLATFORM_CAPABILITY_UPGRADE.md)
 

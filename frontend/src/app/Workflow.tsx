@@ -921,7 +921,9 @@ function WorkflowWorkspace() {
               {visiblePreflightBlockers.map((blocker, index) => (
                 <li key={`${blocker.code}-${blocker.node_key ?? blocker.port ?? index}`}>
                   {blocker.node_key ? `${blocker.node_key}: ` : ''}
-                  {blocker.message}
+                  {blocker.code === 'lsf_account_not_assigned' && language === 'zh'
+                    ? '尚未分配启明/LSF连接。项目权限不等于计算账号授权；请使用自己的计算部署，或由管理员配置获授权的实验室连接。'
+                    : blocker.message}
                 </li>
               ))}
             </ul>

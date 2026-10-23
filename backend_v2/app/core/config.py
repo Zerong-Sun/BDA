@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     lsf_ssh_host: str = ""
     lsf_ssh_port: int = Field(default=22, ge=1, le=65535)
     lsf_ssh_user: str | None = None
+    # JSON UUID list. Public defaults to nobody; private retains administrator-only
+    # use of its deployment account until specific submitters are assigned.
+    lsf_submitter_user_ids: list[uuid.UUID] = Field(default_factory=list)
     lsf_remote_root: str = ""
     lsf_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
     # How long one remote command may take, end to end. Separate from the connect

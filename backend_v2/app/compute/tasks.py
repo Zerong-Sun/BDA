@@ -65,6 +65,17 @@ def _runtime(job: Job) -> RuntimeJob:
     )
 
 
+def _job_adapter(runtime: RuntimeJob, backend: str):
+    if backend != "lsf" or "lsf_target" not in runtime.runtime_spec:
+        return adapter_for(backend)
+    target = runtime.runtime_spec["lsf_target"]
+    required = {"lsf_ssh_host", "lsf_ssh_port", "lsf_ssh_user", "lsf_remote_root", "lsf_queue",
+                "lsf_staging_mode", "lsf_ssh_key_path", "lsf_ssh_password_ref", "lsf_upload_wrapper"}
+    if not isinstance(target, dict) or set(target) != required:
+        raise ValueError("lsf_target_snapshot_invalid")
+    return adapter_for(backend, target=target)
+
+
 def _apply_input_adapter(session: Session, job: Job) -> dict:
     """Let the plugin synthesise inputs it needs but a workflow cannot bind directly.
 
@@ -367,7 +378,7 @@ def dispatch_job(self, job_id: str) -> dict:
         runtime = _runtime(job)
         backend = job.compute_backend
     try:
-        adapter = adapter_for(backend)
+        adapter = _job_adapter(runtime, backend)
         # Only mint presigned URLs when the runner actually fetches them. Under ssh
         # staging the adapter copies inputs onto the cluster and writes its own manifest
         # there, so publishing long-lived credentials to object storage is pure exposure.
@@ -463,7 +474,7 @@ def poll_job(self, job_id: str) -> dict:
             return {"job_id": job_id, "status": "ignored"}
         runtime, backend, external_id = _runtime(job), job.compute_backend, job.external_id
     try:
-        live = adapter_for(backend).status(runtime, external_id)
+        live = _job_adapter(runtime, backend).status(runtime, external_id)
     except Exception as exc:
         if backend == "lsf":
             LSF_FAILURES.labels("poll").inc()
@@ -508,7 +519,7 @@ def collect_job(self, job_id: str) -> dict:
             return {"job_id": job_id, "status": "ignored"}
         runtime, backend, external_id = _runtime(job), job.compute_backend, job.external_id
     try:
-        outputs = adapter_for(backend).collect(runtime, external_id)
+        outputs = _job_adapter(runtime, backend).collect(runtime, external_id)
         storage = ObjectStorage()
         verified = []
         for output in outputs:
@@ -819,9 +830,9 @@ def cancel_job(self, job_id: str) -> dict:
         job = ComputeRepository(session).job(parsed)
         if job is None or job.status in TERMINAL_STATES:
             return {"job_id": job_id, "status": "ignored"}
-        backend, external_id = job.compute_backend, job.external_id
+        backend, external_id, runtime = job.compute_backend, job.external_id, _runtime(job)
     try:
-        cancelled = True if not external_id else adapter_for(backend).cancel(external_id)
+        cancelled = True if not external_id else _job_adapter(runtime, backend).cancel(external_id)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=10) from exc
     if cancelled:

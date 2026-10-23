@@ -61,6 +61,7 @@ config:
   # Site-specific; the chart refuses to render with computeBackend "lsf" until these and a
   # credential are supplied, rather than deploying something that cannot dispatch.
   lsf:
+    submitterUserIds: []
     sshHost: ""
     sshUser: ""
     sshPort: "22"
