@@ -100,6 +100,24 @@ describe('research data grids', () => {
 
   afterEach(cleanup)
 
+  it('paginates large datasets and searches all rows from a later page', async () => {
+    const fixture = workspaceFixture()
+    const rows = Array.from({ length: 60 }, (_, index) => ({ sample: `sample-${String(index).padStart(3, '0')}` }))
+    fixture.datasets[0].data = rows
+    fixture.datasets[0].display_data = rows
+    getWorkspace.mockResolvedValue(fixture)
+    renderWithProviders(<ResearchWorkspacePanel view="data" />)
+    expect(await screen.findByText('sample-024')).toBeVisible()
+    expect(screen.queryByText('sample-025')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
+    expect(await screen.findByText('sample-025')).toBeVisible()
+    expect(screen.queryByText('sample-000')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: /search dataset/i }), { target: { value: 'sample-059' } })
+    expect(await screen.findByText('sample-059')).toBeVisible()
+    expect(screen.getByText('1 - 1 of 1')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Go to next page' })).not.toBeInTheDocument()
+  })
+
   it('shows boolean, array and nested values and resolves a fresh original-file link', async () => {
     const fixture = workspaceFixture()
     fixture.datasets[0].display_data = [{ passed: false, seeds: [1, 2], metrics: { score: 0.7 }, count: 0, mixed: { en: 'label', count: 2 } }]

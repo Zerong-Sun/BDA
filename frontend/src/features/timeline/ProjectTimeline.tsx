@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { listAllTimeline } from '../../lib/api/timeline'
 import { listResearchGoals } from '../../lib/api/researchGoals'
@@ -90,14 +91,23 @@ function EntryCard({
   entry,
   projectId,
   onEdit,
+  selected = false,
 }: {
   entry: TimelineEntry
   projectId: string
   /** Absent in read-only contexts; the card then renders exactly as it used to. */
   onEdit?: (entry: TimelineEntry) => void
+  selected?: boolean
 }) {
   const { t, format } = useI18n()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(selected)
+  const card = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (selected) {
+      card.current?.scrollIntoView({ block: 'start' })
+      card.current?.focus({ preventScroll: true })
+    }
+  }, [selected])
   const setCopilotDraft = useAppStore((state) => state.setCopilotDraft)
   const setCopilotOpen = useAppStore((state) => state.setCopilotOpen)
   const tl = t.timeline
@@ -106,7 +116,7 @@ function EntryCard({
   const outcomeLabel = tl.outcome[entry.outcome as keyof typeof tl.outcome] ?? entry.outcome
 
   return (
-    <li className={`relative border-l-4 ${outcomeRule(entry.outcome)} bg-bg-app pl-4 pr-3 py-3 rounded-r-md`}>
+    <li ref={card} tabIndex={selected ? -1 : undefined} aria-current={selected ? 'true' : undefined} className={`relative min-w-0 [overflow-wrap:anywhere] border-l-4 ${outcomeRule(entry.outcome)} bg-bg-app pl-4 pr-3 py-3 rounded-r-md ${selected ? 'ring-2 ring-primary' : ''}`}>
       <div className="flex flex-wrap items-baseline gap-2">
         <time className="font-mono text-xs text-text-secondary" dateTime={entry.occurred_at}>
           {entry.occurred_at.slice(0, 16).replace('T', ' ')}
@@ -178,7 +188,7 @@ function EntryCard({
           type="button"
           variant="ghost"
           size="sm"
-          className="mt-2 px-0 text-xs"
+          className="mt-2 h-auto min-h-11 max-w-full whitespace-normal px-0 text-left text-xs"
           onClick={() => {
             setCopilotDraft(
               buildDecisionCopilotPrompt(entry, {
@@ -242,10 +252,26 @@ function EntryCard({
   )
 }
 
-export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelineProps) {
-  const { t, format } = useI18n()
+export function ProjectTimeline(props: ProjectTimelineProps) {
+  const [search] = useSearchParams()
+  // A project change or a newly opened record starts a fresh inspection context.
+  // Old filters and editor drafts must not hide or write into that context.
+  return <ProjectTimelineContent key={`${props.projectId}:${search.get('timeline_entry') ?? ''}`} {...props} />
+}
+
+function ProjectTimelineContent({ projectId, hasPrompt = false }: ProjectTimelineProps) {
+  const { t, format, language } = useI18n()
   const tl = t.timeline
-  const [view, setView] = useState<View>('tree')
+  const [search, setSearch] = useSearchParams()
+  const requestedView = search.get('timeline_view')
+  const selectedEntryId = search.get('timeline_entry')
+  const view: View = selectedEntryId ? 'timeline' : VIEWS.includes(requestedView as View) ? requestedView as View : 'tree'
+  const setView = (value: View) => {
+    const next = new URLSearchParams(search)
+    next.set('timeline_view', value)
+    next.delete('timeline_entry')
+    setSearch(next)
+  }
   const [phase, setPhase] = useState('')
   const [entryType, setEntryType] = useState('')
   const [outcome, setOutcome] = useState('')
@@ -271,6 +297,9 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
   })
 
   const entries = useMemo(() => query.data ?? [], [query.data])
+  const missingLinkedRecord = selectedEntryId && !entries.some((entry) => entry.id === selectedEntryId)
+    ? <p role="status" className="mb-3 text-sm text-text-secondary">{language === 'zh' ? '此项目中未找到所链接的记录。你仍可浏览项目记录或新建记录。' : 'The linked record was not found in this project. You can still browse or create project records.'}</p>
+    : null
   const phases = useMemo(
     () => Array.from(new Set(entries.map((entry) => entry.phase))),
     [entries],
@@ -341,6 +370,7 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
     return (
       <div className="grid gap-3">
         <AppFrame panelClassName="p-4">
+          {missingLinkedRecord}
           <p className="text-sm text-text-secondary">{tl.empty}</p>
           {editing ? (
             <TimelineEntryEditor projectId={projectId} onClose={() => setEditing(null)} />
@@ -381,6 +411,7 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
           onClose={() => setEditing(null)}
         />
       ) : null}
+      {missingLinkedRecord}
 
       <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label={tl.title}>
         {VIEWS.map((value) => (
@@ -461,7 +492,17 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
         </Select>
       </div>
 
-      {view === 'tree' ? (
+      {!visible.length ? (
+        <div className="space-y-2">
+          <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '没有符合当前筛选条件的记录。' : 'No records match the current filters.'}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => {
+            setPhase('')
+            setEntryType('')
+            setOutcome('')
+            setLane('')
+          }}>{language === 'zh' ? '清除筛选' : 'Clear filters'}</Button>
+        </div>
+      ) : view === 'tree' ? (
         goalsQuery.isLoading ? (
           <p className="text-sm text-text-secondary">{tl.loading}</p>
         ) : (
@@ -481,9 +522,10 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
             <ol className="space-y-2">
               {open.map((entry) => (
                 <EntryCard
-                  key={entry.id}
+                  key={`${entry.id}:${entry.id === selectedEntryId}`}
                   entry={entry}
                   projectId={projectId}
+                  selected={entry.id === selectedEntryId}
                   onEdit={(value) => setEditing({ entry: value })}
                 />
               ))}
@@ -502,11 +544,12 @@ export function ProjectTimeline({ projectId, hasPrompt = false }: ProjectTimelin
               <ol className="space-y-2">
                 {group.entries.map((entry) => (
                   <EntryCard
-                  key={entry.id}
-                  entry={entry}
-                  projectId={projectId}
-                  onEdit={(value) => setEditing({ entry: value })}
-                />
+                    key={`${entry.id}:${entry.id === selectedEntryId}`}
+                    entry={entry}
+                    projectId={projectId}
+                    selected={entry.id === selectedEntryId}
+                    onEdit={(value) => setEditing({ entry: value })}
+                  />
                 ))}
               </ol>
             </section>

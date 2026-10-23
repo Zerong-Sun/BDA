@@ -11,7 +11,7 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router'
-import { CopilotSettings } from '../../features/copilot/CopilotSettings'
+import { CopilotSettings, type CopilotSettingsActions } from '../../features/copilot/CopilotSettings'
 import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { PrivateAccessLinks } from '../../features/account/PrivateAccessLinks'
 import { useAuthConfig } from '../../lib/auth/account'
@@ -29,6 +29,7 @@ import { Button } from './Button'
 import { applyTheme, resolveTheme } from '../../lib/theme/initTheme'
 import { findDemoProject } from '../../features/tour'
 import { StatusBadge } from './statusBadge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs'
 
 export function AppSettingsDrawer() {
   const { t, format, language } = useI18n()
@@ -38,21 +39,23 @@ export function AppSettingsDrawer() {
   const authConfig = useAuthConfig()
   const access = useProjectAccess(projectId)
   const canManage = !guest && managesProject(access.data)
+  const [section, setSection] = useState('general')
+  const [copilotActions, setCopilotActions] = useState<CopilotSettingsActions | null>(null)
   const backend = useQuery({
     queryKey: ['health'],
     queryFn: getHealth,
-    enabled: settingsOpen,
+    enabled: settingsOpen && section === 'connections',
   })
   const cluster = useQuery({
     queryKey: ['cluster-health'],
     queryFn: getClusterHealth,
-    enabled: settingsOpen && !guest,
+    enabled: settingsOpen && section === 'connections' && !guest,
     retry: false,
   })
   const copilotConfig = useQuery({
     queryKey: ['copilot-config', projectId],
     queryFn: () => getCopilotConfig(projectId),
-    enabled: settingsOpen && Boolean(projectId) && canManage,
+    enabled: settingsOpen && section === 'connections' && Boolean(projectId) && canManage,
     retry: false,
   })
 
@@ -91,9 +94,37 @@ export function AppSettingsDrawer() {
           </Button>
         </div>
       }
-      footer={<Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>{language === 'zh' ? '完成' : 'Done'}</Button>}
+      footer={
+        <div className="flex w-full min-w-0 flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => setSettingsOpen(false)}>
+            {language === 'zh' ? '关闭' : 'Close'}
+          </Button>
+          {section === 'model' && canManage ? <><Button type="button"
+            variant="outline"
+            disabled={!copilotActions?.canTest || copilotActions.testPending}
+            onClick={() => copilotActions?.test()}
+          >
+            {t.settings.testApi}
+          </Button>
+          <Button type="button"
+            variant="default"
+            disabled={!copilotActions?.canSave || copilotActions.savePending}
+            onClick={() => copilotActions?.save()}
+          >
+            {language === 'zh' ? '保存模型配置' : 'Save model configuration'}
+          </Button></> : null}
+        </div>
+      }
     >
       <div data-tour-id="settings-drawer">
+      <Tabs value={section} onValueChange={setSection} className="gap-0">
+        <TabsList variant="line" className="sticky top-0 z-10 h-11! w-full border-b bg-background px-3">
+          <TabsTrigger value="general">{language === 'zh' ? '偏好与帮助' : 'Preferences'}</TabsTrigger>
+          {canManage ? <TabsTrigger value="model">{language === 'zh' ? '模型配置' : 'Model'}</TabsTrigger> : null}
+          <TabsTrigger value="connections">{language === 'zh' ? '连接与管理' : 'Connections'}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="general">
+          <p className="px-4 pt-4 text-xs text-text-secondary">{language === 'zh' ? '外观和操作模式立即生效。任务预算和写入范围在任务计划中设置。' : 'Appearance and mode changes apply immediately. Set task budgets and write scope in the task plan.'}</p>
       <section className="border-b border-border-soft p-4">
         {guest ? <PrivateAccessLinks config={authConfig.data} /> : <Link to="/account" onClick={() => setSettingsOpen(false)} className="text-sm font-medium text-primary underline underline-offset-4">{language === 'zh' ? '账号与访问：密码、邀请和工作区入口' : 'Account & access: password, invitations and workspaces'}</Link>}
       </section>
@@ -136,6 +167,55 @@ export function AppSettingsDrawer() {
       </section> : null}
 
       <section className="space-y-3 border-b border-border-soft p-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <MapPinIcon className="h-4 w-4 text-accent" />
+          {t.guide.settings.sectionTitle}
+        </div>
+        <p className="text-xs text-text-secondary">
+          {language === 'zh' ? '继续或重新开始交互式界面操作导览。' : 'Continue or restart the interactive interface tour.'}
+        </p>
+        <div className="flex gap-2">
+          {tourState.status === 'paused' ? <Button type="button" size="sm" variant="outline" onClick={() => { const demo = findDemoProject(projects); if (!demo) return; setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false); resumeTour() }}>{language === 'zh' ? '继续导览' : 'Continue tour'}</Button> : null}
+          <Button type="button" size="sm" variant="ghost" onClick={() => { const demo = findDemoProject(projects); if (!demo) return; setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false); restartTour() }}>{language === 'zh' ? '重新开始' : 'Restart tour'}</Button>
+        </div>
+        <p className="text-xs text-text-secondary">{t.guide.settings.sectionBody}</p>
+        <Link
+          to="/guide"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-accent-border bg-accent-bg px-4 py-2.5 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent-bg"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <MapPinIcon className="h-4 w-4" aria-hidden="true" />
+          {t.guide.settings.openGuide}
+        </Link>
+      </section>
+
+      <section className="space-y-2 border-b border-border-soft p-4">
+        <p className="text-sm font-medium text-text-primary">{t.settings.appearance}</p>
+        <div className="flex flex-wrap gap-2">
+          {(['light', 'dark', 'system'] as const).map((pref) => (
+            <Button
+              key={pref}
+              type="button"
+              variant={themePreference === pref ? 'secondary' : 'outline'}
+              size="sm"
+              className={clsx(
+                'capitalize',
+              )}
+              onClick={() => setTheme(pref)}
+            >
+              {t.settings.theme[pref]}
+            </Button>
+          ))}
+        </div>
+      </section>
+
+        </TabsContent>
+        {canManage ? <TabsContent value="model" keepMounted>
+          <p className="px-4 pt-4 text-xs text-text-secondary">{language === 'zh' ? '配置当前项目使用的模型。编辑后先保存，再测试连接。' : 'Configure the model for this project. Save changes before testing the connection.'}</p>
+          <CopilotSettings hideActions onActionsReady={setCopilotActions} />
+        </TabsContent> : null}
+        <TabsContent value="connections">
+      <section className="space-y-3 border-b border-border-soft p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium">
             <HardDrivesIcon className="h-4 w-4 text-accent" />
@@ -153,12 +233,12 @@ export function AppSettingsDrawer() {
         </div>
         <ConnectionRow
           label={t.settingsExt.connections.backend}
-          connected={backend.data?.status === 'ok'}
+          connected={backend.isPending ? null : backend.data?.status === 'ok'}
           detail={backend.data ? Object.entries(backend.data.checks ?? {}).map(([name, status]) => `${name}: ${status}`).join(' · ') || backend.data.service || backend.data.status : backend.error instanceof Error ? backend.error.message : t.settingsExt.connections.awaitingValidation}
         />
         {!guest ? <ConnectionRow
           label={t.settingsExt.connections.lsf}
-          connected={cluster.data?.connected === true}
+          connected={cluster.isPending ? null : cluster.data?.connected === true}
           detail={
             cluster.data?.connected
               ? format(t.settingsExt.connections.queueHost, {
@@ -182,49 +262,14 @@ export function AppSettingsDrawer() {
 
       {!guest ? <><ComputeTargetsSection /><AdministrationSections /></> : null}
 
-      <section className="space-y-3 border-b border-border-soft p-4">
-        <h3 className="flex items-center gap-2 text-sm font-medium"><MapPinIcon className="h-4 w-4 text-accent" />{t.guide.settings.sectionTitle}</h3>
-        <p className="text-xs text-text-secondary">{t.guide.settings.sectionBody}</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" render={<Link to={`/guide${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`} />} onClick={() => setSettingsOpen(false)}>{t.guide.settings.openGuide}</Button>
-          {findDemoProject(projects) ? <Button type="button" variant="ghost" onClick={() => {
-            const demo = findDemoProject(projects)
-            if (!demo) return
-            setAppMode('demo'); setProjectId(demo.id); setSettingsOpen(false)
-            if (tourState.status === 'paused') resumeTour()
-            else restartTour()
-          }}>{tourState.status === 'paused' ? (language === 'zh' ? '继续导览' : 'Continue tour') : (language === 'zh' ? '交互导览' : 'Interactive tour')}</Button> : null}
-        </div>
-      </section>
-
-      <section className="space-y-2 border-b border-border-soft p-4">
-        <p className="text-sm font-medium text-text-primary">{t.settings.appearance}</p>
-        <p className="text-xs text-text-secondary">{language === 'zh' ? '外观设置即时生效，仅保存在此浏览器。' : 'Appearance changes apply immediately and are saved in this browser.'}</p>
-        <div className="flex flex-wrap gap-2">
-          {(['light', 'dark', 'system'] as const).map((pref) => (
-            <Button
-              key={pref}
-              type="button"
-              variant={themePreference === pref ? 'secondary' : 'outline'}
-              size="sm"
-              className={clsx(
-                'capitalize',
-              )}
-              onClick={() => setTheme(pref)}
-            >
-              {t.settings.theme[pref]}
-            </Button>
-          ))}
-        </div>
-      </section>
-
-      {canManage ? <CopilotSettings /> : null}
+        </TabsContent>
+      </Tabs>
       </div>
     </DrawerShell>
   )
 }
 
-function ConnectionRow({ label, connected, configured = false, detail }: { label: string; connected: boolean; configured?: boolean; detail: string }) {
+function ConnectionRow({ label, connected, configured = false, detail, successLabel }: { label: string; connected: boolean | null; configured?: boolean; detail: string; successLabel?: string }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const isLongError = !connected && detail.length > 48
@@ -234,8 +279,8 @@ function ConnectionRow({ label, connected, configured = false, detail }: { label
       <div className="flex items-center justify-between gap-3">
         <strong className="text-sm text-text-primary">{label}</strong>
         <StatusBadge
-          status={connected ? 'success' : configured ? 'info' : 'warning'}
-          label={connected ? t.shared.status.connected : configured ? t.settingsExt.connections.configured : t.shared.status.disconnected}
+          status={connected === null ? 'neutral' : connected ? 'success' : configured ? 'info' : 'warning'}
+          label={connected === null ? t.settingsExt.connections.awaitingValidation : connected ? successLabel ?? t.shared.status.connected : configured ? t.settingsExt.connections.configured : t.shared.status.disconnected}
         />
       </div>
       {isLongError ? (

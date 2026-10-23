@@ -115,7 +115,8 @@ def test_agent_steps_share_root_scope_and_count_old_assistant_turns(wired, monke
     monkeypatch.setattr(copilot_tasks, "call_scope", record_scope)
     monkeypatch.setattr(agent_loop, "provider_for", lambda *a: object())
     observed = []
-    def drive(session, run, provider):
+    def drive(session, run, provider, *, max_steps):
+        assert max_steps == 1  # Cancellation may interleave after every step.
         observed.append(call_guard.current_scope_id())
         return run.status
     monkeypatch.setattr(agent_loop, "drive", drive)

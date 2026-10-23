@@ -59,6 +59,12 @@ export interface CopilotTaskDraft {
   service: string | null
   preview: boolean
   writes: string[]
+  /** Historical retry metadata; task creation uses the platform call limit. */
+  maxTurns?: number
+  maxCost?: string
+  proceduralSkills?: string[] | null
+  /** UI provenance only; preparing a new attempt does not resume the old run. */
+  retrySource?: string
 }
 
 export interface WorkflowSeed {

@@ -17,7 +17,9 @@
     "test:browser": "node scripts/browser-vertical-slice.mjs",
     "test:bot-workspace": "node scripts/browser-bot-workspace.mjs",
     "test:tour-ux": "npm run build && node scripts/browser-tour.mjs",
-    "test:display-ux": "npm run build && node scripts/browser-display.mjs"
+    "test:display-ux": "npm run build && node scripts/browser-display.mjs",
+    "test:workspace-ux": "npm run build && node scripts/browser-workspace-shell.mjs",
+    "test:bot-interaction": "npm run build && node scripts/browser-bot-interaction.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

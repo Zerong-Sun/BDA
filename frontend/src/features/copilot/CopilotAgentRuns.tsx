@@ -1,8 +1,9 @@
 import { taskErrorMessage } from './deliveryDisplay'
 import { ToolEvidenceLazy } from './ToolEvidenceLazy'
 import { useState } from 'react'
+import { Link, useLocation } from 'react-router'
 import { requireCopilotWrite, useCopilotReadOnly } from './commandAccess'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftIcon, SpinnerGapIcon } from '@phosphor-icons/react'
 import {
   cancelAgentRun,
@@ -10,11 +11,13 @@ import {
   getAgentRun,
   isLive,
   listAgentRuns,
-  listAgentTurns,
+  listAgentTurnsPage,
   startAgentRun,
   type AgentTurn,
 } from '../../lib/api/agentRuns'
 import { TaskDelivery } from './TaskDelivery'
+import { PrepareTaskRetry } from './PrepareTaskRetry'
+import { RunParameters } from './RunParameters'
 import { AppliedProceduralSkills } from './ProceduralSkills'
 import { BotAvatar } from './BotAvatar'
 import { useCopilotBots } from './bots/registry'
@@ -188,6 +191,8 @@ export function AgentRunDetail({
   onBack: () => void
 }) {
   const { t, format, language } = useI18n()
+  const location = useLocation()
+  const inWorkspace = location.pathname === '/bots' && new URLSearchParams(location.search).get('run') === runId
   const readOnly = useCopilotReadOnly()
   const copy = t.copilot.agentRuns
   const queryClient = useQueryClient()
@@ -209,12 +214,15 @@ export function AgentRunDetail({
   const bots = useCopilotBots()
   const owner = bots.data?.find((bot) => bot.id === run.data?.bot)
 
-  const turns = useQuery({
-    queryKey: ['agent-run-turns', projectId, runId],
-    queryFn: () => listAgentTurns(runId),
+  const turns = useInfiniteQuery({
+    queryKey: ['agent-run-turns', projectId, runId, 'pages'],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => listAgentTurnsPage(runId, pageParam),
+    getNextPageParam: (page) => page.next_cursor || undefined,
     enabled: Boolean(run.data) && !run.isError,
     refetchInterval: run.data && isLive(run.data) ? REFRESH_WHILE_LIVE_MS : false,
   })
+  const transcript = [...new Map(turns.data?.pages.flatMap((page) => page.items).map((turn) => [turn.id, turn])).values()]
 
   const cancel = useMutation({
     mutationFn: () => {
@@ -223,7 +231,8 @@ export function AgentRunDetail({
       return cancelAgentRun(runId, run.data.version)
     },
     onSuccess: (result) => {
-      showToast(format(copy.cancelled, { count: result.cancelled_runs }), 'success')
+      showToast(result.cancelled_runs > 0 ? format(copy.cancelled, { count: result.cancelled_runs })
+        : (language === 'zh' ? '任务已结束，已刷新最终结果。' : 'The task already ended. Its final result has been refreshed.'), 'success')
       void queryClient.invalidateQueries({ queryKey: ['agent-run', projectId, runId] })
       void queryClient.invalidateQueries({ queryKey: ['agent-runs', projectId] })
     },
@@ -258,6 +267,7 @@ export function AgentRunDetail({
           <ArrowLeftIcon aria-hidden="true" /> {copy.close}
         </Button>
         <Button type="button" variant="outline" size="sm" disabled={run.isFetching || turns.isFetching} onClick={() => { void run.refetch(); if (run.data && !run.isError) void turns.refetch() }}>{run.isFetching || turns.isFetching ? (language === 'zh' ? '刷新中…' : 'Refreshing…') : (language === 'zh' ? '刷新记录' : 'Refresh records')}</Button>
+        {run.data && !inWorkspace ? <Button type="button" variant="ghost" size="sm" render={<Link to={`/bots?${new URLSearchParams({ project: projectId, view: 'tasks', run: runId })}`} />}>{language === 'zh' ? '在工作区展开' : 'Open workspace'}</Button> : null}
         {run.data && isLive(run.data) ? (
           <Button
             type="button"
@@ -271,6 +281,7 @@ export function AgentRunDetail({
           </Button>
         ) : null}
       </div>
+      {cancel.isPending ? <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '正在请求取消。当前调用可能需要先结束；请等待后台确认。' : 'Cancellation requested. The current call may need to finish; waiting for backend confirmation.'}</p> : null}
 
       {run.data ? (
         <div className="space-y-1">
@@ -303,18 +314,18 @@ export function AgentRunDetail({
       {run.data ? <AppliedProceduralSkills contract={run.data.task_contract ?? {}} outcome={run.data.outcome ?? {}} /> : null}
       {run.isLoading ? <p role="status">{language === 'zh' ? '加载任务交付…' : 'Loading task delivery…'}</p> : null}
       {run.error || turns.error ? <div className="space-y-2"><p role="alert">{run.error instanceof Error ? run.error.message : (language === 'zh' ? '任务记录加载失败，请重试。' : 'Task records could not be loaded. Try again.')}</p><Button type="button" variant="outline" onClick={() => { if (run.isError) void run.refetch(); if (turns.isError) void turns.refetch() }}>{language === 'zh' ? '重新加载任务记录' : 'Reload task records'}</Button></div> : null}
-      {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-3 rounded-lg border border-border bg-surface-2 p-3" onSubmit={(event) => { event.preventDefault(); continuation.mutate() }}>
+      {run.data && !run.data.parent_run_id && ['succeeded', 'failed'].includes(run.data.status) ? <form className="space-y-3 rounded-lg border border-border bg-surface-2 p-3" onSubmit={(event) => { event.preventDefault(); if (!readOnly && followup.trim() && !continuation.isPending) continuation.mutate() }}>
         <h4 className="text-sm font-semibold">{language === 'zh' ? '继续处理此任务' : 'Continue working on this task'}</h4>
         <label className="block text-sm">{language === 'zh' ? '补充信息或修改要求' : 'Add information or revise the request'}<Textarea placeholder={language === 'zh' ? '说明要补充的证据、修改的范围或已修正的问题' : 'Describe new evidence, scope changes or the issue you corrected'} disabled={readOnly || continuation.isPending} value={followup} onChange={(e) => setFollowup(e.target.value)} /></label>
-        {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
+        {Array.isArray(run.data.task_contract?.authorized_writes) && run.data.task_contract.authorized_writes.length ? <div className="space-y-1 text-sm"><p>{language === 'zh' ? '继续时可取消下列写入授权：' : 'You may revoke these writes before continuing:'}</p>{(run.data.task_contract.authorized_writes as string[]).map((tool) => <label key={tool} className="flex items-center gap-2"><Checkbox disabled={readOnly || continuation.isPending} checked={(retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]).includes(tool)} onCheckedChange={(checked) => { const current = retainedWrites ?? run.data!.task_contract!.authorized_writes as string[]; setRetainedWrites(checked ? [...current, tool] : current.filter((value) => value !== tool)) }} />{tool === 'start_literature_search' ? (language === 'zh' ? '外部文献检索' : 'External literature search') : tool === 'create_knowledge_draft' ? (language === 'zh' ? '保存待审核笔记' : 'Save research notes') : tool}</label>)}</div> : null}
         <p className="text-xs text-text-secondary">{language === 'zh' ? '沿用本任务剩余调用额度；达到上限后停止。' : 'Uses this task’s remaining model calls and stops at its limit.'}</p>
         <Button type="submit" disabled={readOnly || !followup.trim() || continuation.isPending}>{continuation.isPending ? (language === 'zh' ? '提交中…' : 'Submitting…') : (language === 'zh' ? '继续此任务' : 'Continue this task')}</Button>
         {continuation.error ? <p role="alert">{taskErrorMessage(continuation.error, language === 'zh')}</p> : null}
       </form> : null}
       <Disclosure key={runId} title={copy.transcript}>
-        {turns.data && turns.data.length > 0 ? (
+        {transcript.length > 0 ? (
           <ol className="space-y-2">
-            {turns.data.map((turn) => (
+            {transcript.map((turn) => (
               <TranscriptTurn key={turn.id} turn={turn} projectId={projectId} />
             ))}
           </ol>
@@ -323,13 +334,17 @@ export function AgentRunDetail({
             {turns.isLoading ? '' : copy.transcriptEmpty}
           </p>
         )}
+        {turns.hasNextPage ? <Button type="button" variant="outline" disabled={turns.isFetching} onClick={() => void turns.fetchNextPage()}>{language === 'zh' ? '加载后续记录' : 'Load later records'}</Button> : null}
       </Disclosure>
+      {run.data ? <PrepareTaskRetry run={run.data} followup={followup} disabled={readOnly || continuation.isPending} /> : null}
+      {run.data ? <RunParameters run={run.data} /> : null}
+
     </div>
   )
 }
 
 function TranscriptTurn({ turn, projectId }: { turn: AgentTurn; projectId: string }) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const copy = t.copilot.agentRuns
   const roles: Record<string, string> = {
     user: copy.roleUser,
@@ -360,6 +375,9 @@ function TranscriptTurn({ turn, projectId }: { turn: AgentTurn; projectId: strin
           {format(copy.toolCalls, { names: calls.join(', ') })}
         </p>
       ) : null}
+      {calls.length > 0 ? <Disclosure title={language === 'zh' ? '查看调用参数' : 'Inspect call parameters'}>
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(turn.tool_calls, null, 2)}</pre>
+      </Disclosure> : null}
     </li>
   )
 }

@@ -58,6 +58,21 @@ describe('task-centered Copilot', () => {
     expect(screen.getByLabelText('Task goal')).toHaveFocus()
   })
 
+  it('retains a rejected duplicate draft and gives a route back to the original task', async () => {
+    useAppStore.setState({ copilotTaskDrafts: { 'project-task': {
+      goal: 'Review saved UI notes', bot: 'researcher', service: 'literature', preview: true,
+      writes: [], maxTurns: 6, maxCost: '0', proceduralSkills: [], retrySource: 'task-original',
+    } } })
+    server.use(http.post('/api/v2/copilot/agent-runs', () => HttpResponse.json({
+      detail: 'This task already exists.', error_code: 'copilot_duplicate_task',
+    }, { status: 409 })))
+    renderWithProviders(<CopilotWorkspace rememberDraft />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start this plan' }))
+    expect(await screen.findByText(/No new task was created/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Task goal' })).toHaveValue('Review saved UI notes')
+    expect(screen.getByRole('link', { name: 'View original task' })).toHaveAttribute('href', '#/bots?project=project-task&view=tasks&run=task-original')
+    expect(useAppStore.getState().copilotTaskDrafts['project-task'].maxCost).toBe('0')
+  })
   it('does not navigate back when task startup completes after leaving the workspace', async () => {
     let release!: () => void
     const responseReady = new Promise<void>((resolve) => { release = resolve })
@@ -91,10 +106,12 @@ describe('task-centered Copilot', () => {
     fireEvent.change(screen.getByLabelText('Task goal'), { target: { value: 'Research existing evidence' } })
     fireEvent.click(await screen.findByRole('button', { name: /^Researcher/ }))
     fireEvent.click(await screen.findByRole('checkbox', { name: 'Allow external literature search and ingestion' }))
+    fireEvent.click(screen.getByRole('button', { name: 'No method packages' }))
     rendered.unmount()
     renderWithProviders(<CopilotWorkspace rememberDraft />)
     expect(screen.getByLabelText('Task goal')).toHaveValue('Research existing evidence')
     expect(await screen.findByRole('checkbox', { name: 'Allow external literature search and ingestion' })).toBeChecked()
+    expect(screen.getByText('0 methods explicitly selected.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start this plan' })).toBeInTheDocument()
   })
   it('ignores legacy draft budgets and starts with six model calls without billing controls', async () => {
@@ -160,11 +177,16 @@ describe('task-centered Copilot', () => {
   })
   it('requires current task checks and explains failed checks', async () => {
     handlers([])
-    server.use(http.post('/api/v2/copilot/projects/:projectId/config/assessments', () => HttpResponse.json({ model: 'test-model', checks: { tools: false }, checked_at: '2026-09-07', eligible_services: [] })))
-    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" initialService="literature" />)
+    const configure = vi.fn()
+    server.use(http.post('/api/v2/copilot/projects/:projectId/config/assessments', () => HttpResponse.json({ model: 'test-model', checks: { tools: false }, checked_at: '2026-09-07', eligible_services: [], reason: 'DomainError' })))
+    renderWithProviders(<CopilotWorkspace initialGoal="Research PD1" initialService="literature" onConfigureModel={configure} />)
     expect(await screen.findByRole('button', { name: 'Start this plan' })).toBeDisabled()
     fireEvent.click(await screen.findByRole('button', { name: 'Check model task capabilities' }))
     await screen.findByText('tools: ×')
+    expect(screen.getByText(/The model call was blocked/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Configure or diagnose model' }))
+    expect(configure).toHaveBeenCalledOnce()
+    expect(screen.getByLabelText('Task goal')).toHaveValue('Research PD1')
     expect(screen.getByRole('button', { name: 'Start this plan' })).toBeDisabled()
   })
   it('answers a simple question without asking the user to select an execution engine', async () => {

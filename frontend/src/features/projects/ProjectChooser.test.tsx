@@ -70,7 +70,8 @@ describe('ProjectChooser', () => {
 
   it('creates a project from a plain-language objective without a model', async () => {
     createProject.mockResolvedValue({ id: 'proj_new' })
-    renderWithProviders(<ProjectChooser />)
+    const onCreated = vi.fn()
+    renderWithProviders(<ProjectChooser onCreated={onCreated} />)
     fireEvent.click(screen.getByRole('button', { name: /create project/i }))
     fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'Manual project' } })
     fireEvent.change(screen.getByLabelText(/objective.*constraints/i), { target: { value: 'Improve stability at room temperature.' } })
@@ -79,6 +80,8 @@ describe('ProjectChooser', () => {
       name: 'Manual project', prompt: 'Improve stability at room temperature.',
     })))
     expect(createProjectPromptDraft).not.toHaveBeenCalled()
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce())
+    expect(setProjectId).toHaveBeenCalledWith('proj_new')
   })
 
   it('allows reviewing and submitting an AI-generated brief', async () => {

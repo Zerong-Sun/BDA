@@ -79,6 +79,13 @@
 ## 开发、计算与部署
 
 - [前端架构与 API 契约](FRONTEND_V2.md)
+- [工具工作台前端与交互标准](FRONTEND_UX_STANDARD.md)
+- [Bot 导航、参数检查与执行交互规范](BOT_INTERACTION_STANDARD.md)
+- [Bot 交互六维审阅与验证](BOT_INTERACTION_REVIEW.md)
+- [Bot 真实后端流程验收与修复](BOT_LIVE_ACCEPTANCE.md)
+- [本地前端更新与新任务端到端验收](BOT_LOCAL_DEPLOYMENT_ACCEPTANCE.md)
+- [Bot 失败恢复、继续、取消与项目切换验收](BOT_BOUNDARY_ACCEPTANCE.md)
+- [前端工作台六维复核与修复清单](FRONTEND_UX_REVIEW.md)
 - [后端架构与服务边界](BACKEND_V2.md)
 - [计算后端与目标配置](COMPUTE_TARGETS.md)
 - [扩展中心与模型使用资格](EXTENSION_QUALIFICATION.md)

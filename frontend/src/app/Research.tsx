@@ -121,10 +121,10 @@ function ProjectResearchPage() {
           <TabsList
             aria-label={t.research.page.tabsLabel}
             variant="line"
-            className="mt-4 grid !h-auto w-full grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-4"
+            className="mt-4 grid !h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4"
           >
             {groups.map((item) => (
-              <TabsTrigger key={item.key} value={item.key} aria-label={item.label} className="h-auto justify-start px-3 py-2">
+              <TabsTrigger key={item.key} value={item.key} aria-label={item.label} className="h-auto min-h-11 min-w-0 justify-start whitespace-normal px-3 py-2 text-left">
                 {item.label}
               </TabsTrigger>
             ))}

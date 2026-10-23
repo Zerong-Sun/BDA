@@ -107,10 +107,8 @@ function LearningWorkbench({ projectId }: { projectId: string }) {
   return <div className="learning-workbench" data-tour-id="learning-page">
     <header className="learning-header">
       <div className="learning-heading">
-        <div className="learning-eyebrow"><span>ITERAVIA</span><span className="learning-version">2.6 PREVIEW</span></div>
         <h1>{copy('项目学习工作台', 'Project learning workbench')}</h1>
         <p>{copy('把每轮实验变成下一轮决策的依据。', 'Turn each experimental round into evidence for the next decision.')}</p>
-        <p className="learning-limit">{copy('从实验契约、模型验证到下一轮实验与学习交付。模型提升通过回顾性检查；实际实验增益仍需前瞻验证。', 'From assay contracts and model validation to the next experimental round and learning delivery. Promotion passes retrospective checks; experimental benefit needs prospective validation.')}</p>
       </div>
       <dl className="learning-overview" aria-label={copy('当前学习目标的数据概况', 'Current study evidence summary')}>
         {[

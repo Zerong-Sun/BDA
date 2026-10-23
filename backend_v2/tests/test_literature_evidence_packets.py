@@ -76,6 +76,18 @@ def test_tables_can_anchor_quantitative_values_and_retractions_cannot_support_cl
         anchored_analysis(packet, draft)
 
 
+def test_reported_timepoint_phrase_can_end_at_sentence_punctuation():
+    packet = extract_packet(XML)
+    quote = "Treatment was delivered on days 15, 17, and 19."
+    packet['passages'][0]['text'] = quote
+    draft = analysis('days 15, 17, and 19', quote)
+    assert anchored_analysis(packet, draft)['data'][0]['anchor_verification'] == 'exact_text_and_value_match'
+    packet['passages'][0]['text'] = quote.replace('19.', '19.5.')
+    draft['data'][0]['source_quote'] = packet['passages'][0]['text']
+    with pytest.raises(ValueError, match='not_found'):
+        anchored_analysis(packet, draft)
+
+
 @pytest.mark.parametrize("field,value", [
     ("arguments", [None]), ("data", ["invalid"]), ("figure_notes", [None]), ("gaps", [{}]),
 ])

@@ -44,12 +44,16 @@ export async function startAgentRun(body: {
 }
 
 export async function listAgentRuns(projectId: string, limit = 50) {
+  return (await listAgentRunsPage(projectId, undefined, limit)).items
+}
+
+export async function listAgentRunsPage(projectId: string, cursor?: string, limit = 50) {
   const page = await listAgentRunsApiV2CopilotProjectsProjectIdAgentRunsGet<true>({
     path: { project_id: projectId },
-    query: { limit },
+    query: { limit, cursor },
     throwOnError: true,
   })
-  return page.data.items
+  return page.data
 }
 
 export async function getAgentRun(runId: string) {
@@ -61,12 +65,16 @@ export async function getAgentRun(runId: string) {
 }
 
 export async function listAgentTurns(runId: string, limit = 200) {
+  return (await listAgentTurnsPage(runId, undefined, limit)).items
+}
+
+export async function listAgentTurnsPage(runId: string, cursor?: string, limit = 200) {
   const page = await listAgentTurnsApiV2CopilotAgentRunsRunIdTurnsGet<true>({
     path: { run_id: runId },
-    query: { limit },
+    query: { limit, cursor },
     throwOnError: true,
   })
-  return page.data.items
+  return page.data
 }
 
 export async function cancelAgentRun(runId: string, version: number) {

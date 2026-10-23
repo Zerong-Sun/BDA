@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate }
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useI18n } from './lib/i18n'
+import { WorkspaceNavigation } from './components/ui/WorkspaceNavigation'
 import { Topbar } from './components/ui/Topbar'
 import { Button } from './components/ui/Button'
 import { PipelineRail } from './components/ui/PipelineRail'
@@ -113,6 +114,7 @@ function ThemeSync() {
 const railRoutes = ['/research', '/workflow', '/candidates', '/lab', '/results']
 
 export function AppShell() {
+  const { language } = useI18n()
   const copilotOpen = useAppStore((s) => s.copilotOpen)
   const setCopilotOpen = useAppStore((s) => s.setCopilotOpen)
   const copilotSelectedEntityIds = useAppStore((s) => s.copilotSelectedEntityIds)
@@ -160,12 +162,14 @@ export function AppShell() {
   return (
     <div
       data-slot="app-shell"
-      className="flex min-h-screen min-w-0 flex-col bg-background text-foreground"
+      className="workspace-shell flex min-w-0 flex-col bg-background text-foreground"
     >
+      <a className="workspace-skip-link" href="#workspace-main" onClick={(event) => { event.preventDefault(); mainRef.current?.focus() }}>{language === 'zh' ? '跳到工作区' : 'Skip to workspace'}</a>
       <Topbar />
       <PublicWorkspaceNotice />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <div className="workspace-body flex min-h-0 flex-1 overflow-hidden">
+        <WorkspaceNavigation />
+        <main id="workspace-main" tabIndex={-1} ref={mainRef} className="workspace-main min-h-0 min-w-0 flex-1 overflow-y-auto">
           {showRail ? <PipelineRail /> : null}
           <div className="app-content mx-auto max-w-[1600px] px-6 py-6">
             <ErrorBoundary key={`${location.pathname}:${projectId}`}>

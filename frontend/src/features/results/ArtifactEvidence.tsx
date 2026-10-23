@@ -26,12 +26,14 @@ export function ArtifactEvidence({ projectId, artifactId, residues }: { projectI
     <ApiState isLoading={artifact.isLoading} isError={artifact.isError} error={artifact.error} onRetry={() => void artifact.refetch()}>
       {artifact.data ? <>
         <p className="break-all text-sm">{artifact.data.filename} · {artifact.data.artifact_type}</p>
-        <p className="break-all font-mono text-xs">SHA-256: {artifact.data.checksum_sha256}</p>
         {selected.length ? <p className="break-words text-sm">{zh ? '选中残基' : 'Selected residues'}: {selected.map((residue) => `${residue.chain}:${residue.seq}${residue.insertion_code ?? ''}`).join(', ')}</p> : null}
         {structure ? <StructureViewerLazy source={{ projectId, artifactId, url: artifact.data.download_url, format: /\.(cif|mmcif)$/i.test(artifact.data.filename) ? 'mmcif' : 'pdb', proteinName: artifact.data.filename, highlightedResidues: selected.map((residue) => ({ chainId: residue.chain, seq: residue.seq, insertionCode: residue.insertion_code ?? '', label: residue.name })) }} height={420} /> : null}
         <Button type="button" variant="outline" size="sm" onClick={() => { setDownloadError(''); void downloadArtifact(artifact.data!).catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : String(error))) }}>{zh ? '下载源文件' : 'Download source'}</Button>
         {downloadError ? <p role="alert" className="text-destructive">{downloadError}</p> : null}
-        <Disclosure title={zh ? '来源与处理记录' : 'Source and processing lineage'}><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(artifact.data.lineage, null, 2)}</pre></Disclosure>
+        <Disclosure title={zh ? '来源与处理记录' : 'Source and processing lineage'}>
+          <p className="mb-2 break-all font-mono text-xs">SHA-256: {artifact.data.checksum_sha256}</p>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(artifact.data.lineage, null, 2)}</pre>
+        </Disclosure>
       </> : null}
     </ApiState>
   </section>

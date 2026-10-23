@@ -207,7 +207,7 @@ def anchored_analysis(packet: dict[str, Any], analysis: dict[str, Any]) -> dict[
         # A numerical value must be a whole reported number: 21.2 is not 121.2,
         # 0.21.2, -21.2 or 21.2e3. Zero is valid and must not be treated as absent.
         value_found = value in {m.group() for m in REPORTED_NUMBER.finditer(quote)} if REPORTED_NUMBER.fullmatch(value) else bool(
-            value and re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", quote)
+            value and re.search(r"(?<![\w.])" + re.escape(value) + r"(?!\w|\.\d)", quote)
         )
         if not quote or not value or quote not in source or not value_found:
             raise ValueError("quantitative_value_not_found_at_source_anchor")

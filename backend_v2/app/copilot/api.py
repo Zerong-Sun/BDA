@@ -691,6 +691,14 @@ def cancel_agent_run(
             "The agent run changed since it was read",
             status_code=412,
         )
+    # Validate the observed version above, then wait for the current step.
+    # Progress committed while waiting must be refreshed before cancelling:
+    # never overwrite a completed result or flush an obsolete row version.
+    # Match the worker's parent-before-child lock order.
+    if run.status in {"running", "awaiting_tasks"}:
+        if run.parent_run_id:
+            agent_runs.require_run(session, run.parent_run_id, for_update=True)
+        run = agent_runs.require_run(session, run.id, for_update=True)
     cancelled = agent_runs.cancel(session, run, reason=f"cancelled by {user.username}")
     response.headers["ETag"] = etag(run.version)
     return AgentRunCancelled(run=_run_response(session, run), cancelled_runs=cancelled)

@@ -211,15 +211,14 @@ function ProjectResults() {
       />
 
       {searchParams.get('artifact') ? <Suspense fallback={null}><ArtifactEvidence projectId={projectId} artifactId={searchParams.get('artifact')!} residues={searchParams.get('residues')} /></Suspense> : null}
-      <AppFrame className="mb-5" panelClassName="space-y-3 p-4">
-        <p className="text-sm text-text-secondary">{zh ? '在此审阅实测证据、计算证据与分析结论。候选页负责设计、筛选和选择。' : 'Review measured evidence, computational evidence and conclusions here. Use Candidates to manage designs, filtering and selection.'}</p>
+      <nav className="mb-5" aria-label={zh ? '结果相关操作' : 'Result actions'}>
         <div className="flex flex-wrap gap-2">
           <Button render={<Link to={`/lab?project=${encodeURIComponent(projectId)}&section=analysis`} />}>{zh ? '上传原始实验文件并分析' : 'Upload raw experiment and analyse'}</Button>
           <Button variant="outline" render={<Link to={`/candidates?project=${encodeURIComponent(projectId)}${candidateParam ? `&candidate=${encodeURIComponent(candidateParam)}` : ''}`} />}>{zh ? '管理候选与选择' : 'Manage candidates and selection'}</Button>
           <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=methods`} />}>{zh ? '阅读已保存的讨论报告' : 'Read saved discussion reports'}</Button>
           <Button variant="outline" render={<Link to={`/research?project=${encodeURIComponent(projectId)}&tab=timeline`} />}>{zh ? '查看决策记录' : 'Review decision record'}</Button>
         </div>
-      </AppFrame>
+      </nav>
       {candidateParam ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border p-3 text-sm" role="status">
         <span>{zh ? '实验明细筛选：' : 'Experimental detail filter: '}{candidates.find((candidate) => candidate.id === candidateParam)?.name ?? candidateParam}<span className="ml-2 text-muted-foreground">{zh ? '项目汇总和计算统计仍包含全部记录。' : 'Project and computational summaries still include all records.'}</span></span>
         <Button type="button" variant="outline" size="sm" onClick={clearCandidateFilter}>{zh ? '查看全部项目结果' : 'Show all project results'}</Button>

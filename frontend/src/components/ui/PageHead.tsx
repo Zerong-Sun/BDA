@@ -6,14 +6,11 @@ interface PageHeadProps {
   actions?: ReactNode
 }
 
-export function PageHead({ eyebrow, title, actions }: PageHeadProps) {
+export function PageHead({ title, actions }: PageHeadProps) {
   return (
-    <header className="science-page-header workspace-page-head">
-      <div>
-        <p className="science-eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
-      </div>
-      {actions ? <div className="workspace-page-actions">{actions}</div> : null}
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <h1 className="min-w-0 text-page-title font-bold leading-tight text-text-primary">{title}</h1>
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   )
 }

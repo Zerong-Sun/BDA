@@ -5,7 +5,6 @@ import { getProjectOverview } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { derivePipeline, PIPELINE_STAGES, type StageKey } from '../../features/workflow/pipelineStages'
-import { AppFrame } from './AppFrame'
 import { Button } from './Button'
 
 /**
@@ -34,7 +33,7 @@ export function NextStep({ stage }: { stage: StageKey }) {
   if (pageIndex === PIPELINE_STAGES.length - 1) {
     const hasEvidence = (overview.candidate_count ?? overview.funnel.generated ?? 0) > 0 || overview.experiment_result_count > 0
     return (
-      <AppFrame className="mt-6" panelClassName="flex flex-wrap items-center justify-between gap-3 p-4">
+      <nav aria-label={t.pipeline.nextStep} className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-4">
         <div className="min-w-0">
           <p className="text-fine font-medium uppercase tracking-wider text-text-muted">
             {t.pipeline.nextStep}
@@ -51,7 +50,7 @@ export function NextStep({ stage }: { stage: StageKey }) {
           {hasEvidence ? language === 'zh' ? '查看项目决策' : 'Review project decisions' : language === 'zh' ? '返回项目' : 'Review project'}
         </Button>
         </div>
-      </AppFrame>
+      </nav>
     )
   }
 
@@ -61,14 +60,12 @@ export function NextStep({ stage }: { stage: StageKey }) {
   const locked = next.state === 'locked'
 
   return (
-    <AppFrame className="mt-6" panelClassName="flex flex-wrap items-center justify-between gap-3 p-4">
+    <nav aria-label={t.pipeline.nextStep} className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-4">
       <div className="min-w-0">
         <p className="text-fine font-medium uppercase tracking-wider text-text-muted">
           {t.pipeline.nextStep}
         </p>
-        <p className="mt-0.5 text-sm text-text-secondary">
-          {locked ? t.pipeline.lockedHint : format(t.pipeline.continueTo, { stage: nextLabel })}
-        </p>
+        {locked ? <p className="mt-0.5 text-sm text-text-secondary">{t.pipeline.lockedHint}</p> : null}
       </div>
       {locked ? (
         <Button type="button" variant="outline" disabled>
@@ -81,6 +78,6 @@ export function NextStep({ stage }: { stage: StageKey }) {
           <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
         </Button>
       )}
-    </AppFrame>
+    </nav>
   )
 }

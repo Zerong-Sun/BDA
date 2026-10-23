@@ -98,6 +98,7 @@ describe('Decision inbox', () => {
     expect(await screen.findByText('Nothing needs your decision right now.')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Needs your input' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Project results & reports' })).toHaveAttribute('href', '#/research?project=project-inbox')
+    expect(screen.queryByRole('region', { name: 'Compute drafts to confirm' })).not.toBeInTheDocument()
   })
 
   it('shows saved delivery summaries instead of repeating execution instructions', async () => {

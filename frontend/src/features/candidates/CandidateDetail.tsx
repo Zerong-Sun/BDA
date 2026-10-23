@@ -179,7 +179,7 @@ function CandidateDetailContent({ candidate, projectId }: CandidateDetailProps) 
         {Array.isArray(candidate.properties.evidence_links) ? candidate.properties.evidence_links.filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url)).map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block break-all text-primary underline">{url}</a>) : null}
         {candidate.properties.experimental_status === 'not_tested' ? <p>{language === 'zh' ? '尚未进行实验验证。' : 'Not experimentally validated.'}</p> : null}
         <CreateCandidate key={candidate.id} projectId={projectId} candidate={candidate} onCreated={() => {}} />
-        <Link to={`/research?project=${encodeURIComponent(projectId)}&tab=references`} className="ml-3 text-primary underline">{language === 'zh' ? '查看项目文献证据' : 'Open project literature evidence'}</Link>
+        <Link to={`/research?project=${encodeURIComponent(projectId)}&tab=references`} className="ml-3 inline-flex min-h-11 items-center text-primary underline">{language === 'zh' ? '查看项目文献证据' : 'Open project literature evidence'}</Link>
       </div>
       <p className="mb-4 text-sm text-text-secondary">
         {format(t.candidatesExt.detail.familyLine, {

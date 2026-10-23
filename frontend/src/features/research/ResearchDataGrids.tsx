@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
@@ -25,6 +26,7 @@ import {
 import { DataGridColumnHeader } from '../../components/reui/data-grid/data-grid-column-header'
 import { DataGridScrollArea } from '../../components/reui/data-grid/data-grid-scroll-area'
 import { DataGridTable } from '../../components/reui/data-grid/data-grid-table'
+import { DataGridPagination } from '../../components/reui/data-grid/data-grid-pagination'
 import {
   Frame,
   FrameHeader,
@@ -156,8 +158,10 @@ export function DatasetDataGrid({
     columns,
     state: { sorting },
     onSortingChange: setSorting,
+    initialState: { pagination: { pageSize: 25 } },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getRowId: (row) => row.id,
   })
   const title = workspaceText(dataset.title, language)
@@ -179,7 +183,7 @@ export function DatasetDataGrid({
       <FramePanel className="min-w-0 p-0">
         <FrameHeader className="flex-row flex-wrap items-center justify-between gap-3 border-b">
           <div className="flex min-w-0 items-center gap-2">
-            <FrameTitle className="truncate">{title}</FrameTitle>
+            <FrameTitle className="truncate" title={title}>{title}</FrameTitle>
             {renderAskCopilot(dataset.id, 'dataset', title)}
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-2">
@@ -222,6 +226,14 @@ export function DatasetDataGrid({
                 <DataGridTable />
               </DataGridScrollArea>
             </DataGridContainer>
+            {rows.length > 25 ? <DataGridPagination
+              className="px-4 py-3"
+              sizes={[25, 50, 100]}
+              rowsPerPageLabel={language === 'zh' ? '每页行数' : 'Rows per page'}
+              previousPageLabel={language === 'zh' ? '上一页' : 'Go to previous page'}
+              nextPageLabel={language === 'zh' ? '下一页' : 'Go to next page'}
+              info={language === 'zh' ? '第 {from}–{to} 行，共 {count} 行' : '{from} - {to} of {count}'}
+            /> : null}
           </DataGrid>
         </div>
         <Accordion

@@ -222,9 +222,8 @@ export function ProjectReviewPanel({
     >
       <section className="min-w-0">
       <section className="mb-5 border-b border-border-soft pb-5" aria-label={zh ? '研究阅读导览' : 'Research reading guide'}>
-        <p className="text-xs uppercase tracking-wide text-accent">{zh ? '理解研究，再作判断' : 'From question to decision'}</p>
-        <h3 className="mt-1 text-lg font-semibold">{zh ? '这项研究为什么做，下一步凭什么继续？' : 'Why this research, and what would justify the next step?'}</h3>
-        <p className="mt-2 text-sm text-text-secondary">{zh ? '按问题、机制、路线和验证阅读。记录数量表示文档覆盖，不代表科学结论已经成立。' : 'Read the question, mechanism, route and validation together. Record counts describe documentation, not scientific validation.'}</p>
+        <h3 className="text-sm font-semibold">{zh ? '按研究环节查看' : 'Browse by research stage'}</h3>
+        <p className="mt-2 text-sm text-text-secondary">{zh ? '记录数量表示文档覆盖，不代表科学结论已经成立。' : 'Record counts describe documentation, not scientific validation.'}</p>
         <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6" role="group" aria-label={zh ? '按研究环节筛选' : 'Filter by research stage'}>
           {READING_STAGES.map((stage, index) => {
             const count = sections.filter((section) => (stage.tracks as readonly string[]).includes(section.track)).reduce((sum, section) => sum + section.items.length, 0)

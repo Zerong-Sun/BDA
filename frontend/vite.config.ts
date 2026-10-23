@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
@@ -24,6 +26,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Linked worktrees may share installed dependencies. Serve their font/assets
+    // from the resolved dependency directory without exposing the other checkout.
+    fs: { allow: [searchForWorkspaceRoot(import.meta.dirname), realpathSync(resolve(import.meta.dirname, 'node_modules'))] },
     proxy: {
       '/api': {
         target: apiProxyTarget,

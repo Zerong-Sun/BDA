@@ -44,12 +44,13 @@ export const APP_ROUTES: readonly AppRoute[] = [
 ]
 
 /**
- * Read results, work with the team, inspect execution, then resolve pending
- * decisions. Supporting workbenches stay in one menu on every screen size.
+ * Ordered by who acts: the project, what waits on you, the team that works on
+ * it, and the research record. The stage workbenches are grouped in the desktop sidebar
+ * and compact page menu.
  */
 export const PRIMARY_ROUTES: readonly string[] = ['/projects', '/research', '/bots', '/workflow', '/inbox']
 
-/** Routes that sit behind the Workbenches menu rather than in the primary bar. */
+/** Stage and platform routes outside the primary workspace group. */
 export function workbenchRoutes(): AppRoute[] {
   return APP_ROUTES.filter((route) => !PRIMARY_ROUTES.includes(route.to))
 }

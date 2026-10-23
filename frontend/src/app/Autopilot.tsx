@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { PageHead } from '@/components/ui/PageHead'
+import { Disclosure } from '@/components/ui/Disclosure'
 import { Textarea } from '@/components/ui/textarea'
 import {
   cancelAutopilotCampaign,
@@ -23,6 +24,24 @@ import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { useProjectAccess } from '../lib/hooks/useProjectAccess'
 import { useAppStore } from '../lib/store/appStore'
 import { useI18n } from '../lib/i18n'
+
+function PlanPreview({ spec }: { spec: AutopilotDraftResponse['normalized_spec'] }) {
+  const { language } = useI18n()
+  const zh = language === 'zh'
+  // The service uses this order when no explicit stages are declared.
+  const declared = Array.isArray(spec.stages) && spec.stages.length > 0
+  const stages: unknown[] = declared ? spec.stages as unknown[] : ['research', 'plan', 'compute', 'review']
+  const labels: Record<string, string> = zh
+    ? { research: '研究与证据', plan: '制定方案', compute: '计算', review: '复核' }
+    : { research: 'Research and evidence', plan: 'Planning', compute: 'Compute', review: 'Review' }
+  return <div className="space-y-2">
+    {!declared ? <p className="text-sm text-text-secondary">{zh ? '此预览使用默认研究流程，请检查是否符合需求。' : 'This preview uses the default research sequence. Check that it fits your request.'}</p> : null}
+    <ol className="list-decimal space-y-1 pl-5 text-sm">{stages.map((stage, index) => <li key={index}>{typeof stage === 'string' ? labels[stage] ?? stage : JSON.stringify(stage)}</li>)}</ol>
+    <Disclosure title={zh ? '查看计划原始数据' : 'Inspect plan data'}>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(spec, null, 2)}</pre>
+    </Disclosure>
+  </div>
+}
 
 export function AutopilotPage() {
   const { projectId, projectsLoading } = useProjectContext()
@@ -188,14 +207,11 @@ function AutopilotWorkspace({ projectId }: { projectId: string }) {
       <PageHead eyebrow="Autopilot" title={language === 'zh' ? '分阶段研究任务' : 'Staged research tasks'} />
       {access.isError ? <Alert variant="destructive" className="mb-3"><AlertDescription>{language === 'zh' ? '项目权限读取失败，操作暂不可用。' : 'Project permissions could not be loaded. Actions are unavailable.'}</AlertDescription><Button type="button" variant="outline" onClick={() => void access.refetch()}>{language === 'zh' ? '重试权限检查' : 'Retry permission check'}</Button></Alert>
         : (isDemoMode || access.isSuccess) && !canOperate ? <p role="status" className="mb-3 text-sm">{accessMessage}</p> : null}
-      <Alert className="mb-5" variant="warning">
-        <AlertTitle>{language === 'zh' ? '先预览，再确认，再启动' : 'Preview, confirm, then start'}</AlertTitle>
-        <AlertDescription>
+      <p className="mb-5 text-sm text-text-secondary">
           {language === 'zh'
             ? '先检查执行步骤和预算上限，再确认启动。需要人工决定的阶段会暂停等待审核。'
             : 'Review the steps and budget limit before starting. Stages that need a decision pause for your review.'}
-        </AlertDescription>
-      </Alert>
+      </p>
       {campaign?.status === 'blocked' && <Alert className="mb-5" variant="destructive"><AlertTitle>{language === 'zh' ? '计算阶段未成功，自动推进已暂停' : 'Compute did not succeed; automatic progression is paused'}</AlertTitle><AlertDescription>{language === 'zh' ? '打开工作流检查失败或取消原因。可人工接管处理，或取消本次计划；后续阶段尚未启动。' : 'Open the workflow to inspect the failure or cancellation. Take over to resolve it, or cancel this campaign. Subsequent stages have not started.'}</AlertDescription></Alert>}
       <div className="grid gap-5 lg:grid-cols-2">
         <AppFrame heading={language === 'zh' ? '1. 自然语言需求' : '1. Natural-language request'} panelClassName="space-y-4 p-5">
@@ -212,9 +228,7 @@ function AutopilotWorkspace({ projectId }: { projectId: string }) {
           </Button>
         </AppFrame>
         <AppFrame heading={language === 'zh' ? '2. 检查任务计划' : '2. Review the plan'} panelClassName="space-y-4 p-5">
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap border border-border bg-muted p-3 text-xs">
-            {draftCurrent ? JSON.stringify(draft.normalized_spec, null, 2) : (language === 'zh' ? '请先生成当前需求的计划。' : 'Generate a plan for the current request.')}
-          </pre>
+          {draftCurrent ? <PlanPreview spec={draft.normalized_spec} /> : <p className="text-sm text-text-secondary">{language === 'zh' ? '请先生成当前需求的计划。' : 'Generate a plan for the current request.'}</p>}
           {draft && !draftCurrent ? <p role="status" className="text-sm">{language === 'zh' ? '需求已改变，请重新生成预览后确认。' : 'The request changed. Generate a new preview before confirming.'}</p> : null}
           <div className="grid gap-2">
             <Label htmlFor="autopilot-name">{language === 'zh' ? '任务名称' : 'Campaign name'}</Label>
@@ -249,9 +263,10 @@ function AutopilotWorkspace({ projectId }: { projectId: string }) {
           >
             {language === 'zh' ? '人工接管' : 'Take over'}
           </Button>
-          {operationId ? <span className="text-xs text-muted-foreground">{language === 'zh' ? '请求已接收' : 'Request accepted'}: {operationId}</span> : null}
+          {operationId ? <span role="status" className="text-xs text-muted-foreground">{language === 'zh' ? '请求已接收' : 'Request accepted'}</span> : null}
         </AppFrame>
       ) : null}
+      {operationId ? <Disclosure title={language === 'zh' ? '请求详情' : 'Request details'}><p className="break-all font-mono text-xs">{operationId}</p></Disclosure> : null}
       {campaign?.status === 'manual_takeover' ? (
         <Alert className="mt-5" variant="info">
           <AlertTitle>{language === 'zh' ? '已由人工接管' : 'Under manual control'}</AlertTitle>

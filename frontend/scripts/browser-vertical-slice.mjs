@@ -767,7 +767,18 @@ async function assertMobileTouchTargets(page, testCase) {
 
 async function auditKeyboardFocus(page, testCase) {
   const contract = FOCUS_AUDIT_CONTRACTS[testCase.routeId]
-    const expected = await page.evaluate(({ rootSelector, maxSteps }) => {
+  if (testCase.routeId === 'workflow' && testCase.scenario === 'populated') {
+    // React Flow initially hides nodes while measuring them. Capturing the tab
+    // order before that finishes misses focus stops that appear during the audit.
+    await page.waitForFunction(() => {
+      const nodes = [...document.querySelectorAll('.react-flow__node')]
+      return nodes.length > 0 && nodes.every((node) => {
+        const rect = node.getBoundingClientRect()
+        return getComputedStyle(node).visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+      })
+    })
+  }
+  const expected = await page.evaluate(({ rootSelector, maxSteps }) => {
     const root = document.querySelector(rootSelector)
     if (!(root instanceof HTMLElement)) {
       throw new Error(`Missing route focus root ${rootSelector}.`)
@@ -969,20 +980,38 @@ async function exerciseGlobalLayers(page, testCase, diagnostics) {
     || testCase.routeId !== 'experiments'
   ) return
 
-  await assertEscapeFocusReturn(
-    page,
-    page.getByRole('button', { name: 'Application settings' }),
-    page.getByRole('dialog').filter({ has: page.locator('[data-tour-id="settings-drawer"]') }),
-    'Settings',
-    diagnostics,
-  )
-  await assertEscapeFocusReturn(
-    page,
-    page.getByRole('button', { name: COPILOT_TRIGGER_PATTERN }),
-    page.locator(COPILOT_LAYER_SELECTOR),
-    'Copilot',
-    diagnostics,
-  )
+  if (testCase.viewportId === 'mobile') {
+    // Compact utilities open layers through menu items rather than desktop buttons.
+    const utilities = page.getByRole('button', { name: 'More workspace actions' })
+    for (const [name, label, layer] of [
+      ['Application settings', 'Settings', page.getByRole('dialog').filter({ has: page.locator('[data-tour-id="settings-drawer"]') })],
+    ]) {
+      await utilities.click()
+      await page.getByRole('menuitem', { name, exact: true }).click()
+      await expectVisible(layer, name)
+      diagnostics.overlayMotion ??= {}
+      diagnostics.overlayMotion[label] = await assertReducedMotion(page, { requiredLayer: layer, label })
+      await page.keyboard.press('Escape')
+      await expectHidden(layer, name)
+      await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'More workspace actions')
+    }
+    await assertEscapeFocusReturn(page, page.getByRole('button', { name: COPILOT_TRIGGER_PATTERN }), page.locator(COPILOT_LAYER_SELECTOR), 'Copilot', diagnostics)
+  } else {
+    await assertEscapeFocusReturn(
+      page,
+      page.getByRole('button', { name: 'Application settings' }),
+      page.getByRole('dialog').filter({ has: page.locator('[data-tour-id="settings-drawer"]') }),
+      'Settings',
+      diagnostics,
+    )
+    await assertEscapeFocusReturn(
+      page,
+      page.getByRole('button', { name: COPILOT_TRIGGER_PATTERN }),
+      page.locator(COPILOT_LAYER_SELECTOR),
+      'Copilot',
+      diagnostics,
+    )
+  }
 
 
   const helpTrigger = await firstVisible(page.getByRole('button', { name: 'Help' }))
@@ -1236,9 +1265,8 @@ async function exerciseTimelineViews(page, diagnostics) {
     const tab = page.getByRole('tab', { name })
     await expectVisible(tab, `timeline ${String(name)} tab`)
     await tab.click()
-    if ((await tab.getAttribute('aria-selected')) !== 'true') {
-      throw new Error(`Timeline tab ${String(name)} did not become selected.`)
-    }
+    // The selected view is now persisted by the router; wait for its render.
+    await tab.and(page.locator('[aria-selected="true"]')).waitFor({ state: 'visible' })
     seen.push(String(name))
   }
   await expectVisible(
@@ -1450,7 +1478,7 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
   } else if (testCase.routeId === 'tools') {
     const root = page.getByTestId('lab-tools-page')
     const nav = root.getByRole('navigation', { name: 'Lab tool categories' })
-    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Browse tools (14)', exact: true }).click()
     if (await nav.getByRole('button').count() !== 14) throw new Error('Lab tools must contain 14 categorized entries.')
     await nav.getByRole('button', { name: 'Nucleic acid A260 → concentration', exact: true }).click()
     const form = root.getByRole('form', { name: 'Nucleic acid A260 → concentration', exact: true })
@@ -1462,7 +1490,7 @@ async function exerciseRouteInteractions(page, testCase, diagnostics) {
     await expectVisible(root.getByRole('region', { name: 'Calculation result' }), 'absorbance result')
     await form.getByLabel('Sample A260 (AU)', { exact: true }).fill('2')
     await expectVisible(root.getByText('Inputs changed. These are the previous results; calculate again before using them.'), 'stale result marker')
-    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Choose another tool (14)', exact: true }).click()
+    if (!await nav.isVisible()) await root.getByRole('button', { name: 'Browse tools (14)', exact: true }).click()
     await nav.getByRole('button', { name: 'BLI data preview', exact: true }).click()
     await expectVisible(root.getByRole('button', { name: 'Preview without saving' }), 'explicit projectless preview')
     diagnostics.interactions.labTools = 'categorized tool navigation, unit-preserving calculation, stale-result handling and standalone preview'

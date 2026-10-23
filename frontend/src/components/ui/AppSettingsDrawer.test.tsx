@@ -6,6 +6,12 @@ import { AppSettingsDrawer } from './AppSettingsDrawer'
 import { getCopilotConfig } from '../../lib/api/copilot'
 import { getClusterHealth } from '../../lib/api/registry'
 
+const context = vi.hoisted(() => ({ projectId: '' }))
+vi.mock('../../lib/hooks/useProjectAccess', () => ({
+  useProjectAccess: () => ({ data: context.projectId ? { role: 'owner' } : undefined }),
+  managesProject: (access: { role?: string } | undefined) => access?.role === 'owner',
+}))
+
 vi.mock('../../lib/auth/account', async (original) => ({
   ...await original<typeof import('../../lib/auth/account')>(),
   useAuthConfig: () => ({ data: { deployment_kind: 'public', private_portal_url: 'http://localhost:5177' } }),
@@ -22,7 +28,7 @@ vi.mock('../../features/tour', () => ({
 vi.mock('../../lib/hooks/useProjectContext', () => ({
   useProjectContext: () => ({
     projects: [],
-    projectId: '',
+    projectId: context.projectId,
     setProjectId: vi.fn(),
   }),
 }))
@@ -71,6 +77,7 @@ describe('AppSettingsDrawer', () => {
   beforeEach(() => {
     sessionStorage.clear()
     vi.clearAllMocks()
+    context.projectId = ''
     useAppStore.setState({ language: 'en', settingsOpen: true })
   })
 
@@ -78,11 +85,12 @@ describe('AppSettingsDrawer', () => {
 
   it('does not request model configuration without a project when refreshing connections', async () => {
     renderWithProviders(<AppSettingsDrawer />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Connections' }))
     fireEvent.click(screen.getByRole('button', { name: /revalidate/i }))
     await waitFor(() => expect(getClusterHealth).toHaveBeenCalled())
     expect(getCopilotConfig).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Done' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeVisible()
   })
 
   it('shows Private access instead of account, infrastructure and model controls for a visitor', async () => {
@@ -91,6 +99,7 @@ describe('AppSettingsDrawer', () => {
     expect(await screen.findByRole('link', { name: /Create a Private account/ })).toHaveAttribute('href', 'http://localhost:5177/#/register')
     expect(screen.queryByTestId('copilot-settings')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /password, invitations/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Connections' }))
     fireEvent.click(screen.getByRole('button', { name: /revalidate/i }))
     expect(getClusterHealth).not.toHaveBeenCalled()
     expect(getCopilotConfig).not.toHaveBeenCalled()
@@ -102,5 +111,20 @@ describe('AppSettingsDrawer', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('separates immediate preferences from the project model save action', () => {
+    context.projectId = 'project-settings'
+    renderWithProviders(<AppSettingsDrawer />)
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Preferences', 'Model', 'Connections'])
+    expect(screen.queryByRole('button', { name: 'Save model configuration' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }))
+    expect(useAppStore.getState().themePreference).toBe('dark')
+    fireEvent.click(screen.getByRole('tab', { name: 'Model' }))
+    expect(screen.getByRole('button', { name: 'Save model configuration' })).toBeDisabled()
+    expect(screen.getByTestId('copilot-settings')).toBeVisible()
+    fireEvent.click(screen.getByRole('tab', { name: 'Preferences' }))
+    expect(screen.getByTestId('copilot-settings')).not.toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Save model configuration' })).not.toBeInTheDocument()
   })
 })
