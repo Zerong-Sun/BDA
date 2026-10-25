@@ -82,17 +82,16 @@ def parse_bli_csv(source: bytes) -> list[Curve]:
     raise ValueError("Unsupported BLI CSV format; expected ForteBio preprocessed or Time/Data/Fit kinetic triplets")
 
 
-def parse_fortebio_csv(source: str | bytes) -> list[Curve]:
+def parse_fortebio_csv(source: bytes) -> list[Curve]:
     """解析 ForteBio 预处理 CSV → Curve 列表。
 
     metadata 顺序 == 数据列顺序（ForteBio 预处理保证），不做板位重排——
     一旦按源板位排序会破坏元数据与传感器列的 1:1 对应（generate_BLI_figure 要点）。
     """
-    if isinstance(source, bytes):
-        rows = list(csv.reader(source.decode("utf-8").splitlines()))
-    else:
-        with open(source, encoding="utf-8") as handle:
-            rows = list(csv.reader(handle))
+    # Instrument parsers accept content, never a path supplied in its place.
+    if not isinstance(source, bytes):
+        raise ValueError("ForteBio CSV content must be bytes")
+    rows = list(csv.reader(source.decode("utf-8").splitlines()))
     if len(rows) < 6:
         raise ValueError(f"CSV 行数不足（{len(rows)} 行，至少需 6 行：1 XML + 4 头 + 1 数据）")
 
