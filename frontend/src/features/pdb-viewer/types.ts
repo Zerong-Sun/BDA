@@ -7,6 +7,7 @@ export type StructureFormat = 'pdb' | 'mmcif' | 'alphafold'
 export interface HighlightedResidue {
   chainId: string
   seq: number
+  insertionCode?: string
   label?: string
 }
 
@@ -141,11 +142,12 @@ export function parseHotspotResidue(
   const trimmed = residue.trim()
   if (!trimmed) return null
 
-  const match = trimmed.match(/^([A-Za-z0-9]+):([A-Za-z]{1,3})(\d+)$/)
+  const match = trimmed.match(/^([A-Za-z0-9]+):([A-Za-z]{1,3})(-?\d+)([A-Za-z]?)$/)
   if (match) {
     return {
       chainId: match[1],
       seq: Number.parseInt(match[3], 10),
+      ...(match[4] ? { insertionCode: match[4] } : {}),
       label: trimmed,
     }
   }

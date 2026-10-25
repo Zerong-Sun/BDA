@@ -17,6 +17,16 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_roles
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
+from ..projects.service import require_project, visible_project_ids
+from .extensions import (
+    ExtensionAssessment,
+    ExtensionAssessmentCreate,
+    ExtensionCatalog,
+    ModelQualificationSummary,
+    assess_extension,
+    extension_catalog,
+    model_assessment,
+)
 from .models import (
     ComputeNode,
     LLMProvider,
@@ -69,6 +79,30 @@ from .service import (
 
 router = APIRouter(prefix="/registry", tags=["registry"])
 settings = get_settings()
+
+
+@router.get("/extensions", response_model=ExtensionCatalog)
+def get_extension_catalog(
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> ExtensionCatalog:
+    return extension_catalog(session)
+
+
+@router.post("/extensions/{extension_id}/assessments", response_model=ExtensionAssessment,
+             openapi_extra={"x-permission": "registry.extension.assess"})
+def assess_extension_configuration(
+    extension_id: str, payload: ExtensionAssessmentCreate,
+    session: Session = Depends(get_session), user: User = Depends(require_roles("admin")),
+) -> ExtensionAssessment:
+    """Inspect a proposed configuration; no persistence, network or execution."""
+    return assess_extension(session, extension_id, payload)
+
+
+@router.get("/model-plugins/{plugin_id}/qualification", response_model=ModelQualificationSummary)
+def get_model_qualification(
+    plugin_id: uuid.UUID, session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> ModelQualificationSummary:
+    return model_assessment(_resource(session, ModelPlugin, plugin_id, "model_plugin_not_found"))
 
 
 def _plugin_catalog() -> PluginManifestCatalog:
@@ -430,8 +464,12 @@ def list_llm_providers(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> LLMProviderPage:
-    rows, next_cursor = _rows(session, LLMProvider, cursor, limit)
-    return LLMProviderPage(items=[LLMProviderResponse.model_validate(row) for row in rows], next_cursor=next_cursor)
+    rows = RegistryRepository(session).llm_providers(visible_project_ids(session, user), decode_cursor(cursor), limit)
+    page = rows[:limit]
+    return LLMProviderPage(
+        items=[LLMProviderResponse.model_validate(row) for row in page],
+        next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
+    )
 
 
 @router.post(
@@ -455,6 +493,12 @@ def get_llm_provider(
     user: User = Depends(current_user),
 ) -> LLMProviderResponse:
     row = _resource(session, LLMProvider, provider_id, "llm_provider_not_found")
+    if user.role != "admin" and row.name.startswith("Project ") and row.name.endswith(" BYOK"):
+        try:
+            project_id = uuid.UUID(row.name[len("Project "):-len(" BYOK")])
+        except ValueError as exc:
+            raise DomainError("llm_provider_not_found", "LLM provider was not found", status_code=404) from exc
+        require_project(session, project_id, user)
     response.headers["ETag"] = etag(row.version)
     return LLMProviderResponse.model_validate(row)
 

@@ -1,0 +1,100 @@
+{
+  "id": "statistical-analysis-plan",
+  "version": "1.0.0",
+  "title": "Statistical analysis plan",
+  "title_zh": "统计分析计划",
+  "description": "Specify estimands, uncertainty, validation splits and sensitivity checks before analysis.",
+  "description_zh": "预先明确估计目标、独立单位、不确定性和敏感性分析。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "6f766cb2c8de393207c4f0cf624b4402760c933881d3a045957755dc13bad302",
+  "default_for": [],
+  "tool_requests": [
+    "get_dataset_slice",
+    "list_experiment_results",
+    "research_overview"
+  ],
+  "optional_write_tools": [],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "estimand_and_units",
+      "analysis_and_assumptions",
+      "uncertainty_and_multiplicity",
+      "missingness_and_sensitivity",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "estimand_and_units": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "analysis_and_assumptions": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "uncertainty_and_multiplicity": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "missingness_and_sensitivity": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

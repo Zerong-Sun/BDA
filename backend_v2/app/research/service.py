@@ -122,6 +122,10 @@ def _require_superseded(session: Session, project: Project, supersedes_id) -> No
 
 
 def create_finding(session: Session, project: Project, payload: FindingCreate, user: User) -> ResearchFinding:
+    if payload.brief_id is not None:
+        brief = session.get(ResearchBrief, payload.brief_id)
+        if brief is None or brief.project_id != project.id:
+            raise DomainError("research_brief_not_found", "Research brief was not found", status_code=404)
     _require_superseded(session, project, payload.supersedes_id)
     row = ResearchFinding(project_id=project.id, created_by=user.id, **payload.model_dump())
     session.add(row)

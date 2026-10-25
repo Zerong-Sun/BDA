@@ -1,8 +1,7 @@
+import { useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router'
-import clsx from 'clsx'
-import { DotsThreeIcon, PulseIcon, AtomIcon, BooksIcon, FoldersIcon, RobotIcon, ChatCircleIcon, FlaskIcon, GearIcon, ListChecksIcon, QuestionIcon, WrenchIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon, PulseIcon, FoldersIcon, ChatCircleIcon, FlaskIcon, GearIcon } from '@phosphor-icons/react'
 import { useI18n } from '../../lib/i18n'
-import { APP_ROUTES, PRIMARY_ROUTES, routeLabel, type AppRoute } from '../../lib/nav/routes'
 import { CommandPalette } from './CommandPalette'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
@@ -14,6 +13,7 @@ import { HelpMenu } from './HelpMenu'
 import { StatusPill } from './StatusPill'
 import { statusTone } from './statusTone'
 import { Button } from './Button'
+import { BigoBioLogo } from './BigoBioLogo'
 import { StatusBadge } from './statusBadge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
 import {
@@ -24,29 +24,29 @@ import {
   SelectValue,
 } from './select'
 
-// The route list moved to `lib/nav/routes.ts` when the command palette began
-// needing the same one: two copies of "which routes exist and what they are
-// called" drift silently, because renaming one of them breaks nothing.
-const mobileRoutes = APP_ROUTES
-const primaryRoutes = PRIMARY_ROUTES
-
 export function Topbar() {
   const navigate = useNavigate()
-  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, setTourMenuOpen, activityOpen, setActivityOpen } = useAppStore()
+  const utilitiesRef = useRef<HTMLButtonElement>(null)
+  const openUtility = (open: () => void) => {
+    // The menu item unmounts on selection. Give the drawer a stable focus return target.
+    utilitiesRef.current?.focus()
+    open()
+  }
+  const { appMode, copilotOpen, setCopilotOpen, setSettingsOpen, activityOpen, setActivityOpen, setTourMenuOpen } = useAppStore()
   const { t, language } = useI18n()
   const { visibleProjects, activeProject, projectId, setProjectId } = useProjectContext()
   const projectQuery = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
-  const zh = language === 'zh'
-  const navLabel = (key: AppRoute['key']) => routeLabel(key, zh, (item) => t.nav[item])
 
   return (
     <>
-      <header className="science-topbar sticky top-0 z-40 flex flex-wrap items-center gap-2 border-b border-border-soft bg-bg-app/95 px-4 py-2.5 backdrop-blur sm:flex-nowrap lg:gap-3 lg:px-6">
+      <div className="sticky top-0 z-40">
+      <header className="science-topbar flex flex-wrap items-center gap-2 border-b border-border-soft bg-bg-app/95 px-4 py-2.5 backdrop-blur sm:flex-nowrap lg:gap-3 lg:px-6">
         <NavLink
           to={`/projects${projectQuery}`}
           className="science-brand shrink-0 text-sm font-semibold text-text-primary"
         >
-          <span className="science-brand-mark" aria-hidden="true"><AtomIcon weight="duotone" /></span>{t.brand}
+          <BigoBioLogo />
+          <span className="science-brand-product">{t.brand}</span>
         </NavLink>
 
         {/* Project is the anchor of the whole workbench: give it a prominent,
@@ -89,20 +89,36 @@ export function Topbar() {
         </div>
 
         <div className="topbar-actions flex min-w-0 shrink-0 items-center gap-1.5 text-xs">
+          <div className="topbar-help"><HelpMenu /></div>
           <div className="science-mobile-utilities">
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon" />} aria-label={language === 'zh' ? '更多工作区操作' : 'More workspace actions'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
+              <DropdownMenuTrigger render={<Button ref={utilitiesRef} type="button" variant="ghost" size="icon" />} aria-label={language === 'zh' ? '更多工作区操作' : 'More workspace actions'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="science-utility-menu w-64">
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => setCopilotOpen(!copilotOpen)}><ChatCircleIcon aria-hidden="true" />{t.copilot.drawer.toggleTitle}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/tools')}><FlaskIcon aria-hidden="true" />{language === 'zh' ? '工具箱' : 'Toolbox'}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActivityOpen(!activityOpen)}><PulseIcon aria-hidden="true" />{t.operations.toggleTitle}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}><GearIcon aria-hidden="true" />{t.shared.applicationSettings}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTourMenuOpen(true)}><QuestionIcon aria-hidden="true" />{language === 'zh' ? '界面导览' : 'Interface tour'}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openUtility(() => setActivityOpen(!activityOpen))}><PulseIcon aria-hidden="true" />{t.operations.toggleTitle}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openUtility(() => setSettingsOpen(true))}><GearIcon aria-hidden="true" />{t.shared.applicationSettings}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => openUtility(() => setTourMenuOpen(true))}>{language === 'zh' ? '界面导览' : 'Interface tour'}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => navigate(`/guide${projectQuery}`)}>{t.pipeline.workflowGuide}</DropdownMenuItem>
+                  <DropdownMenuItem className="min-[375px]:hidden" onClick={() => navigate(`/faq${projectQuery}`)}>{t.nav.faq}</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          <Button
+            type="button"
+            data-tour-id="copilot-launcher"
+            aria-label={t.copilot.drawer.toggleTitle}
+            aria-expanded={copilotOpen}
+            aria-haspopup="dialog"
+            title={t.copilot.drawer.toggleTitle}
+            variant={copilotOpen ? 'secondary' : 'outline'}
+            className="copilot-launcher"
+            onClick={() => setCopilotOpen(!copilotOpen)}
+          >
+            <ChatCircleIcon aria-hidden="true" />
+            <span className="hidden sm:inline">Bot</span>
+          </Button>
+          <CommandPalette />
           <div className="science-desktop-utilities">
           <span className="hidden sm:inline-flex">
             <StatusBadge
@@ -110,32 +126,6 @@ export function Topbar() {
               label={appMode === 'application' ? t.settingsExt.applicationModeBadge : t.demoMode}
             />
           </span>
-          <span className="hidden sm:inline-flex">
-            <HelpMenu />
-          </span>
-          <Button
-            data-tour-id="tour-help"
-            type="button"
-            aria-label={language === 'zh' ? '打开界面导览' : 'Open interface tour'}
-            title={language === 'zh' ? '界面导览' : 'Interface tour'}
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTourMenuOpen(true)}
-          >
-            <QuestionIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            aria-label={t.copilot.drawer.toggleTitle}
-            title={t.copilot.drawer.toggleTitle}
-            variant={copilotOpen ? 'secondary' : 'ghost'}
-            size="icon-sm"
-            onClick={() => setCopilotOpen(!copilotOpen)}
-          >
-            <ChatCircleIcon className="h-4 w-4" />
-          </Button>
-          <CommandPalette />
-          <Button type="button" variant="ghost" size="sm" render={<NavLink to="/tools" />}>{language === 'zh' ? '工具箱' : 'Toolbox'}</Button>
           <ActivityIndicatorButton />
           <Button
             type="button"
@@ -152,46 +142,8 @@ export function Topbar() {
         </div>
       </header>
 
-      {/* On small screens the pipeline rail collapses, so the topbar keeps a
-          full route list for reachability (and for accessibility tests). */}
-      <nav
-        data-tour-id="main-navigation"
-        aria-label={t.shared.mainNavigation}
-        className="science-navigation flex gap-1 overflow-x-auto border-b border-border-soft bg-bg-app px-3 py-2"
-      >
-        {mobileRoutes.map((route) => (
-          <NavLink
-            key={route.to}
-            data-nav-route={route.to}
-            to={`${route.to}${projectQuery}`}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center gap-2 shrink-0 rounded px-3 py-1.5 text-sm transition-colors',
-                !primaryRoutes.includes(route.to) && 'md:hidden',
-                isActive
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-text-secondary hover:bg-surface-1 hover:text-text-primary',
-              )
-            }
-          >
-            {route.to === '/projects' ? <FoldersIcon aria-hidden="true" /> : route.to === '/inbox' ? <ListChecksIcon aria-hidden="true" /> : route.to === '/bots' ? <RobotIcon aria-hidden="true" /> : route.to === '/research' ? <BooksIcon aria-hidden="true" /> : null}
-            {navLabel(route.key)}
-          </NavLink>
-        ))}
-        <div className="hidden items-stretch md:flex">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="nav-workbenches" />}><WrenchIcon aria-hidden="true" />{zh ? '工作台' : 'Workbenches'}</DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuGroup>
-                {mobileRoutes.filter((route) => !primaryRoutes.includes(route.to) && route.to !== '/faq').map((route) => (
-                  <DropdownMenuItem key={route.to} onClick={() => navigate(`${route.to}${projectQuery}`)}>{navLabel(route.key)}</DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </nav>
       <BackendHealthBanner />
+      </div>
     </>
   )
 }

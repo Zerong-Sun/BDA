@@ -6,6 +6,14 @@ import { applyTheme, resolveTheme } from '../../lib/theme/initTheme'
 import { useI18n } from '../../lib/i18n'
 import { Button } from './Button'
 import { clearAuthenticatedBrowserState } from '../../lib/auth/browserSession'
+import { useState } from 'react'
+import { logoutApiV2AuthLogoutPost } from '@/lib/api/generated/sdk.gen'
+import '@/lib/api/generatedTransport'
+import { invalidateAuthRequests } from '@/lib/api/client'
+import { useAccountText } from '@/lib/auth/accountText'
+import { useAuthConfig, portalUrl } from '@/lib/auth/account'
+import { isPublicVisitor } from '@/lib/auth/publicWorkspace'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +44,10 @@ const THEME_LABELS: Record<ThemePreference, (t: ReturnType<typeof useI18n>['t'])
 }
 
 export function UserMenu() {
+  const accountText = useAccountText()
+  const config = useAuthConfig()
+  const visitor = isPublicVisitor()
+  const [loggingOut, setLoggingOut] = useState(false)
   const { t } = useI18n()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -47,11 +59,20 @@ export function UserMenu() {
     themePreference,
     setThemePreference,
   } = useAppStore()
-  const userLabel = currentUserLabel()
+  const userLabel = visitor ? (language === 'zh' ? 'Public 访客' : 'Public visitor') : currentUserLabel()
+  const privateRegister = portalUrl(config.data?.private_portal_url, 'register')
+  const privateLogin = portalUrl(config.data?.private_portal_url, 'login')
 
-  const logout = () => {
-    clearAuthenticatedBrowserState(queryClient)
-    navigate('/login', { replace: true })
+  const logout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    invalidateAuthRequests()
+    try {
+      await logoutApiV2AuthLogoutPost<true>()
+      clearAuthenticatedBrowserState(queryClient)
+      navigate('/login', { replace: true })
+    } catch { toast.error(accountText.logoutFailed) }
+    finally { setLoggingOut(false) }
   }
 
   const setTheme = (pref: ThemePreference) => {
@@ -77,6 +98,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>{userLabel}</DropdownMenuLabel>
+          {visitor ? <>{privateRegister ? <DropdownMenuItem onClick={() => window.location.assign(privateRegister)}>{accountText.privateRegister}</DropdownMenuItem> : null}{privateLogin ? <DropdownMenuItem onClick={() => window.location.assign(privateLogin)}>{accountText.privateLogin}</DropdownMenuItem> : null}</> : <DropdownMenuItem onClick={() => navigate('/account')}>{accountText.account}</DropdownMenuItem>}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
@@ -104,13 +126,14 @@ export function UserMenu() {
             {uiDensity === 'guided' ? t.shared.userMenu.switchToAdvanced : t.shared.userMenu.switchToGuided}
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+        {!visitor ? <><DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem variant="destructive" onClick={logout}>
+          <DropdownMenuItem variant="destructive" disabled={loggingOut} onClick={() => void logout()}>
             <SignOutIcon aria-hidden="true" />
             {t.shared.userMenu.logout}
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        </> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )

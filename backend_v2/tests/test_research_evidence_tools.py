@@ -9,10 +9,24 @@ from backend_v2.app.research.generation import (
     _ensure_research_targets,
     _ensure_review_sections,
     _external_references,
+    _reference_relevance,
+    _search_query,
     _validate_draft,
 )
 from backend_v2.app.research.schemas import ResearchGenerationCreate
 from pydantic import ValidationError
+
+
+def test_generic_design_word_cannot_make_an_unrelated_target_relevant() -> None:
+    relevant, _ = _reference_relevance("PD-1 protein binder design", "Protein design for pain receptors", "Unrelated biology")
+    assert relevant is False
+    assert 'TITLE_ABS:"protein"' not in _search_query("PD-1 protein binder design")
+    assert _reference_relevance("PD-1 binder design", "Structure of PD-1", "")[0] is True
+
+
+@pytest.mark.parametrize("title", ["Poster Presentations", "Cumulative general subject index volumes 1-30"])
+def test_collection_title_is_not_a_standalone_study(title) -> None:
+    assert _reference_relevance("protein", title, "protein protein design")[0] is False
 
 
 def test_controlled_evidence_tools_retry_and_record_checksum() -> None:

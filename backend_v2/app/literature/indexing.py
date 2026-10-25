@@ -8,10 +8,24 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .evidence_packets import extract_packet
 from .models import LiteratureChunk, LiteratureClaim, LiteratureDocument, LiteratureEvidence
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?。！？])\s+")
 WHITESPACE = re.compile(r"\s+")
+
+
+def is_source_sentence(value: str) -> bool:
+    """Exclude reference-number debris while retaining the complete source chunk.
+
+    This is a text-quality check, never scientific acceptance. Short scientific
+    statements, numbers with units and non-Latin text remain valid candidates.
+    """
+    letters = [character for character in value if character.isalpha()]
+    return len(letters) >= 5 and (
+        len(re.findall(r"[^\W\d_]+", value, re.UNICODE)) >= 2
+        or any("\u3400" <= character <= "\u9fff" for character in letters)
+    )
 
 
 def _local_name(tag: str) -> str:
@@ -55,15 +69,19 @@ def extract_europe_pmc_full_text(xml_bytes: bytes) -> tuple[list[str], dict[str,
                 if text:
                     paragraphs.append(text)
 
+    content_kind = "open_access_full_text" if paragraphs else "metadata_only"
     if not paragraphs:
         abstract = next((element for element in root.iter() if _local_name(element.tag) == "abstract"), None)
         abstract_text = _element_text(abstract)
         if abstract_text:
             paragraphs.append(abstract_text)
+            content_kind = "open_access_abstract"
     return paragraphs[:500], {
         "article_title": article_title,
         "license_text": license_text[:2000],
         "content_checksum_sha256": hashlib.sha256(xml_bytes).hexdigest(),
+        "content_kind": content_kind,
+        "evidence_packet": extract_packet(xml_bytes),
     }
 
 
@@ -91,6 +109,7 @@ def index_document_content(
         if value
     }
     counts = {"chunks": 0, "claims": 0, "evidence": 0}
+    seen_sentences: set[str] = set()
     for position, paragraph in enumerate(paragraphs[:500]):
         normalized = WHITESPACE.sub(" ", paragraph).strip()
         if not normalized:
@@ -103,6 +122,9 @@ def index_document_content(
             continue
         sentences = [item.strip() for item in SENTENCE_SPLIT.split(normalized) if item.strip()]
         for sentence_index, sentence in enumerate(sentences[:20]):
+            if not is_source_sentence(sentence) or sentence in seen_sentences:
+                continue
+            seen_sentences.add(sentence)
             claim = LiteratureClaim(
                 document_id=document.id,
                 chunk_id=chunk.id,
@@ -114,6 +136,7 @@ def index_document_content(
                     "content_checksum_sha256": content_checksum_sha256,
                     "identifiers": identifiers,
                     "analysis_status": "pending_human_review",
+                    "extraction_method": "source_sentence_candidate",
                 },
             )
             session.add(claim)

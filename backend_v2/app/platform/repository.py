@@ -95,6 +95,18 @@ class PlatformRepository:
     def ping(self) -> None:
         self.session.execute(text("SELECT 1"))
 
+    def request_role_is_restricted(self) -> bool:
+        """Reject RLS bypass and ownership privileges on application tables."""
+        if self.session.bind is None or self.session.bind.dialect.name != "postgresql":
+            return False
+        return self.session.scalar(text(
+            "SELECT NOT rolsuper AND NOT rolbypassrls AND NOT EXISTS ("
+            "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') "
+            "AND pg_has_role(current_user, c.relowner, 'USAGE')) "
+            "FROM pg_roles WHERE rolname = current_user"
+        )) is True
+
     def schema_revision(self) -> str | None:
         return self.session.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
 

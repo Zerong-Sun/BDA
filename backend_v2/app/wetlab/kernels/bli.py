@@ -18,16 +18,19 @@ experiment_raw 落 data_type="bli_curves" 原始曲线快照（只写一次）�
 
 import csv
 import re
-from dataclasses import dataclass
+import warnings
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 from scipy.optimize import curve_fit, least_squares  # type: ignore[import-untyped]
 from scipy.signal import savgol_filter  # type: ignore[import-untyped]
 
+from ..diagnostics import check, finite_json, optimizer_diagnostics, quality, trace_arrays
+
 # BLI 分析版本（随 v0.0.8 引入）：写入 results["BLI_ANALYSIS_VERSION"]，
 # 供未来 recompute 对照——同版本 + 同 raw 快照 → 可复现同结果（规则 #8）。
-BLI_ANALYSIS_VERSION = "0.0.8"
+BLI_ANALYSIS_VERSION = "0.0.9-provenance2"
 
 # ═══════════════════════════════════════════════════════════
 #  绘图样式（BLI 风格）—— 酶活等其他模块引用同一套
@@ -62,19 +65,33 @@ class Curve:
     conc_nM: float      # 样品浓度 (nM)
     time: np.ndarray    # 时间 (s)
     response: np.ndarray  # 响应 (nm)，NaN 为缺失
+    instrument_fit: np.ndarray | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    source_format: str = "fortebio_preprocessed"
 
 
-def parse_fortebio_csv(source: str | bytes) -> list[Curve]:
+def parse_bli_csv(source: bytes) -> list[Curve]:
+    """Detect supported exports without treating instrument Fit columns as data."""
+    rows = list(csv.reader(source.decode("utf-8-sig").splitlines()))
+    if rows and rows[0] and rows[0][0].strip().lower() == "conc1":
+        from .bli_kinetic import parse_kinetic_triplets
+
+        return parse_kinetic_triplets(rows)
+    if len(rows) > 1 and any(re.fullmatch(r"t\d+[A-P]\d+c\d+", item.strip()) for item in rows[1]):
+        return parse_fortebio_csv(source)
+    raise ValueError("Unsupported BLI CSV format; expected ForteBio preprocessed or Time/Data/Fit kinetic triplets")
+
+
+def parse_fortebio_csv(source: bytes) -> list[Curve]:
     """解析 ForteBio 预处理 CSV → Curve 列表。
 
     metadata 顺序 == 数据列顺序（ForteBio 预处理保证），不做板位重排——
     一旦按源板位排序会破坏元数据与传感器列的 1:1 对应（generate_BLI_figure 要点）。
     """
-    if isinstance(source, bytes):
-        rows = list(csv.reader(source.decode("utf-8").splitlines()))
-    else:
-        with open(source, encoding="utf-8") as handle:
-            rows = list(csv.reader(handle))
+    # Instrument parsers accept content, never a path supplied in its place.
+    if not isinstance(source, bytes):
+        raise ValueError("ForteBio CSV content must be bytes")
+    rows = list(csv.reader(source.decode("utf-8").splitlines()))
     if len(rows) < 6:
         raise ValueError(f"CSV 行数不足（{len(rows)} 行，至少需 6 行：1 XML + 4 头 + 1 数据）")
 
@@ -383,7 +400,9 @@ def fit_joint(t_list, y_list, conc_list, t_assoc, t_dissoc, verbose=False):
         _p(verbose, "  ⚠ 联合全局拟合可能未收敛")
     kon, koff, rmax = float(fit.x[0]), float(fit.x[1]), float(fit.x[2])
     kd = koff / kon if kon > 0 else float("inf")
-    return {"kon": kon, "koff": koff, "kd": kd, "rmax": rmax}
+    return {"kon": kon, "koff": koff, "kd": kd, "rmax": rmax,
+            "r2": _r2_score(np.concatenate(y_list), np.concatenate(y_list) - fit.fun),
+            "diagnostics": optimizer_diagnostics(fit, ["kon", "koff", "rmax"])}
 
 
 def fit_steady(t_list, y_list, conc_list, t_assoc, t_dissoc, verbose=False):
@@ -476,6 +495,8 @@ def fit_mixed(t_list, y_list, conc_list, t_assoc, t_dissoc, verbose=False):
 
 def filter_dead_curves(t_list, y_list, conc_list, t_dissoc, cutoff=None):
     """按解离前 Req 过滤死曲线。cutoff 缺省 = 3× 最低 1/3 曲线的 Req 噪声。"""
+    if not t_list:
+        return [], [], []
     req_vals = []
     for t, y in zip(t_list, y_list, strict=True):
         mask = (t >= t_dissoc - 1) & (t <= t_dissoc)
@@ -533,10 +554,22 @@ def fit_kd(curves: list[Curve], *, t_assoc: float | None = None,
     （REF 脚本就是靠 CLI 参数传）。ns_sensor: 非特异对照传感器 label（如 "F8"），
     按浓度比例从样品曲线中扣除。返回 {"phase", "standard", "split", "joint", "steady", "mixed"}。
     """
-    entries = sorted(curves, key=lambda c: c.conc_nM, reverse=True)[:n_concs]
-    if not entries:
-        return {"error": "无曲线数据"}
-
+    checks, trace_metrics, entries = [], [], []
+    for curve in sorted(curves, key=lambda c: c.conc_nM, reverse=True)[:n_concs]:
+        t, y, metric = trace_arrays(curve.time, curve.response)
+        trace_metrics.append({"label": curve.label, "concentration_nM": curve.conc_nM, **metric})
+        if metric["excluded_nonfinite_points"]:
+            checks.append(check("missing_points", "Non-finite points were excluded; inspect missing-data intervals.", label=curve.label, count=metric["excluded_nonfinite_points"]))
+        if len(t) < 5 or not metric["strictly_increasing"] or not np.isfinite(curve.conc_nM) or curve.conc_nM <= 0:
+            checks.append(check("unusable_curve", "Curve excluded: requires five finite ordered points and a positive known concentration.", label=curve.label))
+            continue
+        entries.append(Curve(curve.label, curve.sample_id, curve.conc_nM, t, y))
+    if len({c.conc_nM for c in entries}) < 2:
+        checks.append(check("insufficient_concentrations", "At least two distinct positive concentrations are required for this concentration-series analysis."))
+        return {"error": "Insufficient usable concentration series", "quality_control": quality(checks, traces=trace_metrics)}
+    inferred = t_assoc is None or t_dissoc is None
+    if inferred:
+        checks.append(check("inferred_phase_boundaries", "Association/dissociation phases were inferred from signal; verify against the instrument protocol."))
     t_all = [np.asarray(c.time, float) for c in entries]
     y_all = [np.asarray(c.response, float) for c in entries]
     conc_all = [c.conc_nM for c in entries]
@@ -547,8 +580,21 @@ def fit_kd(curves: list[Curve], *, t_assoc: float | None = None,
         t_assoc = t_assoc if t_assoc is not None else a
         t_dissoc = t_dissoc if t_dissoc is not None else d
 
+    if not np.isfinite(t_assoc) or not np.isfinite(t_dissoc) or t_assoc >= t_dissoc:
+        checks.append(check("invalid_phase_boundaries", "Association must precede dissociation with finite phase times."))
+        return {"error": "Invalid phase boundaries", "quality_control": quality(checks, traces=trace_metrics)}
+    sufficient = []
+    for i, t in enumerate(t_all):
+        if np.count_nonzero((t >= t_assoc) & (t <= t_dissoc)) < 5 or np.count_nonzero(t > t_dissoc) < 5:
+            checks.append(check("insufficient_phase_points", "Curve excluded: each fitted phase needs at least five points under the current kinetic methods.", label=entries[i].label))
+        else:
+            sufficient.append(i)
+    t_all = [t_all[i] for i in sufficient]
+    y_all = [y_all[i] for i in sufficient]
+    conc_all = [conc_all[i] for i in sufficient]
+
     # NS 非特异扣除（按 sensor label 匹配，浓度比例缩放）
-    if ns_sensor and ns_subtract != "none":
+    if ns_sensor and ns_subtract != "none" and conc_all:
         ns = next((c for c in entries if c.label == ns_sensor), None)
         if ns is not None:
             ns_t = np.asarray(ns.time, float)
@@ -561,15 +607,36 @@ def fit_kd(curves: list[Curve], *, t_assoc: float | None = None,
     # 死曲线过滤
     if not no_cutoff:
         t_all, y_all, conc_all = filter_dead_curves(t_all, y_all, conc_all, t_dissoc, req_cutoff)
-    if len(t_all) < 2:
-        return {"phase": {"t_assoc": t_assoc, "t_dissoc": t_dissoc}, "error": "有效曲线不足 2 条"}
+    if len({float(c) for c in conc_all}) < 2:
+        checks.append(check("insufficient_signal_series", "Fewer than two distinct concentrations remain after phase and existing signal filtering; absence of a fit is not a non-binding label."))
+        return {"phase": {"t_assoc": t_assoc, "t_dissoc": t_dissoc}, "error": "有效曲线不足 2 条",
+                "quality_control": quality(checks, traces=trace_metrics)}
 
-    results = {
-        "standard": fit_standard(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose),
-        "split": fit_split(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose),
-        "joint": fit_joint(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose),
-        "steady": fit_steady(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose),
-        "mixed": fit_mixed(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose),
-    }
+    results = {}
+    for name, fit_method in (("standard", fit_standard), ("split", fit_split), ("joint", fit_joint),
+                             ("steady", fit_steady), ("mixed", fit_mixed)):
+        try:
+            with warnings.catch_warnings(record=True) as numerical_warnings:
+                warnings.simplefilter("always")
+                results[name] = fit_method(t_all, y_all, conc_all, t_assoc, t_dissoc, verbose)
+            for warning in numerical_warnings:
+                checks.append(check("numerical_fit_warning", str(warning.message), method=name, category=warning.category.__name__))
+        except (ValueError, FloatingPointError, RuntimeError, np.linalg.LinAlgError):
+            results[name] = None
+            checks.append(check("method_not_fitted", "A fitting method did not produce a usable estimate.", method=name))
+    if len(set(conc_all)) <= 3:
+        checks.append(check("endpoint_fit_degrees_of_freedom", "Mixed endpoint isotherm has three parameters; three or fewer concentration levels cannot estimate its residual variance independently.", concentration_levels=len(set(conc_all))))
+    joint = results.get("joint") or {}
+    diagnostic = joint.get("diagnostics", {})
+    if not diagnostic.get("converged"):
+        checks.append(check("joint_not_converged", "The primary global kinetic optimizer did not establish convergence."))
+    if diagnostic.get("active_bounds"):
+        checks.append(check("parameter_at_bound", "Optimizer reports active parameter bounds; the fitted value may be constrained by the search range.", parameters=diagnostic["active_bounds"]))
+    if diagnostic.get("identifiability") == "numerically_rank_deficient":
+        checks.append(check("rank_deficient_fit", "Scaled Jacobian lacks full numerical rank; kinetic parameters are not separately resolved by this fit."))
+    checks.append(check("kinetic_assumptions", "A 1:1 model assumes appropriate referencing, concentration accuracy and no limiting transport/rebinding. These conditions cannot be established from this fit alone.", warning=False))
+    checks.append(check("steady_state_assumption", "Endpoint isotherm methods use the last two seconds; this does not prove equilibrium was reached.", warning=False))
     results["phase"] = {"t_assoc": t_assoc, "t_dissoc": t_dissoc}
-    return results
+    results["quality_control"] = quality(checks, traces=trace_metrics, fitted_curve_count=len(t_all),
+                                         distinct_concentrations=len(set(conc_all)), phase_source="inferred" if inferred else "user_supplied")
+    return finite_json(results)

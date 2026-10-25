@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
+import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleNotch, Flask, FolderPlus, MagicWand, Trash } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/reui/alert'
@@ -29,6 +31,7 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
 import { localizeStatusLabel } from '../../components/ui/statusLabel'
+import { currentRole } from '../research/jsonHelpers'
 import { projectText } from '../../lib/i18n/projectText'
 
 interface ProjectChooserProps {
@@ -37,6 +40,7 @@ interface ProjectChooserProps {
   compact?: boolean
   creating?: boolean
   onCreatingChange?: (creating: boolean) => void
+  onCreated?: () => void
 }
 
 const PROJECT_TYPE_OPTIONS = [
@@ -56,6 +60,7 @@ export function ProjectChooser({
   compact = false,
   creating: creatingProp,
   onCreatingChange,
+  onCreated,
 }: ProjectChooserProps) {
   const { t, format, language } = useI18n()
   const resolvedTitle = title ?? t.projects.projectChooser.defaultTitle
@@ -63,6 +68,7 @@ export function ProjectChooser({
   const queryClient = useQueryClient()
   const { visibleProjects, projectId, setProjectId } = useProjectContext()
   const appMode = useAppStore((state) => state.appMode)
+  const viewer = currentRole() === 'viewer'
   const selectedProject = visibleProjects.find((project) => project.id === projectId) ?? null
   const projectDelete = useDeleteProjectLifecycle()
   const [creatingInternal, setCreatingInternal] = useState(false)
@@ -108,6 +114,7 @@ export function ProjectChooser({
       setSummary('')
       setPrompt('')
       generatePrompt.reset()
+      onCreated?.()
     },
   })
 
@@ -160,11 +167,12 @@ export function ProjectChooser({
             type="button"
             variant="outline"
             className="self-end"
-            disabled={appMode === 'demo'}
-            onClick={() => setCreating(true)}
+            disabled={(viewer || appMode === 'demo') && !isPublicVisitor()}
+            render={isPublicVisitor() ? <Link to="/account" /> : undefined}
+            onClick={isPublicVisitor() ? undefined : () => setCreating(true)}
           >
             <FolderPlus aria-hidden="true" />
-            {appMode === 'demo'
+            {isPublicVisitor() ? (language === 'zh' ? '在 Private 新建项目' : 'Create in Private') : appMode === 'demo'
               ? t.projects.projectChooser.readOnlyDemo
               : t.projects.projectChooser.createProject}
           </Button>
@@ -179,7 +187,7 @@ export function ProjectChooser({
               type="button"
               variant="destructive"
               size="sm"
-              disabled={appMode === 'demo' || projectDelete.isPending}
+              disabled={viewer || appMode === 'demo' || projectDelete.isPending}
               onClick={confirmDelete}
             >
               {projectDelete.isPending && projectDelete.deletingProjectId === selectedProject.id ? (
@@ -211,7 +219,7 @@ export function ProjectChooser({
         ) : null}
       </AppFrame>
 
-      <Dialog open={creating} onOpenChange={setCreating}>
+      <Dialog open={creating && !viewer} onOpenChange={setCreating}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t.projects.projectChooser.createProject}</DialogTitle>

@@ -765,28 +765,17 @@ def test_completing_a_step_whose_successor_is_held_stops_at_the_gate(
     assert entry.writer_user_id == user.id
 
 
-def test_a_workflow_draft_stage_is_finished_by_the_person_who_finished_it(
-    session: Session,
-) -> None:
-    """The dead end one stage past `review`.
-
-    `complete_stage` first refused every stage with a product. Only an agent run
-    ends its own stage; a `workflow_run` is a *draft* the adapter hands to a
-    person to open and finish, so nothing was ever going to settle it and the
-    chain stopped at the first `compute` stage with no action available.
-    """
+def test_a_workflow_draft_cannot_be_declared_successful_by_hand(session: Session) -> None:
     from backend_v2.app.autopilot.service import complete_stage
 
     campaign, _, user = _campaign(session, stage_keys=["compute", "report"])
     compute, report = _stages(session, campaign)
-    compute.resource_type, compute.resource_id = "workflow_run", uuid.uuid4()
+    adapters.ensure_stage_resource(session, campaign, compute)
     compute.status = "ready"
     session.flush()
-
-    complete_stage(session, campaign, compute, compute.version, user)
-
-    assert compute.status == "succeeded"
-    assert report.status == "ready"
+    with pytest.raises(DomainError, match="which settles it"):
+        complete_stage(session, campaign, compute, compute.version, user)
+    assert compute.status == "ready" and report.status == "pending"
 
 
 def test_a_stage_carrying_an_agent_run_is_still_refused(session: Session) -> None:
@@ -823,9 +812,9 @@ def test_every_stage_key_has_a_way_to_end(session: Session) -> None:
     #: circular - widening it would simply send the walk down the other branch,
     #: and the test would keep passing while the stage it describes became
     #: unfinishable. The fact this encodes is about subscriptions: `stage_settled`
-    #: consumes `copilot.agent_run.settled`, and nothing consumes anything for a
-    #: workflow run.
-    REPORTED_BACK_BY_A_WORKER = {"copilot_agent_run"}
+    #: consumes `copilot.agent_run.settled`; `workflow_stage_settled` consumes
+    #: `job.settled` and checks the aggregate workflow outcome.
+    REPORTED_BACK_BY_A_WORKER = {"copilot_agent_run", "workflow_run"}
 
     keys = sorted(set(gates.STAGE_TIERS))
     campaign, _, user = _campaign(session, stage_keys=keys)
@@ -863,7 +852,7 @@ def test_the_adapter_set_is_pinned_so_a_new_one_revisits_the_walk_above() -> Non
     from backend_v2.app.autopilot.service import SELF_SETTLING_RESOURCE_TYPES
 
     assert set(adapters.ADAPTERS) == {"compute", "design", "research", "plan", "report"}
-    assert SELF_SETTLING_RESOURCE_TYPES == frozenset({"copilot_agent_run"})
+    assert SELF_SETTLING_RESOURCE_TYPES == frozenset({"copilot_agent_run", "workflow_run"})
 
 
 # --- The transitions that predate a campaign having an outcome ----------------

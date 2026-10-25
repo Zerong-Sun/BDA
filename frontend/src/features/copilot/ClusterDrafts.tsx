@@ -49,7 +49,6 @@ function DraftPanel({ draft, readOnly }: { draft: ClusterDraft; readOnly: boolea
           <strong className="text-sm text-foreground">{draft.name}</strong>
           <p className="text-xs text-muted-foreground">
             {queue} · {format(t.copilot.cluster.cpuGpu, { cpu: cpuCount, gpu: gpuCount })}
-            {draft.confirmed_job_id ? ` · ${draft.confirmed_job_id}` : ''}
           </p>
         </div>
         <Badge variant="info-light" size="xs">
@@ -66,6 +65,7 @@ function DraftPanel({ draft, readOnly }: { draft: ClusterDraft; readOnly: boolea
           <AccordionItem value={`script-${draft.id}`}>
             <AccordionTrigger>{t.copilot.cluster.reviewScript}</AccordionTrigger>
             <AccordionContent>
+              {draft.confirmed_job_id ? <p className="mb-2 break-all text-xs">{draft.confirmed_job_id}</p> : null}
               <pre className="whitespace-pre-wrap border bg-muted/40 p-2 font-mono text-[11px] text-muted-foreground">
                 {script}
               </pre>

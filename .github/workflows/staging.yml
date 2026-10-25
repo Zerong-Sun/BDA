@@ -20,7 +20,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-candidate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   supply-chain:
+    needs: verify-candidate
     runs-on: ubuntu-latest
     outputs:
       backend-digest: ${{ steps.backend.outputs.digest }}
@@ -29,7 +35,7 @@ jobs:
       frontend-image: ${{ steps.names.outputs.frontend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -44,7 +50,7 @@ jobs:
           echo "frontend=ghcr.io/${owner}/bda-frontend-v2" >> "$GITHUB_OUTPUT"
       - id: backend
         name: Build and push backend
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: backend_v2/Dockerfile
@@ -52,12 +58,12 @@ jobs:
           tags: ${{ steps.names.outputs.backend }}:sha-${{ github.sha }}
           build-args: |
             BDA_BUILD_REVISION=${{ github.sha }}
-            BDA_SCHEMA_REVISION=0070_af3_msa_port
+            BDA_SCHEMA_REVISION=0078_design_memory
           provenance: mode=max
           sbom: true
       - id: frontend
         name: Build and push frontend
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: frontend/Dockerfile
@@ -67,14 +73,14 @@ jobs:
           provenance: mode=max
           sbom: true
       - name: Generate backend SPDX SBOM
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ steps.names.outputs.backend }}@${{ steps.backend.outputs.digest }}
           format: spdx-json
           output-file: backend.spdx.json
           upload-artifact: false
       - name: Generate frontend SPDX SBOM
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ steps.names.outputs.frontend }}@${{ steps.frontend.outputs.digest }}
           format: spdx-json
@@ -114,7 +120,7 @@ jobs:
         run: |
           cosign sign --yes "$BACKEND"
           cosign sign --yes "$FRONTEND"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staging-sbom-${{ github.sha }}
           path: '*.spdx.json'
@@ -184,7 +190,7 @@ jobs:
       - name: Read-only smoke
         run: |
           curl --fail --show-error --silent --retry 12 --retry-all-errors \
-            "https://${STAGING_HOST}/api/v2/health/ready" | jq -e '.status == "ready"'
+            "https://${STAGING_HOST}/api/v2/health/ready" | jq -e '.status == "ok"'
       - name: Roll back failed release
         if: ${{ failure() && steps.prior.outputs.revision != '' }}
         run: helm rollback bda "${{ steps.prior.outputs.revision }}" -n bda-staging --wait --timeout 10m

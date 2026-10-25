@@ -87,7 +87,7 @@ def problem_response(
         status_code=status,
         content=body.model_dump(mode="json"),
         media_type="application/problem+json",
-        headers=headers,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", **(headers or {})},
     )
 
 
@@ -109,12 +109,17 @@ async def http_error_handler(request: Request, exc: HTTPException) -> JSONRespon
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Any endpoint may receive provider credentials, signed object URLs or private
+    # sequences. Model-level errors can contain the complete request in `input`;
+    # validator exceptions in `ctx` can contain it too. Apply the same boundary to
+    # every route rather than maintaining a fragile list of credential endpoints.
+    errors = [{key: value for key, value in error.items() if key not in {"input", "ctx"}} for error in exc.errors()]
     return problem_response(
         request,
         status=422,
         code="validation_error",
         detail="Request validation failed",
-        errors=exc.errors(),
+        errors=errors,
     )
 
 

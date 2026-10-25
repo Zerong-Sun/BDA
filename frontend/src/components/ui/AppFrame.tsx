@@ -25,10 +25,11 @@ export function AppFrame({
   children,
   className,
   panelClassName,
+  variant = 'ghost',
   ...props
 }: AppFrameProps) {
   return (
-    <Frame className={cn('min-w-0', className)} {...props}>
+    <Frame variant={variant} className={cn('min-w-0', variant === 'ghost' && 'bg-transparent [--frame-px:0px] [--frame-py:0px]', className)} {...props}>
       <FramePanel className={cn('min-w-0', panelClassName)}>
         {heading || description || actions ? (
           <FrameHeader className="flex-row items-start justify-between gap-3">

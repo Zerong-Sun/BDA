@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
+from ..audit.service import record_audit
 from ..core.config import get_settings
 from ..core.database import get_session
 from ..core.etag import etag, parse_if_match
@@ -434,7 +435,7 @@ def delete_finding(
 
 
 def _require_goal(session: Session, goal_id: uuid.UUID, user: User) -> ResearchGoal:
-    goal = goals.require_goal(session, goal_id)
+    goal = goals.require_goal(session, goal_id, for_update=True)
     require_project_permission(session, goal.project_id, user, "write")
     return goal
 
@@ -455,7 +456,7 @@ def get_research_goals(
                     field: getattr(row, field)
                     for field in (
                         "id", "project_id", "parent_id", "title", "detail",
-                        "status", "sort_order", "tags", "version", "created_at", "updated_at",
+                        "status", "sort_order", "tags", "decision_contract", "version", "created_at", "updated_at",
                     )
                 },
                 links=[
@@ -488,6 +489,7 @@ def post_research_goal(
         detail=payload.detail,
         parent_id=payload.parent_id,
         tags=payload.tags,
+        decision_contract=payload.decision_contract.model_dump(mode="json"),
     )
     return ResearchGoalResponse.model_validate(goal)
 
@@ -513,6 +515,7 @@ def patch_research_goal(
             "Goal was modified by someone else; reload before retrying.",
             status_code=412,
         )
+    previous_contract = dict(goal.decision_contract or {})
     updated = goals.update_goal(
         session,
         goal,
@@ -522,7 +525,12 @@ def patch_research_goal(
         parent_id=payload.parent_id,
         reparent=payload.reparent,
         tags=payload.tags,
+        decision_contract=payload.decision_contract.model_dump(mode="json") if payload.decision_contract is not None else None,
     )
+    if payload.decision_contract is not None:
+        record_audit(session, action="research.decision_contract.updated", entity_type="research_goal",
+                     entity_id=goal.id, actor_id=user.id, project_id=goal.project_id,
+                     payload={"before": previous_contract, "after": updated.decision_contract, "version": updated.version})
     response.headers["ETag"] = etag(updated.version)
     return ResearchGoalResponse.model_validate(updated)
 

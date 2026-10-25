@@ -19,7 +19,7 @@ from ..knowledge.models import KnowledgeEntry
 from ..literature.models import LiteratureDocument
 from ..platform.operations import enqueue_operation
 from ..research.models import ResearchFinding
-from ..research.workspace import preferred_review_brief
+from ..research.workspace import _references, preferred_review_brief
 from ..targets.repository import TargetRepository
 
 # Through the timeline domain's own service, never into its table: a prompt rewrite is
@@ -550,6 +550,23 @@ def soft_delete_builtin_research_duplicates(session: Session, organization_id: u
 
 
 def dedupe_builtin_research_projects(session: Session, projects: list[Project]) -> list[Project]:
+    # Consolidation removes a duplicate portfolio entry without moving the
+    # historical project's candidates or results into the current project.
+    visible = []
+    for project in projects:
+        link = (project.localized_content or {}).get("portfolio_consolidation", {})
+        target = None
+        if isinstance(link, dict) and link.get("role") == "historical_source":
+            try:
+                target = ProjectRepository(session).get(uuid.UUID(str(link.get("canonical_project_id"))))
+            except ValueError:
+                pass
+        if (target is not None and target.id != project.id
+                and target.organization_id == project.organization_id
+                and not (target.localized_content or {}).get("portfolio_consolidation")):
+            continue
+        visible.append(project)
+    projects = visible
     best_by_key: dict[str, Project] = {}
     for project in projects:
         key = _builtin_research_project_key(session, project)
@@ -596,9 +613,9 @@ def project_library_item(session: Session, project: Project) -> ProjectLibraryIt
             ),
         ),
         finding_count=package_count("finding_count", count(ResearchFinding, ResearchFinding.project_id == project.id)),
-        reference_count=package_count(
-            "reference_count", count(LiteratureDocument, LiteratureDocument.project_id == project.id)
-        ),
+        reference_count=len(_references(list(session.scalars(
+            select(LiteratureDocument).where(LiteratureDocument.project_id == project.id)
+        )))),
         knowledge_count=package_count(
             "knowledge_count", count(KnowledgeEntry, KnowledgeEntry.project_id == project.id)
         ),

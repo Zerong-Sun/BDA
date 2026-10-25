@@ -1,4 +1,4 @@
-import { API_BASE, authToken } from './client'
+import { API_BASE, authToken, captureAuthSession } from './client'
 
 /**
  * Reading a server-sent event stream.
@@ -46,6 +46,7 @@ function parseFrame(raw: string): ServerSentEvent | null {
  * non-2xx open - the caller decides whether that is fatal or a reason to poll.
  */
 export async function streamServerEvents(path: string, { onEvent, signal }: StreamOptions): Promise<void> {
+  const session = captureAuthSession()
   const token = authToken()
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'GET',
@@ -53,8 +54,9 @@ export async function streamServerEvents(path: string, { onEvent, signal }: Stre
       Accept: 'text/event-stream',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    signal,
+    signal: signal ? AbortSignal.any([signal, session.signal]) : session.signal,
   })
+  session.assertCurrent()
   if (!response.ok || !response.body) {
     throw new Error(`Stream ${path} failed to open (${response.status})`)
   }
@@ -65,12 +67,14 @@ export async function streamServerEvents(path: string, { onEvent, signal }: Stre
   try {
     for (;;) {
       const { done, value } = await reader.read()
+      session.assertCurrent()
       if (done) return
       buffer += decoder.decode(value, { stream: true })
       const frames = buffer.split(/\r?\n\r?\n/)
       // The tail is whatever has not been terminated by a blank line yet.
       buffer = frames.pop() ?? ''
       for (const frame of frames) {
+        session.assertCurrent()
         const parsed = parseFrame(frame)
         if (parsed) onEvent(parsed)
       }

@@ -14,6 +14,7 @@ def test_readiness_requires_current_scheduler_even_with_legacy_queue_override(mo
     settings = SimpleNamespace(
         required_worker_queue_list=["research"], build_revision="test", schema_revision="head", redis_url="redis://unused",
         scheduler_dispatch_paused=paused,
+        is_production=False,
     )
     rows = [SimpleNamespace(queues=["research"], build_revision="test", schema_revision="head", last_seen_at=now)]
     if scheduler != "absent":
@@ -58,3 +59,25 @@ def test_readiness_database_failure_fails_closed(monkeypatch):
     assert result.checks["scheduler_heartbeat"] == "unavailable"
     assert result.checks["worker_heartbeats"] == "unavailable"
     assert result.checks["postgresql"] == "unavailable"
+
+
+@pytest.mark.parametrize("restricted", [True, False])
+def test_production_readiness_rejects_roles_that_bypass_project_rls(monkeypatch, restricted):
+    settings = SimpleNamespace(
+        required_worker_queue_list=[], build_revision="test", schema_revision="head", redis_url="redis://unused",
+        scheduler_dispatch_paused=False, is_production=True,
+    )
+    repository = SimpleNamespace(
+        ping=lambda: None, schema_revision=lambda: "head", request_role_is_restricted=lambda: restricted,
+        recent_worker_heartbeats=lambda cutoff: [SimpleNamespace(
+            queues=["scheduler"], build_revision="test", schema_revision="head")],
+    )
+    monkeypatch.setattr(service, "get_settings", lambda: settings)
+    monkeypatch.setattr(service, "SessionFactory", lambda: nullcontext(None))
+    monkeypatch.setattr(service, "PlatformRepository", lambda _: repository)
+    monkeypatch.setattr(service, "Redis", SimpleNamespace(from_url=lambda _: SimpleNamespace(ping=lambda: True)))
+    monkeypatch.setattr(service, "ObjectStorage", lambda: SimpleNamespace(healthy=lambda: True))
+    response = Response()
+    result = api.readiness(response)
+    assert response.status_code == (200 if restricted else 503)
+    assert result.checks["database_request_role"] == ("ok" if restricted else "unsafe")

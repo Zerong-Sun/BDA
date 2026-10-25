@@ -46,6 +46,12 @@ class _FakeTransport:
         for offset in range(0, len(data), chunk_size):
             yield data[offset : offset + chunk_size]
 
+    def stream_checked(self, root: str, relative: str, *, max_bytes: int):
+        data = self.files[f"{root}/{relative}"]
+        if len(data) > max_bytes:
+            raise ValueError("checked_remote_read_size_exceeded")
+        yield from self.stream(f"{root}/{relative}")
+
 
 class _FakeStorage:
     """Object storage that records writes and streams reads, like the real one."""
@@ -332,7 +338,7 @@ def test_nested_rosetta_outputs_match_relative_globs_in_both_collectors(monkeypa
     # The presigned collector knows the full path from the verified object-key prefix,
     # even when its runner only supplied a display basename and no port/type.
     manifest = {"schema_version": "1", "outputs": [{k: v for k, v in ssh.items() if k not in {"port", "artifact_type"}}]}
-    monkeypatch.setattr(storage, "read_json", lambda _: manifest, raising=False)
+    monkeypatch.setattr(storage, "read_json", lambda _, **kwargs: manifest, raising=False)
     signed = adapters._collect_manifest(job)[0]
     assert signed == ssh
 

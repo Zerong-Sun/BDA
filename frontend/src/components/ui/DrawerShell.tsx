@@ -36,11 +36,11 @@ export function DrawerShell({
         className={`w-full ${widthClass}`}
         showCloseButton={false}
       >
-        <SheetHeader className="h-16 shrink-0 border-b border-border-soft px-4 py-3">
+        <SheetHeader className="min-h-16 shrink-0 border-b border-border-soft px-4 py-3">
           <SheetTitle className="sr-only">{title}</SheetTitle>
           {header}
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</div>
         {footer ? (
           <SheetFooter className="shrink-0 flex-row justify-end border-t border-border-soft bg-surface-1 p-4">
             {footer}

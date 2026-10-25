@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { ProjectTimeline } from './ProjectTimeline'
@@ -46,13 +46,87 @@ const ENTRY: TimelineEntry = {
 }
 
 beforeEach(() => {
+  window.location.hash = ''
+  useAppStore.setState({ language: 'en' })
   listAllTimeline.mockReset().mockResolvedValue([ENTRY])
   listResearchGoals.mockReset().mockResolvedValue([])
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.location.hash = '' })
+
+describe('saved plan navigation', () => {
+  it('finds a linked record after an earlier filter hid it, even without a view parameter', async () => {
+    renderWithProviders(<ProjectTimeline projectId="p1" />)
+    fireEvent.click(await screen.findByRole('combobox', { name: 'All outcomes' }))
+    const supported = await screen.findByRole('option', { name: 'Supported' })
+    fireEvent.pointerDown(supported, { button: 0 })
+    fireEvent.pointerUp(supported, { button: 0 })
+    fireEvent.click(supported)
+    await waitFor(() => expect(screen.queryByText('a recorded call')).not.toBeInTheDocument())
+    expect(screen.getByText('No records match the current filters.')).toBeVisible()
+    await act(async () => {
+      window.location.hash = '#/research?project=p1&tab=timeline&timeline_entry=e1'
+    })
+    expect(await screen.findByText('a recorded call')).toBeVisible()
+    expect(screen.getByText('a recorded call').closest('li')).toHaveFocus()
+  })
+
+  it('explains a missing linked record in an empty project too', async () => {
+    window.location.hash = '#/research?project=p1&tab=timeline&timeline_entry=missing'
+    listAllTimeline.mockResolvedValue([])
+    renderWithProviders(<ProjectTimeline projectId="p1" />)
+    expect(await screen.findByText(/The linked record was not found in this project/)).toBeVisible()
+  })
+
+  it('closes the previous project editor and clears filters when switching projects', async () => {
+    const ui = renderWithProviders(<ProjectTimeline projectId="p1" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'New entry' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Title' }), { target: { value: 'First project draft' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'All outcomes' }))
+    const supported = await screen.findByRole('option', { name: 'Supported' })
+    fireEvent.pointerDown(supported, { button: 0 })
+    fireEvent.pointerUp(supported, { button: 0 })
+    fireEvent.click(supported)
+    listAllTimeline.mockResolvedValue([{ ...ENTRY, id: 'e2', project_id: 'p2', title: 'Second project record' }])
+    ui.rerender(<ProjectTimeline projectId="p2" />)
+    expect(await screen.findByText('Second project record')).toBeVisible()
+    expect(screen.queryByDisplayValue('First project draft')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+  })
+
+  it('opens, expands and focuses a linked plan that is not in the decision tree', async () => {
+    window.location.hash = '#/research?project=p1&tab=timeline&timeline_view=timeline&timeline_entry=e1'
+    listAllTimeline.mockResolvedValue([{ ...ENTRY, entry_type: 'plan', body: 'Saved plan details', decision_ref: null }])
+    renderWithProviders(<ProjectTimeline projectId="p1" />)
+    expect(await screen.findByText('Saved plan details')).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('a recorded call').closest('li')).toHaveFocus()
+    expect(listResearchGoals).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('tab', { name: 'Decision tree' }))
+    expect(window.location.hash).not.toContain('timeline_entry')
+    expect(window.location.hash).toContain('timeline_view=tree')
+  })
+
+  it('explains an unavailable record while retaining the project history', async () => {
+    window.location.hash = '#/research?project=p1&tab=timeline&timeline_view=timeline&timeline_entry=other-project-entry'
+    renderWithProviders(<ProjectTimeline projectId="p1" />)
+    expect(await screen.findByText(/The linked record was not found in this project/)).toBeVisible()
+    expect(screen.getByText('a recorded call')).toBeVisible()
+  })
+})
 
 describe('the filter row', () => {
+  it('recovers from a filter with no matching records without reloading', async () => {
+    renderWithProviders(<ProjectTimeline projectId="p1" />)
+    fireEvent.click(await screen.findByRole('combobox', { name: 'All outcomes' }))
+    const supported = await screen.findByRole('option', { name: 'Supported' })
+    fireEvent.pointerDown(supported, { button: 0 })
+    fireEvent.pointerUp(supported, { button: 0 })
+    fireEvent.click(supported)
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }))
+    expect(await screen.findByText('a recorded call')).toBeVisible()
+  })
+
   it('shows readable labels rather than the internal sentinels', async () => {
     // Base UI's Select.Value renders the raw value unless handed a formatter, so the
     // unfiltered state used to display `__all__` in all four controls.

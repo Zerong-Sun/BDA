@@ -1,21 +1,25 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { DotsSixVerticalIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/react'
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useLocation } from 'react-router'
+import { DotsSixVerticalIcon, DotsThreeIcon, ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import { CopilotChat } from '../../features/copilot/CopilotChat'
 import { CopilotActions } from '../../features/copilot/CopilotActions'
 import { CopilotChain } from '../../features/copilot/CopilotChain'
-import { CopilotMcpSessions } from '../../features/copilot/CopilotMcpSessions'
+const CopilotMcpSessions = lazy(() => import('../../features/copilot/CopilotMcpSessions').then((module) => ({ default: module.CopilotMcpSessions })))
 import { CopilotWorkspace } from '../../features/copilot/CopilotWorkspace'
-import { CopilotSettings } from '../../features/copilot/CopilotSettings'
+import { CopilotReview } from '../../features/copilot/CopilotReview'
+const CopilotSettings = lazy(() => import('../../features/copilot/CopilotSettings').then((module) => ({ default: module.CopilotSettings })))
 import { useI18n } from '../../lib/i18n'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
-import { managesProject, useProjectAccess } from '../../lib/hooks/useProjectAccess'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
+import { useCopilotReadOnly } from '../../features/copilot/commandAccess'
 import { currentRole } from '../../features/research/jsonHelpers'
 import { resolveBot, useCopilotBots } from '../../features/copilot/bots/registry'
 import { useAppStore } from '../../lib/store/appStore'
 import { Button } from './Button'
 import { ScrollArea } from './scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './sheet'
-import { Tabs, TabsList, TabsTrigger } from './Tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
 
 interface CopilotDrawerProps {
   open: boolean
@@ -25,33 +29,33 @@ interface CopilotDrawerProps {
 
 export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps) {
   const { t, language } = useI18n()
+  const location = useLocation()
+  const tourActive = useAppStore((state) => state.tourState.status === 'active')
+  const route = `${location.pathname}${location.search}`
+  const previousRoute = useRef(route)
+  useEffect(() => {
+    // Follow real navigation, including links from tool evidence and deliveries.
+    // The destination must not stay obscured by the modal that initiated it.
+    // An active tour coordinates navigation and the drawer together.
+    if (previousRoute.current !== route && open && !tourActive) onClose()
+    previousRoute.current = route
+  }, [route, open, onClose, tourActive])
   const copilotWidth = useAppStore((s) => s.copilotWidth)
   const setCopilotWidth = useAppStore((s) => s.setCopilotWidth)
   // Written into the per-project session rather than passed down, because that is
   // where `useCopilotChat` reads the selected operator from - handing it through
   // props would be a second source for one selection.
-  const { projectId } = useProjectContext()
+  const { projectId, activeProject } = useProjectContext()
   const setCopilotSessionBot = useAppStore((s) => s.setCopilotSessionBot)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // Model configuration is a project manager's decision, as on the Research team page.
+  // Match the config API's project-write permission, as in application settings.
   const access = useProjectAccess(projectId)
-  const canConfigure = managesProject(access.data) || currentRole() === 'admin'
+  const readOnly = useCopilotReadOnly()
+  const canConfigure = !readOnly && (access.data?.permissions.write === true || currentRole() === 'admin')
   const bots = useCopilotBots()
-  // Chat, the chain record, runs and MCP grants are alternatives rather than
-  // companions: a transcript and a conversation both want the whole drawer, and
-  // showing them at once would leave neither readable. MCP sits here rather than
-  // in settings because a grant is scoped to a run and a project, which is what
-  // this drawer is already about - settings is where the model provider lives.
-  //
-  // A tab set rather than four toggle buttons. They were already mutually
-  // exclusive and already announced `aria-pressed`, which is a tab group wearing
-  // buttons: arrow keys did not move between them, and four of them beside a
-  // title and a close button wrapped in a 300px drawer. `Tabs` is already in the
-  // repo and says the right thing to a screen reader without being told.
-  //
-  // Named as on the Research team page. The separate run list is gone: every task
-  // is already listed, under its owner, in Tasks & deliverables.
-  const [surface, setSurface] = useState<'tasks' | 'chat' | 'chain' | 'mcp'>('tasks')
+  // Primary intents stay visible. Infrequent handoffs and access grants belong
+  // in the overflow menu; neither is a second task creation path.
+  const [surface, setSurface] = useState<'tasks' | 'review' | 'chat' | 'chain' | 'mcp'>('tasks')
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -83,7 +87,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
         data-tour-id="copilot-drawer"
         side="right"
         showCloseButton={false}
-        className="w-full sm:max-w-none"
+        className="copilot-console w-full sm:max-w-none"
         style={{ width: `min(${copilotWidth}px, 100vw)` }}
       >
         <Button
@@ -101,8 +105,18 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           <DotsSixVerticalIcon className="h-4 w-4" aria-hidden="true" />
         </Button>
         <SheetHeader className="flex-row items-center justify-between gap-2 border-b">
-          <SheetTitle className="truncate text-sm">{t.copilot.drawer.toggleLabel}</SheetTitle>
+          <div className="min-w-0">
+            <SheetTitle className="truncate text-sm">{t.copilot.drawer.toggleLabel}</SheetTitle>
+            <p className="truncate text-xs text-text-secondary" title={activeProject?.name}>{activeProject?.name ?? (language === 'zh' ? '未选择项目' : 'No project selected')}</p>
+          </div>
           <div className="flex shrink-0 items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" />} aria-label={language === 'zh' ? '更多助手工具' : 'More assistant tools'}><DotsThreeIcon aria-hidden="true" /></DropdownMenuTrigger>
+              <DropdownMenuContent align="end"><DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => { setSettingsOpen(false); setSurface('chain') }}>{language === 'zh' ? 'Bot 交接' : 'Bot handoffs'}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setSettingsOpen(false); setSurface('mcp') }}>{language === 'zh' ? '外部接入' : 'External access'}</DropdownMenuItem>
+              </DropdownMenuGroup></DropdownMenuContent>
+            </DropdownMenu>
             {canConfigure ? (
               <Button
                 type="button"
@@ -111,7 +125,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
                 aria-pressed={settingsOpen}
                 onClick={() => setSettingsOpen((value) => !value)}
               >
-                {t.copilot.drawer.modelSettings}
+                {settingsOpen ? (language === 'zh' ? '返回助手' : 'Back to assistant') : t.copilot.drawer.modelSettings}
               </Button>
             ) : null}
             <Button
@@ -125,34 +139,42 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
             </Button>
           </div>
         </SheetHeader>
-        {/* On its own row: four labels plus the header's own controls do not fit
-            across a 300px drawer, and wrapping them put the close button under
-            the title. */}
-        <Tabs
-          value={surface}
-          onValueChange={(value) => setSurface(value as typeof surface)}
-          className="shrink-0 border-b px-2 pb-1"
-        >
-          <TabsList variant="line" className="w-full justify-start gap-0.5 overflow-x-auto">
-            <TabsTrigger value="tasks">{language === 'zh' ? '任务与交付' : 'Tasks & deliverables'}</TabsTrigger>
-            <TabsTrigger value="chat">{language === 'zh' ? '对话' : 'Conversation'}</TabsTrigger>
-            <TabsTrigger value="chain">{language === 'zh' ? 'Bot 交接' : 'Bot handoffs'}</TabsTrigger>
-            <TabsTrigger value="mcp">{language === 'zh' ? '外部接入' : 'External access'}</TabsTrigger>
-          </TabsList>
-        </Tabs>
         {settingsOpen && canConfigure ? (
-          <ScrollArea className="h-[40%] shrink-0 border-b">
-            <CopilotSettings />
+          <ScrollArea className="min-h-0 flex-1">
+            <Suspense fallback={null}><CopilotSettings /></Suspense>
           </ScrollArea>
         ) : null}
-        {surface === 'tasks' ? (
-          <CopilotWorkspace pageContext={pageContext} />
-        ) : surface === 'mcp' ? (
+        <Tabs
+          hidden={settingsOpen && canConfigure}
+          value={surface}
+          onValueChange={(value) => setSurface(value as typeof surface)}
+          className={settingsOpen && canConfigure ? 'hidden' : 'min-h-0 flex-1 gap-0'}
+        >
+          <TabsList variant="line" className="grid h-auto! w-full shrink-0 grid-cols-3 border-b px-2">
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal leading-tight" value="tasks">{language === 'zh' ? '发起任务' : 'Start a task'}</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal leading-tight" value="review">{language === 'zh' ? '决策与参数' : 'Decisions & parameters'}</TabsTrigger>
+            <TabsTrigger className="min-h-11 min-w-0 whitespace-normal leading-tight" value="chat">{language === 'zh' ? '对话' : 'Conversation'}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tasks" keepMounted className="min-h-0 overflow-y-auto">
+            <CopilotWorkspace pageContext={pageContext} rememberDraft onConfigureModel={canConfigure ? () => setSettingsOpen(true) : undefined} />
+          </TabsContent>
+          <TabsContent value="review" className="min-h-0 overflow-y-auto">
+            <CopilotReview />
+          </TabsContent>
+          <TabsContent value="chat" className="min-h-0 overflow-hidden">
+            <div className="flex h-full min-h-0 flex-col">
+              <CopilotActions onNavigate={onClose} />
+              <div className="min-h-0 flex-1"><CopilotChat pageContext={pageContext} /></div>
+            </div>
+          </TabsContent>
+        {surface === 'mcp' ? (
           <ScrollArea className="min-h-0 flex-1">
-            <CopilotMcpSessions />
+            <h3 className="px-4 pt-3 font-semibold">{language === 'zh' ? '外部接入' : 'External access'}</h3>
+            <Suspense fallback={null}><CopilotMcpSessions /></Suspense>
           </ScrollArea>
         ) : surface === 'chain' ? (
           <ScrollArea className="min-h-0 flex-1">
+            <h3 className="px-4 pt-3 font-semibold">{language === 'zh' ? 'Bot 交接' : 'Bot handoffs'}</h3>
             {/* Naming the successor moves the reader to it. Reading what was
                 handed over and then hunting for the recipient in the chat's own
                 dropdown is the handoff protocol working on paper only. */}
@@ -164,16 +186,8 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
               }}
             />
           </ScrollArea>
-        ) : (
-          <>
-            <div className="shrink-0">
-              <CopilotActions onNavigate={onClose} />
-            </div>
-            <div className="min-h-0 flex-1">
-              <CopilotChat pageContext={pageContext} />
-            </div>
-          </>
-        )}
+        ) : null}
+        </Tabs>
       </SheetContent>
     </Sheet>
   )

@@ -1,4 +1,4 @@
-import { API_BASE, apiAuthorizationHeaders } from './client'
+import { API_BASE, apiAuthorizationHeaders, captureAuthSession } from './client'
 import './generatedTransport'
 import {
   getArtifactApiV2ArtifactsArtifactIdGet,
@@ -25,10 +25,12 @@ function inferArtifactType(format: string): string {
 }
 
 export async function uploadArtifact(file: File, projectId?: string): Promise<Artifact> {
+  const session = captureAuthSession()
   if (!projectId) throw new Error('A project is required for artifact uploads.')
   const format = inferFormat(file.name)
   const artifactType = inferArtifactType(format)
   const uploadResult = await postUploadApiV2ArtifactUploadsPost<true>({
+    signal: session.signal,
     body: { project_id: projectId, filename: file.name,
       artifact_type: artifactType === 'structure' ? 'target_structure' : artifactType,
       content_type: file.type || 'application/octet-stream' },
@@ -37,9 +39,12 @@ export async function uploadArtifact(file: File, projectId?: string): Promise<Ar
   const upload = uploadResult.data
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
   const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
-  const response = await fetch(upload.upload_url, { method: 'PUT', headers: upload.required_headers, body: file })
+  session.assertCurrent()
+  const response = await fetch(upload.upload_url, { method: 'PUT', headers: upload.required_headers, body: file, signal: session.signal })
+  session.assertCurrent()
   if (!response.ok) throw new Error(`Object upload failed (${response.status})`)
   const artifact = await postCompleteApiV2ArtifactUploadsUploadIdCompletePost<true>({
+    signal: session.signal,
     path: { upload_id: upload.id },
     body: { checksum_sha256: checksum, lineage: { source: 'browser_upload' }, lineage_edges: [] },
     throwOnError: true,
@@ -70,6 +75,7 @@ export async function getArtifact(artifactId: string): Promise<Artifact> {
 }
 
 export async function downloadArtifact(artifact: Artifact): Promise<void> {
+  const session = captureAuthSession()
   const url = artifact.download_url
   if (!url) throw new Error('No download URL is available for this artifact.')
   const baseOrigin = API_BASE.startsWith('http') ? new URL(API_BASE).origin : ''
@@ -78,11 +84,13 @@ export async function downloadArtifact(artifact: Artifact): Promise<void> {
     : `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`
   const response = await fetch(downloadUrl, {
     headers: apiAuthorizationHeaders(downloadUrl),
+    signal: session.signal,
   })
   if (!response.ok) {
     throw new Error(`Artifact download failed (${response.status})`)
   }
   const blob = await response.blob()
+  session.assertCurrent()
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = objectUrl

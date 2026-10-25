@@ -7,6 +7,7 @@ import json
 
 from ..core.config import get_settings
 from ..registry.runtime_validation import plugin_declaration_fingerprint
+from .access import lsf_target_snapshot
 from .scripts import preview_context, render_script
 
 
@@ -17,7 +18,7 @@ def render_review(node, plugin, backend: str, manifest: dict) -> tuple[str, str]
     script = render_script(preview_context(node, plugin, backend, command, manifest["parameters"]))
     settings = get_settings()
     site = (
-        {"host": settings.lsf_ssh_host, "root": settings.lsf_remote_root, "staging": settings.lsf_staging_mode}
+        lsf_target_snapshot()
         if backend == "lsf"
         else {"host": settings.docker_host}
         if backend == "docker"

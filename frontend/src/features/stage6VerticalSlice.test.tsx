@@ -2,6 +2,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ApiState } from '../components/ui/ApiState'
+import { WorkspaceNavigation } from '../components/ui/WorkspaceNavigation'
 import { Topbar } from '../components/ui/Topbar'
 import { WorkflowProgress } from './experiments/WorkflowProgress'
 import { CandidateStructureOverlay } from './candidates/CandidateStructureOverlay'
@@ -110,10 +111,11 @@ beforeEach(() => {
 })
 
 describe('Stage 6 vertical slice', () => {
-  it('keeps a non-expert on the readiness recovery path and explains candidate provenance', () => {
+  it('keeps imported evidence accessible while explaining the readiness blocker', () => {
     renderWithProviders(
       <>
         <Topbar />
+        <WorkspaceNavigation />
         <WorkflowProgress projectQuery="?project=proj_vertical" overview={blockedOverview} hasProject />
         <TargetStructureOverlay target={target} readiness={readiness} projectId="proj_vertical" />
         <CandidateStructureOverlay
@@ -135,7 +137,7 @@ describe('Stage 6 vertical slice', () => {
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Continue' })).toHaveAttribute(
       'href',
-      '#/research?project=proj_vertical',
+      '#/results?project=proj_vertical',
     )
     expect(screen.getByText('Target structure interpretation overlay')).toBeInTheDocument()
     expect(screen.getByText('Confirm target identity')).toBeInTheDocument()

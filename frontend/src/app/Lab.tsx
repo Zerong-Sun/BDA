@@ -1,34 +1,40 @@
-import { Disclosure } from '../components/ui/Disclosure'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { Button } from '../components/ui/Button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs'
 import { ProjectChooser } from '../features/projects/ProjectChooser'
 import { useI18n } from '../lib/i18n'
 import { useProjectContext } from '../lib/hooks/useProjectContext'
 import { ProteinLibrary } from '../features/lab/ProteinLibrary'
-import { BenchCalculators } from '../features/lab/BenchCalculators'
 import { InstrumentAnalysis } from '../features/lab/InstrumentAnalysis'
 
-/**
- * The wet-lab bench: the constructs in hand and the numbers a run starts from.
- *
- * Sits between Candidates and Results in the loop, because this is where a
- * design becomes something measurable and where the measurement comes from.
- */
-export function LabPage({ toolbox = false }: { toolbox?: boolean }) {
-  const { t, language } = useI18n()
+/** Project constructs, recorded instrument analysis and human quality review. */
+export function LabPage() {
+  const { language } = useI18n()
   const { projectId } = useProjectContext()
+  const [search, setSearch] = useSearchParams()
+  const section = search.get('section') === 'analysis' ? 'analysis' : 'library'
+  const zh = language === 'zh'
 
   return (
     <div className="space-y-8" data-tour-id="lab-page">
       <header className="space-y-1">
-        <h1 className="text-2xl font-medium">{toolbox ? (language === 'zh' ? '实验工具箱' : 'Lab toolbox') : t.lab.title}</h1>
-        <p className="text-text-secondary">{toolbox ? (language === 'zh' ? '直接计算或预览仪器数据，需要保存时再关联项目。' : 'Calculate or preview instrument data. Associate a project when you want to save.') : t.lab.subtitle}</p>
+        <h1 className="text-2xl font-medium">{zh ? '项目实验' : 'Project lab'}</h1>
+        <p className="text-text-secondary">{zh ? '管理项目蛋白与构建体，保存仪器分析并记录人工质控。' : 'Manage project proteins and constructs, record instrument analyses, and review measurement quality.'}</p>
       </header>
-      {toolbox ? <Disclosure className="rounded-lg border border-border-soft p-4" title={language === 'zh' ? '选择保存项目（可选）' : 'Choose a project for saving (optional)'}><ProjectChooser compact /></Disclosure> : <Button variant="outline" render={<Link to="/tools" />}>{language === 'zh' ? '独立使用工具箱' : 'Open standalone toolbox'}</Button>}
-      {projectId && !toolbox ? <ProteinLibrary projectId={projectId} /> : null}
-      <BenchCalculators projectId={projectId || ''} />
-      <InstrumentAnalysis projectId={projectId || ''} previewOnly={toolbox} />
-
+      <Button type="button" variant="outline" render={<Link to="/tools" />}>{zh ? '打开独立计算与预览工具' : 'Open standalone calculations and previews'}</Button>
+      {!projectId ? <ProjectChooser compact /> : <Tabs value={section} onValueChange={(value) => {
+        const next = new URLSearchParams(search)
+        next.set('section', value === 'analysis' ? 'analysis' : 'library')
+        next.set('project', projectId)
+        setSearch(next)
+      }}>
+        <TabsList variant="line" aria-label={zh ? '项目实验分区' : 'Project lab sections'}>
+          <TabsTrigger value="library">{zh ? '蛋白与构建体库' : 'Proteins & constructs'}</TabsTrigger>
+          <TabsTrigger value="analysis">{zh ? '仪器分析与质控' : 'Instrument analysis & QC'}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="library">{section === 'library' ? <ProteinLibrary key={projectId} projectId={projectId} /> : null}</TabsContent>
+        <TabsContent value="analysis">{section === 'analysis' ? <InstrumentAnalysis key={projectId} projectId={projectId} /> : null}</TabsContent>
+      </Tabs>}
     </div>
   )
 }

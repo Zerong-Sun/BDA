@@ -68,9 +68,9 @@ describe('Decision inbox', () => {
 
     const input = screen.getByRole('region', { name: 'Needs your input' })
     // Recorded under a retired id, owned now by the operator that absorbed it.
-    expect(await within(input).findByRole('link', { name: /Search PD1 literature/ })).toHaveAttribute('href', '#/bots/researcher?project=project-inbox&run=r1')
+    expect(await within(input).findByRole('link', { name: /Search PD1 literature/ })).toHaveAttribute('href', '#/bots?project=project-inbox&view=tasks&run=r1')
     expect(within(input).queryByText(/Delegated child/)).not.toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Ready for your review' })).getByRole('link', { name: /Plan the route/ })).toHaveAttribute('href', '#/bots/planner?project=project-inbox&run=r2')
+    expect(within(screen.getByRole('region', { name: 'Ready for your review' })).getByRole('link', { name: /Plan the route/ })).toHaveAttribute('href', '#/bots?project=project-inbox&view=tasks&run=r2')
     expect(screen.queryByText(/Still thinking/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Already recorded/)).not.toBeInTheDocument()
 
@@ -87,7 +87,7 @@ describe('Decision inbox', () => {
     expect(within(waiting).getByText(/2 options/)).toBeInTheDocument()
 
     const evidence = screen.getByRole('region', { name: 'Claims without evidence' })
-    expect(await within(evidence).findByRole('link', { name: /Evidence for routing/ })).toHaveAttribute('href', '#/bots/planner?project=project-inbox')
+    expect(await within(evidence).findByRole('link', { name: /Evidence for routing/ })).toHaveAttribute('href', '#/bots?project=project-inbox&view=handoffs')
     expect(within(evidence).queryByText(/Draft ready/)).not.toBeInTheDocument()
     expect(screen.queryByText('Nothing needs your decision right now.')).not.toBeInTheDocument()
   })
@@ -96,6 +96,30 @@ describe('Decision inbox', () => {
     handlers()
     renderWithProviders(<InboxPage />)
     expect(await screen.findByText('Nothing needs your decision right now.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Needs your input' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Project results & reports' })).toHaveAttribute('href', '#/research?project=project-inbox')
+    expect(screen.queryByRole('region', { name: 'Compute drafts to confirm' })).not.toBeInTheDocument()
+  })
+
+  it('shows saved delivery summaries instead of repeating execution instructions', async () => {
+    handlers({ runs: [run('r1', 'Long execution instructions', 'researcher', 'succeeded', 'completed', { outcome: { status: 'completed', summary: 'Evidence report ready; sample identity still needs review.' } })] })
+    renderWithProviders(<InboxPage />)
+    expect(await screen.findByRole('link', { name: /Evidence report ready/ })).toHaveAttribute('href', '#/bots?project=project-inbox&view=tasks&run=r1')
+    expect(screen.queryByText('Long execution instructions')).not.toBeInTheDocument()
+  })
+
+  it('keeps long queues compact and exposes older items on demand', async () => {
+    handlers({ runs: Array.from({ length: 10 }, (_, i) => run(`r${i}`, `Input ${i}`, 'researcher', 'succeeded', 'needs_input', { updated_at: `2026-09-${String(10 + i).padStart(2, '0')}T00:00:00Z` })) })
+    renderWithProviders(<InboxPage />)
+    const section = screen.getByRole('region', { name: 'Needs your input' })
+    const expand = await within(section).findByRole('button', { name: 'Show all 10' })
+    expect(within(section).getAllByRole('link')).toHaveLength(8)
+    expect(within(section).getAllByRole('link')[0]).toHaveTextContent('Input 9')
+    expect(within(section).queryByText('Input 0')).not.toBeInTheDocument()
+    fireEvent.click(expand)
+    expect(within(section).getAllByRole('link')).toHaveLength(10)
+    fireEvent.click(within(section).getByRole('button', { name: 'Show less' }))
+    expect(within(section).getAllByRole('link')).toHaveLength(8)
   })
 
   it('keeps the other sources visible when one cannot be read, and recovers it', async () => {

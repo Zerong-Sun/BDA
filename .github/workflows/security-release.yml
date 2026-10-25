@@ -1,0 +1,57 @@
+name: Security upgrade candidate
+
+on:
+  push:
+    branches: [codex/security-release-20261025]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bda-security-candidate
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  publish-candidate:
+    needs: verify
+    if: github.ref == 'refs/heads/codex/security-release-20261025'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Recheck public data before packaging
+        run: python scripts/check_public_data.py
+      - name: Create source archive and checksum
+        env:
+          TAG: v2.6.0-rc.3
+        run: |
+          git archive --format=tar --prefix="bda-${TAG}/" HEAD | gzip -n > "bda-${TAG}-source.tar.gz"
+          sha256sum "bda-${TAG}-source.tar.gz" > SHA256SUMS
+          printf '%s\n' "${GITHUB_SHA}" > SOURCE_COMMIT
+      - name: Publish the verified security candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v2.6.0-rc.3
+        run: |
+          # Never move an existing version to a different commit.
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            git fetch origin "refs/tags/${TAG}"
+            test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+            echo "The exact candidate is already published."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "BDA 2.6 RC3 — security upgrade" \
+            --notes-file docs/SECURITY_UPGRADE_2026-10-25.md \
+            "bda-${TAG}-source.tar.gz" SHA256SUMS SOURCE_COMMIT

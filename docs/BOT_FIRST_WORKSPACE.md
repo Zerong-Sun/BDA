@@ -2,13 +2,19 @@
 
 状态：活跃
 
-最后核验：2026-09-14（Asia/Shanghai）
+最后核验：2026-10-11（导航入口更新；历史验收批次保留原日期）
 
 权威范围：Bot 优先工作区的诊断、设计、实现清单与验收记录。
 
-数据来源：`codex/bot-first-science-workspace` 分支的前端代码、浏览器验收脚本与公开 PD1 演示包。
+数据来源：当前导航与 Bots/Research 页面代码，以及原 `codex/bot-first-science-workspace` 分支的实现、浏览器验收脚本与公开 PD1 演示包。
 
-替代关系：不取代 [前端架构与 API 契约](FRONTEND_V2.md)；Bot 名册与职责边界以 [Copilot Bot Roster](COPILOT_BOT_ROSTER.md) 为准。
+替代关系：当前导航、研究记录和文献任务入口以 [导航与工作区入口契约](NAVIGATION_WORKSPACE_CONTRACT.md)为准；不取代 [前端架构与 API 契约](FRONTEND_V2.md)；Bot 名册与职责边界以 [Copilot Bot Roster](COPILOT_BOT_ROSTER.md) 为准。
+
+## 当前入口（2026-10-11）
+
+研究团队仍是任务、对话与交接的统一工作区。Research 文献入口只向 `/bots?project=…&view=tasks&service=literature` 交接可编辑草稿，不再嵌入另一套任务界面；完整草稿参数和项目隔离规则见导航契约。导航不会自动启动任务或授予写入权限，已有未提交草稿由用户决定保留或替换。
+
+实验工具使用主导航 `/tools`。完整决策记录统一位于 `/research?project=…&tab=timeline`，旧 `/timeline` 仅作兼容重定向。帮助入口统一收纳导览、指南和 FAQ。以下内容保留各次改版的设计与历史验收，不将旧批次验证数字视为本次全量验收。
 
 Status: implemented and reviewed · 2026-09-14
 
@@ -257,9 +263,12 @@ Each source loads, fails and retries on its own; the all-clear message appears
 only when every source has been read. Live runs and delegated child runs are
 excluded, because a child reports through its parent.
 
-The main navigation now reads by who acts: **Projects · Decisions · Research
-team · Research**. Workflow, Candidates, Lab, Results and Timeline sit under a
-**Workbenches** menu on desktop; on small screens every route remains a link.
+The main navigation now reads **Projects · Decisions · Research team · Research · Lab tools**.
+The **Workbenches** menu groups Workflow/Candidates under Computational design,
+Lab/Project learning/Results under Experimental learning, and Capabilities &
+extensions under Platform. Full history lives in Research → Decision record;
+Timeline is no longer a second navigation destination. On small screens each
+workbench route remains a link.
 The Bots overview is titled **Research team**. There is no count badge in the
 top bar, so no route issues extra requests on arrival.
 
@@ -268,7 +277,7 @@ top bar, so no route issues extra requests on arrival.
 Branch: `claude/bot-interaction-decision-display-fb5506`, stacked on the
 six-operator roster and the decision inbox. Five steps, each separately
 mergeable; the plan they follow is
-[研究室与结构位点选择规划](plans/BOT_ROOM_PLAN.md).
+[研究室与结构位点选择规划](archive/2026-09-30/BOT_ROOM_PLAN.md).
 
 ### The room
 

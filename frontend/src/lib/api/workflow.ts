@@ -41,7 +41,21 @@ export function listWorkflowNodes(workflowRunId: string): Promise<WorkflowNode[]
 
 export function getWorkflowGraph(workflowRunId: string): Promise<WorkflowGraph> {
   return getWorkflowGraphApiV2WorkflowRunsWorkflowIdGraphGet<true>({ path: { workflow_id: workflowRunId },
-    throwOnError: true }).then(({ data }) => WorkflowGraphSchema.parse(data))
+    throwOnError: true }).then(({ data }) => {
+    const graph = WorkflowGraphSchema.parse(data)
+    const storedEdges = graph.workflow.graph.edges
+    // Older imports have ordering edges with no persisted gate identity. The API
+    // response schema supplies a new UUID on every read; never use that transient
+    // identity for canvas keys or gate operations against the stored graph.
+    if (Array.isArray(storedEdges)) graph.edges = graph.edges.map((edge, index) => {
+      const stored = storedEdges[index]
+      if (stored && typeof stored === 'object' && !stored.id && stored.source === edge.source && stored.target === edge.target) {
+        return { ...edge, id: `legacy:${index}:${edge.source}:${edge.target}`, gate: undefined, legacy_connection: true }
+      }
+      return edge
+    })
+    return graph
+  })
 }
 
 export function getWorkflowPreflight(
@@ -118,6 +132,7 @@ export function addWorkflowNode(
   workflowRunId: string,
   payload: {
     node_type: string
+    execution_mode?: 'dispatch' | 'manual'
     key: string
     model_plugin?: string
     model_plugin_id?: string
@@ -129,6 +144,7 @@ export function addWorkflowNode(
   return workflowIfMatch(workflowRunId).then((headers) => addWorkflowNodeApiV2WorkflowRunsWorkflowIdNodesPost<true>({
     path: { workflow_id: workflowRunId }, headers, body: {
       key: payload.key, node_type: payload.node_type,
+      ...(payload.execution_mode ? { execution_mode: payload.execution_mode } : {}),
       model_plugin: payload.model_plugin ?? payload.node_type,
       model_plugin_id: payload.model_plugin_id, parameters: payload.parameters ?? {}, position: payload.position,
     }, throwOnError: true,

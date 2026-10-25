@@ -27,6 +27,7 @@ from .capabilities import (
     normalize_capabilities,
 )
 from .models import CopilotAgentRun, CopilotConfig, CopilotMcpSession
+from .procedural_skills import ProceduralSkillDetail, ProceduralSkillSummary, catalog, require_skill
 from .provider import complete as complete_with_provider
 from .provider import credential_available
 from .provider_selection import select_provider
@@ -107,6 +108,7 @@ BOTS = [
     BotResponse(
         id=bot.id,
         title=bot.title,
+        aliases=list(bot.aliases),
         title_zh=bot.title_zh,
         phase=bot.phase,
         stance=bot.stance,
@@ -145,6 +147,17 @@ def _config_response(session: Session, row: CopilotConfig) -> CopilotConfigRespo
 @router.get("/skills", response_model=list[SkillResponse])
 def list_skills(user: User = Depends(current_user)) -> list[SkillResponse]:
     return SKILLS
+
+
+@router.get("/procedural-skills", response_model=list[ProceduralSkillSummary])
+def list_procedural_skills(user: User = Depends(current_user)) -> list[ProceduralSkillSummary]:
+    """Bundled scientific methods. These do not grant project capabilities."""
+    return [ProceduralSkillSummary.model_validate(item.model_dump(exclude={"instructions"})) for item in catalog()]
+
+
+@router.get("/procedural-skills/{skill_id}", response_model=ProceduralSkillDetail)
+def get_procedural_skill(skill_id: str, user: User = Depends(current_user)) -> ProceduralSkillDetail:
+    return require_skill(skill_id)
 
 
 @router.get("/bots", response_model=list[BotResponse])
@@ -212,11 +225,15 @@ def post_chat(
         },
         intent=payload.intent,
     )
-    return ChatAccepted(
+    accepted = ChatAccepted(
         operation_id=operation.id,
         conversation_id=conversation.id,
         message=MessageResponse.model_validate(message),
     )
+    # The request-scoped session dependency exits after the response is sent.
+    # A 202 must already have a durable resource and its outbox operation.
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/conversations", response_model=ConversationPage)
@@ -352,6 +369,7 @@ def read_room(
     project_id: uuid.UUID,
     cursor: str | None = Query(default=None),
     limit: int = Query(default=room.DEFAULT_LIMIT, ge=1, le=room.MAX_LIMIT),
+    include_archived: bool = Query(default=False),
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> RoomPage:
@@ -367,7 +385,9 @@ def read_room(
     instant, and a conversation that reorders is not readable.
     """
     require_project(session, project_id, user)
-    entries, next_cursor = room.events(session, project_id=project_id, limit=limit, cursor=cursor)
+    entries, next_cursor = room.events(
+        session, project_id=project_id, limit=limit, cursor=cursor, include_archived=include_archived,
+    )
     return RoomPage(
         items=[RoomEvent.model_validate(entry) for entry in entries],
         next_cursor=next_cursor,
@@ -512,13 +532,17 @@ def test_config(
     if provider is None or not provider.enabled:
         return CopilotConfigTestResponse(connected=False, model="", reason="No enabled LLM provider is configured")
     try:
-        sample = complete_with_provider(
-            provider,
-            [
-                {"role": "system", "content": "Reply with exactly: BDA provider connected"},
-                {"role": "user", "content": "Connection test"},
-            ],
-        )
+        from .call_guard import call_scope
+        from .qualification import fingerprint
+
+        with call_scope(f"provider-test:{project_id}:{fingerprint(provider)}"):
+            sample = complete_with_provider(
+                provider,
+                [
+                    {"role": "system", "content": "Reply with exactly: BDA provider connected"},
+                    {"role": "user", "content": "Connection test"},
+                ],
+            )
     except Exception as exc:
         return CopilotConfigTestResponse(
             connected=False,
@@ -596,7 +620,9 @@ def start_agent_run(
 ) -> AgentRunAccepted:
     project = require_project(session, payload.project_id, user)
     run, operation = start_agent_run_service(session, project, user, payload)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/agent-runs", response_model=AgentRunPage)
@@ -665,6 +691,14 @@ def cancel_agent_run(
             "The agent run changed since it was read",
             status_code=412,
         )
+    # Validate the observed version above, then wait for the current step.
+    # Progress committed while waiting must be refreshed before cancelling:
+    # never overwrite a completed result or flush an obsolete row version.
+    # Match the worker's parent-before-child lock order.
+    if run.status in {"running", "awaiting_tasks"}:
+        if run.parent_run_id:
+            agent_runs.require_run(session, run.parent_run_id, for_update=True)
+        run = agent_runs.require_run(session, run.id, for_update=True)
     cancelled = agent_runs.cancel(session, run, reason=f"cancelled by {user.username}")
     response.headers["ETag"] = etag(run.version)
     return AgentRunCancelled(run=_run_response(session, run), cancelled_runs=cancelled)
@@ -819,7 +853,9 @@ def continue_agent_run(
     if expected != run.version:
         raise DomainError("version_conflict", "The task changed. Reload it before continuing.", status_code=412)
     operation = continue_service(session, run, user, payload.message, payload.authorized_writes)
-    return AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    accepted = AgentRunAccepted(run=_run_response(session, run), operation_id=operation.id)
+    session.commit()
+    return accepted
 
 
 @router.get("/projects/{project_id}/task-readiness", response_model=TaskReadinessResponse)
@@ -850,3 +886,30 @@ def save_task_decision_record(
         raise DomainError("version_conflict", "Reload the task before saving its delivery.", status_code=412)
     save_task_record(session, run, user)
     return _run_response(session, run)
+
+
+@router.get("/projects/{project_id}/bots/{bot_id}/records")
+def get_bot_records(
+    project_id: uuid.UUID, bot_id: str, query: str = Query("", max_length=500),
+    limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> dict:
+    from .records import read_record
+    require_project(session, project_id, user)
+    result = read_record(session, project_id, bot_id, query, limit, offset)
+    result.pop("markdown")
+    return result
+
+
+@router.get("/projects/{project_id}/bots/{bot_id}/records.md")
+def download_bot_records(
+    project_id: uuid.UUID, bot_id: str,
+    session: Session = Depends(get_session), user: User = Depends(current_user),
+) -> Response:
+    from .records import read_record
+    require_project(session, project_id, user)
+    record = read_record(session, project_id, bot_id)
+    return Response(record["markdown"], media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="{bot_id}-{project_id}.md"',
+        "Cache-Control": "private, no-store",
+    })

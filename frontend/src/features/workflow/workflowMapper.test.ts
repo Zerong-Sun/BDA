@@ -24,6 +24,25 @@ function apiNode(overrides: Record<string, unknown>) {
 }
 
 describe('workflowMapper', () => {
+  it('restores card widths from ID- or key-based layout records without mixing them into positions', () => {
+    const nodes = [apiNode({ position: { x: 17, y: 42 } })]
+    for (const id of ['n1', 'target_protein']) {
+      const mapped = mapApiGraphToGraph(nodes, [], { nodes: [{ id, width: 360 }] }).nodes[0]
+      expect(mapped.width).toBe(360)
+      expect(mapped.position).toEqual({ x: 17, y: 42 })
+    }
+    expect(mapApiGraphToGraph(nodes, [], { nodes: [null, { id: 'n1', width: 'invalid' }] }).nodes[0].width).toBeUndefined()
+    expect(mapApiGraphToGraph(nodes, [], { nodes: [{ id: 'n1', width: 10000 }] }).nodes[0].width).toBe(560)
+  })
+
+  it('aligns an unpositioned route by dependencies despite an unordered API response', () => {
+    const nodes = [apiNode({ id: 'score', node_key: 'score' }), apiNode({ id: 'input', node_key: 'input' }), apiNode({ id: 'design', node_key: 'design' })]
+    const graph = mapApiGraphToGraph(nodes, [{ source: 'input', target: 'design' }, { source: 'design', target: 'score' }])
+    expect(graph.nodes.map((node) => node.position)).toEqual([{ x: 560, y: 80 }, { x: 40, y: 80 }, { x: 300, y: 80 }])
+    const saved = { x: 17, y: 42 }
+    expect(mapApiGraphToGraph([apiNode({ position: saved })], []).nodes[0].position).toEqual(saved)
+  })
+
   it('maps every API node status onto a canvas status', () => {
     // The API vocabulary, not the retired 'completed'/'staging' one the seeding script
     // used to emit. A value the pipeline can return must never fall through.

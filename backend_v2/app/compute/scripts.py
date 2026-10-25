@@ -89,10 +89,14 @@ python3 - "$BDA_OUTPUT_DIR" "$BDA_REMOTE_DIR/output-manifest.json" <<'BDA_EMIT_M
 import hashlib, json, os, sys
 
 output_dir, manifest_path = sys.argv[1], sys.argv[2]
+if os.path.islink(output_dir):
+    raise ValueError("output_symlinks_forbidden")
 entries = []
 for root, _dirs, files in os.walk(output_dir):
     for name in sorted(files):
         path = os.path.join(root, name)
+        if os.path.islink(path):
+            raise ValueError("output_symlinks_forbidden")
         digest = hashlib.sha256()
         with open(path, "rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -189,6 +193,8 @@ def _resource_directives(resources: dict) -> list[str]:
     gpu = resources.get("gpu")
     if gpu:
         count = resources.get("gpu_count") or 1
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            raise ValueError("gpu_count_must_be_a_positive_integer")
         directives.append(f'#BSUB -gpu "num={count}:mode=exclusive_process"')
     walltime = resources.get("walltime_minutes")
     if isinstance(walltime, int) and walltime > 0:
@@ -222,6 +228,8 @@ def _input_port_directories(ctx: ScriptContext) -> list[str]:
     then runs as written.
     """
     ports = sorted({name for port in ctx.input_ports if (name := str(port).strip())})
+    if any(not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", name) for name in ports):
+        raise ValueError("input_port_name_invalid")
     if not ports:
         return []
     # $BDA_INPUT_DIR stays expanded; only the port name is quoted as a literal.
@@ -229,14 +237,21 @@ def _input_port_directories(ctx: ScriptContext) -> list[str]:
 
 
 def _render_lsf(ctx: ScriptContext) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", ctx.job_name):
+        raise ValueError("lsf_job_name_invalid")
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@/+:-]*", ctx.queue):
+        raise ValueError("lsf_queue_invalid")
+    if any(ord(char) < 32 for char in ctx.remote_dir):
+        raise ValueError("lsf_remote_directory_invalid")
     header = [
         "#!/bin/bash",
         f"#BSUB -J {ctx.job_name}",
         f"#BSUB -q {ctx.queue}",
-        f"#BSUB -o {ctx.remote_dir}/stdout.log",
-        f"#BSUB -e {ctx.remote_dir}/stderr.log",
+        f"#BSUB -o {shlex.quote(ctx.remote_dir + '/stdout.log')}",
+        f"#BSUB -e {shlex.quote(ctx.remote_dir + '/stderr.log')}",
         *_resource_directives(ctx.resources),
         "set -Eeuo pipefail",
+        "umask 077",
     ]
     if ctx.staging_mode == "ssh":
         body = [
@@ -281,6 +296,12 @@ def _render_docker(ctx: ScriptContext) -> str:
         "--rm",
         "--name",
         ctx.job_name,
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges:true",
+        "--pids-limit",
+        "512",
         "-e",
         f"BDA_INPUT_MANIFEST_URL={ctx.input_manifest_url}",
         "-e",
@@ -343,7 +364,7 @@ def _runtime_preamble(ctx: ScriptContext) -> list[str]:
     if ctx.container_image and ctx.container_image.startswith("site://"):
         raise ValueError("plugin_site_unresolved: site URI cannot be used as a module/environment name")
     if ctx.runtime_mode == "module" and ctx.container_image:
-        return [f"module load {ctx.container_image}"]
+        return [f"module load {shlex.quote(ctx.container_image)}"]
     if ctx.runtime_mode == "conda" and ctx.container_image:
-        return ['eval "$(conda shell.bash hook)"', f"conda activate {ctx.container_image}"]
+        return ['eval "$(conda shell.bash hook)"', f"conda activate {shlex.quote(ctx.container_image)}"]
     return []

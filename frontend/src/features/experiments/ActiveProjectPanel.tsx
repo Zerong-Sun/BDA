@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Disclosure } from '@/components/ui/Disclosure'
 import { StatusPills } from '../../components/ui/StatusPill'
 import type { Project } from '../../lib/api/projects'
 import { useI18n } from '../../lib/i18n'
-import { projectText } from '../../lib/i18n/projectText'
+import { projectText, projectActionText } from '../../lib/i18n/projectText'
 import {
   useProjectTargetStructure,
   useTargetReadiness,
@@ -83,7 +83,7 @@ export function ActiveProjectPanel({
         description={t.projects.activeProjectPanel.noProjectBody}
         panelClassName="p-5"
       >
-        <Button type="button" className="mt-4" onClick={onCreate}>
+        <Button type="button" className="mt-4" disabled={readOnly} onClick={onCreate}>
           <FolderPlus className="h-4 w-4" />
           {t.projects.activeProjectPanel.newProject}
         </Button>
@@ -132,12 +132,12 @@ export function ActiveProjectPanel({
                   ? t.projects.activeProjectPanel.targetReady
                   : t.projects.activeProjectPanel.targetBlocked}
               </strong>
-              <span>{readinessQuery.data.next_action}</span>
+              <span>{projectActionText(readinessQuery.data.next_action, t)}</span>
             </div>
             {readinessQuery.data.blockers.length > 0 ? (
               <ul className="mt-2 list-disc space-y-1 pl-4">
                 {readinessQuery.data.blockers.map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
+                  <li key={blocker}>{projectActionText(blocker, t)}</li>
                 ))}
               </ul>
             ) : null}
@@ -237,15 +237,15 @@ export function ActiveProjectPanel({
               </Alert>
             ) : null}
             {targetQuery.data.structure.latest_revision?.options ? (
-              <ScrollArea className="mt-3 h-48 rounded border border-border-soft">
-                <pre className="whitespace-pre-wrap p-2 text-[11px] text-text-secondary">
+              <Disclosure title={language === 'zh' ? '查看结构准备参数' : 'Inspect structure preparation parameters'}>
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs text-text-secondary">
                   {JSON.stringify(
                     targetQuery.data.structure.latest_revision.options,
                     null,
                     2,
                   )}
                 </pre>
-              </ScrollArea>
+              </Disclosure>
             ) : null}
           </div>
         ) : null}

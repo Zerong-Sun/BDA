@@ -6,9 +6,9 @@ const entries = Object.values(manifest).filter((item) => item.isEntry)
 if (entries.length !== 1) throw new Error(`Expected one frontend entry chunk, found ${entries.length}`)
 
 const entryBytes = (await stat(join('dist', entries[0].file))).size
-const maxEntryBytes = 750 * 1024
+const maxEntryBytes = 550 * 1024
 if (entryBytes > maxEntryBytes) {
-  throw new Error(`Frontend entry chunk is ${(entryBytes / 1024).toFixed(1)} KiB; limit is 750 KiB`)
+  throw new Error(`Frontend entry chunk is ${(entryBytes / 1024).toFixed(1)} KiB; limit is 550 KiB`)
 }
 
 const oversized = []

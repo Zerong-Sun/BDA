@@ -1,0 +1,105 @@
+{
+  "id": "structure-comparison",
+  "version": "1.0.0",
+  "title": "Structure comparison",
+  "title_zh": "结构比较",
+  "description": "Compare declared structures with explicit chain mapping, confidence and alignment limits.",
+  "description_zh": "按链映射、残基对应与置信度边界比较结构。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "9bc85616348f7a64e14c9cc54e94ca2bb32afd015209a57449dbc2172ec74607",
+  "default_for": [],
+  "tool_requests": [
+    "list_project_targets",
+    "analyse_structure",
+    "compare_structures",
+    "measure_structure_interface",
+    "list_structure_contacts",
+    "list_structure_residues",
+    "describe_structure_site",
+    "render_structure_view"
+  ],
+  "optional_write_tools": [],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "inputs_and_mapping",
+      "comparison_and_confidence",
+      "interface_observations",
+      "alignment_limitations",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "inputs_and_mapping": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "comparison_and_confidence": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "interface_observations": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "alignment_limitations": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

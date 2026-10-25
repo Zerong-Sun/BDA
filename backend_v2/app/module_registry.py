@@ -25,6 +25,7 @@ class ModuleDescriptor:
 
 
 MODULES = (
+    ModuleDescriptor("design_memory", ("backend_v2.app.design_memory.models",), ("backend_v2.app.design_memory.api",), permission_actions=("project:write",)),
     ModuleDescriptor("identity", ("backend_v2.app.identity.models",), ("backend_v2.app.identity.api", "backend_v2.app.identity.organizations_api"), permission_actions=("organization:manage",)),
     ModuleDescriptor("projects", ("backend_v2.app.projects.models",), ("backend_v2.app.projects.api",), ("backend_v2.app.projects.tasks",), ("project:read", "project:write")),
     ModuleDescriptor("targets", ("backend_v2.app.targets.models",), ("backend_v2.app.targets.api",), ("backend_v2.app.targets.tasks",), ("project:write",)),
@@ -36,6 +37,7 @@ MODULES = (
     ModuleDescriptor("artifacts", ("backend_v2.app.artifacts.models",), ("backend_v2.app.artifacts.api",), permission_actions=("artifact",), metric_prefixes=("bda_v2_artifact",)),
     ModuleDescriptor("autopilot", ("backend_v2.app.autopilot.models",), ("backend_v2.app.autopilot.api",), ("backend_v2.app.autopilot.tasks",), ("autopilot",)),
     ModuleDescriptor("audit", ("backend_v2.app.audit.models",), ("backend_v2.app.audit.api",), permission_actions=("project:read",)),
+    ModuleDescriptor("learning", ("backend_v2.app.learning.models",), ("backend_v2.app.learning.api",), permission_actions=("project:write", "experiment")),
     ModuleDescriptor("experiments", ("backend_v2.app.experiments.models",), ("backend_v2.app.experiments.api",), ("backend_v2.app.experiments.tasks",), ("experiment",)),
     ModuleDescriptor("knowledge", ("backend_v2.app.knowledge.models",), ("backend_v2.app.knowledge.api",), permission_actions=("project:write",)),
     ModuleDescriptor("literature", ("backend_v2.app.literature.models",), ("backend_v2.app.literature.api",), ("backend_v2.app.literature.tasks",), ("research",)),

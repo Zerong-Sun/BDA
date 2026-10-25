@@ -236,12 +236,14 @@ def test_a_producer_does_not_choose_its_own_reviewer() -> None:
         assert bot.reviews == ()
 
 
-def test_review_and_delegation_terminate_on_producers() -> None:
+def test_review_and_delegation_cannot_recurse() -> None:
     """Otherwise there is no bottom: a reviewer reviewing a reviewer, or a
     director directing a director, never reaches the work."""
     for bot in bots.all_bots():
-        for target in bot.reviews + bot.directs:
+        for target in bot.reviews:
             assert bots.require(target).stance == "produce", (bot.id, target)
+        for target in bot.directs:
+            assert bots.require(target).stance != "direct", (bot.id, target)
 
 
 def test_no_reviewer_can_repair_what_it_finds() -> None:
@@ -259,7 +261,8 @@ def test_no_reviewer_can_repair_what_it_finds() -> None:
         writes = set(bot.capabilities) & granting
         # The handover channel is copilot bookkeeping, not a research write -
         # see `bots._INTERNAL_WRITE_CAPABILITIES`.
-        assert writes <= {"chain-messaging"}, (bot.id, sorted(writes))
+        allowed = {"chain-messaging", "chain-orchestration"} if bot.stance == "direct" else {"chain-messaging"}
+        assert writes <= allowed, (bot.id, sorted(writes))
 
 
 def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
@@ -276,9 +279,9 @@ def test_every_operator_that_hands_off_can_leave_something_behind() -> None:
 
 def test_a_director_may_direct_only_what_it_declares() -> None:
     assert bots.may_direct("conductor", "planner") is True
-    # Review is asked for, not ordered: a director able to open a review run
-    # would be selecting its own reviewer.
-    assert bots.may_direct("conductor", "auditor") is False
+    # The declared independent reviewer can be scheduled, but cannot repair work.
+    assert bots.may_direct("conductor", "auditor") is True
+    assert bots.may_direct("conductor", "conductor") is False
     assert bots.may_direct("planner", "runner") is False
     assert bots.may_direct("ghost", "planner") is False
 
@@ -633,7 +636,7 @@ def test_an_owner_is_offered_only_the_writes_it_can_be_granted() -> None:
     # the literature review (search and pending-review notes); a reviewer owns none.
     assert bots.task_write_tools(bots.require("researcher")) == {
         "brief": [],
-        "literature": ["start_literature_search", "create_knowledge_draft"],
+        "literature": ["start_literature_search", "create_knowledge_draft", "save_literature_analysis"],
     }
     assert bots.task_write_tools(bots.require("auditor")) == {}
 
@@ -703,13 +706,14 @@ def test_a_bot_run_carries_its_charter_into_every_turn(session: Session) -> None
     assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
 
 
-def test_a_run_without_a_bot_gets_the_loop_policy_and_nothing_else(session: Session) -> None:
+def test_a_run_without_a_bot_gets_loop_policy_without_a_bot_charter(session: Session) -> None:
     project, user = _project(session, enabled_skills=["research"])
     run = _run(session, project, user)
 
     system = [m for m in agent_loop.messages_for(run, []) if m["role"] == "system"]
 
-    assert len(system) == 1
+    assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
+    assert not any(bot.charter in message["content"] for bot in bots.all_bots() for message in system)
 
 
 def test_a_bot_removed_from_the_roster_leaves_an_undifferentiated_run(session: Session) -> None:
@@ -724,7 +728,8 @@ def test_a_bot_removed_from_the_roster_leaves_an_undifferentiated_run(session: S
 
     system = [m for m in agent_loop.messages_for(run, []) if m["role"] == "system"]
 
-    assert len(system) == 1
+    assert any("BDA_AGENT_LOOP_V1" in message["content"] for message in system)
+    assert not any(bot.charter in message["content"] for bot in bots.all_bots() for message in system)
 
 
 def test_a_subagent_inherits_its_parents_charter(session: Session) -> None:

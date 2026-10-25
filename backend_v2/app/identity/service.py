@@ -4,11 +4,13 @@ import base64
 import hashlib
 import secrets
 import urllib.parse
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import httpx
 import jwt
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
@@ -56,6 +58,8 @@ def create_access_token(user: User) -> str:
         {
             "sub": str(user.id),
             "role": user.role,
+            "realm": settings.auth_realm,
+            "ver": user.version or 1,
             "iss": settings.jwt_issuer,
             "iat": now,
             "exp": now + timedelta(minutes=settings.access_token_minutes),
@@ -68,18 +72,23 @@ def create_access_token(user: User) -> str:
 def decode_access_token(token: str) -> dict:
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer)
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer)
+        if payload.get("realm", "bda") != settings.auth_realm:
+            raise jwt.InvalidTokenError("Incorrect account realm")
+        return payload
     except jwt.PyJWTError as exc:
         raise DomainError("invalid_token", "Access token is invalid or expired", status_code=401) from exc
 
 
-def issue_refresh_token(session: Session, user: User) -> str:
+def issue_refresh_token(session: Session, user: User, *, family_id: uuid.UUID | None = None) -> str:
     settings = get_settings()
     raw = secrets.token_urlsafe(48)
     session.add(
         RefreshSession(
             user_id=user.id,
             token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+            family_id=family_id or uuid.uuid4(),
+            realm=settings.auth_realm,
             expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_days),
         )
     )
@@ -89,14 +98,22 @@ def issue_refresh_token(session: Session, user: User) -> str:
 def rotate_refresh_token(session: Session, raw_token: str) -> tuple[User, str]:
     now = datetime.now(UTC)
     repo = IdentityRepository(session)
-    stored = repo.active_refresh_session(hashlib.sha256(raw_token.encode()).hexdigest(), now)
-    if stored is None:
+    digest = hashlib.sha256(raw_token.encode()).hexdigest()
+    candidate = repo.refresh_session(digest)
+    if candidate is None or candidate.realm != get_settings().auth_realm:
         raise DomainError("invalid_refresh_token", "Refresh token is invalid or expired", status_code=401)
-    user = repo.user_by_id(stored.user_id)
+    # All credential/session mutations lock the user first. A concurrent logout or
+    # password reset cannot leave a just-rotated refresh token usable afterwards.
+    user = session.scalar(
+        select(User).where(User.id == candidate.user_id).with_for_update().execution_options(populate_existing=True)
+    )
     if user is None or not user.enabled:
         raise DomainError("invalid_refresh_token", "Refresh token user is unavailable", status_code=401)
+    stored = repo.active_refresh_session(digest, now)
+    if stored is None:
+        raise DomainError("invalid_refresh_token", "Refresh token is invalid or expired", status_code=401)
     stored.revoked_at = now
-    return user, issue_refresh_token(session, user)
+    return user, issue_refresh_token(session, user, family_id=stored.family_id)
 
 
 def bootstrap_admin(session: Session, *, username: str, password: str) -> User:
@@ -108,10 +125,18 @@ def bootstrap_admin(session: Session, *, username: str, password: str) -> User:
         session.add(user)
         session.flush()
     else:
-        user = existing
+        locked = session.scalar(
+            select(User).where(User.id == existing.id).with_for_update().execution_options(populate_existing=True)
+        )
+        assert locked is not None
+        user = locked
         user.password_hash = password_hash
         user.role = "admin"
         user.enabled = True
+        user.version += 1
+        session.execute(
+            update(RefreshSession).where(RefreshSession.user_id == user.id).values(revoked_at=datetime.now(UTC))
+        )
     organization = session.query(Organization).filter_by(legacy_id="bootstrap-default").one_or_none()
     if organization is None:
         organization = Organization(name="Default Organization", legacy_id="bootstrap-default")
@@ -128,7 +153,9 @@ def bootstrap_admin(session: Session, *, username: str, password: str) -> User:
 # influence that document choose the algorithm, which is the setup for algorithm
 # confusion. Symmetric algorithms are excluded outright - verifying an RS256-shaped token
 # under HS256 is exactly the substitution being prevented.
-ALLOWED_ID_TOKEN_ALGORITHMS = frozenset({"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"})
+ALLOWED_ID_TOKEN_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"}
+)
 
 
 def _configured_redirect_uris(config: dict[str, str]) -> list[str]:
@@ -254,6 +281,10 @@ def complete_oidc(session: Session, provider: str, state: str, code: str) -> Use
     if user is not None and not user.enabled:
         raise DomainError("invalid_credentials", "OIDC user is unavailable", status_code=401)
     if user is None:
+        if not get_settings().writes_enabled or get_settings().registration_mode != "open":
+            raise DomainError(
+                "oidc_account_not_provisioned", "This identity must be provisioned by an administrator", status_code=403
+            )
         base_username = str(claims.get("preferred_username") or claims.get("email") or f"oidc-{subject}")[:100]
         username = base_username
         suffix = 1

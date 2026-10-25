@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { AppFrame } from '@/components/ui/AppFrame'
 import { GuideCTA, GuideHero, ModelPrinciples, WorkflowFAQ, WorkflowMap } from '../features/guide'
 import { useI18n } from '../lib/i18n'
+import { useAppStore } from '../lib/store/appStore'
+import { Button } from '../components/ui/Button'
 
 export function GuidePage() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const navigate = useNavigate()
   const [activeStep, setActiveStep] = useState(1)
   const [searchParams] = useSearchParams()
   const isAuthenticated = Boolean(sessionStorage.getItem('bda_token'))
@@ -30,7 +33,11 @@ export function GuidePage() {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             {backLabel}
           </Link>
-          <span className="font-mono text-caption font-medium uppercase tracking-wider text-accent">{t.guide.nav.label}</span>
+          {isAuthenticated ? <Button type="button" variant="outline" onClick={() => {
+            useAppStore.getState().setTourMenuOpen(true)
+            navigate(backPath)
+          }}>{language === 'zh' ? '跟随界面导览' : 'Take the interface tour'}</Button>
+            : <span className="font-mono text-caption font-medium uppercase tracking-wider text-accent">{t.guide.nav.label}</span>}
         </div>
       </div>
 

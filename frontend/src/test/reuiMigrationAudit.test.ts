@@ -375,6 +375,8 @@ describe('REUI migration guardrails', () => {
     const components = JSON.parse(readFileSync(resolve(root, 'components.json'), 'utf8'))
     const tsconfig = JSON.parse(readFileSync(resolve(root, 'tsconfig.app.json'), 'utf8'))
     const styles = readFileSync(resolve(root, 'src/index.css'), 'utf8')
+    const workspaceStyles = readFileSync(resolve(root, 'src/styles/science-workspace.css'), 'utf8')
+    const darkStyles = workspaceStyles.match(/\.dark,\s*\[data-theme="dark"\]\s*\{([^}]*)\}/)?.[1]
     const aliases = Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : []
     const rootAlias = aliases.find((alias) => alias.find === '@')
     const vitestAliases = Array.isArray(vitestConfig.resolve?.alias)
@@ -441,17 +443,17 @@ describe('REUI migration guardrails', () => {
       expect(exactUiEntries.has(`${lowercase}.tsx`)).toBe(false)
     }
 
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--primary:\s*var\(--bda-primary\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--accent:\s*var\(--bda-primary\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--success:\s*var\(--bda-success\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--success-foreground:\s*var\(--background\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--info:\s*var\(--bda-info\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--info-foreground:\s*var\(--background\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--warning:\s*var\(--bda-warning\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--warning-foreground:\s*var\(--background\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--destructive-foreground:\s*var\(--background\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--invert:\s*var\(--foreground\);/)
-    expect(styles).toMatch(/\.dark\s*\{[\s\S]*--invert-foreground:\s*var\(--background\);/)
+    // The workspace owns the shared palette; index.css must not override it.
+    expect(styles).not.toMatch(/\.dark\s*\{/)
+    expect(darkStyles).toBeDefined()
+    expect(darkStyles).toMatch(/--primary:\s*var\(--bda-primary\);/)
+    expect(darkStyles).toMatch(/--accent:\s*#[\da-f]{6};/)
+    for (const status of ['success', 'info', 'warning', 'destructive']) {
+      expect(darkStyles).toContain(`--${status}: var(--bda-${status});`)
+      expect(darkStyles).toContain(`--${status}-foreground: var(--text-inverse);`)
+    }
+    expect(darkStyles).toMatch(/--invert:\s*var\(--text-primary\);/)
+    expect(darkStyles).toMatch(/--invert-foreground:\s*var\(--bg-app\);/)
   })
 
   it('removes stale adapters and forbidden icon imports', () => {

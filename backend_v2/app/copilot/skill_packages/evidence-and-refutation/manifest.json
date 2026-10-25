@@ -1,0 +1,106 @@
+{
+  "id": "evidence-and-refutation",
+  "version": "1.0.0",
+  "title": "Evidence and refutation",
+  "title_zh": "证据摘录与反证",
+  "description": "Extract traceable source passages and compare support, refutation and scope.",
+  "description_zh": "整理可定位原文，区分支持、反驳、适用条件和未知。",
+  "license": "Apache-2.0",
+  "author": "BDA contributors",
+  "instruction_sha256": "b420b97ab51abf08c0930eccc18e703e38c2ee707a937644a7401a001faeaa99",
+  "default_for": [
+    "literature"
+  ],
+  "tool_requests": [
+    "search_research",
+    "get_reference_content",
+    "get_reference",
+    "research_overview"
+  ],
+  "optional_write_tools": [
+    "start_literature_search",
+    "create_knowledge_draft"
+  ],
+  "data_policy": "Uses the existing project-scoped model and tools. Text may be sent to the configured LLM under existing policy; no additional destinations or credentials. External search and record writes require separate existing authorization.",
+  "provenance": [
+    {
+      "title": "Agent Skills format",
+      "url": "https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "relation": "format",
+      "note": "Format reference only. BDA manifests are a separate application contract."
+    },
+    {
+      "title": "Scientific Agent Skills methods",
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills/tree/92ace75ac21efe19a620434e0ca4e356081fe807",
+      "relation": "method_reference",
+      "note": "Method organization reference. BDA instructions were independently authored; no upstream scripts or skill text copied."
+    }
+  ],
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "goal"
+    ],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50000
+      }
+    }
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "project_claim",
+      "source_comparison",
+      "counterevidence",
+      "applicability",
+      "evidence_call_ids",
+      "limitations"
+    ],
+    "properties": {
+      "project_claim": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "source_comparison": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "counterevidence": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "applicability": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 6000
+      },
+      "evidence_call_ids": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 60,
+        "uniqueItems": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxItems": 30
+      }
+    }
+  }
+}

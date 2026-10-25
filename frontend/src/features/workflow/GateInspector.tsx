@@ -1,3 +1,5 @@
+import type { ModelPlugin } from '../../lib/schemas/registry'
+import { gateContext } from './gateContext'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { Input } from '../../components/ui/Input'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -19,12 +21,16 @@ import { emptyPolicy, gateLabel, type GatePolicy, type GateSummary } from './gat
 import { getArtifact } from '../../lib/api/artifacts'
 import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
 import { GatePolicyEditor } from './GatePolicyEditor'
+import { GateEvidencePanel } from './GateEvidencePanel'
 
 export function GateInspector({
   workflowId,
+  sourcePlugin,
+  targetPlugin,
   edge,
   runs,
   readOnly,
+  canOperate,
   onSave,
   onClose,
   onSource,
@@ -33,9 +39,13 @@ export function GateInspector({
   onDelete,
 }: {
   workflowId: string
+  sourcePlugin?: ModelPlugin
+  targetPlugin?: ModelPlugin
   edge: WorkflowEdge
   runs: GateSummary[]
   readOnly: boolean
+  /** Submitted graphs are immutable, but authorized reviewers can still release gates. */
+  canOperate: boolean
   onSave: (edge: WorkflowEdge) => Promise<void>
   onClose: () => void
   onSource: () => void
@@ -45,6 +55,8 @@ export function GateInspector({
 }) {
   const { language } = useI18n()
   const zh = language === 'zh'
+  const historical = edge.legacy_connection === true
+  const context = gateContext(edge, sourcePlugin, targetPlugin)
   const [policy, setPolicy] = useState<GatePolicy>((edge.gate as GatePolicy) ?? emptyPolicy())
   const [previewArtifactId, setPreviewArtifactId] = useState('')
   const artifactPreview = useQuery({
@@ -58,7 +70,7 @@ export function GateInspector({
   const sources = useQuery({
     queryKey: ['gate-preview-sources', workflowId, edge.id],
     queryFn: () => previewSources(workflowId, edge.id!),
-    enabled: !!edge.id,
+    enabled: !!edge.id && !historical,
   })
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
@@ -89,6 +101,7 @@ export function GateInspector({
   })
   const action = useMutation({
     mutationFn: async (kind: 'save' | 'preview' | 'release' | 'retry') => {
+      if (!canOperate || (kind === 'save' && readOnly)) throw new Error(zh ? '当前项目无此操作权限。' : 'This action is unavailable in this project.')
       if (kind === 'save')
         await onSave({
           ...edge,
@@ -125,13 +138,20 @@ export function GateInspector({
       if (kind === 'save') toast(zh ? '门控规则已保存' : 'Gate rules saved', 'success')
       if (kind === 'release') toast(zh ? '已提交放行，正在准备下游输入' : 'Release submitted; preparing downstream inputs', 'success')
       await cache.invalidateQueries({ queryKey: ['workflow-gates', workflowId] })
+      await cache.invalidateQueries({ queryKey: ['scientific-gates', workflowId] })
       await cache.invalidateQueries({ queryKey: ['gate-results', workflowId] })
     },
     onError: (e) => toast(e.message, 'error'),
   })
   const reviewable = gate?.status === 'awaiting_review' && !gate.preview
-  const canSelect = reviewable && !action.isPending && !results.isFetching && !results.isError
+  const canSelect = canOperate && reviewable && !action.isPending && !results.isFetching && !results.isError
     && results.data?.gate.version === gate.version && releasedVersion !== selectionKey
+  if (historical) return <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
+    <div className="flex items-center justify-between"><strong>{zh ? '历史依赖' : 'Historical dependency'}</strong><Button type="button" size="sm" variant="ghost" aria-label={zh ? '关闭门控' : 'Close gate'} onClick={onClose}>×</Button></div>
+    <p className="my-3 break-words">{sourcePlugin?.name ?? edge.source} → {targetPlugin?.name ?? edge.target}</p>
+    <p className="text-text-secondary">{zh ? '这条历史连线只记录了步骤依赖，没有保存门控规则或复核记录，不能据此判断筛选已通过。如需重新执行，请新建路线并配置门控。' : 'This historical connection records a step dependency, with no saved gate policy or review record. It does not establish that screening passed. Create a new route with gates before executing again.'}</p>
+    <Button type="button" className="mt-3" variant="outline" size="sm" onClick={onSource}>{zh ? '查看上游步骤' : 'Inspect upstream step'}</Button>
+  </aside>
   return (
     <aside className="h-full overflow-auto rounded-lg border border-border-soft bg-surface-1 p-3 text-sm">
       <div className="flex items-center justify-between">
@@ -143,7 +163,7 @@ export function GateInspector({
       <p className="my-2 break-words text-xs">
         {edge.source}.{edge.source_port} → {edge.target}.{edge.target_port}
       </p>
-      {!readOnly && (
+      {canOperate && !readOnly && (
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onEditMapping}>
             {zh ? '修改连接端口' : 'Edit connection ports'}
@@ -158,6 +178,19 @@ export function GateInspector({
           </Button>
         </div>
       )}
+      <div className="my-3 grid gap-2 rounded border border-border-soft p-2 text-xs" aria-label={zh ? '模型输入输出与推进条件' : 'Model contract and progression'}>
+        <strong>{sourcePlugin?.name ?? edge.source} → {targetPlugin?.name ?? edge.target}</strong>
+        <p>{zh ? '传递内容：' : 'Transfer: '}{context.output ? `${context.output.name} · ${context.output.artifact_type}` : (edge.gate?.mode === 'dependency' ? (zh ? '仅完成依赖，不传递文件' : 'Completion dependency; no files') : (zh ? '未解析到输出端口，请检查模型与端口绑定' : 'Output port unresolved; check the model and mapping'))} → {context.input?.name ?? '—'}</p>
+        {context.input?.description && <p>{context.input.description}</p>}
+        {context.sequence && <p>{zh ? '按候选序列筛选，放行后只把所选 FASTA 记录绑定到下游。序列不包含骨架坐标；需要 initial guess 的模型必须另行提供结构。' : 'Screen candidate sequences and bind only selected FASTA records downstream. Sequences contain no coordinates; initial-guess models also need a structure.'}</p>}
+        {context.structure && <p>{zh ? '按结构及其关联指标筛选，放行后将保留的结构文件绑定到下游。DSSP 需指定实际设计链。' : 'Screen structures with their associated metrics; bind retained structures downstream. DSSP requires the actual design chain.'}</p>}
+        {context.metrics.length > 0 && <p>{zh ? '上游解析器指标：' : 'Upstream parser metrics: '}{context.metrics.join(' · ')}</p>}
+        <p>{policy.mode === 'dependency'
+          ? (zh ? '上游成功后继续；此连线不满足下游文件输入。' : 'Continue after upstream succeeds; this edge does not supply a file input.')
+          : policy.mode === 'manual' || policy.mode === 'review'
+            ? (zh ? '上游完成后等待人工放行；确认后自动准备下游输入，全部必需输入就绪再推进。' : 'Wait for review after upstream completion, then automatically prepare downstream inputs and advance once all required inputs are ready.')
+            : (zh ? '上游完成后自动筛选并准备输入；所有必需输入就绪才推进。必需输入无合格结果则跳过下游，筛选错误会阻止推进。' : 'Automatically screen and prepare inputs after upstream completes. Advance once all required inputs are ready; an empty required input skips downstream, and screening errors block progression.')}</p>
+      </div>
       <p className="my-2 text-accent">{gateLabel(edge.gate as GatePolicy, gate, zh)}</p>
       <Button type="button" size="sm" variant="outline" onClick={onSource}>
         {zh ? '上游输出标准（所有出边共用）' : 'Upstream output standard (shared)'}
@@ -167,9 +200,10 @@ export function GateInspector({
         title={<> {zh ? '本分支筛选规则' : 'Branch screening policy'} </>}
       >
         <div className="mt-2">
-          <GatePolicyEditor value={policy} onChange={setPolicy} disabled={readOnly} />
+          <GatePolicyEditor metrics={context.metrics} allowStructure={context.structure || !!policy.structure} value={policy} onChange={setPolicy} disabled={!canOperate || readOnly || action.isPending} />
         </div>
       </WorkflowSection>
+      {edge.id ? <GateEvidencePanel workflowId={workflowId} edgeId={edge.id} canWrite={canOperate} readOnly={readOnly} /> : null}
       <label className="mb-2 block text-xs">
         {zh ? '试运行数据（同项目、同插件）' : 'Preview data (same project and plugin)'}
         <WorkflowSelect
@@ -191,7 +225,7 @@ export function GateInspector({
         <Button
           type="button"
           size="sm"
-          disabled={readOnly || action.isPending}
+          disabled={!canOperate || readOnly || action.isPending}
           onClick={() => action.mutate('save')}
         >
           {zh ? '保存规则' : 'Save rules'}
@@ -200,7 +234,7 @@ export function GateInspector({
           type="button"
           size="sm"
           variant="outline"
-          disabled={action.isPending || (!runs.length && !sourceJob)}
+          disabled={!canOperate || action.isPending || (!runs.length && !sourceJob)}
           onClick={() => action.mutate('preview')}
         >
           {zh ? '试运行' : 'Preview'}
@@ -216,7 +250,7 @@ export function GateInspector({
           type="button"
           size="sm"
           onClick={() => action.mutate('retry')}
-          disabled={action.isPending}
+          disabled={!canOperate || action.isPending}
         >
           {zh ? '重试筛选' : 'Retry screening'}
         </Button>

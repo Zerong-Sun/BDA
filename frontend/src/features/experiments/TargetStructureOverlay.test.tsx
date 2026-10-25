@@ -1,8 +1,9 @@
 import { screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import type { ProjectTargetStructure, TargetReadiness } from '../../lib/schemas/target'
 import { TargetStructureOverlay } from './TargetStructureOverlay'
+import { useAppStore } from '../../lib/store/appStore'
 
 const target: ProjectTargetStructure = {
   target: { id: 'target_a', project_id: 'proj_test', name: 'Example target', sequence: null,
@@ -29,6 +30,15 @@ const readiness: TargetReadiness = {
 }
 
 describe('TargetStructureOverlay', () => {
+  beforeEach(() => useAppStore.setState({ language: 'en' }))
+
+  it.each([['zh', '创建工作流'], ['en', 'Create workflow']] as const)('renders the real readiness action in %s', (language, label) => {
+    useAppStore.setState({ language })
+    renderWithProviders(<TargetStructureOverlay target={target} readiness={{ ...readiness, ready_for_workflow: true, next_action: 'create_workflow', blockers: [] }} projectId="proj_test" />)
+    expect(screen.getByText(label, { exact: false })).toBeInTheDocument()
+    expect(screen.queryByText(/create_workflow/)).not.toBeInTheDocument()
+  })
+
   it('shows target chain roles, readiness, missing contact evidence, and provenance', () => {
     renderWithProviders(
       <TargetStructureOverlay target={target} readiness={readiness} projectId="proj_test" />,

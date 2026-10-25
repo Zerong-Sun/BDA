@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import secrets
@@ -28,6 +29,7 @@ from .capabilities import (
     normalize_capabilities,
     tools_for_capabilities,
 )
+from .endpoint_policy import validate_llm_endpoint
 from .mcp import hash_token as hash_mcp_token
 from .models import (
     CopilotAgentRun,
@@ -89,6 +91,15 @@ def submit_chat(
     context: dict | None = None,
     intent: str = "chat",
 ):
+    session.scalar(select(Project).where(Project.id == project.id).with_for_update())
+    duplicate = session.scalar(select(CopilotMessage).join(
+        CopilotConversation, CopilotConversation.id == CopilotMessage.conversation_id
+    ).where(CopilotConversation.project_id == project.id,
+            CopilotConversation.created_by == user.id,
+            CopilotMessage.role == "user", CopilotMessage.content == content.strip(),
+            CopilotMessage.created_at >= datetime.now(UTC) - timedelta(minutes=1)).limit(1))
+    if duplicate is not None:
+        raise DomainError("copilot_duplicate_message", "This message was already submitted; wait for its result.", status_code=409)
     conversation = session.get(CopilotConversation, conversation_id) if conversation_id else None
     if conversation and conversation.project_id != project.id:
         raise DomainError("conversation_not_found", "Conversation does not belong to this project", status_code=404)
@@ -99,7 +110,7 @@ def submit_chat(
     message = CopilotMessage(
         conversation_id=conversation.id,
         role="user",
-        content=content,
+        content=content.strip(),
         context={
             **(context or {}),
             "intent": intent,
@@ -139,6 +150,8 @@ def put_config(
     raw_api_key = str(settings_payload.pop("llm_api_key", "")).strip()
     endpoint = str(settings_payload.get("llm_api_base", "")).strip()
     model = str(settings_payload.get("llm_model", "")).strip()
+    if endpoint:
+        validate_llm_endpoint(endpoint, require_approval=False)
     if row is None:
         row = CopilotConfig(project_id=project_id, version=1)
         session.add(row)
@@ -377,8 +390,14 @@ def create_route_plan(session: Session, project: Project, payload: RoutePlanCrea
         rationale.append("No enabled model plugins are available for the recommended route.")
 
     if payload.use_model:
-        from .provider import complete
+        from .call_guard import call_scope
+        from .provider import complete as provider_complete
         from .provider_selection import select_provider
+
+        def complete(selected_provider, messages):
+            identity = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
+            with call_scope(f"route-plan:{project.id}:{identity}"):
+                return provider_complete(selected_provider, messages)
 
         for option in options:
             option.recommended = False
@@ -542,6 +561,9 @@ def start_agent_run(
     tools directly would be able to reach past the project's own configuration,
     and `allowed_tools` is the restriction a subagent is intersected against.
     """
+    # Serialize duplicate UI submissions before they can create different budget
+    # scopes. A recent identical request requires reviewing its existing task.
+    session.scalar(select(Project).where(Project.id == project.id).with_for_update())
     config = session.scalar(select(CopilotConfig).where(CopilotConfig.project_id == project.id))
     enabled = normalize_capabilities(list(config.enabled_skills) if config else None)
     if payload.bot and payload.skills:
@@ -606,7 +628,7 @@ def start_agent_run(
         raise DomainError("copilot_task_scope_invalid", "Requested writes exceed the service or project scope.", status_code=403)
     # Existing bot clients use the originating request as their mandate.
     # Task clients explicitly send a recipe or a write list (including []).
-    uses_contract = recipe is not None or payload.authorized_writes is not None or "service_kind" in payload.model_fields_set
+    uses_contract = recipe is not None or payload.authorized_writes is not None or "service_kind" in payload.model_fields_set or payload.procedural_skills is not None
     allowed_tools = sorted((available - REGISTRY.user_intent_write_ids()) | writes) if uses_contract else sorted(available)
     if payload.conversation_id:
         conversation = session.get(CopilotConversation, payload.conversation_id)
@@ -618,12 +640,30 @@ def start_agent_run(
             "An agent run with no tools cannot make progress; enable a capability first.",
             status_code=422,
         )
+    from .procedural_skills import snapshots_for
+    contract = build_contract(payload.service_kind, sorted(writes)) if uses_contract else {}
+    snapshots = snapshots_for(payload.procedural_skills, service_kind=payload.service_kind,
+                              goal=payload.goal, allowed_tools=allowed_tools)
+    if snapshots:
+        contract["procedural_skills"] = snapshots
+    duplicates = session.scalars(select(CopilotAgentRun).where(
+        CopilotAgentRun.project_id == project.id,
+        CopilotAgentRun.created_by == user.id,
+        CopilotAgentRun.parent_run_id.is_(None),
+        CopilotAgentRun.goal == payload.goal.strip(),
+        CopilotAgentRun.bot == payload.bot,
+        CopilotAgentRun.created_at >= datetime.now(UTC) - timedelta(hours=24),
+    ).order_by(CopilotAgentRun.created_at.desc()).limit(20))
+    duplicate = next((item for item in duplicates if item.allowed_tools == allowed_tools
+                      and {key: value for key, value in (item.task_contract or {}).items() if key != "cost_mode"} == contract), None)
+    if duplicate is not None:
+        raise DomainError("copilot_duplicate_task", f"This task already exists ({duplicate.id}); review its result instead of submitting it again.", status_code=409)
     run = agent_runs.create_run(
         session,
         project_id=project.id,
         user_id=user.id,
-        goal=payload.goal,
-        task_contract=build_contract(payload.service_kind, sorted(writes)) if uses_contract else {},
+        goal=payload.goal.strip(),
+        task_contract=contract,
         allowed_tools=allowed_tools,
         conversation_id=payload.conversation_id,
         max_turns=payload.max_turns,
@@ -772,7 +812,7 @@ def continue_agent_run(session: Session, run: CopilotAgentRun, user: User, messa
         raise DomainError("copilot_task_actor_mismatch", "Only the task creator can extend its authorization.", status_code=403)
     if run.parent_run_id or run.status not in {"succeeded", "failed"}:
         raise DomainError("copilot_task_not_continuable", "Only a stopped root task can be continued.", status_code=409)
-    if run.turn_count >= 200:
+    if agent_runs.assistant_calls(session, run) >= min(6, run.max_turns):
         raise DomainError("copilot_task_turn_limit", "Start a new task after reviewing the results.", status_code=409)
     root = agent_runs.budget_root(session, run)
     if root.max_cost_usd_cents is not None and agent_runs.tree_cost_usd_cents(session, root) >= root.max_cost_usd_cents:
@@ -786,7 +826,7 @@ def continue_agent_run(session: Session, run: CopilotAgentRun, user: User, messa
         run.task_contract = {**(run.task_contract or {}), **build_contract((run.task_contract or {}).get("service_kind", "custom"), authorized_writes)}
         run.allowed_tools = sorted(set(run.allowed_tools) - (REGISTRY.user_intent_write_ids() - set(authorized_writes)))
     agent_runs.append_turn(session, run, role="user", content=message)
-    run.max_turns = min(200, max(run.max_turns, run.turn_count + 12))
+    run.max_turns = min(6, run.max_turns)
     run.status, run.error, run.outcome = "running", None, {}
     run.version += 1
     session.flush()

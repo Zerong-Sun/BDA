@@ -34,6 +34,15 @@ ingress:
   tlsSecret: bda-tls
 config:
   environment: production
+  deploymentKind: private
+  authRealm: private
+  registrationMode: closed
+  publicPortalUrl: ""
+  privatePortalUrl: ""
+  # Public only. Every project in this dedicated organization is published.
+  publicWorkspaceUserId: ""
+  publicWorkspaceOrganizationId: ""
+  publicWorkspaceReadLimit: "600"
   databasePoolSize: "5"
   databaseMaxOverflow: "5"
   workerConcurrency: "2"
@@ -44,14 +53,19 @@ config:
   minioPublicEndpoint: artifacts.bda.example.invalid
   minioRegion: us-east-1
   computeBackend: lsf
+  computeMaxCollectionBytes: "10737418240"
+  computeMaxCollectionFiles: "10000"
   exposeDocs: "false"
   writesEnabled: "false"
   # Where the API writes BYOK provider keys and the LLM workers read them. Must be inside
   # the mounted claim below, because every pod's root filesystem is read-only.
   llmSecretDir: /var/lib/bda/secrets
+  # Comma-separated, operator-reviewed HTTPS origins; empty disables outbound LLM.
+  llmAllowedEndpointOrigins: ""
   # Site-specific; the chart refuses to render with computeBackend "lsf" until these and a
   # credential are supplied, rather than deploying something that cannot dispatch.
   lsf:
+    submitterUserIds: []
     sshHost: ""
     sshUser: ""
     sshPort: "22"

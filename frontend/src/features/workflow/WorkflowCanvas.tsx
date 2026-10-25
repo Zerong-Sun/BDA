@@ -5,6 +5,7 @@ import {
   Controls,
   MiniMap,
   applyEdgeChanges,
+  applyNodeChanges,
   useEdgesState,
   useNodesState,
   type Connection,
@@ -13,8 +14,11 @@ import {
   type Node,
   type NodeChange,
   type NodeTypes,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import { CursorClick, SpinnerGap } from '@phosphor-icons/react'
+import { Button } from '../../components/ui/Button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Frame, FramePanel } from '../../components/reui/frame'
 import { WorkflowNodeCard } from './WorkflowNode'
 import { WorkflowEdge } from './WorkflowEdge'
@@ -27,10 +31,13 @@ import {
   type WorkflowNodeData,
 } from './workflowTypes'
 import { useToastStore } from '../../components/ui/toastStore'
-import { saveWorkflowLayout, addWorkflowNode } from '../../lib/api/workflow'
+import { saveWorkflowLayout, addWorkflowNode, getWorkflowGraph } from '../../lib/api/workflow'
+import { saveConnections } from '../../lib/api/workflowGates'
 import { useAppStore } from '../../lib/store/appStore'
 import { themeColor } from '../../lib/theme/themeColor'
 import { useI18n } from '../../lib/i18n'
+import { workflowOverview } from './workflowOverview'
+import { MIN_NODE_WIDTH, workflowNodeWidth } from './workflowNodeLayout'
 
 const nodeTypes: NodeTypes = { workflowNode: WorkflowNodeCard }
 const edgeTypes: EdgeTypes = { workflowEdge: WorkflowEdge }
@@ -58,6 +65,7 @@ interface WorkflowCanvasProps {
   initialEdges?: BdaWorkflowEdge[]
   workflowRunId?: string
   readOnly?: boolean
+  overview?: boolean
   onNodeAdded?: () => void
   onLayoutSaved?: () => void
   onConnectionRequested?: (connection: Connection) => void
@@ -79,6 +87,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       initialEdges,
       workflowRunId,
       readOnly = false,
+      overview = false,
       onNodeAdded,
       onLayoutSaved,
       onNodeSelected,
@@ -89,12 +98,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     },
     ref,
   ) {
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes ?? [])
+    const [nodes, setNodes] = useNodesState(initialNodes ?? [])
     const [edges, setEdges] = useEdgesState(initialEdges ?? [])
     const showToast = useToastStore(s => s.show)
     const [addingNode, setAddingNode] = useState(false)
     useAppStore((s) => s.themePreference)
-    const { t } = useI18n()
+    const { t, language } = useI18n()
     const gridColor = themeColor('--border-soft', '#202020')
     const accentColor = themeColor('--accent', '#D08A2A')
     const maskColor = themeColor('--border-soft', 'rgba(0,0,0,0.45)')
@@ -104,6 +113,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     const edgesRef = useRef(edges)
     nodesRef.current = nodes
     edgesRef.current = edges
+
+    useEffect(() => () => {
+      if (saveTimer.current !== null) {
+        window.clearTimeout(saveTimer.current)
+        saveTimer.current = null
+      }
+    }, [readOnly, workflowRunId])
 
     useEffect(() => {
       if (!initialNodes) return
@@ -133,6 +149,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           return {
             ...node,
             position: existingPositions.get(node.id) ?? node.position,
+            width: existing?.width ?? node.width,
+            measured: existing?.measured,
+            resizing: existing?.resizing,
+            dragging: existing?.dragging,
             selected: existing?.selected,
           }
         })
@@ -167,30 +187,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       })
     }, [nodeCount, selectedNodeId, setNodes])
 
-    // Keyboard selection. React Flow selects a focused node on Enter or Space
-    // inside its own store and never calls `onNodeClick`, so a keyboard user
-    // could highlight a node without the inspector or the URL ever hearing of
-    // it. Only selections are forwarded: deselection also happens as a side
-    // effect of clicking an edge, and forwarding that would clear the edge the
-    // person just chose. Clearing is the pane click and Escape, below.
-    const handleNodesChange = useCallback(
-      (changes: NodeChange<BdaWorkflowNode>[]) => {
-        onNodesChange(changes)
-        const picked = changes.find((change) => change.type === 'select' && change.selected)
-        if (picked && picked.type === 'select') onNodeSelected?.(picked.id)
-      },
-      [onNodeSelected, onNodesChange],
-    )
-
     const persistLayout = useCallback(
       (currentNodes: Node[], currentEdges: BdaWorkflowEdge[]) => {
-        if (!workflowRunId) return
+        if (!workflowRunId || readOnly) return
         if (saveTimer.current) window.clearTimeout(saveTimer.current)
         saveTimer.current = window.setTimeout(() => {
+          saveTimer.current = null
           void saveWorkflowLayout(workflowRunId, {
             nodes: currentNodes.map((node) => ({
               id: node.id,
               position: node.position,
+              ...(node.width !== undefined ? { width: node.width } : {}),
             })),
             edges: currentEdges.map((edge) => ({
               source: edge.source,
@@ -201,8 +208,36 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             .catch(error => showToast(error instanceof Error ? error.message : 'Layout save failed', 'error'))
         }, 500)
       },
-      [workflowRunId, onLayoutSaved, showToast],
+      [workflowRunId, readOnly, onLayoutSaved, showToast],
     )
+
+    const handleNodesChange = useCallback(
+      (changes: NodeChange<BdaWorkflowNode>[]) => {
+        // Keep the ref current in the same event as the final resize/drag. Saving
+        // from the previous render can otherwise miss the last pointer movement.
+        const next = applyNodeChanges(changes, nodesRef.current)
+        nodesRef.current = next
+        setNodes(next)
+        if (!overview && changes.some(change => change.type === 'dimensions' && change.resizing === false)) {
+          persistLayout(next, edgesRef.current)
+        }
+        // Keyboard selection must reach the inspector too. Deselection is handled
+        // by the pane/Escape, so picking an edge does not immediately clear it.
+        const picked = changes.find(change => change.type === 'select' && change.selected)
+        if (picked && picked.type === 'select') onNodeSelected?.(picked.id)
+      },
+      [onNodeSelected, setNodes, persistLayout, overview],
+    )
+
+    const resizeNode = useCallback((id: string, requestedWidth: number) => {
+      if (readOnly || overview) return
+      const width = workflowNodeWidth(requestedWidth)
+      if (width === undefined) return
+      const next = nodesRef.current.map(node => node.id === id ? { ...node, width } : node)
+      nodesRef.current = next
+      setNodes(next)
+      persistLayout(next, edgesRef.current)
+    }, [readOnly, overview, setNodes, persistLayout])
 
     const onEdgesChange = useCallback(
       (changes: EdgeChange<BdaWorkflowEdge>[]) => {
@@ -266,6 +301,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
 
           const created = await addWorkflowNode(workflowRunId, {
             node_type: template.nodeType,
+            ...(template.resource === 'manual' ? { execution_mode: 'manual' as const } : {}),
             key: nodeName,
             model_plugin: template.modelName,
             model_plugin_id: template.pluginId,
@@ -383,8 +419,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           setNodes(nextNodes)
           setEdges(nextEdges)
           if (workflowRunId && !readOnly) {
-            const { getWorkflowGraph } = await import('../../lib/api/workflow')
-            const { saveConnections } = await import('../../lib/api/workflowGates')
             const latest = await getWorkflowGraph(workflowRunId)
             await saveConnections(workflowRunId, [...latest.edges, ...newEdges.map(e => ({ id: e.id, source: e.source, target: e.target }))], latest.workflow.version)
           }
@@ -403,10 +437,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
       addRecommendedWorkflow,
     ])
 
+    const flowInstance = useRef<ReactFlowInstance<BdaWorkflowNode, BdaWorkflowEdge> | null>(null)
+    const orderedNodes = useMemo(() => [...nodes].sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y), [nodes])
+    const focusNodeId = nodes.some(node => node.id === selectedNodeId) ? selectedNodeId! : orderedNodes[0]?.id
+    const focusCard = (id = focusNodeId) => {
+      if (id) void flowInstance.current?.fitView({ nodes: [{ id }], minZoom: 0.9, maxZoom: 1, padding: 0.12, duration: 200 })
+    }
     const proOptions = useMemo(() => ({ hideAttribution: true }), [])
+    // Node deletion has no canvas persistence handler. React Flow's default
+    // Backspace removal would only hide server nodes locally (even read-only
+    // ones) and can also remove their connections. Keep those nodes inspectable.
+    const renderedNodes = useMemo(() => nodes.map(node => ({
+      ...node,
+      width: node.width ?? MIN_NODE_WIDTH,
+      deletable: false,
+      data: { ...node.data, onWidthChange: (width: number) => resizeNode(node.id, width) },
+    })), [nodes, resizeNode])
+    const overviewGraph = useMemo(() => workflowOverview(renderedNodes, edges), [renderedNodes, edges])
+    const completedCount = nodes.filter(node => node.data.status === 'completed').length
+    const activeStatuses = [...new Set(nodes.map(node => node.data.status))]
     const flowKey = useMemo(
-      () => `${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
-      [nodes, edges],
+      () => `${overview ? 'overview' : 'workbench'}::${nodes.map((node) => node.id).join('|') || 'empty-workflow'}::${edges.map((edge) => edge.id).join('|')}`,
+      [overview, nodes, edges],
     )
 
     // `h-full` rather than a viewport fraction: the page gives the canvas column a
@@ -414,14 +466,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
     // graph zoomed further out than it needed to be. The min-height still applies on
     // narrow layouts, where the column is not height-constrained.
     return (
-      <Frame variant="inverse" spacing="xs" className="h-full min-h-[34rem]">
+      <Frame variant="inverse" spacing="xs" className="h-full min-h-[34rem] min-w-0 flex-1 xl:min-h-0">
         <FramePanel className="relative flex h-full flex-col overflow-hidden bg-bg-canvas p-0">
         {/* Banner and legend sit above the graph rather than floating on it. As overlays
             they covered the top-left corner of the route permanently, and with both
             present the legend was drawn straight over the read-only sentence. */}
-        {readOnly ? (
+        {overview ? <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border-soft bg-surface-1 px-6 py-5">
+          <div><h2 className="text-lg font-semibold text-text-primary">{language === 'zh' ? '流程总览' : 'Workflow overview'}</h2><p className="mt-1 text-xs text-text-secondary">{language === 'zh' ? `${nodes.length} 个步骤 · ${completedCount} 个已完成` : `${nodes.length} stages · ${completedCount} completed`}{edges.length === 0 ? (language === 'zh' ? ' · 无已记录的依赖连线' : ' · Dependency edges not recorded') : ''}</p></div>
+          <div className="flex items-center gap-4 text-xs text-text-secondary">{activeStatuses.map(status => <span key={status} className="inline-flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${status === 'completed' ? 'bg-success' : status === 'running' ? 'bg-info' : status === 'failed' ? 'bg-danger' : 'bg-accent-2'}`} />{status === 'requires_review' ? t.shared.status.needsReview : statusLegendKeys.find(item => item[0] === status) ? t.shared.status[statusLegendKeys.find(item => item[0] === status)![1]] : status.replaceAll('_', ' ')}<span className="font-semibold text-text-primary">{nodes.filter(node => node.data.status === status).length}</span></span>)}</div>
+        </div> : null}
+        {readOnly && !overview ? (
           <p className="shrink-0 border-b border-border-soft px-3 py-2 text-xs text-text-secondary">
-            {t.workflowExt.canvas.readOnlyBanner}
+            {language === 'zh' ? '当前工作流只读。可选择节点和连线查看详情。' : 'This workflow is read-only. Select nodes and connections to inspect details.'}
           </p>
         ) : null}
         {addingNode ? (
@@ -440,10 +496,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
               <p className="mt-2 text-xs leading-relaxed text-text-secondary">{t.workflowExt.canvas.emptyBody}</p>
             </div>
           </div>
-        ) : (
+        ) : !overview ? (
           <div className="shrink-0 border-b border-border-soft px-3 py-1.5 text-[11px] text-text-secondary">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>{t.workflowExt.canvas.connectHint}</span>
+              <span>{readOnly ? (language === 'zh' ? '切换步骤查看结果；选择连线检查门控。' : 'Switch steps to inspect results; select a connection to review gates.') : t.workflowExt.canvas.connectHint}</span>
               <span
                 className="flex flex-wrap items-center gap-x-3 gap-y-1"
                 aria-label={t.workflowExt.canvas.statusLegendAria}
@@ -457,12 +513,24 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
               </span>
             </div>
           </div>
-        )}
+        ) : null}
+        {!overview && nodes.length > 0 ? <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-soft px-3 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+            <span className="shrink-0">{language === 'zh' ? '步骤' : 'Step'}</span>
+            <Select value={focusNodeId ?? null} items={orderedNodes.map((node, index) => ({ value: node.id, label: `${index + 1}. ${node.data.label}` }))} onValueChange={id => { if (id) { onNodeSelected?.(id); focusCard(id) } }}>
+              <SelectTrigger aria-label={language === 'zh' ? '定位工作流步骤' : 'Focus workflow step'} className="min-w-0 flex-1"><SelectValue className="truncate" /></SelectTrigger>
+              <SelectContent>{orderedNodes.map((node, index) => <SelectItem key={node.id} value={node.id}>{index + 1}. {node.data.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => focusCard()}>{language === 'zh' ? '可读大小' : 'Readable size'}</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void flowInstance.current?.fitView({ padding: 0.15, duration: 200 })}>{language === 'zh' ? '适应全图' : 'Fit all'}</Button>
+        </div> : null}
         <ReactFlow
+          onInit={instance => { flowInstance.current = instance }}
           className="min-h-0 flex-1"
           key={flowKey}
-          nodes={nodes}
-          edges={edges}
+          nodes={overview ? overviewGraph.nodes : renderedNodes}
+          edges={overview ? overviewGraph.edges : edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onKeyDown={(event) => {
@@ -481,20 +549,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           edgeTypes={edgeTypes}
           fitView
           minZoom={0.1}
-          fitViewOptions={{ padding: 0.2, minZoom: 0.1 }}
+          fitViewOptions={overview ? { padding: 0.07, minZoom: 0.1, maxZoom: 1.25 } : { nodes: focusNodeId ? [{ id: focusNodeId }] : undefined, padding: 0.12, minZoom: 0.9, maxZoom: 1 }}
           proOptions={proOptions}
-          nodesDraggable={!readOnly}
-          nodesConnectable={!readOnly}
+          nodesDraggable={!readOnly && !overview}
+          nodesConnectable={!readOnly && !overview}
           edgesFocusable={false}
           edgesReconnectable={false}
+          deleteKeyCode={readOnly || overview ? null : 'Backspace'}
           panOnScroll
           selectionOnDrag={false}
         >
-          <Background gap={20} color={gridColor} style={{ opacity: 0.15 }} />
+          <Background gap={overview ? 24 : 20} color={gridColor} style={{ opacity: overview ? 0.08 : 0.15 }} />
           {/* Default minimap is 200x150 and covers a corner of the route on the column
               widths this page uses; a route of a handful of stages does not need that
               much of the canvas spent on an overview of itself. */}
-          <MiniMap
+          {!overview ? <MiniMap
             nodeColor={accentColor}
             maskColor={maskColor}
             pannable
@@ -503,8 +572,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
             // Hidden on phones: the canvas there is short enough that the overview covers
             // a quarter of the route it is meant to summarise.
             className="!hidden !bg-surface-1 !border-border-soft md:!block"
-          />
-          <Controls fitViewOptions={{ padding: 0.2, minZoom: 0.1 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
+          /> : null}
+          <Controls showInteractive={!overview} fitViewOptions={{ padding: overview ? 0.07 : 0.2, minZoom: 0.1, maxZoom: overview ? 1.25 : 2 }} className="!bg-surface-1 !border-border-soft !shadow-none [&>button]:!bg-surface-1 [&>button]:!border-border-soft [&>button]:!text-text-primary" />
         </ReactFlow>
         </FramePanel>
       </Frame>

@@ -82,6 +82,7 @@ def test_manual_materialization_retry_preserves_selection(env):
 
 def test_no_coordinates_is_actionable_data_error_not_empty_success(env):
     s, _, _, _, _, gate, storage = runtime_fixture(env)
+    gate.preview = True
     gate.snapshot = {
         **gate.snapshot,
         "edge": {**gate.snapshot["edge"], "gate": {"configured": True, "structure": {"chains": ["B"]}}},
@@ -322,16 +323,12 @@ def test_filtered_count_is_validated_before_any_compute_dispatch(env):
     from backend_v2.app.compute.repository import ComputeRepository
     from backend_v2.app.compute.service import schedule_ready_jobs
 
-    s, w, submission, _, target, gate, storage = runtime_fixture(env)
+    s, w, submission, _, target, gate, storage = runtime_fixture(
+        env,
+        target_configuration={"parameter_links": {"count": {"source": "selected_count", "from_node": "a"}}},
+        target_schema={"type": "object", "properties": {"count": {"type": "integer", "minimum": 2}}},
+    )
     run_gate(s, gate, storage)
-    target.runtime_spec = {
-        **target.runtime_spec,
-        "configuration": {"parameter_links": {"count": {"source": "selected_count", "from_node": "a"}}},
-        "plugin_snapshot": {
-            **target.runtime_spec["plugin_snapshot"],
-            "parameter_schema": {"type": "object", "properties": {"count": {"type": "integer", "minimum": 2}}},
-        },
-    }
     schedule_ready_jobs(s, submission, w)
     assert target.status == "failed" and target.error_code == "runtime_parameters_invalid"
     assert "minimum" in target.error_message

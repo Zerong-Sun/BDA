@@ -43,9 +43,13 @@ def _extract_json(value: str | dict) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     text = value.strip()
-    fenced = re.fullmatch(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
-    if fenced:
-        text = fenced.group(1)
+    # Parse only the envelope. Overlapping whitespace/body regex quantifiers
+    # made an unterminated, attacker-supplied fence consume cubic CPU time.
+    if text.startswith("```") and text.endswith("```") and len(text) >= 6:
+        text = text[3:-3]
+        if text[:4].lower() == "json":
+            text = text[4:]
+        text = text.strip()
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError as exc:

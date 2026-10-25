@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 _trace_id: ContextVar[str] = ContextVar("bda_v2_trace_id", default="")
 _traceparent = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-(0[01])$")
+_trace_id_pattern = re.compile(r"[0-9a-f]{32}")
 logger = structlog.get_logger()
 tracer = trace.get_tracer("bda-backend-v2.http")
 
@@ -25,6 +26,11 @@ class TraceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         inbound = request.headers.get("traceparent", "")
         match = _traceparent.match(inbound)
+        if match and (match.group(1) == "0" * 32 or match.group(2) == "0" * 16):
+            match = None
+        supplied_trace_id = request.headers.get("x-trace-id", "")
+        if not _trace_id_pattern.fullmatch(supplied_trace_id) or supplied_trace_id == "0" * 32:
+            supplied_trace_id = ""
         with tracer.start_as_current_span(
             f"{request.method} {request.url.path}", context=extract(dict(request.headers))
         ) as span:
@@ -34,7 +40,7 @@ class TraceMiddleware(BaseHTTPMiddleware):
                 if span_context.is_valid
                 else match.group(1)
                 if match
-                else request.headers.get("x-trace-id") or uuid.uuid4().hex
+                else supplied_trace_id or uuid.uuid4().hex
             )
             span_id = f"{span_context.span_id:016x}" if span_context.is_valid else uuid.uuid4().hex[:16]
             token = _trace_id.set(trace_id)

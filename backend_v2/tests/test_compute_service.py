@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
@@ -18,14 +19,45 @@ from backend_v2.app.compute.service import (
     transition_job,
 )
 from backend_v2.app.core.models import Base
+from backend_v2.app.core.pagination import decode_cursor, encode_cursor
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
 from backend_v2.tests._sqlite import enforce_foreign_keys
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session, sessionmaker
+
+
+@pytest.mark.parametrize('role', ['admin', 'researcher', 'viewer'])
+def test_public_lsf_requires_account_assignment_before_submission_or_retry(compute_session, monkeypatch, role):
+    from backend_v2.app.compute import access
+    from backend_v2.app.compute.models import ComputeDraft, JobSubmission
+    from backend_v2.app.core.config import get_settings
+    from backend_v2.app.workflows.preflight import evaluate_preflight
+    from sqlalchemy import func
+
+    session, user, project, workflow = compute_session
+    user.role = role
+    settings = get_settings().model_copy(update={'deployment_kind': 'public', 'lsf_submitter_user_ids': [],
+                                                 'lsf_ssh_host': 'cluster.example', 'lsf_remote_root': '/scratch/bda'})
+    monkeypatch.setattr(access, 'get_settings', lambda: settings)
+    monkeypatch.setattr(compute_service, 'get_settings', lambda: settings)
+    with pytest.raises(DomainError) as failure:
+        create_submission(session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend='lsf'),
+                          idempotency_key='unassigned-account', user=user)
+    assert failure.value.error_code == 'lsf_account_not_assigned'
+    assert session.scalar(select(func.count(JobSubmission.id))) == 0
+    assert session.scalar(select(func.count(Job.id))) == 0
+    blockers, _, _ = evaluate_preflight(session, workflow, compute_backend='lsf', user=user)
+    assert any(issue['code'] == 'lsf_account_not_assigned' for issue in blockers)
+    draft = ComputeDraft(project_id=project.id, backend='lsf', name='Draft', created_by=user.id, status='draft')
+    with pytest.raises(DomainError, match='assigned LSF connection'):
+        compute_service.confirm_draft(session, draft, project, user)
+    assert draft.status == 'draft'
+    with pytest.raises(DomainError, match='assigned LSF connection'):
+        retry_job(session, Job(compute_backend='lsf', status='failed', runtime_spec={}), project, user)
 
 
 @pytest.mark.parametrize("count", [100, 205])
@@ -54,6 +86,82 @@ def test_terminal_job_stream_drains_pages_with_equal_timestamps(compute_session,
     assert len(test_events) == count
     assert {event["id"] for event in test_events} == expected
     assert received[-1]["event"] == "done"
+
+
+def test_lsf_submission_freezes_its_identity_and_refuses_retry_after_a_site_change(compute_session, monkeypatch):
+    from backend_v2.app.compute import access
+    from backend_v2.app.core.config import get_settings
+    from backend_v2.app.workflows import preflight
+
+    session, user, project, workflow = compute_session
+    settings = get_settings().model_copy(update={'lsf_ssh_host': 'first.example', 'lsf_remote_root': '/scratch/first',
+                                                 'lsf_ssh_user': 'alice', 'lsf_submitter_user_ids': [user.id]})
+    monkeypatch.setattr(access, 'get_settings', lambda: settings)
+    monkeypatch.setattr(compute_service, 'get_settings', lambda: settings)
+    monkeypatch.setattr(preflight, 'get_settings', lambda: settings)
+    _, jobs = create_submission(session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend='lsf'),
+                                idempotency_key='frozen-site', user=user)
+    assert all(job.runtime_spec['lsf_target']['lsf_ssh_host'] == 'first.example' for job in jobs)
+    assert all(job.runtime_spec['compute_actor_id'] == str(user.id) for job in jobs)
+    settings.lsf_ssh_host = 'second.example'
+    jobs[0].status = 'failed'
+    with pytest.raises(DomainError) as failure:
+        retry_job(session, jobs[0], project, user)
+    assert failure.value.error_code == 'lsf_retry_site_changed'
+    assert jobs[0].runtime_spec['lsf_target']['lsf_ssh_host'] == 'first.example'
+
+
+@pytest.mark.parametrize("limit", [1, 2, 3, 10])
+def test_job_log_pages_follow_time_with_uuid_ties_and_legacy_cursors(compute_session, limit) -> None:
+    session, user, project, workflow = compute_session
+    _, jobs = create_submission(
+        session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend="demo"),
+        idempotency_key="log-pages", user=user,
+    )
+    job = jobs[0]
+    session.execute(delete(JobEvent).where(JobEvent.job_id == job.id))
+    timestamp = datetime(2026, 9, 30, 9, 0, tzinfo=UTC)
+    # Insertion order, UUID order and chronological order intentionally disagree.
+    events = [
+        JobEvent(id=uuid.UUID(int=number), job_id=job.id, event_type=f"test.{number}",
+                 payload={}, created_at=timestamp + timedelta(seconds=offset))
+        for number, offset in [(1, 3), (900, 0), (70, 1), (10, 1), (20, 1), (500, 2)]
+    ]
+    session.add_all(events)
+    session.commit()
+    expected = [uuid.UUID(int=number) for number in (900, 10, 20, 70, 500, 1)]
+    received = []
+    cursor = None
+    while True:
+        page = compute_api.get_job_logs(job.id, cursor=cursor, limit=limit, session=session, user=user)
+        received.extend(item.id for item in page.items)
+        if page.next_cursor is None:
+            break
+        # Existing clients can still decode and reuse their opaque UUID cursor.
+        assert decode_cursor(page.next_cursor) == page.items[-1].id
+        cursor = page.next_cursor
+        assert len(received) <= len(expected), "Pagination must advance"
+    assert received == expected
+    assert len(received) == len(set(received))
+    # A saved old UUID cursor is now resolved to the event's chronological position.
+    page = compute_api.get_job_logs(job.id, cursor=encode_cursor(expected[2]), limit=10, session=session, user=user)
+    assert [item.id for item in page.items] == expected[3:]
+
+
+def test_job_log_cursor_must_belong_to_requested_job(compute_session) -> None:
+    session, user, project, workflow = compute_session
+    _, jobs = create_submission(
+        session, workflow=workflow, project=project, payload=SubmissionCreate(compute_backend="demo"),
+        idempotency_key="log-cursor-scope", user=user,
+    )
+    session.commit()
+    other_event = session.scalar(select(JobEvent).where(JobEvent.job_id == jobs[1].id))
+    assert other_event is not None
+    for cursor in (encode_cursor(other_event.id), encode_cursor(uuid.uuid4()), "not-a-valid-cursor"):
+        with pytest.raises(DomainError) as error:
+            compute_api.get_job_logs(jobs[0].id, cursor=cursor, limit=10, session=session, user=user)
+        assert error.value.error_code == "invalid_cursor"
+        assert error.value.status_code == 422
 
 
 @pytest.fixture
@@ -145,7 +253,10 @@ def test_submission_idempotency_dependency_progress_and_retry(compute_session) -
     transition_job(session, by_node["b"], "failed")
     schedule_ready_jobs(session, submission, workflow)
     assert submission.status == "failed" and workflow.status == "failed"
+    failed_version = workflow.version
     retried = retry_job(session, by_node["b"], project, user)
+    assert submission.status == "pending" and workflow.status == "queued"
+    assert workflow.version > failed_version
     assert retried.attempt_number == 2
     assert f"attempt-{retried.attempt_number}" in retried.runtime_spec["output_manifest_key"]
 

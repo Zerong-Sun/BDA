@@ -19,6 +19,24 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..core.models import Base, UUIDVersionMixin
 
 
+class CopilotCallBudget(Base):
+    """Internal durable admission ledger; never stores prompts or credentials."""
+    __tablename__ = "copilot_call_budgets"
+    scope_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    reserved_cny_micros: Mapped[int] = mapped_column(Integer, default=0)
+    max_calls: Mapped[int] = mapped_column(Integer, default=6)
+
+
+class CopilotCallReservation(Base):
+    __tablename__ = "copilot_call_reservations"
+    scope_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reserved_cny_micros: Mapped[int] = mapped_column(Integer)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class CopilotConversation(UUIDVersionMixin, Base):
     __tablename__ = "copilot_conversations"
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
@@ -40,6 +58,8 @@ class CopilotMessage(UUIDVersionMixin, Base):
     #: as a room where several operators speak.
     bot: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content: Mapped[str] = mapped_column(Text)
+    #: Private provider protocol state, never part of the public message schema.
+    reasoning_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="pending")
     citations: Mapped[list] = mapped_column(JSON, default=list)
     tool_calls: Mapped[list] = mapped_column(JSON, default=list)
@@ -86,7 +106,7 @@ AGENT_RUN_STATUSES = (
 #: lifecycle: a literature search, a target intelligence run, a gap repair. They
 #: were the awkward case before it existed, because the agent could start them
 #: and then had nothing to do but report "queued" and stop.
-AGENT_TASK_KINDS = ("gpu_job", "subagent", "operation")
+AGENT_TASK_KINDS = ("gpu_job", "subagent", "operation", "decision")
 
 AGENT_TASK_STATUSES = ("running", "succeeded", "failed", "cancelled")
 
@@ -138,7 +158,7 @@ class CopilotAgentRun(UUIDVersionMixin, Base):
 
     #: Budget, checked before each provider call rather than after, so an
     #: overrun stops the run instead of being noticed once it is paid for.
-    max_turns: Mapped[int] = mapped_column(Integer, default=24)
+    max_turns: Mapped[int] = mapped_column(Integer, default=6)
     turn_count: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd_cents: Mapped[int] = mapped_column(Integer, default=0)
     max_cost_usd_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -167,6 +187,9 @@ class CopilotAgentTurn(UUIDVersionMixin, Base):
     sequence: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text, default="")
+    #: Kept verbatim for thinking-model replay, including across worker resumes.
+    #: Separate from public content and tool calls; absent for older providers.
+    reasoning_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Tool calls requested in this turn, and their results once they resolve.
     tool_calls: Mapped[list] = mapped_column(JSON, default=list)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
@@ -376,3 +399,7 @@ class CopilotDecisionRequest(UUIDVersionMixin, Base):
     #: The person the asking operator was working for. Who answered is a
     #: separate column, because they are often not the same person.
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+
+# Register transactional journal projections in HTTP and worker processes alike.
+from . import records as _records  # noqa: E402,F401

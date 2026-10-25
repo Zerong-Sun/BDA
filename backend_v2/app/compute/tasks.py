@@ -65,6 +65,17 @@ def _runtime(job: Job) -> RuntimeJob:
     )
 
 
+def _job_adapter(runtime: RuntimeJob, backend: str):
+    if backend != "lsf" or "lsf_target" not in runtime.runtime_spec:
+        return adapter_for(backend)
+    target = runtime.runtime_spec["lsf_target"]
+    required = {"lsf_ssh_host", "lsf_ssh_port", "lsf_ssh_user", "lsf_remote_root", "lsf_queue",
+                "lsf_staging_mode", "lsf_ssh_key_path", "lsf_ssh_password_ref", "lsf_upload_wrapper"}
+    if not isinstance(target, dict) or set(target) != required:
+        raise ValueError("lsf_target_snapshot_invalid")
+    return adapter_for(backend, target=target)
+
+
 def _apply_input_adapter(session: Session, job: Job) -> dict:
     """Let the plugin synthesise inputs it needs but a workflow cannot bind directly.
 
@@ -269,7 +280,7 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
             # Retained so events written by a previous release still drain during a
             # rolling deploy; nothing produces this topic any more.
             "job.succeeded": "bda_v2.campaign_advance",
-            "job.settled": ("bda_v2.campaign_advance", "bda_v2.copilot_agent_task_settled"),
+            "job.settled": ("bda_v2.campaign_advance", "bda_v2.copilot_agent_task_settled", "bda_v2.autopilot_workflow_settled"),
             "operation.settled": "bda_v2.copilot_agent_operation_settled",
             "copilot.agent_run.settled": "bda_v2.autopilot_stage_settled",
             "campaign.evaluate": "bda_v2.campaign_evaluate",
@@ -287,7 +298,13 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                 # every tick and eventually filled the batch, starving every real event.
                 _defer_event(event, f"unknown_topic:{event.topic}")
                 continue
-            operation = session.get(Operation, event.id)
+            # A fast consumer can start before this publishing transaction commits.
+            # Hold the operation lock until queued and published_at commit together;
+            # otherwise its running update invalidates our version and rolls back
+            # an already sent batch, causing immediate redelivery of every event.
+            operation = session.scalar(
+                select(Operation).where(Operation.id == event.id).with_for_update().execution_options(populate_existing=True)
+            )
             project_id = event.payload.get("project_id")
             if not project_id and operation is not None and operation.project_id is not None:
                 project_id = str(operation.project_id)
@@ -305,11 +322,14 @@ def publish_outbox(batch_size: int = 100, *, event_ids: list[str] | None = None)
                     args.append(bool(event.payload.get("dry_run")))
                 names = (subscribers,) if isinstance(subscribers, str) else subscribers
                 message_headers = {"bda_project_id": str(project_id)} if project_id else None
+                scope_id = event.payload.get("_llm_call_scope")
+                if isinstance(scope_id, str) and scope_id:
+                    message_headers = {**(message_headers or {}), "bda_llm_call_scope": scope_id}
                 for index, task_name in enumerate(names):
                     # The first subscriber keeps the event id, because an Operation
                     # row is keyed on it. Any further subscriber gets a task id
-                    # derived from that same id, so redelivery of the event still
-                    # deduplicates per subscriber instead of colliding between them.
+                    # derived from that same id. This gives idempotent consumers a
+                    # stable identity; Celery task IDs alone do not deduplicate delivery.
                     task_id = str(event.id) if index == 0 else str(uuid.uuid5(event.id, task_name))
                     celery_app.send_task(task_name, args=args, task_id=task_id, headers=message_headers)
                 event.published_at = datetime.now(UTC)
@@ -358,7 +378,7 @@ def dispatch_job(self, job_id: str) -> dict:
         runtime = _runtime(job)
         backend = job.compute_backend
     try:
-        adapter = adapter_for(backend)
+        adapter = _job_adapter(runtime, backend)
         # Only mint presigned URLs when the runner actually fetches them. Under ssh
         # staging the adapter copies inputs onto the cluster and writes its own manifest
         # there, so publishing long-lived credentials to object storage is pure exposure.
@@ -454,7 +474,7 @@ def poll_job(self, job_id: str) -> dict:
             return {"job_id": job_id, "status": "ignored"}
         runtime, backend, external_id = _runtime(job), job.compute_backend, job.external_id
     try:
-        live = adapter_for(backend).status(runtime, external_id)
+        live = _job_adapter(runtime, backend).status(runtime, external_id)
     except Exception as exc:
         if backend == "lsf":
             LSF_FAILURES.labels("poll").inc()
@@ -499,7 +519,7 @@ def collect_job(self, job_id: str) -> dict:
             return {"job_id": job_id, "status": "ignored"}
         runtime, backend, external_id = _runtime(job), job.compute_backend, job.external_id
     try:
-        outputs = adapter_for(backend).collect(runtime, external_id)
+        outputs = _job_adapter(runtime, backend).collect(runtime, external_id)
         storage = ObjectStorage()
         verified = []
         for output in outputs:
@@ -810,9 +830,9 @@ def cancel_job(self, job_id: str) -> dict:
         job = ComputeRepository(session).job(parsed)
         if job is None or job.status in TERMINAL_STATES:
             return {"job_id": job_id, "status": "ignored"}
-        backend, external_id = job.compute_backend, job.external_id
+        backend, external_id, runtime = job.compute_backend, job.external_id, _runtime(job)
     try:
-        cancelled = True if not external_id else adapter_for(backend).cancel(external_id)
+        cancelled = True if not external_id else _job_adapter(runtime, backend).cancel(external_id)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=10) from exc
     if cancelled:
@@ -843,6 +863,27 @@ def _gc_protected(object_name: str, live_job_prefixes: tuple[str, ...]) -> bool:
     if object_name.startswith(GC_PROTECTED_PREFIXES):
         return True
     return any(segment in object_name for segment in GC_PROTECTED_SEGMENTS)
+
+
+def _gc_scope(
+    object_name: str,
+    known_projects: frozenset[str],
+    known_jobs: frozenset[str],
+    recorded_keys: set[str],
+) -> str:
+    """Attribute a key before collection; absence from one DB is not ownership.
+
+    Distinct databases can share a bucket. Unknown project/job prefixes belong
+    outside this database's collection scope. Unscoped keys (including staging)
+    require an actual local record; their owner cannot be inferred from age.
+    """
+    if object_name in recorded_keys:
+        return "local"
+    for prefix, known in (("projects", known_projects), ("jobs", known_jobs)):
+        parts = object_name.split("/", 2)
+        if len(parts) == 3 and parts[0] == prefix and parts[1] and parts[2]:
+            return "local" if parts[1] in known else "foreign"
+    return "unattributed"
 
 
 @celery_app.task(name="bda_v2.reconcile_artifacts")
@@ -876,13 +917,17 @@ def reconcile_artifacts() -> dict:
             f"jobs/{job_id}/"
             for job_id in session.scalars(select(Job.id).where(Job.status.not_in(TERMINAL_STATES)))
         )
+        known_projects = frozenset(str(item) for item in session.scalars(select(Project.id)))
+        known_jobs = frozenset(str(item) for item in session.scalars(select(Job.id)))
+        recorded_keys = set(session.scalars(select(Artifact.object_key)))
+        recorded_keys.update(session.scalars(select(ArtifactUpload.object_key)))
 
     storage = ObjectStorage()
     for _, key in expired_data:
         if storage.exists(key):
             storage.remove(key)
     missing = [artifact_id for artifact_id, key in available_data if not storage.exists(key)]
-    orphaned = [
+    unclaimed = [
         item.object_name
         for item in storage.list_objects()
         if item.object_name not in known_staging | known_artifacts
@@ -890,6 +935,11 @@ def reconcile_artifacts() -> dict:
         and item.last_modified
         and item.last_modified < now - timedelta(hours=1)
     ]
+    scoped = {
+        name: _gc_scope(name, known_projects, known_jobs, recorded_keys)
+        for name in unclaimed
+    }
+    orphaned = [name for name, scope in scoped.items() if scope == "local"]
     for key in orphaned:
         storage.remove(key)
 
@@ -903,7 +953,13 @@ def reconcile_artifacts() -> dict:
             artifact = session.get(Artifact, artifact_id)
             if artifact and artifact.status == "available":
                 artifact.status = "failed"
-    return {"expired_uploads": len(expired_data), "missing_objects": len(missing), "orphaned_objects": len(orphaned)}
+    return {
+        "expired_uploads": len(expired_data),
+        "missing_objects": len(missing),
+        "orphaned_objects": len(orphaned),
+        "foreign_objects": sum(scope == "foreign" for scope in scoped.values()),
+        "unattributed_objects": sum(scope == "unattributed" for scope in scoped.values()),
+    }
 
 
 @celery_app.task(name="bda_v2.purge_deleted_projects")

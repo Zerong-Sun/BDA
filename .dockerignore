@@ -20,11 +20,17 @@ frontend/.vite
 frontend/.npm-cache
 
 # Local data, secrets, and artifacts (never bake into images)
+private
+.bda-sync
 .env
 secrets
 .env.*
 !.env.example
 **/secrets.env
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
 **/scheduler.env
 **/interpolation.env
 **/*.dump

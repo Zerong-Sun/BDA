@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class DeliveryCreate(BaseModel):
@@ -24,6 +24,11 @@ class DeliveryResponse(BaseModel):
     version: int
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("selection")
+    def public_selection(self, value: dict) -> dict:
+        # The frozen row data belongs in the download, not every listing response.
+        return {key: item for key, item in value.items() if key != "_snapshot"}
 
 
 class DeliveryPage(BaseModel):

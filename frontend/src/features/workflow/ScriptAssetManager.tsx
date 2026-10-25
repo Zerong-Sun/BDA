@@ -21,9 +21,13 @@ import {
 } from '../../components/reui/sortable'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { currentRole } from '../research/jsonHelpers'
+import { useAppStore } from '../../lib/store/appStore'
 
 export function ScriptAssetManager() {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const canUpload = currentRole() === 'admin' && !demo
   const [relativePath, setRelativePath] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [lastResult, setLastResult] = useState<string>('')
@@ -56,6 +60,7 @@ export function ScriptAssetManager() {
 
   const upload = useMutation({
     mutationFn: () => {
+      if (!canUpload) throw new Error(language === 'zh' ? '脚本归档需要管理员权限。' : 'Script archival requires administrator access.')
       if (!file) throw new Error(t.workflowExt.scriptAssets.selectFileFirst)
       return uploadScriptAsset(file, {
         relativePath: relativePath.trim() || undefined,
@@ -97,9 +102,11 @@ export function ScriptAssetManager() {
         <Alert variant="info">
           <AlertDescription>{t.workflowExt.scriptAssets.importHint}</AlertDescription>
         </Alert>
+        {!canUpload ? <p className="text-xs text-text-secondary">{language === 'zh' ? '可查看已归档脚本；新增归档由管理员操作。' : 'Archived scripts are available to browse. Only administrators can add archives.'}</p> : null}
         <label className="grid gap-1 text-xs text-text-secondary">
           {t.workflowExt.scriptAssets.archivePath}
           <Input
+            disabled={!canUpload || upload.isPending}
             value={relativePath}
             onChange={(event) => setRelativePath(event.target.value)}
             placeholder={t.workflowExt.scriptAssets.archivePathExample}
@@ -110,6 +117,7 @@ export function ScriptAssetManager() {
           <span>{t.workflowExt.scriptAssets.scriptFile}</span>
           <Input
             ref={fileInputRef}
+            disabled={!canUpload || upload.isPending}
             aria-label={t.workflowExt.scriptAssets.scriptFile}
             type="file"
             className="hidden"
@@ -120,6 +128,7 @@ export function ScriptAssetManager() {
             type="button"
             variant="outline"
             className="w-fit"
+            disabled={!canUpload || upload.isPending}
             onClick={() => fileInputRef.current?.click()}
           >
             <UploadSimple className="h-3.5 w-3.5" />
@@ -130,7 +139,7 @@ export function ScriptAssetManager() {
         <div className="flex gap-2">
           <Button type="button"
             className="flex-1"
-            disabled={!projectId || !file || upload.isPending}
+            disabled={!canUpload || !projectId || !file || upload.isPending}
             onClick={() => upload.mutate()}
           >
             {upload.isPending ? (
@@ -194,7 +203,7 @@ export function ScriptAssetManager() {
                 >
                   <DotsSixVertical className="h-4 w-4" />
                 </SortableItemHandle>
-                <strong className="truncate text-xs">{script.name}</strong>
+                <strong className="min-w-0 break-all text-xs">{script.name}</strong>
               </div>
               <Badge variant="outline">{script.runtime}</Badge>
             </div>

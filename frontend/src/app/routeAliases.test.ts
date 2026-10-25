@@ -25,8 +25,9 @@ describe('project library route', () => {
     )
   })
 
-  it('lands on /projects rather than the old path', () => {
-    expect(appSource).toMatch(/<Route index element=\{<Navigate to="\/projects" replace \/>\}/)
+  it('opens the same project workspace through the access gate', () => {
+    expect(appSource).toContain('<Route index element={<Navigate to="/projects" replace />} />')
+    expect(appSource).toContain('<Route element={<WorkspaceAccessGate />}')
   })
 })
 

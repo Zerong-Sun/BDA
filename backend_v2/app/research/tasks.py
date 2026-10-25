@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
+from ..copilot.call_guard import call_scope
 from ..core.celery_app import celery_app
 from ..core.config import get_settings
 from ..core.database import SessionFactory, session_scope
@@ -453,7 +454,7 @@ def research_generate(generation_id: str) -> dict:
     from ..research.models import ResearchGeneration
 
     parsed = uuid.UUID(generation_id)
-    with session_scope() as session:
+    with call_scope(f"research-generation:{parsed}"), session_scope() as session:
         row = session.get(ResearchGeneration, parsed)
         if row is None:
             return {"generation_id": generation_id, "status": "missing"}
@@ -511,7 +512,7 @@ def research_decision_tree_draft(draft_id: str) -> dict:
     from .schemas import DecisionTreeProposal
 
     parsed = uuid.UUID(draft_id)
-    with session_scope() as session:
+    with call_scope(f"research-decision-tree:{parsed}"), session_scope() as session:
         row = session.get(DecisionTreeDraft, parsed)
         if row is None:
             return {"draft_id": draft_id, "status": "missing"}

@@ -1,5 +1,7 @@
 import './generatedTransport'
 import {
+  postInstrumentReviewApiV2ProjectsProjectIdWetlabResultsResultIdReviewPost,
+  listResultsApiV2ProjectsProjectIdExperimentResultsGet,
   getConcentrationApiV2ProjectsProjectIdWetlabConcentrationGet,
   standaloneConcentrationApiV2WetlabConcentrationGet,
   previewAnalysisApiV2WetlabAnalysisPreviewsPost,
@@ -15,6 +17,8 @@ import {
   postPromoteCandidateApiV2ProjectsProjectIdCandidatesCandidateIdPromoteToBenchPost,
 } from './generated/sdk.gen'
 import {
+  InstrumentQCSchema,
+  type InstrumentAnalysisData,
   AktaSummarySchema,
   BliSummarySchema,
   EnzymeSummarySchema,
@@ -175,6 +179,9 @@ export async function planDilutionSeries(query: {
 // a measurement to fail.
 
 export interface AnalysisRecord {
+  candidate_id?: string | null
+  version?: number
+  qc_review?: Record<string, unknown> | null
   experiment_result_id: string
   experiment_type: string
   analysis_version: string
@@ -184,6 +191,8 @@ export interface AnalysisRecord {
 }
 
 function record(data: {
+  version?: number
+  qc_review?: Record<string, unknown> | null
   experiment_result_id: string
   experiment_type: string
   analysis_version: string
@@ -192,6 +201,7 @@ function record(data: {
   source_artifact_id: string
 }): AnalysisRecord {
   return {
+    version: data.version, qc_review: data.qc_review,
     experiment_result_id: data.experiment_result_id,
     experiment_type: data.experiment_type,
     analysis_version: data.analysis_version,
@@ -199,6 +209,16 @@ function record(data: {
     unit: data.unit,
     source_artifact_id: data.source_artifact_id,
   }
+}
+
+export interface BliProcessingOptions {
+  baseline_mode?: 'initial_point' | 'fitted_offset'
+  sample_mapping?: Record<string, string>
+  excluded_labels?: string[]
+  reference_label?: string | null
+  analysis_method?: 'measured_global' | 'instrument_kobs'
+  correction_note?: string | null
+  supersedes_result_id?: string | null
 }
 
 export async function analyseBli(
@@ -209,7 +229,7 @@ export async function analyseBli(
     t_assoc?: number | null
     t_dissoc?: number | null
     candidate_id?: string | null
-  },
+  } & BliProcessingOptions,
 ) {
   const result = await postBliAnalysisApiV2ProjectsProjectIdWetlabBliAnalysesPost<true>({
     path: { project_id: projectId },
@@ -244,7 +264,7 @@ export async function analyseEnzyme(
 }
 
 
-export async function previewInstrumentAnalysis(file: File, options: {
+export async function previewInstrumentAnalysis(file: File, options: BliProcessingOptions & {
   instrument: 'bli' | 'akta' | 'enzyme'; sample_id?: string | null; channel?: string | null;
   t_assoc?: number | null; t_dissoc?: number | null; subtract_background?: boolean;
 }) {
@@ -257,4 +277,42 @@ export async function previewInstrumentAnalysis(file: File, options: {
   if (options.instrument === 'bli') return { instrument: 'bli' as const, record, summary: BliSummarySchema.parse(data.summary) }
   if (options.instrument === 'akta') return { instrument: 'akta' as const, record, summary: AktaSummarySchema.parse(data.summary) }
   return { instrument: 'enzyme' as const, record, summary: EnzymeSummarySchema.parse(data.summary) }
+}
+
+export async function reviewInstrumentAnalysis(projectId: string, result: AnalysisRecord, accept: boolean, rationale: string) {
+  if (result.version == null) throw new Error('Reload the result to obtain its review version')
+  return (await postInstrumentReviewApiV2ProjectsProjectIdWetlabResultsResultIdReviewPost<true>({
+    path: { project_id: projectId, result_id: result.experiment_result_id },
+    headers: { 'If-Match': `W/"${result.version}"` }, body: { accept, rationale }, throwOnError: true,
+  })).data
+}
+
+export async function listSavedInstrumentAnalyses(projectId: string, cursor?: string) {
+  const { data } = await listResultsApiV2ProjectsProjectIdExperimentResultsGet<true>({
+    path: { project_id: projectId }, query: { limit: 100, cursor }, throwOnError: true,
+  })
+  return { next_cursor: data.next_cursor, items: data.items.filter((row) => ['bli_affinity', 'akta_purification', 'enzyme_activity'].includes(row.experiment_type)).map((row) => {
+    const meta = row.result_metadata
+    const stored = meta.summary ?? meta.results
+    const result = stored && typeof stored === 'object' ? stored as Record<string, unknown> : {}
+    let analysis: InstrumentAnalysisData | null = null
+    let summaryError: string | null = null
+    const record: AnalysisRecord & { version: number; qc_review: Record<string, unknown> | null } = { experiment_result_id: row.id, experiment_type: row.experiment_type, value: row.value, unit: row.unit,
+      candidate_id: row.candidate_id, source_artifact_id: row.source_artifact_id ?? '', analysis_version: String(meta.analysis_version ?? ''), version: row.version,
+      qc_review: meta.instrument_qc_review && typeof meta.instrument_qc_review === 'object' ? meta.instrument_qc_review as Record<string, unknown> : null } satisfies AnalysisRecord
+    const summary = { ...result, source_checksum_sha256: result.source_checksum_sha256 ?? meta.source_checksum_sha256, processing: result.processing ?? meta.params, supersedes_result_id: result.supersedes_result_id ?? meta.supersedes_result_id }
+    try {
+      if (row.experiment_type === 'bli_affinity') analysis = { instrument: 'bli', record, summary: BliSummarySchema.parse(summary) }
+      else if (row.experiment_type === 'akta_purification') analysis = { instrument: 'akta', record, summary: AktaSummarySchema.parse(summary) }
+      else analysis = { instrument: 'enzyme', record, summary: EnzymeSummarySchema.parse(summary) }
+    } catch { summaryError = 'Stored curves are absent or incompatible with this viewer. Download the raw source or create a new analysis version.' }
+
+    return {
+      record,
+      analysis,
+      summaryError,
+      quality: result.quality_control == null ? null : InstrumentQCSchema.parse(result.quality_control),
+      label: String(meta.source_filename ?? row.id),
+    }
+  }) }
 }

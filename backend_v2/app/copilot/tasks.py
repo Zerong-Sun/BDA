@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.celery_app import celery_app
@@ -19,8 +19,13 @@ from ..core.metrics import (
     COPILOT_CITATION_COVERAGE,
     COPILOT_UNSUPPORTED_CLAIMS,
 )
+from ..core.problem import DomainError
 from ..projects.models import Project
-from .models import CopilotAgentRun
+from .call_guard import call_scope
+from .chat_context import compact_research_context, history_citations, select_chat_history
+from .citations import dedupe as dedupe_citations
+from .citations import rebase_history_markers
+from .models import CopilotAgentRun, CopilotAgentTurn
 
 settings = get_settings()
 
@@ -57,15 +62,15 @@ def copilot_respond(message_id: str) -> dict:
         WRITE_TOOL_NAMES,
         complete_research_turn,
         grounded_answer_issues,
-        repair_grounded_scientific_answer,
-        review_grounded_scientific_answer,
-        review_scientific_answer,
+        repair_grounded_scientific_answer_result,
+        review_grounded_scientific_answer_result,
+        review_scientific_answer_result,
     )
     from ..copilot.research_context import ResearchContextService
     from ..identity.models import User
 
     parsed = uuid.UUID(message_id)
-    with session_scope() as session:
+    with call_scope(f"copilot-message:{parsed}"), session_scope() as session:
         # A Copilot operation may be delivered more than once. Lock the source
         # turn for the whole provider/tool transaction so actions and assistant
         # messages are emitted exactly once.
@@ -135,19 +140,32 @@ def copilot_respond(message_id: str) -> dict:
                 allowed_kinds=allowed_kinds,
             )
             citations = research.citations
-            history = list(
+            stored_history = list(
                 session.scalars(
                     select(CopilotMessage)
                     .where(
                         CopilotMessage.conversation_id == conversation.id,
                         CopilotMessage.id != source.id,
                         CopilotMessage.status.in_(["completed", "pending"]),
+                        CopilotMessage.context["chat_archive"]["archived"].as_boolean().is_not(True),
                     )
                     .order_by(CopilotMessage.created_at.desc())
                     .limit(40)
                 )
             )
-            history.reverse()
+            stored_history.reverse()
+            history = select_chat_history(stored_history)
+            # Follow-up edits can cite earlier answers. Preserve their actual
+            # source records, then rebase answer-local numbers for this request.
+            citations = dedupe_citations([
+                *citations,
+                *history_citations(history),
+            ])
+            reasoning_content = None
+            delivery_context: dict = {}
+            answer = ""
+            draft_ready = False
+            tool_calls = list(research.tool_calls)
             try:
                 if provider and provider.enabled:
                     configured_prompt = (
@@ -155,9 +173,9 @@ def copilot_respond(message_id: str) -> dict:
                     )
                     skills = ", ".join(sorted(enabled_capabilities))
                     active_skills = ", ".join(sorted(turn_capabilities)) or "none"
-                    from .policy import SCIENTIFIC_POLICY
+                    from .policy import RESPONSE_STYLE, SCIENTIFIC_POLICY
 
-                    system_prompt = SCIENTIFIC_POLICY
+                    system_prompt = SCIENTIFIC_POLICY + "\n" + RESPONSE_STYLE
                     messages = [{"role": "system", "content": system_prompt}]
                     if configured_prompt:
                         messages.append(
@@ -194,13 +212,17 @@ def copilot_respond(message_id: str) -> dict:
                                 f"Enabled skills: {skills}. Active turn capability: {active_skills}. "
                                 "A skill hint narrows this turn and never grants a disabled capability. Turn context: "
                                 f"{json.dumps({key: value for key, value in turn_context.items() if not key.startswith('_')}, ensure_ascii=False)}.\n"
-                                f"Retrieved Research workspace evidence:\n{research.context}\n"
+                                f"Retrieved Research workspace evidence:\n{compact_research_context(research.context)}\n"
                                 f"Operational project context:\n{project_context.overview_packet()}"
                             ),
                         }
                     )
                     messages.extend(
-                        {"role": item.role, "content": item.content}
+                        {
+                            "role": item.role,
+                            "content": rebase_history_markers(item.content, item.citations or [], citations)
+                            if item.role == "assistant" else item.content,
+                        }
                         for item in history
                         if item.role in {"user", "assistant"} and item.content.strip()
                     )
@@ -220,19 +242,33 @@ def copilot_respond(message_id: str) -> dict:
                         max_tool_calls=max_tool_calls,
                         bot=active_bot.id if active_bot else None,
                         enabled_capabilities=enabled_capabilities,
+                        bench_response_language=turn_context.get("language", "en")
+                        if turn_capabilities == {"wetlab-read"} else None,
                     )
                     answer = agent_result.content
+                    draft_ready = bool(answer.strip())
+                    if agent_result.calculator_delivery:
+                        delivery_context = {"calculator_delivery": True,
+                                            "delivery_status": "partial" if agent_result.delivery_incomplete else "complete"}
+                    reasoning_content = agent_result.reasoning_content
                     citations = agent_result.citations
                     tool_calls = agent_result.tool_calls
                     grounded_citations = _traceable_literature_citations(citations)
-                    if len(answer) >= 1500 and grounded_citations:
+                    review_request = source.content
+                    if history:
+                        earlier = "\n\n".join(item.content for item in history if item.role == "user")[-12_000:]
+                        review_request = f"Current request:\n{source.content}\n\nEarlier user requests (context only):\n{earlier}"
+                    # Server-rendered arithmetic already carries its validated assumptions.
+                    # A prose reviewer must not rewrite the calculator's facts.
+                    if not agent_result.calculator_delivery and len(answer) >= 1500 and grounded_citations:
                         evidence_packet = research_context.grounding_packet(citations)
-                        answer = review_grounded_scientific_answer(
+                        reviewed = review_grounded_scientific_answer_result(
                             provider,
-                            source.content,
+                            review_request,
                             answer,
                             evidence_packet,
                         )
+                        answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                         tool_calls.append(
                             {
                                 "name": "grounded_scientific_review",
@@ -242,13 +278,14 @@ def copilot_respond(message_id: str) -> dict:
                         )
                         review_issues = grounded_answer_issues(answer)
                         if review_issues:
-                            answer = repair_grounded_scientific_answer(
+                            reviewed = repair_grounded_scientific_answer_result(
                                 provider,
-                                source.content,
+                                review_request,
                                 answer,
                                 evidence_packet,
                                 review_issues,
                             )
+                            answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                             remaining_issues = grounded_answer_issues(answer)
                             tool_calls.append(
                                 {
@@ -265,8 +302,9 @@ def copilot_respond(message_id: str) -> dict:
                                     + "、".join(remaining_issues)
                                     + "。不得将本回答作为已验证科学结论。"
                                 )
-                    elif _needs_scientific_review(available_kinds, answer):
-                        answer = review_scientific_answer(provider, source.content, answer)
+                    elif not agent_result.calculator_delivery and _needs_scientific_review(available_kinds, answer):
+                        reviewed = review_scientific_answer_result(provider, review_request, answer)
+                        answer, reasoning_content = reviewed.content, reviewed.reasoning_content
                 elif settings.is_production:
                     raise RuntimeError("copilot_provider_not_configured")
                 else:
@@ -288,16 +326,39 @@ def copilot_respond(message_id: str) -> dict:
                         bot=active_bot.id if active_bot else None,
                         status="completed",
                         content=answer,
+                        reasoning_content=reasoning_content,
                         citations=citations,
                         tool_calls=tool_calls,
                         context={
                             "policy_version": "BDA_COPILOT_POLICY_V6",
                             "capabilities": sorted(enabled_capabilities),
                             "active_capabilities": sorted(turn_capabilities),
+                            **delivery_context,
                         },
                     )
                 )
             except Exception as exc:
+                error_code = exc.error_code if isinstance(exc, DomainError) else "copilot_provider_failed"
+                if draft_ready and error_code in {"llm_budget_exhausted", "llm_call_limit", "llm_duplicate_call"}:
+                    # A stopped review cannot erase an already generated answer,
+                    # nor may the draft masquerade as a fully reviewed delivery.
+                    source.status = "completed"
+                    source.version += 1
+                    zh = turn_context.get("language", "en") == "zh"
+                    notice = (
+                        "本轮已达到调用限制，最终复核未完成。以下保留已生成草稿，不代表复核通过。你可以继续提问或新建对话。"
+                        if zh else
+                        "This turn reached its request limit before final review completed. The generated draft is retained below; it has not passed final review. You can continue chatting or start a new conversation."
+                    )
+                    session.add(CopilotMessage(
+                        conversation_id=source.conversation_id, role="assistant",
+                        bot=active_bot.id if active_bot else None, status="completed",
+                        content=f"> {notice}\n\n{answer}", citations=citations,
+                        tool_calls=[*tool_calls, {"name": "final_review", "status": "blocked", "error": error_code}],
+                        context={**delivery_context, "delivery_status": "partial",
+                                 "review_status": "not_completed", "stop_reason": error_code},
+                    ))
+                    return {"message_id": message_id, "status": "completed"}
                 source.status = "failed"
                 source.error = str(exc)[:2000]
                 source.version += 1
@@ -312,6 +373,7 @@ def copilot_respond(message_id: str) -> dict:
                         status="failed",
                         content="Copilot provider failed; no scientific conclusion was generated.",
                         error=str(exc)[:2000],
+                        context={"error_code": error_code},
                     )
                 )
     return {"message_id": message_id, "status": "completed"}
@@ -342,9 +404,13 @@ def copilot_agent_step(run_id: str) -> dict:
         candidate = session.get(CopilotAgentRun, parsed)
         if candidate is not None and candidate.parent_run_id:
             agent_runs.require_run(session, candidate.parent_run_id, for_update=True)
-        # Lock the run for the whole of this stay. Two workers driving one
-        # transcript would interleave turns, and the transcript is the state.
-        run = session.scalar(select(CopilotAgentRun).where(CopilotAgentRun.id == parsed).with_for_update())
+        # Serialize one step, then release the row for cancellation and readers.
+        # Holding this lock for the entire model loop prevents a user's cancel
+        # from taking effect until the task has already finished.
+        run = session.scalar(
+            select(CopilotAgentRun).where(CopilotAgentRun.id == parsed)
+            .with_for_update().execution_options(populate_existing=True)
+        )
         if run is None:
             return {"run_id": run_id, "status": "missing"}
         if run.status == "awaiting_tasks":
@@ -353,7 +419,17 @@ def copilot_agent_step(run_id: str) -> dict:
             return {"run_id": run_id, "status": run.status}
         try:
             provider = agent_loop.provider_for(session, run)
-            status = agent_loop.drive(session, run, provider)
+            root = agent_runs.budget_root(session, run)
+            prior_calls = session.scalar(
+                select(func.count(CopilotAgentTurn.id))
+                .join(CopilotAgentRun, CopilotAgentTurn.run_id == CopilotAgentRun.id)
+                .where(
+                    or_(CopilotAgentRun.id == root.id, CopilotAgentRun.parent_run_id == root.id),
+                    CopilotAgentTurn.role == "assistant",
+                )
+            ) or 0
+            with call_scope(f"copilot-agent:{root.id}", max_calls=root.max_turns, initial_calls=int(prior_calls)):
+                status = agent_loop.drive(session, run, provider, max_steps=1)
         except Exception as exc:
             agent_runs.finish(session, run, status="failed", error=str(exc)[:2000])
             agent_loop.settle_parent(session, run)

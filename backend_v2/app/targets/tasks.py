@@ -41,7 +41,10 @@ def target_structure_import(target_id: str, payload: dict) -> dict:
         with session_scope() as session:
             target = session.get(Target, parsed)
             artifact = session.get(Artifact, artifact_id)
-            if target is None or artifact is None or artifact.project_id != target.project_id:
+            if (
+                target is None or artifact is None or artifact.project_id != target.project_id
+                or artifact.status != "available" or artifact.deleted_at is not None
+            ):
                 raise ValueError("target_structure_artifact_invalid")
             target.structure_artifact_id = artifact.id
             target.structure_status = "available"
@@ -106,7 +109,10 @@ def target_structure_prepare(revision_id: str) -> dict:
             return {"revision_id": revision_id, "status": "available"}
         source = session.get(Artifact, revision.source_artifact_id)
         target = session.get(Target, revision.target_id)
-        if source is None or target is None:
+        if (
+            source is None or target is None or source.project_id != target.project_id
+            or source.status != "available" or source.deleted_at is not None
+        ):
             raise ValueError("target_structure_source_missing")
         source_key, project_id, created_by = source.object_key, source.project_id, revision.created_by
         filename, options = source.filename, revision.options

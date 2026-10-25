@@ -28,6 +28,7 @@ import warnings
 from typing import Any
 
 import numpy as np
+from Bio.Align import PairwiseAligner
 from Bio.PDB import MMCIFParser, NeighborSearch, PDBParser, Superimposer
 from Bio.PDB.Polypeptide import protein_letters_3to1
 from Bio.PDB.SASA import ShrakeRupley
@@ -65,11 +66,11 @@ HBOND_MAX_ANGSTROM = 3.5
 #: Charged-group distance for a salt bridge. 4.0 is the usual convention.
 SALT_BRIDGE_MAX_ANGSTROM = 4.0
 
-#: Side-chain atoms that carry formal charge at physiological pH.
+#: Conventional side-chain charge assignments near neutral pH. Histidine is
+#: excluded: its protonation depends on pH and environment, not its name alone.
 _ANIONIC_ATOMS = {("ASP", "OD1"), ("ASP", "OD2"), ("GLU", "OE1"), ("GLU", "OE2")}
 _CATIONIC_ATOMS = {
     ("LYS", "NZ"), ("ARG", "NE"), ("ARG", "NH1"), ("ARG", "NH2"),
-    ("HIS", "ND1"), ("HIS", "NE2"),
 }
 
 #: Residues counted as hydrophobic when describing what an interface is made of.
@@ -89,6 +90,11 @@ _MMCIF_HINT = re.compile(r"^(data_|loop_|_atom_site\.)", re.MULTILINE)
 _PDB_HINT = re.compile(r"^(ATOM  |HETATM|HEADER|MODEL |CRYST1|SEQRES)", re.MULTILINE)
 _RESOLUTION_PDB = re.compile(r"^REMARK\s+2\s+RESOLUTION\.\s+([0-9.]+)\s+ANGSTROMS", re.MULTILINE)
 _RESOLUTION_CIF = re.compile(r"^_refine\.ls_d_res_high\s+([0-9.]+)", re.MULTILINE)
+_PLDDT_B_FACTOR_DECLARATION = re.compile(
+    r"^REMARK\s+\d+\s+B[- ]FACTORS?\s+(?:CONTAIN|STORE|REPRESENT)\s+PLDDT\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+_PLDDT_SOURCES = frozenset({"alphafold_db", "alphafold", "alphafold2", "alphafold3", "colabfold", "boltz", "boltz2"})
 
 
 def detect_format(text: str) -> str:
@@ -176,33 +182,60 @@ def _numbering_gaps(residues: list[Any]) -> list[dict[str, Any]]:
     return gaps
 
 
-def _confidence(atoms: list[Any], *, has_resolution: bool) -> dict[str, Any]:
-    """B-factor statistics, and whether they are plausibly pLDDT.
+def _confidence(
+    atoms: list[Any], *, has_resolution: bool, text: str, provenance: dict[str, Any]
+) -> dict[str, Any]:
+    """Report the B column without inferring its meaning from its numeric range.
 
-    AlphaFold and Boltz write per-atom pLDDT into the B-factor column, so the
-    same numbers mean opposite things: high is good for pLDDT and bad for a
-    crystallographic B-factor. The file does not say which it is, so this
-    returns the statistics under a neutral name and a separate, explicitly
-    stated test - values inside [0, 100] and no refinement resolution - rather
-    than labelling the column and being confidently wrong on one of the two.
+    Missing resolution and values in [0, 100] do not distinguish predicted,
+    experimental and synthetic coordinates. pLDDT needs an explicit source
+    with that convention or a file declaration; synthetic provenance wins.
     """
     values = np.array([float(atom.get_bfactor()) for atom in atoms], dtype=float)
     if values.size == 0:
         return {"available": False}
     inside_plddt_range = bool(values.min() >= 0.0 and values.max() <= 100.0)
+    source = str(provenance.get("source") or "").lower()
+    declared = (
+        source in _PLDDT_SOURCES and provenance.get("predicted") is not False
+        or str(provenance.get("b_factor_metric") or "").lower() == "plddt"
+        or bool(_PLDDT_B_FACTOR_DECLARATION.search(text))
+    )
+    metric, provenance_status = "unknown", "unknown"
+    if provenance.get("synthetic") is True:
+        provenance_status = "synthetic"
+        interpretation = (
+            "Synthetic structure; B-factor-column values are not validated pLDDT. "
+            "Do not use these values to infer prediction confidence, disorder or coordinate reliability."
+        )
+    elif declared and inside_plddt_range and not has_resolution:
+        metric, provenance_status = "plddt", "declared"
+        interpretation = (
+            "The recorded prediction source or file explicitly declares pLDDT in the B-factor column; "
+            "higher values indicate local prediction confidence, not experimental validation or interface accuracy."
+        )
+    elif declared:
+        provenance_status = "conflicting"
+        interpretation = "The pLDDT declaration conflicts with the numeric range or refinement resolution; column semantics are uncertain."
+    elif has_resolution:
+        metric, provenance_status = "b_factor", "declared"
+        interpretation = "The file declares refinement resolution. Treated as B-factors, not prediction confidence."
+    else:
+        interpretation = (
+            "B-factor-column semantics are unknown. The numeric range and missing refinement resolution are only "
+            "a heuristic; do not infer a predicted origin, pLDDT, disorder or coordinate reliability from them."
+        )
     return {
         "available": True,
         "mean": round(float(values.mean()), 2),
         "min": round(float(values.min()), 2),
         "max": round(float(values.max()), 2),
-        "looks_like_plddt": bool(inside_plddt_range and not has_resolution),
-        "interpretation": (
-            "Values are in [0, 100] and the file declares no refinement "
-            "resolution, which is consistent with a predicted model writing "
-            "pLDDT into the B-factor column; higher is more confident."
-            if inside_plddt_range and not has_resolution
-            else "Treated as crystallographic B-factors; higher is less ordered."
-        ),
+        "numeric_range_compatible_with_plddt": inside_plddt_range,
+        "metric": metric,
+        "provenance_status": provenance_status,
+        # Retained for existing consumers, but never true from the range alone.
+        "looks_like_plddt": metric == "plddt",
+        "interpretation": interpretation,
     }
 
 
@@ -216,7 +249,7 @@ def _resolution(text: str, fmt: str) -> float | None:
         return None
 
 
-def analyse(text: str) -> dict[str, Any]:
+def analyse(text: str, *, provenance: dict[str, Any] | None = None) -> dict[str, Any]:
     """Everything about the file that does not need a question first."""
     structure, fmt = _parse(text)
     models = list(structure)
@@ -270,7 +303,7 @@ def analyse(text: str) -> dict[str, Any]:
         "ligands": ligands,
         "solvent_residue_count": solvent_count,
         "disulfides": _disulfides(model),
-        "confidence": _confidence(all_atoms, has_resolution=resolution is not None),
+        "confidence": _confidence(all_atoms, has_resolution=resolution is not None, text=text, provenance=provenance or {}),
         "notes": (
             ["Only the first model was analysed; the file contains more."]
             if len(models) > 1
@@ -412,8 +445,28 @@ def _contact_result(
         "interface_residues_b": sorted(
             {(pair["b"]["seq"], pair["b"]["name"]) for pair in pairs}
         ),
+        # The older tuple summaries above omit insertion codes; use these
+        # complete identities for selections and reports. Aggregate before
+        # truncating pairs so residue-level counts remain correct.
+        "interface_residue_details_a": _contact_residues(pairs, "a"),
+        "interface_residue_details_b": _contact_residues(pairs, "b"),
+        "residue_numbering": "author chain and residue numbering; insertion_code is part of the identity",
+        "evidence_type": "geometric_contact",
+        "hotspot_interpretation": "Contacts do not establish an experimentally validated binding hotspot or energetic importance.",
         "pairs": shown,
     }
+
+
+def _contact_residues(pairs: list[dict[str, Any]], side: str) -> list[dict[str, Any]]:
+    found: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    for pair in pairs:
+        residue = pair[side]
+        key = (residue["chain"], residue["seq"], residue["insertion_code"] or "", residue["name"])
+        if key not in found:
+            found[key] = {**residue, "contact_pair_count": 0, "minimum_distance_angstrom": pair["distance_angstrom"]}
+        found[key]["contact_pair_count"] += 1
+        found[key]["minimum_distance_angstrom"] = min(found[key]["minimum_distance_angstrom"], pair["distance_angstrom"])
+    return [found[key] for key in sorted(found)]
 
 
 def site(
@@ -421,6 +474,7 @@ def site(
     *,
     chain: str | None = None,
     residue_seq: int | None = None,
+    insertion_code: str | None = None,
     ligand: str | None = None,
     radius_angstrom: float = 5.0,
 ) -> dict[str, Any]:
@@ -439,7 +493,7 @@ def site(
     structure, _ = _parse(text)
     model = list(structure)[0]
 
-    centre = _find_centre(model, chain=chain, residue_seq=residue_seq, ligand=ligand)
+    centre = _find_centre(model, chain=chain, residue_seq=residue_seq, insertion_code=insertion_code, ligand=ligand)
     centre_atoms = _heavy_atoms(centre)
     if not centre_atoms:
         raise StructureFormatError("The named centre has no heavy atoms.")
@@ -480,13 +534,25 @@ def site(
     }
 
 
-def _find_centre(model: Any, *, chain: str | None, residue_seq: int | None, ligand: str | None) -> Any:
+def _find_centre(
+    model: Any, *, chain: str | None, residue_seq: int | None, ligand: str | None,
+    insertion_code: str | None = None,
+) -> Any:
     if residue_seq is not None:
         if chain is None:
             raise StructureFormatError("A residue centre needs its chain; residue numbers repeat across chains.")
-        for residue in _chain_or_error(model, chain):
-            if int(residue.get_id()[1]) == residue_seq:
-                return residue
+        matches = [
+            residue for residue in _chain_or_error(model, chain)
+            if int(residue.get_id()[1]) == residue_seq
+            and (insertion_code is None or residue.get_id()[2].strip() == insertion_code.strip())
+        ]
+        if len(matches) > 1:
+            raise StructureFormatError(
+                f"Residue {residue_seq} in chain {chain!r} is ambiguous; supply insertion_code "
+                "(empty string selects the uninserted residue)."
+            )
+        if matches:
+            return matches[0]
         raise StructureFormatError(f"No residue {residue_seq} in chain {chain!r}.")
 
     wanted = str(ligand).strip().upper()
@@ -642,6 +708,7 @@ def interface(
 
     interface_residues = [item for item in per_residue]
     hydrophobic = sum(1 for item in interface_residues if item["name"].upper() in _HYDROPHOBIC)
+    residue_counts = {chain.get_id(): len(_polymer_residues(chain)) for chain in model}
     return {
         "chain_a": chain_a,
         "chain_b": chain_b,
@@ -655,6 +722,17 @@ def interface(
         # The conventional "interface area": half the total buried, because the
         # two sides bury each other and reporting the sum double-counts it.
         "interface_area_a2": round((buried[chain_a] + buried[chain_b]) / 2, 1),
+        "residue_scope": {
+            "analysed_model": model.get_id(),
+            "model_count": len(list(structure)),
+            "definition": "All non-solvent residues, including ligands, in the first model only.",
+            "selected_chain_counts": {chain_a: residue_counts[chain_a], chain_b: residue_counts[chain_b]},
+            "model_total": sum(residue_counts.values()),
+        },
+        "interface_residue_definition": (
+            "Non-solvent residues losing more than 0.1 A^2 of accessible surface on complex formation. "
+            "This is distinct from a heavy-atom distance contact and does not count every residue in the file."
+        ),
         "interface_residue_count": {
             chain_a: sum(1 for item in interface_residues if item["chain"] == chain_a),
             chain_b: sum(1 for item in interface_residues if item["chain"] == chain_b),
@@ -668,9 +746,18 @@ def interface(
             "no angle term, because hydrogens are absent from most of these files"
         ),
         "salt_bridge_count": len(bridges),
+        "salt_bridge_definition": (
+            f"ASP/GLU carboxylate and LYS/ARG side-chain nitrogen within {SALT_BRIDGE_MAX_ANGSTROM} A; "
+            "conventional near-neutral-pH charge assignments, not a protonation calculation. "
+            "Histidine is excluded because its charge depends on pH and local environment."
+        ),
+        "evidence_type": "geometric_interface",
+        "hotspot_interpretation": "Burial and contacts do not establish an experimentally validated binding hotspot or affinity.",
         "hydrogen_bonds": bonds[:MAX_CONTACT_PAIRS],
         "salt_bridges": bridges[:MAX_CONTACT_PAIRS],
         "interface_residues": interface_residues[:MAX_CONTACT_PAIRS],
+        "returned_interface_residue_count": min(len(interface_residues), MAX_CONTACT_PAIRS),
+        "interface_residues_truncated": len(interface_residues) > MAX_CONTACT_PAIRS,
     }
 
 
@@ -700,6 +787,7 @@ def superpose(
     *,
     reference_chain: str,
     mobile_chain: str,
+    pairing: str = "author_number",
 ) -> dict[str, Any]:
     """Least-squares fit of one chain onto another, and how far off it lands.
 
@@ -711,7 +799,8 @@ def superpose(
 
     Two decisions, both about honesty rather than accuracy:
 
-    **Residues are paired by author numbering, never by order.** Files of the
+    **Residues default to author-number correspondence.** Explicit sequence
+    alignment is also available for different constructs. Files of the
     same construct agree on numbering; they disagree on how many residues they
     contain, because one is missing a disordered loop. Pairing by order would
     compare different residues and report a small, confident, wrong number.
@@ -729,7 +818,14 @@ def superpose(
 
     left = _ca_by_number(reference_model, reference_chain)
     right = _ca_by_number(mobile_model, mobile_chain)
-    shared = sorted(set(left) & set(right))
+    alignment_details: dict[str, Any] = {}
+    if pairing == "author_number":
+        pairs = [(key, key) for key in sorted(set(left) & set(right))]
+    elif pairing == "sequence_alignment":
+        pairs, alignment_details = _align_ca_sequences(left, right)
+    else:
+        raise StructureFormatError("Pairing must be author_number or sequence_alignment.")
+    shared = [pair[0] for pair in pairs]
     if len(shared) < MIN_SUPERPOSITION_PAIRS:
         raise StructureFormatError(
             f"Only {len(shared)} residue numbers are present in both chains; "
@@ -737,8 +833,8 @@ def superpose(
             "Check that the two files use the same numbering."
         )
 
-    fixed = [left[key] for key in shared]
-    moving = [right[key] for key in shared]
+    fixed = [left[key] for key, _ in pairs]
+    moving = [right[key] for _, key in pairs]
     before = float(
         np.sqrt(np.mean([np.sum((a.coord - b.coord) ** 2) for a, b in zip(fixed, moving, strict=True)]))
     )
@@ -764,13 +860,20 @@ def superpose(
             tm_score = round(sum(1 / (1 + (d / d0) ** 2) for d in deviations) / length, 4)
 
     ranked: list[dict[str, Any]] = [
-        {"seq": key[0], "insertion_code": key[1] or None, "deviation_angstrom": round(value, 2)}
-        for key, value in zip(shared, deviations, strict=True)
+        {"seq": key[0], "insertion_code": key[1] or None, "mobile_seq": mobile[0],
+         "mobile_insertion_code": mobile[1] or None, "deviation_angstrom": round(value, 2)}
+        for (key, mobile), value in zip(pairs, deviations, strict=True)
     ]
     ranked.sort(key=lambda item: float(item["deviation_angstrom"]), reverse=True)
     return {
         "reference_chain": reference_chain,
         "mobile_chain": mobile_chain,
+        "pairing": pairing,
+        "alignment": alignment_details or None,
+        "reference_coverage": round(length / len(left), 4),
+        "mobile_coverage": round(length / len(right), 4),
+        "residue_correspondence": [{"reference_seq": a[0], "reference_insertion_code": a[1] or None,
+                                    "mobile_seq": b[0], "mobile_insertion_code": b[1] or None} for a, b in pairs],
         "paired_residue_count": length,
         "reference_residue_count": len(left),
         "mobile_residue_count": len(right),
@@ -779,9 +882,46 @@ def superpose(
         "tm_score_on_paired_residues": tm_score,
         "tm_score_note": (
             "TM-score formula evaluated on the RMSD-minimising superposition of "
-            "residues paired by number. Not TM-align: no alignment search is "
+            f"residues paired by {pairing}. Not TM-align: no alignment search over spatial coordinates is "
             "performed, so this is not comparable with a published TM-align score."
         ),
         "paired_residue_numbers": [key[0] for key in shared],
         "largest_deviations": ranked[:20],
+    }
+
+
+def _align_ca_sequences(left: dict, right: dict) -> tuple[list, dict]:
+    """Explicit sequence correspondence; never infer correspondence from geometry.
+
+    Only the first two optima are inspected. If an alternative optimum exists,
+    refuse to invent which repeated segment the user intended to compare.
+    """
+    def recognized(atoms: dict) -> tuple[list, str]:
+        entries = [(key, protein_letters_3to1.get(atom.parent.get_resname().strip().upper()))
+                   for key, atom in atoms.items()]
+        return [key for key, residue in entries if residue], "".join(residue for _, residue in entries if residue)
+
+    left_keys, left_sequence = recognized(left)
+    right_keys, right_sequence = recognized(right)
+    if not left_sequence or not right_sequence:
+        raise StructureFormatError("Sequence alignment requires recognized amino acids with CA atoms in both chains.")
+    if len(left_sequence) * len(right_sequence) > 4_000_000:
+        raise StructureFormatError("Sequence alignment exceeds the local 4-million-cell limit; use a registered alignment workflow.")
+    aligner = PairwiseAligner(mode="global", match_score=2, mismatch_score=-1, open_gap_score=-10, extend_gap_score=-0.5)
+    alignments = iter(aligner.align(left_sequence, right_sequence))
+    aligned = next(alignments)
+    if next(alignments, None) is not None:
+        raise StructureFormatError("Sequence alignment is ambiguous: multiple equally scoring correspondences exist. Review the construct or use a dedicated alignment workflow.")
+    index_pairs = [(i, j) for a, b in zip(*aligned.aligned, strict=True)
+                   for i, j in zip(range(int(a[0]), int(a[1])), range(int(b[0]), int(b[1])), strict=True)]
+    if len(index_pairs) < MIN_SUPERPOSITION_PAIRS:
+        raise StructureFormatError("Too few aligned amino acids with CA coordinates to superpose.")
+    identity = sum(left_sequence[i] == right_sequence[j] for i, j in index_pairs) / len(index_pairs)
+    return [(left_keys[i], right_keys[j]) for i, j in index_pairs], {
+        "method": "biopython-global-affine-v1", "algorithm": aligner.algorithm,
+        "scoring": {"match": 2, "mismatch": -1, "open_gap": -10, "extend_gap": -0.5},
+        "score": float(aligned.score), "paired_sequence_identity": round(identity, 4),
+        "reference_unrecognized_ca_count": len(left) - len(left_keys),
+        "mobile_unrecognized_ca_count": len(right) - len(right_keys),
+        "limitations": "Global alignment of observed residues only. Missing coordinates, tags and low similarity require review; this is not structural alignment or proof of homology.",
     }

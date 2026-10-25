@@ -17,6 +17,7 @@ from .core.problem import (
     unhandled_error_handler,
     validation_error_handler,
 )
+from .core.security import SecurityHeadersMiddleware
 from .core.telemetry import configure_telemetry
 from .core.trace import TraceMiddleware
 from .module_registry import routers
@@ -48,7 +49,13 @@ app.add_middleware(MetricsMiddleware)
 @app.middleware("http")
 async def production_write_gate(request, call_next):
     if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/api/v2"):
-        if not settings.writes_enabled and request.url.path not in {"/api/v2/auth/token", "/api/v2/auth/refresh"}:
+        # A bounded, rate-limited pure calculator accepts a body to avoid
+        # exposing sequences in URLs. Only this exact POST is read-only; neither
+        # headers nor a general wetlab prefix can bypass the write fence.
+        read_only_calculation = (request.method, request.url.path) == ("POST", "/api/v2/wetlab/calculations")
+        if (not settings.writes_enabled
+                and request.url.path not in {"/api/v2/auth/token", "/api/v2/auth/refresh", "/api/v2/auth/logout"}
+                and not read_only_calculation):
             return await domain_error_handler(
                 request,
                 DomainError(
@@ -59,6 +66,8 @@ async def production_write_gate(request, call_next):
             )
     return await call_next(request)
 
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_exception_handler(DomainError, domain_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, http_error_handler)  # type: ignore[arg-type]

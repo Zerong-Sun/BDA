@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table'
+import { useProjectAccess } from '../../lib/hooks/useProjectAccess'
+import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
 import { createProtein, importFasta, listProteins } from '../../lib/api/wetlab'
 import type { ProteinRead } from '../../lib/api/generated/types.gen'
@@ -27,12 +29,14 @@ import { Textarea } from '../../components/ui/textarea'
 /**
  * The bench's protein library.
  *
- * Constructs are listed by fingerprint, never by sequence: the server does not
- * return one. The notice says so out loud, because a scientist who cannot find
- * the sequence column needs to know that is the design and not a failure.
+ * The server returns fingerprints, not sequences. Expose those identifiers on
+ * demand while keeping names and measured properties readable by default.
  */
 export function ProteinLibrary({ projectId }: { projectId: string }) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
+  const access = useProjectAccess(projectId)
+  const demo = useAppStore((state) => state.appMode === 'demo')
+  const writable = access.data?.permissions.write === true && !demo
   const copy = t.lab.library
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
@@ -40,6 +44,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
   const [sequence, setSequence] = useState('')
   const [fasta, setFasta] = useState('')
   const [importOpen, setImportOpen] = useState<string[]>([])
+  const [showFingerprints, setShowFingerprints] = useState(false)
 
   // Keyed on the project: constructs must never leak between projects through
   // a shared cache entry.
@@ -52,7 +57,10 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['proteins', projectId] })
 
   const addOne = useMutation({
-    mutationFn: () => createProtein(projectId, { name, sequence }),
+    mutationFn: () => {
+      if (!writable) throw new Error(language === 'zh' ? '需要项目编辑权限。' : 'Project edit access is required.')
+      return createProtein(projectId, { name: name.trim(), sequence })
+    },
     onSuccess: () => {
       setName('')
       setSequence('')
@@ -61,7 +69,10 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
   })
 
   const addBatch = useMutation({
-    mutationFn: () => importFasta(projectId, fasta),
+    mutationFn: () => {
+      if (!writable) throw new Error(language === 'zh' ? '需要项目编辑权限。' : 'Project edit access is required.')
+      return importFasta(projectId, fasta)
+    },
     onSuccess: () => {
       setFasta('')
       void invalidate()
@@ -154,6 +165,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
+    state: { columnVisibility: { fingerprint: showFingerprints } },
   })
 
   const importSummary = addBatch.data
@@ -162,10 +174,13 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
     <Frame dense>
       <FrameHeader>
         <FrameTitle>{copy.title}</FrameTitle>
-        <p className="text-sm text-text-secondary">{copy.sequenceNotice}</p>
       </FrameHeader>
 
       <div className="space-y-4 p-4">
+        <Button type="button" size="sm" variant="ghost" aria-pressed={showFingerprints} onClick={() => setShowFingerprints((visible) => !visible)}>
+          {showFingerprints ? (language === 'zh' ? '隐藏序列标识' : 'Hide sequence identifiers') : (language === 'zh' ? '查看序列标识' : 'Show sequence identifiers')}
+        </Button>
+        {showFingerprints ? <p className="text-sm text-text-secondary">{copy.sequenceNotice}</p> : null}
         <Input
           type="text"
           value={search}
@@ -181,6 +196,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
             addOne.mutate()
           }}
         >
+          <fieldset disabled={!writable || addOne.isPending} className="contents">
           <label className="flex flex-col gap-1 text-sm">
             <span>{copy.name}</span>
             <Input
@@ -200,10 +216,13 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
               required
             />
           </label>
-          <Button type="submit" disabled={addOne.isPending}>
+          <Button type="submit" disabled={!name.trim() || !sequence.trim() || addOne.isPending}>
             {copy.add}
           </Button>
+          </fieldset>
         </form>
+
+        {access.isError ? <Button type="button" variant="outline" onClick={() => void access.refetch()}>{language === 'zh' ? '重试权限检查' : 'Retry permission check'}</Button> : !writable && access.isSuccess ? <p role="status" className="text-sm text-text-secondary">{language === 'zh' ? '当前为只读模式；添加构建体需要项目编辑权限。' : 'Read-only access. Adding constructs requires project edit access.'}</p> : null}
 
         {addOne.error ? (
           <p role="alert" className="text-sm text-destructive">
@@ -222,6 +241,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
                   addBatch.mutate()
                 }}
               >
+                <fieldset disabled={!writable || addBatch.isPending} className="space-y-2">
                 <Textarea
                   className="h-32 font-mono text-sm"
                   placeholder={copy.importPlaceholder}
@@ -229,10 +249,12 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
                   onChange={(event) => setFasta(event.target.value)}
                   aria-label={copy.importFasta}
                 />
-                <Button type="submit" disabled={addBatch.isPending}>
+                <Button type="submit" disabled={!fasta.trim() || addBatch.isPending}>
                   {copy.importFasta}
                 </Button>
+                </fieldset>
               </form>
+              {addBatch.isError ? <p role="alert" className="text-sm text-destructive">{addBatch.error.message}</p> : null}
               {importSummary ? (
                 // Per-record outcome, because a batch with one duplicate is the
                 // normal case and the good records still landed.
@@ -276,10 +298,10 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
           </div>
         ) : null}
 
-        <DataGrid
+        {proteins.isSuccess ? <DataGrid
           table={table}
           recordCount={rows.length}
-          emptyMessage={copy.empty}
+          emptyMessage={search.trim() ? (language === 'zh' ? '没有匹配的构建体，请清除筛选后重试。' : 'No matching constructs. Clear the filter to view all records.') : copy.empty}
           tableLayout={{
             dense: true,
             headerBackground: true,
@@ -293,7 +315,7 @@ export function ProteinLibrary({ projectId }: { projectId: string }) {
               <DataGridTable />
             </DataGridScrollArea>
           </DataGridContainer>
-        </DataGrid>
+        </DataGrid> : null}
       </div>
     </Frame>
   )

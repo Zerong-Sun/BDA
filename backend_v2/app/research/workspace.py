@@ -31,7 +31,7 @@ from .schemas import (
     ResearchWorkspaceTarget,
 )
 
-DATASET_KEYS = {"identifiers", "search_log", "field_dictionary", "ontology_relations"}
+DATASET_KEYS = {"identifiers", "search_log", "field_dictionary", "ontology_relations", "dataset", "data_table"}
 METHOD_KEYS = {"methods", "search_strategy", "database_schema", "validation_report"}
 KNOWLEDGE_TITLES = {
     "methods": {"zh": "研究方法", "en": "Methods", "default": "Methods"},
@@ -63,19 +63,21 @@ def _text(value: object) -> str:
 
 
 def _localized(value: object, fallback: object = "") -> LocalizedResearchText:
-    default = _text(fallback)
+    # Artifact lineage may already store a bilingual name/role/method. Keep its
+    # locales instead of turning the dictionary into a visible Python repr.
+    base = _localized(fallback) if isinstance(fallback, dict) else LocalizedResearchText(default=_text(fallback))
     if isinstance(value, dict):
         raw_default = value.get("default")
-        zh_value = value.get("zh") or value.get("zh-CN")
-        en_value = value.get("en")
-        default = _text(raw_default or default or zh_value or en_value)
+        zh_value = value.get("zh") or value.get("zh-CN") or base.zh
+        en_value = value.get("en") or base.en
+        default = _text(raw_default or base.default or zh_value or en_value)
         return LocalizedResearchText(
             zh=_text(zh_value) or None,
             en=_text(en_value) or None,
             default=default,
         )
-    raw = _text(value) or default
-    return LocalizedResearchText(default=raw)
+    raw = _text(value) or base.default
+    return LocalizedResearchText(zh=base.zh, en=base.en, default=raw)
 
 
 def _strings(value: object) -> list[str]:
@@ -250,8 +252,25 @@ def _evidence_relationships(
 
 def _references(rows: list[LiteratureDocument]) -> list[ResearchWorkspaceReference]:
     result: list[ResearchWorkspaceReference] = []
+    by_id = {str(row.id): row for row in rows}
+    aliases: dict[str, list[LiteratureDocument]] = {}
     for row in rows:
+        target = by_id.get(str((row.metadata_json or {}).get("presentation_duplicate_of") or ""))
+        if (target is not None and target.id != row.id and target.project_id == row.project_id
+                and not (target.metadata_json or {}).get("presentation_duplicate_of")):
+            aliases.setdefault(str(target.id), []).append(row)
+    alias_ids = {other.id for group in aliases.values() for other in group}
+    for row in rows:
+        if row.id in alias_ids:
+            continue
         meta = row.metadata_json or {}
+        merged = aliases.get(str(row.id), [])
+        if merged:
+            meta = {**meta, "consolidated_document_ids": [str(other.id) for other in merged],
+                    "consolidated_ref_ids": [
+                        _text((other.metadata_json or {}).get("ref_id") or other.external_id or other.id)
+                        for other in merged
+                    ]}
         url = _text(meta.get("url") or meta.get("pubmed_url") or meta.get("doi_url") or meta.get("pmc_url"))
         result.append(
             ResearchWorkspaceReference(
@@ -393,6 +412,11 @@ def _finding_references(
                     status="linked_from_review",
                     metadata={
                         **metadata,
+                        # Inherit an explicit editorial disposition. A URL cited
+                        # in historical prose must not re-enter the main library
+                        # as a newly unclassified reference.
+                        **({"evidence_curation": evidence["evidence_curation"]}
+                           if isinstance(evidence.get("evidence_curation"), dict) else {}),
                         "source": raw_source,
                         "provider": provider,
                         "derived_from_finding_id": str(row.id),
@@ -463,6 +487,8 @@ def _knowledge(rows: list[KnowledgeEntry]) -> tuple[list[ResearchWorkspaceKnowle
     methods: list[ResearchWorkspaceKnowledge] = []
     datasets: list[ResearchWorkspaceKnowledge] = []
     for row in rows:
+        if row.entry_type == "bot_work_record":
+            continue  # System journal revisions have a dedicated reader, never scientific methods.
         source = row.source or {}
         localized = source.get("localized_content", {})
         key = _text(source.get("entry_key") or row.entry_type)
@@ -497,7 +523,9 @@ def preferred_review_brief(session: Session, project_id: uuid.UUID) -> ResearchB
     multi-thousand-character review a person had accepted. ``status`` already records
     which brief is canonical; ``created_at`` only breaks ties within one status.
 
-    Only ``accepted`` is treated as canonical, and everything else falls back to newest.
+    A review explicitly selected with ``display_role=project_evidence_review``
+    takes precedence without changing its scientific review status. Otherwise,
+    ``accepted`` is treated as canonical and everything else falls back to newest.
     ``reviewed`` deliberately gets no precedence. In practice it can mark the short
     placeholder shells a project was seeded with, so ranking it above drafts replaces a
     project's real note with a stub and shows less than before. ``accepted`` is the
@@ -512,9 +540,12 @@ def preferred_review_brief(session: Session, project_id: uuid.UUID) -> ResearchB
         .where(ResearchBrief.project_id == project_id)
         .order_by(
             case(
-                (ResearchBrief.status == "accepted", 0),
-                (ResearchBrief.status == PROGRESS_NOTE_STATUS, 2),
-                else_=1,
+                # An explicitly selected evidence review is a display decision,
+                # independent of scientific acceptance by a human reviewer.
+                (ResearchBrief.scope["display_role"].as_string() == "project_evidence_review", 0),
+                (ResearchBrief.status == "accepted", 1),
+                (ResearchBrief.status == PROGRESS_NOTE_STATUS, 3),
+                else_=2,
             ),
             ResearchBrief.created_at.desc(),
             # Two briefs can share a created_at - the PD-1 pair left by the 2026-09-07
@@ -532,6 +563,13 @@ def build_research_workspace(session: Session, project: Project) -> ResearchWork
             select(ResearchFinding).where(ResearchFinding.project_id == project.id).order_by(ResearchFinding.created_at)
         )
     )
+    findings_by_id = {str(row.id): row for row in findings}
+    findings = [row for row in findings if not (
+        (other := findings_by_id.get(str((row.evidence or {}).get("presentation_duplicate_of") or "")))
+        and other.id != row.id and other.project_id == row.project_id
+        and not (other.evidence or {}).get("presentation_duplicate_of")
+        and other.finding_type == row.finding_type and other.content.strip() == row.content.strip()
+    )]
     documents = list(
         session.scalars(
             select(LiteratureDocument)
@@ -559,7 +597,7 @@ def build_research_workspace(session: Session, project: Project) -> ResearchWork
     )
     knowledge = list(
         session.scalars(
-            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id).order_by(KnowledgeEntry.created_at)
+            select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id, KnowledgeEntry.entry_type != "bot_work_record").order_by(KnowledgeEntry.created_at)
         )
     )
     target = session.get(Target, project.primary_target_id) if project.primary_target_id else None

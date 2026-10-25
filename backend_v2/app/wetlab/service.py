@@ -10,9 +10,15 @@ from __future__ import annotations
 import hashlib
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..candidates.models import Candidate
 from ..core.problem import DomainError
+from ..experiments.models import ExperimentResult
+from ..experiments.service import review_instrument_result
+from ..identity.models import User
+from ..projects.models import Project
 from .kernels import calculators
 from .models import Protein
 from .repository import ProteinRepository
@@ -35,6 +41,24 @@ from .schemas import (
 #: characters is 48 bits - collision-free for any realistic library, and short
 #: enough to read out loud in a lab.
 FINGERPRINT_CHARS = 12
+
+
+def review_analysis(
+    session: Session, project: Project, result_id: uuid.UUID, user: User, *, expected: int,
+    accept: bool, rationale: str,
+) -> tuple[ExperimentResult, bool]:
+    """Lock a project result and atomically review its measured projection."""
+    from .analysis import record_measured_metric
+
+    row = session.scalar(select(ExperimentResult).where(
+        ExperimentResult.id == result_id, ExperimentResult.project_id == project.id,
+    ).with_for_update())
+    if row is None:
+        raise DomainError("instrument_result_not_found", "Instrument result was not found", status_code=404)
+    reviewed = review_instrument_result(session, project, row, user, expected=expected,
+                                        accept=accept, rationale=rationale)
+    metric = record_measured_metric(session, reviewed)
+    return reviewed, metric is not None
 
 
 def sequence_digest(sequence: str) -> str:
@@ -83,6 +107,7 @@ def _derive(sequence: str) -> dict[str, float]:
 def create_protein(
     session: Session, project_id: uuid.UUID, user_id: uuid.UUID, payload: ProteinCreate
 ) -> Protein:
+    _verify_candidate(session, project_id, payload.candidate_id)
     repository = ProteinRepository(session)
     sequence = payload.sequence
     digest = sequence_digest(sequence)
@@ -116,6 +141,7 @@ def update_protein(session: Session, protein: Protein, payload: ProteinUpdate) -
     so editing it in place would silently invalidate past results. A corrected
     sequence is a new construct.
     """
+    _verify_candidate(session, protein.project_id, payload.candidate_id)
     if payload.name is not None:
         protein.name = payload.name
     if payload.tags is not None:
@@ -127,6 +153,14 @@ def update_protein(session: Session, protein: Protein, payload: ProteinUpdate) -
     protein.version += 1
     session.flush()
     return protein
+
+
+def _verify_candidate(session: Session, project_id: uuid.UUID, candidate_id: uuid.UUID | None) -> None:
+    if candidate_id is None:
+        return
+    candidate = session.get(Candidate, candidate_id)
+    if candidate is None or candidate.project_id != project_id:
+        raise DomainError("candidate_not_found", "Candidate was not found in this project", status_code=404)
 
 
 def parse_fasta(content: str) -> list[tuple[str, str]]:

@@ -24,11 +24,15 @@ export function GatePolicyEditor({
   onChange,
   disabled = false,
   output = false,
+  metrics = [],
+  allowStructure = true,
 }: {
   value: GatePolicy
   onChange: (v: GatePolicy) => void
   disabled?: boolean
   output?: boolean
+  metrics?: string[]
+  allowStructure?: boolean
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { language } = useI18n()
@@ -92,6 +96,9 @@ export function GatePolicyEditor({
           <WorkflowOption value="or">OR</WorkflowOption>
         </WorkflowSelect>
       </label>
+      {rules.conditions.some(rule => ['plddt', 'plddt_min', 'iplddt', 'binder_plddt', 'design_chain_plddt'].includes(rule.metric.split(':')[0])) ? (
+        <p className="text-xs text-text-secondary">{zh ? 'pLDDT / ipLDDT 阈值采用 0–100 量纲；量纲不明或冲突的结果需先核实。' : 'pLDDT / ipLDDT thresholds use 0–100. Results with unknown or conflicting scales require review.'}</p>
+      ) : null}
       {rules.conditions.map((rule, index) => (
         <div key={index} className="grid grid-cols-[1fr_55px_65px_24px] gap-1">
           <Input
@@ -158,8 +165,17 @@ export function GatePolicyEditor({
       >
         {zh ? '添加指标条件' : 'Add metric condition'}
       </Button>
+      {metrics.length > 0 && <label>
+        {zh ? '添加上游模型指标' : 'Add upstream model metric'}
+        <WorkflowSelect className={field} value="" onChange={event => {
+          if (event.target.value) setRules({ conditions: [...rules.conditions, { metric: event.target.value, op: 'gte', value: 0 }] })
+        }}>
+          <WorkflowOption value="">{zh ? '选择指标后设置比较方向和阈值' : 'Choose metric, then set comparison and threshold'}</WorkflowOption>
+          {metrics.map(metric => <WorkflowOption key={metric} value={metric}>{metric}</WorkflowOption>)}
+        </WorkflowSelect>
+      </label>}
       <label>
-        {zh ? '排序指标' : 'Ranking metric'}
+        {zh ? '排序指标'  : 'Ranking metric'}
         <Input
           className={field}
           value={rules.sort_metric ?? ''}
@@ -183,7 +199,7 @@ export function GatePolicyEditor({
           onChange={(e) => setRules({ top_n: e.target.value ? Number(e.target.value) : null })}
         />
       </label>
-      <label>
+      {allowStructure && <label>
         <Checkbox
           checked={!!value.structure}
           onCheckedChange={(checked) =>
@@ -195,7 +211,7 @@ export function GatePolicyEditor({
           }
         />{' '}
         {zh ? '结构质量标准（DSSP）' : 'Structure quality standard (DSSP)'}
-      </label>
+      </label>}
       {value.structure && (
         <div className="grid gap-2 rounded border border-border-soft p-2">
           <label>

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { http, HttpResponse } from 'msw'
@@ -33,17 +34,50 @@ afterEach(cleanup)
 
 function DrawerHarness() {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
   return (
     <>
       <Button type="button" onClick={() => setOpen(true)}>
         Launch Copilot
       </Button>
+      <Button type="button" onClick={() => navigate('/tools')}>Prepare tour route</Button>
       <CopilotDrawer open={open} onClose={() => setOpen(false)} />
     </>
   )
 }
 
 describe('CopilotDrawer', () => {
+  it('offers model configuration to project writers and hides it from project viewers', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'researcher' }))
+    server.use(
+      http.get('/api/v2/projects', () => HttpResponse.json({ items: [{ id: 'writer-project', name: 'Writer project', organization_id: 'org', owner_id: 'user', project_type: 'design', summary: null, status: 'active', primary_target_id: null, version: 1, created_at: '2026-10-20T00:00:00Z', updated_at: '2026-10-20T00:00:00Z' }], next_cursor: null })),
+      http.get('/api/v2/projects/writer-project/access', () => HttpResponse.json({ project_id: 'writer-project', role: 'researcher', permissions: { read: true, write: true, manage: false } })),
+    )
+    useAppStore.setState({ activeProjectId: 'writer-project', appMode: 'application' })
+    const ui = renderWithProviders(<DrawerHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
+    expect(await screen.findByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    ui.unmount()
+    server.use(http.get('/api/v2/projects/writer-project/access', () => HttpResponse.json({ project_id: 'writer-project', role: 'viewer', permissions: { read: true, write: false, manage: false } })))
+    renderWithProviders(<DrawerHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
+    await screen.findByText('Writer project')
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+  it('lets the active tour coordinate route changes with the assistant', async () => {
+    const original = useAppStore.getState().tourState
+    useAppStore.setState({ tourState: { ...original, status: 'active' } })
+    try {
+      renderWithProviders(<DrawerHarness />)
+      fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
+      await screen.findByRole('dialog', { name: 'Copilot' })
+      fireEvent.click(screen.getByRole('button', { name: 'Prepare tour route', hidden: true }))
+      await waitFor(() => expect(window.location.hash).toContain('/tools'))
+      expect(screen.getByRole('dialog', { name: 'Copilot' })).toBeInTheDocument()
+    } finally {
+      useAppStore.setState({ tourState: original })
+    }
+  })
   it('uses the Sheet slot, closes with Escape, and returns focus to its trigger', async () => {
     renderWithProviders(<DrawerHarness />)
     const trigger = screen.getByRole('button', { name: 'Launch Copilot' })
@@ -70,7 +104,14 @@ describe('CopilotDrawer', () => {
     expect(screen.queryByRole('tab', { name: 'Agent runs' })).not.toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
     expect(await screen.findByText('Model configuration panel')).toBeInTheDocument()
-    expect(screen.getByText('Task workspace')).toBeInTheDocument()
+    expect(screen.getByText('Task workspace')).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to assistant' }))
+    expect(screen.getByText('Task workspace')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More assistant tools' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Bot handoffs' }))
+    expect(await screen.findByText('Chain record')).toBeVisible()
+    expect(screen.queryByText('Model configuration panel')).not.toBeInTheDocument()
   })
 
   it('offers the surfaces as tabs rather than as toggle buttons', async () => {
@@ -83,8 +124,8 @@ describe('CopilotDrawer', () => {
 
     const tabs = screen.getAllByRole('tab')
 
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Tasks & deliverables', 'Conversation', 'Bot handoffs', 'External access'])
-    expect(screen.getByRole('tab', { name: 'Tasks & deliverables' })).toHaveAttribute('aria-selected', 'true')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Start a task', 'Decisions & parameters', 'Conversation'])
+    expect(screen.getByRole('tab', { name: 'Start a task' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('hands the reader from a handover to the operator it names', async () => {
@@ -124,7 +165,8 @@ describe('CopilotDrawer', () => {
     renderWithProviders(<DrawerHarness />)
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
-    fireEvent.click(screen.getByRole('tab', { name: 'Bot handoffs' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More assistant tools' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Bot handoffs' }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Go to Medic' }))
 
@@ -141,7 +183,8 @@ describe('CopilotDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Launch Copilot' }))
     await screen.findByRole('dialog', { name: 'Copilot' })
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Bot handoffs' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More assistant tools' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Bot handoffs' }))
 
     expect(await screen.findByText('Chain record')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Conversation' })).toHaveAttribute('aria-selected', 'false')

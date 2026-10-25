@@ -5,6 +5,7 @@ on:
     branches: [main]
   # Stacked and release-branch PRs need the same gates as PRs aimed directly at main.
   pull_request:
+  workflow_call:
 
 # Least-privilege default token; jobs opt into more only if needed.
 permissions:
@@ -59,10 +60,12 @@ jobs:
       - name: Enforce coverage gates
         run: python backend_v2/scripts/check_coverage.py backend_v2/coverage.json
       - name: Enforce research package branch coverage
-        run: >-
-          pytest backend_v2/tests/test_research_package_validation.py
-          --cov=backend_v2.app.research.package_validation --cov-branch
-          --cov-report=term-missing --cov-fail-under=95
+        run: |
+          pytest backend_v2/tests/test_research_package_validation.py \
+            --cov=backend_v2.app.research.package_validation --cov-branch \
+            --cov-report=term-missing --cov-report=json:backend_v2/research-branch-coverage.json --cov-fail-under=95
+          # pytest-cov's percent is statements + branches; enforce branch outcomes separately.
+          python backend_v2/scripts/check_coverage.py backend_v2/research-branch-coverage.json --research-branch
       - name: Reject OpenAPI contract drift
         run: |
           PYTHONPATH=. python backend_v2/scripts/export_openapi.py backend_v2/openapi.json
@@ -94,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -157,7 +160,8 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r backend_v2/requirements.lock
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+          pip-audit -r backend_v2/requirements-dev.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
       - name: Node dependency audit
@@ -177,7 +181,7 @@ jobs:
         run: >-
           docker build -f backend_v2/Dockerfile
           --build-arg BDA_BUILD_REVISION=${GITHUB_SHA}
-          --build-arg BDA_SCHEMA_REVISION=0070_af3_msa_port
+          --build-arg BDA_SCHEMA_REVISION=0078_design_memory
           -t bda-backend-v2:ci .
       # The image ships without pip or setuptools. A library that reaches for pkg_resources
       # at import time would fail only at runtime, which no other step here would catch.

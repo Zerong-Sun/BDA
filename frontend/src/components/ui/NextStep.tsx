@@ -5,7 +5,6 @@ import { getProjectOverview } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { derivePipeline, PIPELINE_STAGES, type StageKey } from '../../features/workflow/pipelineStages'
-import { AppFrame } from './AppFrame'
 import { Button } from './Button'
 
 /**
@@ -15,7 +14,7 @@ import { Button } from './Button'
  * stage points back to Research to start the next round.
  */
 export function NextStep({ stage }: { stage: StageKey }) {
-  const { t, format } = useI18n()
+  const { t, format, language } = useI18n()
   const { projectId, hasProject } = useProjectContext()
 
   const { data: overview } = useQuery({
@@ -24,30 +23,34 @@ export function NextStep({ stage }: { stage: StageKey }) {
     enabled: Boolean(projectId),
   })
 
-  if (!hasProject) return null
+  if (!hasProject || !overview) return null
 
   const query = projectId ? `?project=${encodeURIComponent(projectId)}` : ''
   const pageIndex = PIPELINE_STAGES.findIndex((item) => item.key === stage)
   const { stages } = derivePipeline(hasProject, overview)
 
-  // Final stage: close the loop back to Research for the next round.
+  // Reaching this page does not prove that a research cycle has completed.
   if (pageIndex === PIPELINE_STAGES.length - 1) {
+    const hasEvidence = (overview.candidate_count ?? overview.funnel.generated ?? 0) > 0 || overview.experiment_result_count > 0
     return (
-      <AppFrame className="mt-6" panelClassName="flex flex-wrap items-center justify-between gap-3 p-4">
+      <nav aria-label={t.pipeline.nextStep} className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-4">
         <div className="min-w-0">
           <p className="text-fine font-medium uppercase tracking-wider text-text-muted">
             {t.pipeline.nextStep}
           </p>
-          <p className="mt-0.5 text-sm text-text-secondary">{t.pipeline.loopCompleteBody}</p>
+          <p className="mt-0.5 text-sm text-text-secondary">{hasEvidence ? language === 'zh' ? '复核证据，记录判断和仍待解决的问题。' : 'Review the evidence and record decisions and open questions.' : language === 'zh' ? '尚无结果。返回项目检查输入和任务进度。' : 'No results are available yet. Review project inputs and task progress.'}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {overview.experiment_result_count > 0 ? <Button render={<Link to={`/learning${query}`} />}>{language === 'zh' ? '用实验数据规划下一轮' : 'Plan the next learning cycle'}<ArrowRightIcon aria-hidden="true" /></Button> : null}
         <Button
           variant="outline"
-          render={<Link to={`/research${query}`} />}
+          render={<Link to={hasEvidence ? `/research${query}&tab=timeline` : `/projects${query}`} />}
         >
           <ArrowCounterClockwiseIcon className="h-4 w-4" aria-hidden="true" />
-          {t.pipeline.startNextRound}
+          {hasEvidence ? language === 'zh' ? '查看项目决策' : 'Review project decisions' : language === 'zh' ? '返回项目' : 'Review project'}
         </Button>
-      </AppFrame>
+        </div>
+      </nav>
     )
   }
 
@@ -57,14 +60,12 @@ export function NextStep({ stage }: { stage: StageKey }) {
   const locked = next.state === 'locked'
 
   return (
-    <AppFrame className="mt-6" panelClassName="flex flex-wrap items-center justify-between gap-3 p-4">
+    <nav aria-label={t.pipeline.nextStep} className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border-soft pt-4">
       <div className="min-w-0">
         <p className="text-fine font-medium uppercase tracking-wider text-text-muted">
           {t.pipeline.nextStep}
         </p>
-        <p className="mt-0.5 text-sm text-text-secondary">
-          {locked ? t.pipeline.lockedHint : format(t.pipeline.continueTo, { stage: nextLabel })}
-        </p>
+        {locked ? <p className="mt-0.5 text-sm text-text-secondary">{t.pipeline.lockedHint}</p> : null}
       </div>
       {locked ? (
         <Button type="button" variant="outline" disabled>
@@ -77,6 +78,6 @@ export function NextStep({ stage }: { stage: StageKey }) {
           <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
         </Button>
       )}
-    </AppFrame>
+    </nav>
   )
 }

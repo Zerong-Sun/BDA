@@ -26,11 +26,13 @@ def list_entries(
     project_id: uuid.UUID,
     cursor: str | None = Query(default=None),
     limit: int = Query(50, ge=1, le=200),
+    q: str = Query(default="", max_length=500),
+    entry_type: str | None = Query(default=None, min_length=1, max_length=80),
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> KnowledgePage:
     require_project(session, project_id, user)
-    rows = KnowledgeRepository(session).list_project(project_id, decode_cursor(cursor), limit)
+    rows = KnowledgeRepository(session).list_project(project_id, decode_cursor(cursor), limit, query=q, entry_type=entry_type)
     page = rows[:limit]
     return KnowledgePage(
         items=[KnowledgeResponse.model_validate(x) for x in page],

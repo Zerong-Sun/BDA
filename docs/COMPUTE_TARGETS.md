@@ -2,7 +2,7 @@
 
 状态：活跃
 
-最后核验：2026-08-29（Asia/Shanghai；本轮核验格式、索引与链接）
+最后核验：2026-10-24（Asia/Shanghai；账号授权与作业目标快照）
 
 权威范围：本文标题所述主题；平台总览与成熟度以仓库根目录 `README.md` 为准。
 
@@ -31,8 +31,9 @@ reach the cluster, run everything in compose and skip this document.
 
 ```bash
 cp backend_v2/scripts/host-worker.env.example backend_v2/scripts/host-worker.env
-# fill in credentials, then store the cluster password outside the repo:
-umask 077 && printf %s 'THE_PASSWORD' > ~/.bda/lsf-password
+# Configure a site-approved non-interactive credential reference, or an existing
+# SSH session established manually by the account holder. Never put a password
+# in a command, environment variable or repository.
 ```
 
 Stop the containerised worker from consuming the compute queues, or jobs will land on
@@ -49,9 +50,10 @@ backend_v2/scripts/run-host-worker.sh --check
 backend_v2/scripts/run-host-worker.sh
 ```
 
-`--check` verifies PostgreSQL, Redis, MinIO, credentials, cluster reachability and that
-`bjobs` responds. Run it whenever jobs stop progressing — it distinguishes "the VPN is
-down" from "the configuration is wrong".
+`--check` includes cluster reachability and scheduler checks. Run it only after the
+account holder has established and explicitly confirmed the session. It is not a
+background connectivity monitor. Expired authentication must be restored manually;
+an agent must not handle password or MFA prompts.
 
 The worker uses Celery's solo pool: the SSH transport holds a live connection that does
 not survive being forked into prefork children.
@@ -132,3 +134,30 @@ See [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md#3b-cluster-staging-modes). In shor
 `BDA_V2_LSF_STAGING_MODE=ssh` (the default) the worker stages inputs and retrieves
 outputs itself, and the compute node needs no network access and no installed software.
 Only one direction of connectivity is required — worker to cluster.
+
+## Account assignment and multiple users
+
+A BDA project role does not authorize use of the deployment's LSF account.
+`BDA_V2_LSF_SUBMITTER_USER_IDS` is an explicit JSON list of BDA user UUIDs allowed to
+submit through that account. Public defaults to no users, including administrators;
+Private defaults to administrators only when the list is empty. A nonempty list is
+authoritative for both deployments. Apply the same configuration to API and workers.
+Preflight, script preview, workflow submission, compute-draft confirmation and retry
+enforce this boundary. Registration and organization membership cannot enlarge it.
+
+The allowlist grants use of one deployment account. It does not connect a student's
+personal cluster identity. Until personal connector routing is implemented, use a
+separate deployment and compute worker for each personal account, or an explicitly
+approved laboratory service account whose site terms permit sharing. Do not add
+students to the list while telling them jobs will run under their personal identities.
+
+New LSF jobs freeze their SSH host/user/port, remote root, queue, staging mode and
+credential references in an internal target snapshot. Dispatch, polling, collection and
+cancellation use that snapshot after deployment configuration changes. Credential values
+are never copied. The script-review fingerprint covers the same identity. Retries after
+a target change, and retries of legacy jobs without a target snapshot, require a new
+reviewed workflow. Legacy tracking retains its existing adapter behavior.
+
+The personal-connector design and release acceptance boundary are recorded in
+[Public release readiness](PUBLIC_RELEASE_READINESS.md). Cluster qualification requires
+the account holder's session and site-specific execution evidence.

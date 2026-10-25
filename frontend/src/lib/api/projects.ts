@@ -14,9 +14,11 @@ import {
   projectLibraryApiV2ProjectsLibraryGet,
   listWorkflowsApiV2ProjectsProjectIdWorkflowRunsGet,
   getProjectPromptDraftApiV2ProjectsPromptDraftsDraftIdGet,
+  getProjectApiV2ProjectsProjectIdGet,
   patchProjectApiV2ProjectsProjectIdPatch,
   patchTargetApiV2TargetsTargetIdPatch,
   postFindingApiV2ProjectsProjectIdResearchFindingsPost,
+  postDeliveryApiV2ProjectsProjectIdDeliveryPackagesPost,
   postProjectApiV2ProjectsPost,
   postProjectPromptDraftApiV2ProjectsPromptDraftsPost,
   postTargetApiV2ProjectsProjectIdTargetsPost,
@@ -67,6 +69,12 @@ export async function listProjects(): Promise<Project[]> {
     cursor = page.next_cursor ?? null
   } while (cursor)
   return projects
+}
+
+export async function getProject(projectId: string): Promise<Project> {
+  return ProjectSchema.parse((await getProjectApiV2ProjectsProjectIdGet<true>({
+    path: { project_id: projectId }, throwOnError: true,
+  })).data)
 }
 
 export async function listProjectLibrary(): Promise<ProjectLibraryItem[]> {
@@ -300,10 +308,17 @@ export async function getResultsSummary(projectId: string) {
 
 export async function getDeliveryPackage(projectId: string) {
   const page = (await listDeliveryApiV2ProjectsProjectIdDeliveryPackagesGet<true>({
-    path: { project_id: projectId }, query: { limit: 1 }, throwOnError: true,
+    path: { project_id: projectId }, query: { limit: 1, order: 'newest' }, throwOnError: true,
   })).data
   if (!page.items[0]) throw new ApiError('Delivery package was not found', 404)
   return DeliveryPackageSchema.parse(page.items[0])
+}
+
+export async function createDeliveryPackage(projectId: string, name: string) {
+  const { data } = await postDeliveryApiV2ProjectsProjectIdDeliveryPackagesPost<true>({
+    path: { project_id: projectId }, body: { name, candidate_ids: [], include_experiment_results: true }, throwOnError: true,
+  })
+  return DeliveryPackageSchema.parse(data.delivery_package)
 }
 
 export async function getDeliveryPackageOrNull(projectId: string): Promise<DeliveryPackageData | null> {

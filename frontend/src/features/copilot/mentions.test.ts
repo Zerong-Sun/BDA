@@ -20,6 +20,15 @@ const ROSTER: CopilotBot[] = [
 ]
 
 describe('parseMention', () => {
+  it('supports renamed members, multi-word English names and old handles', () => {
+    const roster = [bot({ id: 'conductor', title: 'Project Lead', title_zh: '项目负责人', aliases: ['Conductor', '总调度'] })]
+    expect(parseMention('@Project Lead please coordinate PD-L1', roster)?.body).toBe('please coordinate PD-L1')
+    expect(parseMention('@项目负责人推进项目', roster)?.bot?.id).toBe('conductor')
+    expect(parseMention('@总调度 推进项目', roster)?.bot?.id).toBe('conductor')
+    expect(parseMention('@Conductor do it', roster)?.bot?.id).toBe('conductor')
+    expect(parseMention('@conductorx do it', roster)?.bot).toBeUndefined()
+  })
+
   it('returns nothing when the message addresses nobody', () => {
     expect(parseMention('which route fits this target?', ROSTER)).toBeNull()
   })

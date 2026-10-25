@@ -24,6 +24,8 @@ export function WorkflowEdge({
     targetPosition,
   })
 
+  if (data?.overview) return <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={{ stroke: themeColor('--accent', '#D08A2A'), strokeWidth: 2, ...style }} />
+
   // Compact layouts leave too little space between cards for a readable gate.
   const labelOffset = Math.abs(targetX - sourceX) < 180 ? 56 : 0
 

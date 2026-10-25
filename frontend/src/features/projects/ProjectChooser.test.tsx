@@ -37,6 +37,7 @@ vi.mock('../../lib/hooks/useProjectContext', () => ({
 vi.mock('../../lib/api/projects', () => ({ createProject, createProjectPromptDraft, waitForProjectPromptDraft, deleteProject }))
 
 beforeEach(() => {
+  sessionStorage.clear()
   setProjectId.mockReset()
   createProject.mockReset()
   createProjectPromptDraft.mockReset()
@@ -44,9 +45,17 @@ beforeEach(() => {
   useAppStore.setState({ appMode: 'application', language: 'en' })
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); sessionStorage.clear() })
 
 describe('ProjectChooser', () => {
+  it('does not open project creation for an invited viewer, including a controlled dialog request', () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'viewer' }))
+    renderWithProviders(<ProjectChooser creating />)
+    expect(screen.getByRole('button', { name: /create project/i })).toBeDisabled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(createProject).not.toHaveBeenCalled()
+  })
+
   it('clears a selected project through the localized sentinel option', () => {
     renderWithProviders(<ProjectChooser />)
 
@@ -61,7 +70,8 @@ describe('ProjectChooser', () => {
 
   it('creates a project from a plain-language objective without a model', async () => {
     createProject.mockResolvedValue({ id: 'proj_new' })
-    renderWithProviders(<ProjectChooser />)
+    const onCreated = vi.fn()
+    renderWithProviders(<ProjectChooser onCreated={onCreated} />)
     fireEvent.click(screen.getByRole('button', { name: /create project/i }))
     fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'Manual project' } })
     fireEvent.change(screen.getByLabelText(/objective.*constraints/i), { target: { value: 'Improve stability at room temperature.' } })
@@ -70,6 +80,8 @@ describe('ProjectChooser', () => {
       name: 'Manual project', prompt: 'Improve stability at room temperature.',
     })))
     expect(createProjectPromptDraft).not.toHaveBeenCalled()
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce())
+    expect(setProjectId).toHaveBeenCalledWith('proj_new')
   })
 
   it('allows reviewing and submitting an AI-generated brief', async () => {

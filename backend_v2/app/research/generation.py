@@ -42,7 +42,9 @@ LOW_QUALITY_REFERENCE_TITLES = (
     "congress of ",
     "poster presentations",
     "conference abstracts",
+    "cumulative general subject index",
 )
+GENERIC_TOPIC_TERMS = {"protein", "proteins", "design", "binding", "binder", "binders", "receptor", "receptors", "novel", "development", "engineering", "analysis", "study", "therapeutic"}
 TOPIC_STOPWORDS = {
     "and",
     "branches",
@@ -93,7 +95,10 @@ def _topic_terms(value: str) -> set[str]:
 def _search_query(topic: str, evidence_cutoff: date | str | None = None) -> str:
     terms = sorted(_topic_terms(topic), key=lambda term: (-any(character.isdigit() for character in term), -len(term)))
     selected = terms[:10]
-    topic_query = " OR ".join(f'TITLE_ABS:"{term}"' for term in selected) or topic
+    specific = [term for term in selected if term not in GENERIC_TOPIC_TERMS]
+    # A generic word such as "protein" must not independently retrieve a paper
+    # about another target merely because the requested topic also says design.
+    topic_query = " OR ".join(f'TITLE_ABS:"{term}"' for term in (specific or selected)) or topic
     if evidence_cutoff:
         cutoff = evidence_cutoff if isinstance(evidence_cutoff, date) else date.fromisoformat(evidence_cutoff)
         return (
@@ -107,6 +112,9 @@ def _reference_relevance(topic: str, title: str, abstract: str) -> tuple[bool, l
     if not title or any(pattern in normalized_title for pattern in LOW_QUALITY_REFERENCE_TITLES):
         return False, []
     topic_terms = _topic_terms(topic)
+    specific = topic_terms - GENERIC_TOPIC_TERMS
+    if specific:
+        topic_terms = specific
     title_matches = topic_terms & _topic_terms(title)
     abstract_matches = topic_terms & _topic_terms(abstract)
     matched = sorted(title_matches | abstract_matches)
@@ -198,6 +206,8 @@ def _external_references(
                     "retrieval_scope": "metadata_only",
                     "full_text_retrieved": False,
                     "relevance": {"matched_terms": matched_terms, "query": query},
+                    "evidence_role": "unreviewed_discovery",
+                    "relevance_review_status": "pending_review",
                     "verification": verification,
                     "review_status": "pending_review",
                 },
@@ -236,7 +246,12 @@ def _annotate_source_references(
         item = dict(reference)
         metadata = dict(item.get("metadata") or {})
         document = documents_by_id.get(str(item.get("document_id") or ""))
-        has_full_text = str(item.get("document_id") or "") in chunk_document_ids
+        provenance = (document.metadata_json or {}).get("content_provenance", {}) if document else {}
+        content_kind = str(provenance.get("content_kind") or "")
+        has_full_text = (
+            str(item.get("document_id") or "") in chunk_document_ids
+            and content_kind in {"open_access_full_text", "open_full_text", "full_text"}
+        )
         has_abstract = bool(document and document.abstract)
         metadata.update(
             {
@@ -575,24 +590,19 @@ def finalize_research_generation(session: Session, row: ResearchGeneration) -> R
         references.extend(item for item in external_references if _reference_identity(item) not in existing_refs)
         issues.extend(external_issues)
     reference_ids = {str(item.get("ref_id")) for item in references}
-    verified_ids = {
-        str(item.get("ref_id"))
-        for item in references
-        if str(item.get("verification_status") or "").lower().startswith("verified")
-    }
     graph_edges = workspace.get("graph_edges", [])
     for edge in graph_edges:
         edge_refs = [str(item) for item in edge.get("reference_ids", [])]
         missing = [item for item in edge_refs if item not in reference_ids]
         if missing:
             issues.append({"kind": "unknown_reference", "entity_id": str(edge.get("id")), "detail": ",".join(missing)})
-        if edge.get("assertion") == "established_fact" and not any(item in verified_ids for item in edge_refs):
+        if edge.get("assertion") == "established_fact":
             edge["assertion"] = "evidence_based_inference"
             issues.append(
                 {
                     "kind": "assertion_downgraded",
                     "entity_id": str(edge.get("id")),
-                    "detail": "No locally verified reference supports established_fact",
+                    "detail": "A draft requires claim-level review; verified publication metadata does not verify the assertion",
                 }
             )
 
@@ -795,13 +805,16 @@ def import_research_generation(
         project.version += 1
 
     review = draft.get("review_document") or {}
+    source_scope = review.get("scope") or {}
     brief = ResearchBrief(
         project_id=project.id,
         title=_localized_text(review.get("title")) or f"{project_name} — Project Review",
         content=_localized_text(review.get("content")),
         status="draft",
         scope={
-            **(review.get("scope") or {}),
+            **{key: value for key, value in source_scope.items()
+               if key not in {"display_role", "editorial_key", "evidence_note_ids"}},
+            "source_review_scope": source_scope,
             "localized_content": {"title": review.get("title"), "content": review.get("content")},
             "source": "copilot_research_v2",
             "checksum": row.checksum,
@@ -882,6 +895,17 @@ def import_research_generation(
 
     for reference in draft["references"]:
         metadata = {**(reference.get("metadata") or {}), **reference, "review_status": "pending_review"}
+        previous_curation = metadata.pop("evidence_curation", None)
+        source_packet = metadata.pop("evidence_packet", None)
+        if source_packet:
+            metadata["source_evidence_packet"] = source_packet
+        # Project relevance is never inherited from a different project's
+        # editorial decision, even when publication metadata is verified.
+        metadata["evidence_curation"] = {
+            "project_id": str(project.id), "scope": "unreviewed",
+            "reason": "Imported reference; relevance to this project has not been reviewed.",
+            "source_curation": previous_curation,
+        }
         session.add(
             LiteratureDocument(
                 project_id=project.id,

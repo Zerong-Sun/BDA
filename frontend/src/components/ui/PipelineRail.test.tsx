@@ -3,12 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { PipelineRail } from './PipelineRail'
+import { getProjectOverview } from '../../lib/api/projects'
+
+let projectStatus = 'active'
 
 vi.mock('../../lib/hooks/useProjectContext', () => ({
   useProjectContext: () => ({
     projectId: 'proj_ready',
     hasProject: true,
-    activeProject: { id: 'proj_ready', name: 'Ready project' },
+    activeProject: { id: 'proj_ready', name: 'Ready project', status: projectStatus },
   }),
 }))
 
@@ -22,10 +25,35 @@ vi.mock('../../lib/api/projects', () => ({
 
 describe('PipelineRail route selection', () => {
   beforeEach(() => {
+    projectStatus = 'active'
+    vi.clearAllMocks()
     useAppStore.setState({ language: 'en' })
   })
 
   afterEach(cleanup)
+
+  it.each(['archived', 'completed'])('omits workflow execution progress on a %s research review', (status) => {
+    projectStatus = status
+    window.location.hash = '/research?project=proj_ready'
+    renderWithProviders(<PipelineRail />)
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(getProjectOverview).not.toHaveBeenCalled()
+  })
+
+  it('opens imported results and lab records when the target is not ready, without marking research done', async () => {
+    vi.mocked(getProjectOverview).mockResolvedValueOnce({ target_readiness: { ready_for_workflow: false },
+      funnel: { generated: 0, ordered: 0 }, candidate_count: 0, experiment_result_count: 2, latest_workflow_id: null,
+    } as never)
+    window.location.hash = '/projects?project=proj_ready'
+    renderWithProviders(<PipelineRail />)
+    const results = screen.getByRole('tab', { name: /Results/i })
+    await waitFor(() => expect(results).toBeEnabled())
+    expect(screen.getByRole('tab', { name: /Lab/i })).toBeEnabled()
+    expect(screen.getByRole('tab', { name: /Research/i })).not.toHaveTextContent(/done/i)
+    expect(screen.getByRole('tab', { name: /Workflow/i })).toBeEnabled()
+    fireEvent.click(results)
+    await waitFor(() => expect(window.location.hash).toContain('/results?project=proj_ready'))
+  })
 
   it('selects Research from the route even when project progress is at Results', async () => {
     window.location.hash = '/research?project=proj_ready'

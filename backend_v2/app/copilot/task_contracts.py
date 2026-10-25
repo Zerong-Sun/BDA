@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .delivery_context import delivery_constraints, visible_characters
 from .models import CopilotAgentRun, CopilotAgentTurn
 
 
@@ -25,13 +26,14 @@ SERVICES: dict[str, dict] = {
     },
     "literature": {
         "title": "Research the evidence", "title_zh": "调研与比较证据",
-        "deliverable": "Search scope, traced excerpts, disagreements and evidence gaps",
-        "deliverable_zh": "检索范围、来源片段、证据分歧与缺口；可选保存待审核笔记",
+        "deliverable": "Per-paper project arguments, traced evidence, figures, quantitative data and gaps",
+        "deliverable_zh": "逐篇提取项目论点、原文论据、图表、定量数据与局限；保留明确缺口",
         "capabilities": ["project-read", "research-read", "knowledge-authoring", "literature-search"],
-        "write_tools": ["start_literature_search", "create_knowledge_draft"],
+        "write_tools": ["start_literature_search", "create_knowledge_draft", "save_literature_analysis"],
         "steps": [
             _step("discovery", "Find evidence", "发现相关文献", ["search_research"]),
-            _step("excerpts", "Read traced excerpts", "读取可追溯正文或摘要", ["get_reference_content"]),
+            _step("excerpts", "Read traced excerpts", "读取可追溯正文或摘要", ["get_reference_content", "get_reference_evidence_packet"]),
+            _step("evidence_packet", "Read figures and data", "逐篇读取图表与数据证据包", ["get_reference_evidence_packet"]),
         ],
     },
     "planning": {
@@ -40,6 +42,7 @@ SERVICES: dict[str, dict] = {
         "deliverable_zh": "适用路线、比较依据、输入缺口和待审核方案",
         "capabilities": ["project-read", "research-read", "workflow-planning"], "write_tools": [],
         "steps": [
+            _step("experience", "Review prior lessons and applicability", "检查已有经验与适用条件", ["list_design_lessons"]),
             _step("context", "Inspect inputs", "检查目标与输入", ["list_project_targets", "research_overview"]),
             _step("routes", "Compare registered routes", "比较已注册路线", ["plan_workflow_route"]),
         ],
@@ -59,13 +62,13 @@ SERVICES: dict[str, dict] = {
         "deliverable": "Observed results, limitations, supported/refuted hypotheses and next actions",
         "deliverable_zh": "结果比较、限制、支持或否定的假设和下一轮建议",
         "capabilities": ["project-read", "research-read", "result-interpretation"], "write_tools": [],
-        "steps": [_step("results", "Read recorded results", "读取实际结果", ["list_experiment_results", "list_project_candidates"])],
+        "steps": [_step("experience", "Review hypotheses and prior lessons", "检查原假说与已有经验", ["list_design_lessons"]), _step("results", "Read recorded results", "读取实际结果", ["list_experiment_results", "list_project_candidates"])],
     },
 }
 
 DELIVERY_SECTIONS = {
     "brief": ["objective", "constraints", "success_criteria", "missing_inputs"],
-    "literature": ["search_scope", "evidence_comparison", "disagreements", "limitations"],
+    "literature": ["search_scope", "evidence_comparison", "per_paper_arguments", "figures_and_data", "disagreements", "limitations"],
     "planning": ["route_comparison", "inputs", "risks", "next_step"],
     "execution": ["current_state", "blockers", "recovery"],
     "interpretation": ["observations", "limitations", "hypotheses", "next_round"],
@@ -73,7 +76,7 @@ DELIVERY_SECTIONS = {
 
 FINAL_INSTRUCTION = """
 Return your final delivery as JSON (no markdown fence):
-{"status":"completed|partial|blocked|needs_input", "summary":"the deliverable, with source IDs and limitations",
+{"status":"completed|partial|blocked|needs_input|review_required", "summary":"the deliverable, with source IDs and limitations",
  "sections":{"each required_sections key":"nonempty content, with sources or an explicit unknown"},
  "evidence_call_ids":["successful tool_call_id used"], "missing":["remaining item"], "next_action":"specific next action"}.
 A completed delivery must satisfy every contract step and cite the successful tool calls
@@ -81,6 +84,17 @@ that support it. This confirms delivery of a draft/diagnosis, never scientific v
 If you cannot proceed, report blocked or needs_input with an actionable reason. Do not
 invent artifact links or evidence IDs. A brief must include objectives, constraints,
 success criteria and missing inputs. For literature distinguish excerpts from search hits.
+Keep the summary to one or two sentences. Make each section concise and focused on
+its own purpose, preserving the source IDs, units, analysis versions and limitations
+needed to review its claims. Do not repeat complete tool payloads or the same content
+across the summary and sections. State a shared limitation once unless its effect
+differs for a particular result.
+The user's explicit length limit applies to ALL user-facing text across summary,
+sections, missing and next_action together. JSON formatting and review do not exempt
+you from that limit. For a short report use only required sections, avoid repeating
+IDs and keep tool-call IDs in evidence_call_ids unless the user requests them in prose.
+Do not expand a bounded evidence review into solving the entire research project:
+an identified scientific gap can be the requested output, not unfinished execution.
 """
 
 
@@ -92,7 +106,9 @@ def build_contract(kind: str, writes: list[str]) -> dict:
             steps[0] = _step("discovery", "Search external literature", "执行外部文献检索", ["start_literature_search"])
         if "create_knowledge_draft" in writes:
             steps.append(_step("note", "Save a review draft", "保存待审核笔记", ["create_knowledge_draft"]))
-    return {"version": 1, "required_sections": DELIVERY_SECTIONS.get(kind, []), "service_kind": kind, "authorized_writes": sorted(writes), "steps": steps,
+        if "save_literature_analysis" in writes:
+            steps.append(_step("save_evidence", "Save per-paper analysis", "保存逐篇论点、图表和数据", ["save_literature_analysis"]))
+    return {"version": 2 if kind == "literature" else 1, "required_sections": DELIVERY_SECTIONS.get(kind, []), "service_kind": kind, "authorized_writes": sorted(writes), "steps": steps,
             "deliverable": service["deliverable"] if service else "Reviewable answer to the stated goal",
             "deliverable_zh": service["deliverable_zh"] if service else "针对目标的可审核答复",
             "submission_policy": "human_confirmation"}
@@ -108,9 +124,21 @@ def tool_records(turns: list[CopilotAgentTurn]) -> list[dict]:
         except (ValueError, TypeError):
             continue
         meta = (turn.tool_calls or [{}])[0]
-        bad = isinstance(result, dict) and (result.get("error") or result.get("status") in {"failed", "cancelled", "pending", "running"})
+        # A settled compute wait reports the job's failure, not a failed read.
+        # Keep failed actions/delegations and unresolved waits unsuccessful.
+        observed_job = (meta.get("name") == "await_compute_job" and isinstance(result, dict)
+                        and ((result.get("kind") == "gpu_job" and result.get("resource_id")
+                              and result.get("job_status") in {"succeeded", "failed", "cancelled"})
+                             or (result.get("job_id") and result.get("waiting") is False
+                                 and result.get("status") in {"succeeded", "failed", "cancelled"})))
+        observed_run = (meta.get("name") == "read_operator_work" and isinstance(result, dict)
+                        and result.get("run_id") and isinstance(result.get("tool_results"), list)
+                        and not result.get("error"))
+        bad = not (observed_job or observed_run) and isinstance(result, dict) and (result.get("error") or result.get("status") in {"failed", "cancelled", "pending", "running"})
         records.append({"call_id": meta.get("tool_call_id", ""), "tool": meta.get("name", ""),
-                        "successful": bool(result) and not bool(bad), "result": result})
+                        # An empty list is a successful query with no matches.
+                        # Steps that require actual rows enforce that below.
+                        "successful": result is not None and not bool(bad), "result": result})
     return records
 
 
@@ -120,9 +148,127 @@ def _has_excerpt(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     provenance = value.get("content_provenance") or value
-    if isinstance(provenance, dict) and value.get("chunk_id") and provenance.get("content_checksum_sha256") and provenance.get("retrieval_trace_id"):
+    content = value.get("content")
+    if (isinstance(content, str) and content.strip() and isinstance(provenance, dict)
+            and value.get("chunk_id") and provenance.get("content_checksum_sha256")
+            and provenance.get("retrieval_trace_id")):
         return True
     return any(_has_excerpt(item) for item in value.values() if isinstance(item, (list, dict)))
+
+
+def source_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Observed saved-source windows, separate from task/evidence completion.
+
+    A traced excerpt can answer a narrow question without reading its whole
+    source. Conversely, one successful page must not imply all pages were read.
+    Only actual, consistently identified rows count; empty/failed reads cannot
+    erase an earlier gap. Offsets are indexed-chunk offsets, not publications.
+    """
+    sources: dict[tuple[str, str], dict] = {}
+    for record in tool_records(turns):
+        rows = record["result"]
+        if record["tool"] != "get_reference_content" or not record["successful"] or not isinstance(rows, list) or not rows:
+            continue
+        first = rows[0].get("data") if isinstance(rows[0], dict) else None
+        if not isinstance(first, dict):
+            continue
+        window = first.get("read_window")
+        provenance = first.get("content_provenance")
+        if not isinstance(window, dict) or not isinstance(provenance, dict):
+            continue
+        document, checksum = first.get("document_id"), provenance.get("content_checksum_sha256")
+        offset, total, count = (window.get(key) for key in ("offset", "total_count", "returned_count"))
+        if (not isinstance(document, str) or not document or not isinstance(checksum, str) or not checksum
+                or type(offset) is not int or type(total) is not int or type(count) is not int
+                or offset < 0 or total < 0 or count != len(rows) or offset + count > total):
+            continue
+        # Do not trust a window counter in place of its actual traced contents.
+        if not all(isinstance(row, dict) and isinstance(row.get("data"), dict)
+                   and row["data"].get("document_id") == document
+                   and isinstance(row["data"].get("content_provenance"), dict)
+                   and row["data"]["content_provenance"].get("content_checksum_sha256") == checksum
+                   and _has_excerpt(row["data"]) for row in rows):
+            continue
+        source = sources.setdefault((document, checksum), {
+            "document_id": document, "ref_id": first.get("ref_id"),
+            "content_checksum_sha256": checksum, "read_windows": [],
+            "total_counts": [], "observed_has_more": False, "evidence_call_ids": [],
+        })
+        source["read_windows"].append([offset, offset + count])
+        source["total_counts"].append(total)
+        source["observed_has_more"] |= window.get("has_more") is True
+        source["evidence_call_ids"].append(record["call_id"])
+    result = []
+    for source in sources.values():
+        merged: list[list[int]] = []
+        for start, end in sorted(source["read_windows"]):
+            if merged and start <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], end)
+            else:
+                merged.append([start, end])
+        totals = sorted(set(source.pop("total_counts")))
+        total = totals[0] if len(totals) == 1 else None
+        # With conflicting totals, preserve observations without claiming a
+        # complete source or prescribing a potentially stale next offset.
+        next_offset = 0
+        for start, end in merged:
+            if start > next_offset:
+                break
+            next_offset = end
+        complete = total is not None and next_offset == total
+        result.append({**source, "read_windows": merged, "observed_total_counts": totals,
+                       "total_count": total, "read_count": sum(end - start for start, end in merged),
+                       "coverage_complete": complete,
+                       "known_next_offset": next_offset if total is not None and next_offset < total else None,
+                       "evidence_call_ids": list(dict.fromkeys(source["evidence_call_ids"]))})
+    return result
+
+
+def pending_source_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Only sources actually observed to have more saved pages merit feedback."""
+    return [source for source in source_coverage(turns)
+            if source["observed_has_more"] and not source["coverage_complete"]]
+
+
+def evidence_packet_coverage(turns: list[CopilotAgentTurn]) -> list[dict]:
+    """Track each paper and section actually read, including explicit empty lists."""
+    groups: dict[tuple[str, str], dict] = {}
+    required = {"arguments", "figures", "tables", "data", "supplements"}
+    for record in tool_records(turns):
+        r = record["result"]
+        if record["tool"] != "get_reference_evidence_packet" or not record["successful"] or not isinstance(r, dict) or not r.get("source_sha256"):
+            continue
+        key = (str(r.get("document_id")), str(r["source_sha256"]))
+        if key not in groups or groups[key].get("document_version") != r.get("document_version"):
+            groups[key] = {"document_id": key[0], "source_sha256": key[1], "document_version": r.get("document_version"), "sections": {}, "gaps": []}
+        group = groups[key]
+        section, window = r.get("section"), r.get("read_window") or {}
+        evidence_gaps = r.get("gaps") or []
+        if (not isinstance(window, dict) or not isinstance(r.get("items"), list)
+                or not isinstance(evidence_gaps, list) or any(not isinstance(g, str) for g in evidence_gaps)):
+            continue
+        offset, count, total = window.get("offset"), window.get("returned_count"), window.get("total_count")
+        if (not isinstance(section, str) or section not in required or type(offset) is not int or type(count) is not int or type(total) is not int
+                or min(offset, count, total) < 0 or offset + count > total
+                or count != len(r.get("items") or [])):
+            continue
+        slot = group["sections"].setdefault(section, {"totals": set(), "positions": set()})
+        slot["totals"].add(total)
+        slot["positions"].update(range(offset, offset + count))
+        group["gaps"].extend(evidence_gaps)
+    output = []
+    for group in groups.values():
+        complete = []
+        for section, slot in group.pop("sections").items():
+            # Positions have already been bounded to [0, total). Avoid allocating
+            # a potentially huge range for malformed source metadata.
+            if len(slot["totals"]) == 1 and len(slot["positions"]) == next(iter(slot["totals"])):
+                complete.append(section)
+        group["missing_sections"] = sorted(required - set(complete))
+        group["read_sections"] = sorted(complete)
+        group["gaps"] = list(dict.fromkeys(group["gaps"]))
+        output.append(group)
+    return output
 
 
 def progress(contract: dict, turns: list[CopilotAgentTurn]) -> list[dict]:
@@ -131,18 +277,43 @@ def progress(contract: dict, turns: list[CopilotAgentTurn]) -> list[dict]:
     for step in contract.get("steps", []):
         matches = [r for r in records if r["tool"] in step["tools"] and r["successful"]]
         if step["id"] == "excerpts":
-            matches = [r for r in matches if _has_excerpt(r["result"])]
+            matches = [r for r in matches if _has_excerpt(r["result"]) or (
+                isinstance(r["result"], dict) and r["result"].get("schema") == "literature-evidence-packet-v1"
+                and r["result"].get("section") == "passages" and r["result"].get("source_sha256")
+                and r["result"].get("retrieval_trace_id") and r["result"].get("items"))]
         if step["id"] == "results":
             matches = [r for r in matches if isinstance(r["result"], list) and r["result"] or isinstance(r["result"], dict) and r["result"].get("items")]
+        if step["id"] == "evidence_packet":
+            matches = [r for r in matches if isinstance(r["result"], dict) and r["result"].get("schema") == "literature-evidence-packet-v1" and r["result"].get("source_sha256")]
         rows.append({**step, "status": "completed" if matches else "pending", "evidence_call_ids": [r["call_id"] for r in matches]})
     return rows
+
+
+def _delivery_json(answer: str) -> Any:
+    """Read JSON or one terminal JSON fence, optionally introduced by prose.
+
+    Real providers sometimes add a sentence before the otherwise valid final
+    object. Accept that presentation variation without guessing among multiple
+    blocks or stripping trailing text that might qualify the delivery.
+    """
+    text = answer.strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        if text.count("```") != 2:
+            raise
+        _, block, suffix = text.split("```")
+        language, separator, payload = block.partition("\n")
+        if suffix.strip() or not separator or language.strip().lower() not in {"", "json"}:
+            raise ValueError("ambiguous delivery fence") from None
+        return json.loads(payload)
 
 
 def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgentTurn]) -> dict:
     steps = progress(run.task_contract or {}, turns)
     try:
-        data = json.loads(answer.removeprefix("```json").removeprefix("```").removesuffix("```").strip())
-        if not isinstance(data, dict) or data.get("status") not in {"completed", "partial", "blocked", "needs_input"}:
+        data = _delivery_json(answer)
+        if not isinstance(data, dict) or data.get("status") not in {"completed", "partial", "blocked", "needs_input", "review_required"}:
             raise ValueError("invalid delivery status")
         if not isinstance(data.get("summary"), str) or not data["summary"].strip():
             raise ValueError("missing summary")
@@ -157,31 +328,67 @@ def evaluate_delivery(run: CopilotAgentRun, answer: str, turns: list[CopilotAgen
     except (ValueError, TypeError):
         return {"status": "review_required", "summary": answer, "missing": ["structured_delivery_required"],
                 "next_action": "Review the answer or continue with a specific request.", "steps": steps, "evidence_call_ids": []}
+    # This diagnostic is recomputed, not a scientific gap for a model to carry
+    # forward after it has actually shortened the draft.
+    missing = [item for item in missing if item != "delivery_length_exceeded"]
+    data["missing"] = missing
     successful = {r["call_id"] for r in tool_records(turns) if r["successful"]}
     invalid = set(refs) - successful
     gaps = [s["id"] for s in steps if s["status"] != "completed"]
     sections = data.get("sections", {})
     if not isinstance(sections, dict):
         sections = {}
+    invalid_sections = any(not isinstance(v, str) or not v.strip() for v in sections.values())
     sections = {k: v for k, v in sections.items() if isinstance(v, str) and v.strip()}
     gaps += [key for key in (run.task_contract or {}).get("required_sections", []) if key not in sections]
     status = data["status"]
     checks = []
+    # New contracts require per-paper figure/data coverage. Historical contracts
+    # retain their original acceptance rule rather than becoming retroactively incomplete.
+    if any(step.get("id") == "evidence_packet" for step in (run.task_contract or {}).get("steps", [])):
+        coverage = evidence_packet_coverage(turns)
+        for paper in coverage:
+            if paper["missing_sections"]:
+                gaps.append(f"paper_sections_unread:{paper['document_id']}:{','.join(paper['missing_sections'])}")
+            if paper["gaps"]:
+                gaps.append(f"paper_evidence_gaps:{paper['document_id']}")
+        known = {p["document_id"] for p in coverage}
+        for paper in source_coverage(turns):
+            if paper["document_id"] not in known:
+                gaps.append(f"paper_evidence_packet_unread:{paper['document_id']}")
+    if invalid_sections:
+        checks.append("invalid_section_values")
     if invalid:
         checks.append("unverified_evidence_call_ids")
     if status == "completed" and (gaps or missing or not refs or any(not set(s["evidence_call_ids"]) & set(refs) for s in steps)):
         status = "partial"
     if status == "completed" and not steps:
         status = "review_required"  # Open-ended goals have no machine-verifiable delivery contract.
-    if invalid:
+    if invalid or invalid_sections:
         status = "review_required"
-    return {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks)),
+    from .procedural_skills import evaluate_outputs
+    skill_outputs, skill_checks = evaluate_outputs(run.task_contract or {}, data, successful)
+    if skill_checks:
+        status = "review_required" if any("invalid" in check or "unverified" in check or "unexpected" in check for check in skill_checks) else ("partial" if status == "completed" else status)
+    result: dict[str, Any] = {"status": status, "summary": data["summary"], "sections": sections, "missing": list(dict.fromkeys(missing + gaps + checks + skill_checks)),
+            **({"skill_outputs": skill_outputs} if (run.task_contract or {}).get("procedural_skills") else {}),
             "next_action": data["next_action"], "evidence_call_ids": [ref for ref in refs if ref in successful], "steps": steps}
+    # Server-derived gaps are visible too. Check the actual delivery after all
+    # contract/skill diagnostics are assembled, before adding this diagnostic
+    # itself; a failed length check must never be accepted by factual review.
+    limit = delivery_constraints(run, turns)["max_visible_characters"]
+    if limit and visible_characters(result) > limit:
+        result["status"] = "review_required"
+        result["missing"].append("delivery_length_exceeded")
+    return result
 
 
 def task_view(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) -> dict:
     result = dict(run.outcome or {})
     result["steps"] = progress(run.task_contract or {}, turns)
+    if (run.task_contract or {}).get("service_kind") == "literature":
+        result["source_coverage"] = source_coverage(turns)
+        result["evidence_packet_coverage"] = evidence_packet_coverage(turns)
     records = tool_records(turns)
     result["evidence"] = [{"call_id": r["call_id"], "tool": r["tool"], "successful": r["successful"]} for r in records]
     result["deliverables"] = [
@@ -206,8 +413,8 @@ def available_step_tools(run: CopilotAgentRun, turns: list[CopilotAgentTurn]) ->
     bookkeeping = allowed & (REGISTRY.write_ids() - REGISTRY.user_intent_write_ids())
     if pending is None:
         return reads
-    # Keep discovery/context available, but expose the work of just this step.
-    helpers = {'research_overview', 'list_project_targets', 'search_research', 'get_research_items', 'get_reference'}
-    if pending['id'] == 'note':
-        helpers |= {'get_reference_content', 'search_project_knowledge'}
-    return bookkeeping | (allowed & (helpers | set(pending['tools'])))
+    # Evidence reads must not disappear behind a recipe step. A user may name
+    # a known source directly, and diagnosis may need several kinds of reads.
+    # Only user-intent writes are gated by the current step; delivery still
+    # requires every declared step and its verified evidence.
+    return reads | bookkeeping | (allowed & set(pending['tools']))

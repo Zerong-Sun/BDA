@@ -10,6 +10,23 @@ from ..core.statuses import WorkflowNodeStatus, WorkflowRunStatus
 from .gate_schemas import GatePolicy
 
 
+class RoutePresentation(BaseModel):
+    """Display-only route identity; it cannot change execution or scientific status."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=60)
+    name_en: str = Field(min_length=1, max_length=80)
+    category: Literal["design", "validation", "calibration", "overview", "history", "draft"]
+    method: str = Field(min_length=1, max_length=120)
+    summary: str = Field(min_length=1, max_length=1500)
+    objective: str = Field(min_length=1, max_length=1500)
+    evidence: str = Field(min_length=1, max_length=1500)
+    next_step: str = Field(min_length=1, max_length=1500)
+    record_role: Literal["current_plan", "execution_record", "historical_record", "placeholder"]
+    variant: str = Field(default="", max_length=100)
+    aliases: list[str] = Field(default_factory=list, max_length=30)
+
+
 class WorkflowInputBinding(BaseModel):
     """Where one input port of a node gets its data from."""
 
@@ -53,6 +70,7 @@ class WorkflowEdgeInput(BaseModel):
 
 
 class WorkflowCreate(BaseModel):
+    compute_backend: Literal["docker", "lsf"] | None = None
     name: str = Field(min_length=1, max_length=200)
     nodes: list[WorkflowNodeInput] = Field(default_factory=list, max_length=200)
     edges: list[WorkflowEdgeInput] = Field(default_factory=list, max_length=500)
