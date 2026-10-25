@@ -26,12 +26,17 @@ def select_provider(
                 return None
         return provider
 
+    settings = get_settings()
+    # Customer projects must select a model explicitly, even when only one shared
+    # provider exists or an administrator has configured a personal default.
+    if getattr(settings, "deployment_kind", "private") == "public":
+        return None
     providers = [
         provider
         for provider in session.scalars(select(LLMProvider).where(LLMProvider.enabled.is_(True)))
         if not (provider.name.startswith("Project ") and provider.name.endswith(" BYOK"))
     ]
-    reference = get_settings().llm_default_provider_ref
+    reference = settings.llm_default_provider_ref
     if reference:
         providers = [provider for provider in providers if provider.credential_ref == reference]
     else:

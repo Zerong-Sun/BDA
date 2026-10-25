@@ -17,6 +17,7 @@ from .core.problem import (
     unhandled_error_handler,
     validation_error_handler,
 )
+from .core.security import SecurityHeadersMiddleware
 from .core.telemetry import configure_telemetry
 from .core.trace import TraceMiddleware
 from .module_registry import routers
@@ -65,6 +66,8 @@ async def production_write_gate(request, call_next):
             )
     return await call_next(request)
 
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_exception_handler(DomainError, domain_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, http_error_handler)  # type: ignore[arg-type]

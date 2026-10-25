@@ -21,6 +21,7 @@ from .ssh_transport import KeySSHTransport, PasswordSSHTransport, SSHTransport, 
 # Collected outputs are buffered in memory up to this size and spill to disk beyond it,
 # so a large structure set cannot exhaust the worker.
 SPOOL_TO_DISK_BYTES = 32 * 1024 * 1024
+MAX_OUTPUT_MANIFEST_BYTES = 8 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,9 @@ class DockerAdapter:
             remove=False,
             labels={"bda.job_id": str(job.id), "bda.attempt": str(job.attempt_number)},
             environment={**_manifest_environment(job), **_parameter_environment(job)},
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
+            pids_limit=512,
         )
         return str(container.id)
 
@@ -213,6 +217,9 @@ class LSFAdapter:
         settings = _TargetSettings(get_settings(), target or {})
         self.host = settings.lsf_ssh_host
         self.root = settings.lsf_remote_root.rstrip("/")
+        root_path = PurePosixPath(self.root)
+        if not root_path.is_absolute() or ".." in root_path.parts or any(ord(char) < 32 for char in self.root):
+            raise ValueError("lsf_remote_root_must_be_absolute")
         self.timeout = settings.lsf_connect_timeout_seconds
         self.command_timeout = settings.lsf_command_timeout_seconds
         self.ssh_key = settings.lsf_ssh_key_path
@@ -395,15 +402,20 @@ class LSFAdapter:
         raw_inputs = manifest.get("inputs")
         inputs: list = raw_inputs if isinstance(raw_inputs, list) else []
         storage = ObjectStorage()
-        self._ssh(f"mkdir -p {shlex.quote(remote_dir)}/inputs {shlex.quote(remote_dir)}/outputs")
+        self._ssh(f"umask 077; mkdir -p {shlex.quote(remote_dir)}/inputs {shlex.quote(remote_dir)}/outputs")
         staged = []
         for item in inputs:
             if not isinstance(item, dict) or not item.get("object_key"):
                 continue
             filename = PurePosixPath(str(item.get("filename") or "input")).name
-            relative = f"inputs/{item.get('port') or 'input'}/{filename}"
+            port = str(item.get("port") or "input")
+            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", port) or port in {".", ".."}:
+                raise ValueError("input_manifest_port_invalid")
+            if filename in {"", ".", ".."} or "\\" in filename or any(ord(char) < 32 for char in filename):
+                raise ValueError("input_manifest_filename_invalid")
+            relative = f"inputs/{port}/{filename}"
             remote_path = f"{remote_dir}/{relative}"
-            self._ssh(f"mkdir -p {shlex.quote(str(PurePosixPath(remote_path).parent))}")
+            self._ssh(f"umask 077; mkdir -p {shlex.quote(str(PurePosixPath(remote_path).parent))}")
             self.transport.put_stream(remote_path, storage.stream(str(item["object_key"])))
             staged.append({**item, "path": remote_path, "relative_path": relative})
         # The job reads local paths, so the staged manifest replaces URLs with them.
@@ -415,10 +427,13 @@ class LSFAdapter:
     def _collect_over_ssh(self, job: RuntimeJob) -> list[dict]:
         """Pull the job's outputs off the cluster and into object storage."""
         remote_dir = self.remote_dir(job)
-        raw = self.transport.get_bytes(f"{remote_dir}/output-manifest.json")
+        settings = get_settings()
+        raw = b"".join(self.transport.stream_checked(remote_dir, "output-manifest.json", max_bytes=MAX_OUTPUT_MANIFEST_BYTES))
         manifest = json.loads(raw.decode("utf-8"))
-        if manifest.get("schema_version") != "1" or not isinstance(manifest.get("outputs"), list):
+        if not isinstance(manifest, dict) or manifest.get("schema_version") != "1" or not isinstance(manifest.get("outputs"), list):
             raise ValueError("output_manifest_schema_invalid")
+        if len(manifest["outputs"]) > settings.compute_max_collection_files:
+            raise ValueError("output_manifest_too_many_files")
         storage = ObjectStorage()
         prefix = f"jobs/{job.id}/attempt-{job.attempt_number}/outputs"
         declared = {
@@ -427,24 +442,35 @@ class LSFAdapter:
             if isinstance(port, dict)
         }
         collected: list[dict] = []
+        remaining = settings.compute_max_collection_bytes
         for entry in manifest["outputs"]:
+            if not isinstance(entry, dict):
+                raise ValueError("output_manifest_entry_invalid")
             relative = PurePosixPath(str(entry.get("relative_path") or entry.get("filename") or ""))
             if not relative.parts or relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("output_manifest_path_invalid")
+            expected_size = entry.get("size_bytes")
+            if type(expected_size) is not int or expected_size < 0 or expected_size > remaining:
+                raise ValueError("output_manifest_size_invalid")
             content_type = str(entry.get("content_type") or "application/octet-stream")
             object_key = f"{prefix}/{relative}"
             with tempfile.SpooledTemporaryFile(max_size=SPOOL_TO_DISK_BYTES) as buffer:
                 digest = hashlib.sha256()
                 size = 0
-                for chunk in self.transport.stream(f"{remote_dir}/outputs/{relative}"):
+                for chunk in self.transport.stream_checked(remote_dir, f"outputs/{relative}", max_bytes=expected_size):
                     digest.update(chunk)
                     size += len(chunk)
+                    if size > expected_size:
+                        raise ValueError("collect_output_size_mismatch")
                     buffer.write(chunk)
+                if size != expected_size:
+                    raise ValueError("collect_output_size_mismatch")
                 checksum = digest.hexdigest()
                 if str(entry.get("checksum_sha256", "")).lower() != checksum:
                     raise ValueError("collect_output_checksum_mismatch")
                 buffer.seek(0)
                 storage.put_stream(object_key, buffer, size, content_type)
+            remaining -= size
             # A file under outputs/<port>/ declares its port by location. Models that
             # write to their own directory layout, or straight into the root, are typed
             # by matching the declared filename globs instead.
@@ -513,10 +539,14 @@ def _manifest_environment(job: RuntimeJob) -> dict[str, str]:
 def _collect_manifest(job: RuntimeJob) -> list[dict]:
     key = str(job.runtime_spec.get("output_manifest_key") or "")
     expected_prefix = f"jobs/{job.id}/attempt-{job.attempt_number}/outputs/"
-    manifest = ObjectStorage().read_json(key)
+    settings = get_settings()
+    manifest = ObjectStorage().read_json(key, max_bytes=MAX_OUTPUT_MANIFEST_BYTES)
     if manifest.get("schema_version") != "1" or not isinstance(manifest.get("outputs"), list):
         raise ValueError("output_manifest_schema_invalid")
+    if len(manifest["outputs"]) > settings.compute_max_collection_files:
+        raise ValueError("output_manifest_too_many_files")
     outputs: list[dict] = []
+    remaining = settings.compute_max_collection_bytes
     declared = {
         str(port.get("name")): port
         for port in (job.runtime_spec.get("plugin_snapshot") or {}).get("output_ports", [])
@@ -533,8 +563,9 @@ def _collect_manifest(job: RuntimeJob) -> list[dict]:
         if len(checksum) != 64 or any(ch not in "0123456789abcdef" for ch in checksum):
             raise ValueError("output_manifest_checksum_invalid")
         size = raw.get("size_bytes")
-        if not isinstance(size, int) or size < 0:
+        if type(size) is not int or size < 0 or size > remaining:
             raise ValueError("output_manifest_size_invalid")
+        remaining -= size
         filename = str(raw.get("filename") or path.name)
         filename_path = PurePosixPath(filename)
         if filename_path.is_absolute() or len(filename_path.parts) != 1 or filename in {".", ".."}:

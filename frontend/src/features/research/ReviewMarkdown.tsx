@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 import { useI18n } from '../../lib/i18n'
 import { CitationDetails } from './CitationDetails'
 import { groupCitations } from './citationGroups'
-import { remarkCitationMarkers, type CitationRecord } from './citationMarkers'
+import { remarkCitationMarkers, safeCitationUrl, type CitationRecord } from './citationMarkers'
 
 /**
  * Long-form research prose (project reviews, methods, validation notes) is
@@ -106,6 +106,13 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
           p: ({ children: content }) => <p data-chat-emphasis={emphasis(content)}>{content}</p>,
           h1: ({ children: content }) => <h1 data-chat-emphasis={emphasis(content)}>{content}</h1>,
           h3: ({ children: content }) => <h3 data-chat-emphasis={emphasis(content)}>{content}</h3>,
+          // Retrieved and model-authored Markdown is untrusted. An image URL
+          // can encode research data, so never fetch it automatically.
+          img: ({ src, alt }) => {
+            const href = safeCitationUrl(src)
+            const label = alt || (language === 'zh' ? '查看图片' : 'Open image')
+            return href ? <a href={href} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>
+          },
           a: ({ href, children: content, node }) => {
             const match = node?.properties['data-bda-citation'] === true ? href?.match(/^#bda-citation-(\d+)$/) : null
             if (!match || !citations[Number(match[1]) - 1]) return <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">{content}</a>

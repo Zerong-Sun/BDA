@@ -25,6 +25,7 @@ def offline_guard(monkeypatch):
 
 @pytest.fixture
 def configured(monkeypatch):
+    monkeypatch.setattr(provider, "validate_llm_endpoint", lambda _: None)
     monkeypatch.setattr(provider, "credential_value", lambda _: "offline-only-token")
     monkeypatch.setattr(provider, "LLM_COMPLETION_DEADLINE_SECONDS", 0.06)
     return SimpleNamespace(endpoint="https://provider.invalid/v1", model="unchanged-model",
@@ -50,8 +51,8 @@ def _transport(monkeypatch, handler):
     original_client = httpx.AsyncClient
     clients = []
 
-    def client():
-        instance = original_client(transport=httpx.MockTransport(handler))
+    def client(**kwargs):
+        instance = original_client(transport=httpx.MockTransport(handler), **kwargs)
         clients.append(instance)
         return instance
 

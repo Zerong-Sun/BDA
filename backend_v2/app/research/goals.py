@@ -237,6 +237,30 @@ def attach(
             f"resource_type must be one of {', '.join(GOAL_LINK_TYPES)}",
             status_code=422,
         )
+    # UUIDs are references, not authorization. A caller may read both projects
+    # and still must never splice another project's evidence into this goal.
+    from ..candidates.models import Candidate
+    from ..compute.models import Job
+    from ..experiments.models import ExperimentResult
+    from ..timeline.models import ProjectTimelineEntry
+    from ..wetlab.models import Protein
+    from .models import ResearchFinding
+
+    resource_models = {
+        "candidate": Candidate,
+        "job": Job,
+        "experiment_result": ExperimentResult,
+        "timeline_entry": ProjectTimelineEntry,
+        "protein": Protein,
+        "finding": ResearchFinding,
+    }
+    resource = session.get(resource_models[resource_type], resource_id)
+    if resource is None or getattr(resource, "project_id", None) != goal.project_id:
+        raise DomainError(
+            "research_goal_resource_not_found",
+            "Linked evidence was not found in this project",
+            status_code=404,
+        )
     existing = session.scalar(
         select(ResearchGoalLink).where(
             ResearchGoalLink.goal_id == goal.id,

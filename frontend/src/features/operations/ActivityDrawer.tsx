@@ -83,7 +83,7 @@ export function ActivityDrawer() {
         status: status || undefined,
         limit: 50,
       }),
-    enabled: activityOpen,
+    enabled: activityOpen && (scope !== 'project' || Boolean(projectId)),
     // Anything unsettled will change on its own; anything settled will not. Polling
     // stops as soon as the page holds nothing in flight.
     refetchInterval: (result) =>

@@ -26,7 +26,7 @@ def campaign_advance(job_id: str) -> dict:
     forever, and a round of several jobs was marked failed only if some other job
     in it happened to succeed afterwards.
     """
-    from ..campaigns.models import CampaignEvaluation, CampaignRound
+    from ..campaigns.models import Campaign, CampaignEvaluation, CampaignRound
     from ..candidates.models import Candidate
 
     parsed = uuid.UUID(job_id)
@@ -35,7 +35,8 @@ def campaign_advance(job_id: str) -> dict:
         if job is None or job.status not in TERMINAL_STATES:
             return {"job_id": job_id, "status": "ignored"}
         round_ = session.scalar(
-            select(CampaignRound).where(
+            select(CampaignRound).join(Campaign, Campaign.id == CampaignRound.campaign_id).where(
+                Campaign.project_id == job.project_id,
                 (CampaignRound.submission_id == job.submission_id)
                 | ((CampaignRound.submission_id.is_(None)) & (CampaignRound.workflow_run_id == job.workflow_run_id))
             )
@@ -52,7 +53,10 @@ def campaign_advance(job_id: str) -> dict:
             round_.status = "failed"
             return {"job_id": job_id, "status": "failed"}
         candidates = list(
-            session.scalars(select(Candidate).where(Candidate.source_job_id.in_([item.id for item in jobs])))
+            session.scalars(select(Candidate).where(
+                Candidate.project_id == job.project_id,
+                Candidate.source_job_id.in_([item.id for item in jobs]),
+            ))
         )
         existing_candidate_ids = set(
             session.scalars(select(CampaignEvaluation.candidate_id).where(CampaignEvaluation.round_id == round_.id))
@@ -75,7 +79,7 @@ def campaign_advance(job_id: str) -> dict:
 
 @celery_app.task(name="bda_v2.campaign_evaluate")
 def campaign_evaluate(round_id: str) -> dict:
-    from ..campaigns.models import CampaignEvaluation, CampaignRound
+    from ..campaigns.models import Campaign, CampaignEvaluation, CampaignRound
     from ..candidates.models import Candidate
 
     parsed = uuid.UUID(round_id)
@@ -83,13 +87,21 @@ def campaign_evaluate(round_id: str) -> dict:
         round_ = session.get(CampaignRound, parsed)
         if round_ is None:
             return {"round_id": round_id, "status": "missing"}
+        campaign = session.get(Campaign, round_.campaign_id)
+        if campaign is None:
+            return {"round_id": round_id, "status": "missing"}
         jobs = []
         if round_.submission_id:
             jobs = ComputeRepository(session).jobs_for_submission(round_.submission_id)
         elif round_.workflow_run_id:
             jobs = ComputeRepository(session).jobs_for_workflow(round_.workflow_run_id)
+        if any(job.project_id != campaign.project_id for job in jobs):
+            raise ValueError("campaign_job_project_mismatch")
         candidates = (
-            list(session.scalars(select(Candidate).where(Candidate.source_job_id.in_([job.id for job in jobs]))))
+            list(session.scalars(select(Candidate).where(
+                Candidate.project_id == campaign.project_id,
+                Candidate.source_job_id.in_([job.id for job in jobs]),
+            )))
             if jobs
             else []
         )

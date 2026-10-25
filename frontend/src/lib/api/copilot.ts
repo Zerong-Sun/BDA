@@ -1,4 +1,4 @@
-import { API_BASE, ApiError } from './client'
+import { API_BASE, ApiError, authToken, captureAuthSession } from './client'
 import './generatedTransport'
 import {
   createInterpretationApiV2CopilotInterpretationsPost,
@@ -465,6 +465,8 @@ export async function streamCopilotMessage(
   // Bound the entire wait, including POST acceptance and a silent SSE body.
   // Timing out stops this browser's wait; it does not cancel accepted work.
   const controller = new AbortController()
+  const session = captureAuthSession()
+  const signal = AbortSignal.any([controller.signal, session.signal])
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   let timedOut = false
@@ -476,7 +478,6 @@ export async function streamCopilotMessage(
     }, 120_000)
   })
   const receive = async () => {
-    const token = sessionStorage.getItem('bda_token')
     onStatus?.('connecting')
     const body: CopilotChatRequest = {
       ...payload,
@@ -495,21 +496,25 @@ export async function streamCopilotMessage(
         selected_entity_ids: body.context?.selected_entity_ids ?? [],
         language: body.context?.language ?? 'en',
       },
-    }, signal: controller.signal, throwOnError: true })
-    controller.signal.throwIfAborted()
+    }, signal, throwOnError: true })
+    session.assertCurrent()
+    signal.throwIfAborted()
     const acceptedMessageId = accepted.message?.id ?? ''
     const result = { conversationId: accepted.conversation_id, messageId: acceptedMessageId }
     onAccepted?.(result)
     onStatus?.('thinking')
     const streamQuery = acceptedMessageId ? `?after_message_id=${encodeURIComponent(acceptedMessageId)}` : ''
+    // Acceptance may refresh the token. Read it again for the stream.
+    const token = authToken()
     const response = await fetch(`${API_BASE}/copilot/conversations/${accepted.conversation_id}/stream${streamQuery}`, {
       method: 'GET',
-      signal: controller.signal,
+      signal,
       headers: {
         'content-type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
+    session.assertCurrent()
     if (!response.ok || !response.body) {
       let detail = `Copilot connection failed (${response.status})`
       try {
@@ -525,12 +530,14 @@ export async function streamCopilotMessage(
     let buffer = ''
     for (;;) {
       const { done, value } = await reader.read()
-      controller.signal.throwIfAborted()
+      session.assertCurrent()
+      signal.throwIfAborted()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       const events = buffer.split(/\r?\n\r?\n/)
       buffer = events.pop() ?? ''
       for (const evt of events) {
+        session.assertCurrent()
         const lines = evt.split(/\r?\n/)
         const dataLines = lines.filter((line) => line.startsWith('data:'))
         const eventLine = lines.find((line) => line.startsWith('event:'))

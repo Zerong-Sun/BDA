@@ -62,6 +62,8 @@ def dependency_health() -> dict[str, str]:
         with SessionFactory() as session:
             repository = PlatformRepository(session)
             repository.ping()
+            if settings.is_production:
+                checks["database_request_role"] = "ok" if repository.request_role_is_restricted() else "unsafe"
             actual_revision = repository.schema_revision()
             checks["schema_revision"] = "ok" if actual_revision == settings.schema_revision else "mismatch"
             heartbeats = repository.recent_worker_heartbeats(datetime.now(UTC) - timedelta(seconds=90))

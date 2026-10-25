@@ -14,6 +14,29 @@ const rejected = () => new Response(JSON.stringify({ detail: 'Rejected' }), {
 })
 
 describe('generated transport session boundaries', () => {
+  it('rejects a successful response from a previous account and aborts its request', async () => {
+    let finish!: (response: Response) => void
+    let started!: () => void
+    const ready = new Promise<void>(resolve => { started = resolve })
+    const fetch = vi.fn<(request: RequestInfo | URL) => Promise<Response>>(() => new Promise<Response>(resolve => { finish = resolve; started() }))
+    vi.stubGlobal('fetch', fetch)
+    const pending = generatedClient.get({ url: '/api/v2/projects' })
+    const rejectedRequest = expect(pending).rejects.toBeDefined()
+    await ready
+    invalidateAuthRequests()
+    expect((fetch.mock.calls[0][0] as Request).signal.aborted).toBe(true)
+    finish(new Response(JSON.stringify({ private: 'old-account' }), { headers: { 'content-type': 'application/json' } }))
+    await rejectedRequest
+  })
+
+  it('does not send a bearer token to an absolute URL outside the configured API', async () => {
+    sessionStorage.setItem('bda_token', 'access-token')
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    await expect(generatedClient.get({ url: 'https://untrusted.example/api/v2/projects' })).rejects.toBeDefined()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('does not sign out a new account when a previous account retry returns 401 late', async () => {
     let finishRetry!: (response: Response) => void
     let retryStarted!: () => void

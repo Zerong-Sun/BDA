@@ -2,6 +2,19 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { initialTourState, useAppStore } from './appStore'
 
 describe('tour state', () => {
+  it('discards project and conversation fields in a legacy persisted snapshot', async () => {
+    useAppStore.getState().resetAuthenticatedState()
+    localStorage.setItem('bda-app-store', JSON.stringify({ state: {
+      language: 'zh', activeProjectId: 'previous-account-project',
+      copilotMessages: [{ role: 'assistant', content: 'private history' }],
+      copilotSessions: { secret: { conversationId: 'private', messages: [], bot: null } },
+      copilotDraft: 'private draft', copilotSelectedEntityIds: ['private-id'],
+      workflowSeed: { projectId: 'secret', goal: 'private', source: 'research_review' },
+    }, version: 0 }))
+    await useAppStore.persist.rehydrate()
+    expect(useAppStore.getState()).toMatchObject({ language: 'zh', activeProjectId: '',
+      copilotMessages: [], copilotSessions: {}, copilotDraft: '', copilotSelectedEntityIds: [], workflowSeed: null })
+  })
   beforeEach(() => {
     localStorage.clear()
     useAppStore.setState({ appMode: 'application', tourState: initialTourState, tourMenuOpen: false })

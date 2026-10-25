@@ -13,6 +13,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..candidates.models import Candidate
 from ..core.problem import DomainError
 from ..experiments.models import ExperimentResult
 from ..experiments.service import review_instrument_result
@@ -106,6 +107,7 @@ def _derive(sequence: str) -> dict[str, float]:
 def create_protein(
     session: Session, project_id: uuid.UUID, user_id: uuid.UUID, payload: ProteinCreate
 ) -> Protein:
+    _verify_candidate(session, project_id, payload.candidate_id)
     repository = ProteinRepository(session)
     sequence = payload.sequence
     digest = sequence_digest(sequence)
@@ -139,6 +141,7 @@ def update_protein(session: Session, protein: Protein, payload: ProteinUpdate) -
     so editing it in place would silently invalidate past results. A corrected
     sequence is a new construct.
     """
+    _verify_candidate(session, protein.project_id, payload.candidate_id)
     if payload.name is not None:
         protein.name = payload.name
     if payload.tags is not None:
@@ -150,6 +153,14 @@ def update_protein(session: Session, protein: Protein, payload: ProteinUpdate) -
     protein.version += 1
     session.flush()
     return protein
+
+
+def _verify_candidate(session: Session, project_id: uuid.UUID, candidate_id: uuid.UUID | None) -> None:
+    if candidate_id is None:
+        return
+    candidate = session.get(Candidate, candidate_id)
+    if candidate is None or candidate.project_id != project_id:
+        raise DomainError("candidate_not_found", "Candidate was not found in this project", status_code=404)
 
 
 def parse_fasta(content: str) -> list[tuple[str, str]]:

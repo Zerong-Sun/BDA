@@ -84,13 +84,8 @@ class ObjectStorage:
     def _clamp(self, seconds: int) -> int:
         return max(60, min(int(seconds), MAX_PRESIGN_SECONDS))
 
-    def read_json(self, object_key: str) -> dict:
-        response = self.client.get_object(self.bucket, object_key)
-        try:
-            data = json.loads(response.read().decode("utf-8"))
-        finally:
-            response.close()
-            response.release_conn()
+    def read_json(self, object_key: str, *, max_bytes: int | None = None) -> dict:
+        data = json.loads(self.read_bytes(object_key, max_bytes=max_bytes).decode("utf-8"))
         if not isinstance(data, dict):
             raise ValueError("manifest_root_must_be_object")
         return data

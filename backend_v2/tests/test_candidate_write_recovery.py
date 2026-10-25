@@ -83,10 +83,26 @@ def test_insert_race_recovers_through_savepoint(session, monkeypatch, changed):
     session.commit()
 
 
-def test_unrelated_integrity_failure_is_not_masked_as_replay(session):
+def test_unrelated_integrity_failure_is_not_masked_as_replay(session, monkeypatch):
     project, user = _project(session)
+    real_flush = session.flush
+
+    def unrelated_insert_failure(*args, **kwargs):
+        if any(isinstance(row, Candidate) for row in session.new):
+            raise IntegrityError("INSERT candidate", {}, RuntimeError("synthetic storage constraint"))
+        return real_flush(*args, **kwargs)
+
+    monkeypatch.setattr(session, "flush", unrelated_insert_failure)
     with pytest.raises(IntegrityError):
+        create_candidate(session, project, proposal(), user)
+    assert session.scalar(select(Candidate.id)) is None
+
+
+def test_missing_source_job_is_rejected_before_insertion(session):
+    project, user = _project(session)
+    with pytest.raises(DomainError) as caught:
         create_candidate(session, project, proposal(source_job_id=uuid.uuid4()), user)
+    assert caught.value.error_code == "job_not_found"
     assert session.scalar(select(Candidate.id)) is None
 
 

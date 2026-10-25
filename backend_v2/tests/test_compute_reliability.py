@@ -27,7 +27,7 @@ class FakeStorage:
         type(self).issued_ttls.append(ttl_seconds)
         return f"https://put/{key}"
 
-    def read_json(self, key: str) -> dict:
+    def read_json(self, key: str, *, max_bytes: int | None = None) -> dict:
         return self.manifest
 
     def exists(self, key: str) -> bool:

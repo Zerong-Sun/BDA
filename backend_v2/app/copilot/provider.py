@@ -10,6 +10,7 @@ import httpx
 
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
+from .endpoint_policy import validate_llm_endpoint
 
 LLM_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
 LLM_MAX_ATTEMPTS = 1
@@ -41,7 +42,7 @@ def structured_retry_provider(provider: LLMProvider) -> LLMProvider | None:
 async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) -> httpx.Response:
     try:
         async with asyncio.timeout(LLM_COMPLETION_DEADLINE_SECONDS):
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False, follow_redirects=False) as client:
                 # A timeout/connection break/5xx can happen after generation
                 # was accepted and charged. Never replay an ambiguous POST.
                 # Even an apparently safe connection failure remains one
@@ -102,6 +103,7 @@ def completion_message(
         )
     if "n" in provider.config and (type(provider.config["n"]) is not int or provider.config["n"] != 1):
         raise DomainError("llm_multiple_completions_not_allowed", "Each model call must request exactly one completion.", status_code=422)
+    validate_llm_endpoint(provider.endpoint)
     token = credential_value(provider.credential_ref)
     endpoint = provider.endpoint.rstrip("/")
     if not endpoint.endswith("/chat/completions"):

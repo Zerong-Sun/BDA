@@ -47,6 +47,16 @@ function mockProjectContext(projectId = 'proj_test') {
 }
 
 describe('CopilotChat', () => {
+  it('discards legacy history with no project provenance before displaying or sending it', async () => {
+    useAppStore.setState({ copilotMessages: [{ role: 'assistant', content: 'another project secret' }] })
+    renderWithProviders(<CopilotChat />)
+    const input = await screen.findByLabelText('Ask the Copilot a question')
+    expect(screen.queryByText('another project secret')).not.toBeInTheDocument()
+    fireEvent.change(input, { target: { value: 'New project question' } })
+    fireEvent.click(screen.getByLabelText('Send message'))
+    await waitFor(() => expect(streamCopilotMessage).toHaveBeenCalledOnce())
+    expect(vi.mocked(streamCopilotMessage).mock.calls[0][0].messages).toEqual([{ role: 'user', content: 'New project question' }])
+  })
   beforeEach(() => {
     sessionStorage.clear()
     mockProjectContext()
@@ -354,7 +364,7 @@ describe('CopilotChat', () => {
     finishStream?.()
   })
 
-  it('sanitizes persisted empty assistant placeholders before calling the API', async () => {
+  it('sanitizes saved project empty assistant placeholders before calling the API', async () => {
     useAppStore.setState({
       copilotSessions: { proj_test: { conversationId: null, bot: null, messages: [
         { role: 'user', content: 'Earlier question' },

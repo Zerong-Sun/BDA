@@ -11,6 +11,9 @@ def mock_post(monkeypatch: Any, post: Any) -> None:
         return post(url, **kwargs)
 
     monkeypatch.setattr(provider.httpx.AsyncClient, "post", send)
+    # This fixture replaces the network boundary. Egress policy has dedicated
+    # adversarial tests and must not require live deployment settings here.
+    monkeypatch.setattr(provider, "validate_llm_endpoint", lambda _: None)
 
 
 def mock_sleep(monkeypatch: Any, callback: Any) -> None:

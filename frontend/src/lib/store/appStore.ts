@@ -365,7 +365,15 @@ export const useAppStore = create<AppState>()(
     {
       name: 'bda-app-store',
       merge: (persistedState, currentState) => {
-        const restored = { ...currentState, ...persistedState as Partial<AppState> }
+        // Older versions persisted project data. Never hydrate those fields,
+        // even though newly written snapshots already contain preferences only.
+        const saved = (persistedState ?? {}) as Partial<AppState>
+        const restored = { ...currentState,
+          ...(saved.language === 'en' || saved.language === 'zh' ? { language: saved.language } : {}),
+          ...(saved.uiDensity === 'guided' || saved.uiDensity === 'advanced' ? { uiDensity: saved.uiDensity } : {}),
+          ...(['light', 'dark', 'system'].includes(saved.themePreference ?? '') ? { themePreference: saved.themePreference! } : {}),
+          ...(saved.tourState && getTourStep(saved.tourState.sectionId, saved.tourState.stepId) ? { tourState: saved.tourState } : {}),
+        }
         // The tour persists its position, while operating mode is session-only.
         // Restore that active tour's read-only context before pages render.
         // Paused/completed tours must not switch a normal workspace into demo.

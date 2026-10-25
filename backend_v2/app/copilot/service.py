@@ -29,6 +29,7 @@ from .capabilities import (
     normalize_capabilities,
     tools_for_capabilities,
 )
+from .endpoint_policy import validate_llm_endpoint
 from .mcp import hash_token as hash_mcp_token
 from .models import (
     CopilotAgentRun,
@@ -149,6 +150,8 @@ def put_config(
     raw_api_key = str(settings_payload.pop("llm_api_key", "")).strip()
     endpoint = str(settings_payload.get("llm_api_base", "")).strip()
     model = str(settings_payload.get("llm_model", "")).strip()
+    if endpoint:
+        validate_llm_endpoint(endpoint, require_approval=False)
     if row is None:
         row = CopilotConfig(project_id=project_id, version=1)
         session.add(row)

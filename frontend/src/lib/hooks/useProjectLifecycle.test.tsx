@@ -77,7 +77,7 @@ function DeleteProjectRoutes() {
 describe('project lifecycle hooks', () => {
   it('drops the old run and structure selection when selecting another project', async () => {
     mockProjectList([makeProject('a'), makeProject('b')])
-    window.location.hash = '/bots?project=a&view=tasks&run=old&structureA=old-a&structureB=old-b&compare=1&artifact=old&residues=old&knowledge=old&goal=old&draft=old&draft_project=a&service=literature&from=references'
+    window.location.hash = '/bots?project=a&view=tasks&run=old&structureA=old-a&structureB=old-b&compare=1&artifact=old&residues=old&knowledge=old&goal=old&draft=old&draft_project=a&service=literature&from=references&entry=old&campaign=old'
     useAppStore.setState({ copilotSelectedEntityIds: ['old-evidence'] })
     function SwitchProject() {
       const { projectId, setProjectId } = useProjectContext()

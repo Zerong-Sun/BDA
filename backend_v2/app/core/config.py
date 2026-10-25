@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     upload_url_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     max_upload_bytes: int = Field(default=100 * 1024 * 1024, ge=1024)
     compute_backend: str = "docker"
+    compute_max_collection_bytes: int = Field(default=10 * 1024**3, ge=1)
+    compute_max_collection_files: int = Field(default=10_000, ge=1, le=100_000)
     # Production always requires proof; development can opt in for acceptance runs.
     compute_require_runtime_proof: bool = False
     registry_task_queue: str = "maintenance"
@@ -92,6 +94,9 @@ class Settings(BaseSettings):
     # file (``file:/run/secrets/lsf-password``); never an inline value.
     lsf_ssh_password_ref: str | None = None
     llm_default_provider_ref: str | None = None
+    # Exact origins approved by the operator; empty disables outbound model calls.
+    # Private inference gateways must be explicitly approved here as well.
+    llm_allowed_endpoint_origins: str = ""
     # Absolute, and outside the source tree. The previous relative default pointed into
     # `backend/`, a directory removed with v1, so BYOK either wrote into whatever the
     # working directory happened to be or failed outright on a read-only root filesystem.
@@ -221,6 +226,8 @@ class Settings(BaseSettings):
                 (self.docker_tls_ca, self.docker_tls_cert, self.docker_tls_key)
             ):
                 raise ValueError("production Docker requires CA, client certificate and client key")
+            if self.compute_backend == "docker" and not self.docker_tls_verify:
+                raise ValueError("production Docker requires TLS certificate verification")
             if self.compute_backend == "lsf" and not (self.lsf_ssh_key_path or self.lsf_ssh_password_ref):
                 raise ValueError("production LSF requires an SSH key path or a password reference")
             if self.compute_backend == "lsf" and not (self.lsf_ssh_host.strip() and self.lsf_remote_root.strip()):
@@ -235,7 +242,7 @@ class Settings(BaseSettings):
                 raise ValueError("production requires an explicit public MinIO presign endpoint")
             if not self.oidc_providers:
                 raise ValueError("production requires at least one OIDC provider")
-            if not self.llm_default_provider_ref:
+            if self.deployment_kind != "public" and not self.llm_default_provider_ref:
                 raise ValueError("production requires an LLM provider credential reference")
             if not self.external_research_sources:
                 raise ValueError("production requires configured external research sources")

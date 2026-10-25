@@ -7,7 +7,7 @@ import { Color } from 'molstar/lib/mol-util/color'
 import { ProteinBackboneAtoms } from 'molstar/lib/mol-model/structure/model/types'
 import { SetUtils } from 'molstar/lib/mol-util/set'
 import { OrderedSet } from 'molstar/lib/mol-data/int'
-import { apiAuthorizationHeaders } from '../../lib/api/client'
+import { apiAuthorizationHeaders, captureAuthSession } from '../../lib/api/client'
 import {
   type ColorPreset,
   type RepresentationPreset,
@@ -205,8 +205,10 @@ export async function loadStructureFromAuthenticatedUrl(
   },
   url: string,
 ): Promise<void> {
+  const session = captureAuthSession()
   const response = await fetch(url, {
     headers: apiAuthorizationHeaders(url),
+    signal: session.signal,
   })
   if (!response.ok) {
     throw new Error(`Structure download failed (${response.status})`)
@@ -214,6 +216,7 @@ export async function loadStructureFromAuthenticatedUrl(
   const disposition = response.headers.get('content-disposition') ?? ''
   const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? url
   const text = await response.text()
+  session.assertCurrent()
   if (!text.trim()) {
     throw new Error('Structure file is empty')
   }

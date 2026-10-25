@@ -8,14 +8,22 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
+from backend_v2.app.candidates.models import Candidate
+from backend_v2.app.compute.models import Job, JobSubmission
 from backend_v2.app.core.models import Base
 from backend_v2.app.core.problem import DomainError
+from backend_v2.app.experiments.models import ExperimentResult
 from backend_v2.app.identity.models import Organization, User
 from backend_v2.app.projects.models import Project
 from backend_v2.app.research import goals
+from backend_v2.app.research.models import ResearchFinding
+from backend_v2.app.timeline.models import ProjectTimelineEntry
+from backend_v2.app.wetlab.models import Protein
+from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun
 from backend_v2.tests._sqlite import drop_all
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
@@ -54,6 +62,33 @@ def _project(session: Session, name: str = "trace") -> tuple[uuid.UUID, uuid.UUI
     session.add(project)
     session.flush()
     return project.id, user.id
+
+
+def _evidence(session: Session, project_id: uuid.UUID, user_id: uuid.UUID, kind: str):
+    if kind == "candidate":
+        row = Candidate(project_id=project_id, candidate_key=str(uuid.uuid4()), name="Evidence")
+    elif kind == "experiment_result":
+        row = ExperimentResult(project_id=project_id, created_by=user_id, experiment_type="binding")
+    elif kind == "timeline_entry":
+        row = ProjectTimelineEntry(project_id=project_id, created_by=user_id, title="Decision", occurred_at=datetime.now(UTC))
+    elif kind == "finding":
+        row = ResearchFinding(project_id=project_id, created_by=user_id, finding_type="finding", title="Finding", content="Evidence")
+    elif kind == "protein":
+        row = Protein(project_id=project_id, created_by=user_id, name="Protein", sequence="AAA", sequence_sha256="a" * 64)
+    elif kind == "job":
+        workflow = WorkflowRun(project_id=project_id, created_by=user_id, name="Workflow")
+        session.add(workflow)
+        session.flush()
+        node = WorkflowNode(workflow_run_id=workflow.id, node_key="fold", node_type="model", model_plugin="demo")
+        submission = JobSubmission(project_id=project_id, created_by=user_id, workflow_run_id=workflow.id, compute_backend="demo")
+        session.add_all([node, submission])
+        session.flush()
+        row = Job(project_id=project_id, workflow_run_id=workflow.id, workflow_node_id=node.id, submission_id=submission.id, compute_backend="demo", model_plugin="demo")
+    else:
+        raise AssertionError(kind)
+    session.add(row)
+    session.flush()
+    return row
 
 
 def test_goals_nest_and_number_within_their_parent(session: Session) -> None:
@@ -134,7 +169,7 @@ def test_one_result_can_serve_several_goals(session: Session) -> None:
     project_id, user_id = _project(session)
     first = goals.create_goal(session, project_id, user_id, title="affinity")
     second = goals.create_goal(session, project_id, user_id, title="specificity")
-    result_id = uuid.uuid4()
+    result_id = _evidence(session, project_id, user_id, "experiment_result").id
 
     goals.attach(session, first, user_id, resource_type="experiment_result", resource_id=result_id)
     goals.attach(session, second, user_id, resource_type="experiment_result", resource_id=result_id)
@@ -147,7 +182,7 @@ def test_one_result_can_serve_several_goals(session: Session) -> None:
 def test_attaching_the_same_thing_twice_is_idempotent(session: Session) -> None:
     project_id, user_id = _project(session)
     goal = goals.create_goal(session, project_id, user_id, title="g")
-    resource_id = uuid.uuid4()
+    resource_id = _evidence(session, project_id, user_id, "candidate").id
     first = goals.attach(session, goal, user_id, resource_type="candidate", resource_id=resource_id)
     second = goals.attach(session, goal, user_id, resource_type="candidate", resource_id=resource_id)
     assert first.id == second.id
@@ -166,7 +201,7 @@ def test_a_decision_hangs_off_the_goals_it_constrains(session: Session) -> None:
     project_id, user_id = _project(session)
     expressible = goals.create_goal(session, project_id, user_id, title="expressible candidate")
     safety = goals.create_goal(session, project_id, user_id, title="safety")
-    decision_id = uuid.uuid4()
+    decision_id = _evidence(session, project_id, user_id, "timeline_entry").id
 
     goals.attach(session, expressible, user_id, resource_type="timeline_entry", resource_id=decision_id)
     goals.attach(session, safety, user_id, resource_type="timeline_entry", resource_id=decision_id)
@@ -188,14 +223,31 @@ def test_deleting_a_goal_takes_its_subtree_and_links_but_not_the_evidence(sessio
     project_id, user_id = _project(session)
     root = goals.create_goal(session, project_id, user_id, title="root")
     child = goals.create_goal(session, project_id, user_id, title="child", parent_id=root.id)
-    goals.attach(session, child, user_id, resource_type="job", resource_id=uuid.uuid4())
+    job = _evidence(session, project_id, user_id, "job")
+    goals.attach(session, child, user_id, resource_type="job", resource_id=job.id)
 
     goals.delete_goal(session, root)
     session.expire_all()
 
     assert goals.tree(session, project_id) == []
+    assert session.get(Job, job.id) is not None
     # The link went with its goal; nothing here owns the job it referenced, which
     # is exactly why links carry no foreign key to it.
+
+
+@pytest.mark.parametrize("kind", goals.GOAL_LINK_TYPES)
+def test_goal_links_require_existing_evidence_in_the_same_project(session: Session, kind: str) -> None:
+    project_id, user_id = _project(session, "ours")
+    foreign_project_id, foreign_user_id = _project(session, "theirs")
+    goal = goals.create_goal(session, project_id, user_id, title="Our question")
+    foreign = _evidence(session, foreign_project_id, foreign_user_id, kind)
+    for resource_id in (foreign.id, uuid.uuid4()):
+        with pytest.raises(DomainError) as raised:
+            goals.attach(session, goal, user_id, resource_type=kind, resource_id=resource_id)
+        assert raised.value.error_code == "research_goal_resource_not_found"
+        assert goals.links_for(session, [goal.id])[goal.id] == []
+    local = _evidence(session, project_id, user_id, kind)
+    assert goals.attach(session, goal, user_id, resource_type=kind, resource_id=local.id).resource_id == local.id
 
 
 def test_tree_returns_roots_before_their_children(session: Session) -> None:

@@ -20,7 +20,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-candidate:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   supply-chain:
+    needs: verify-candidate
     runs-on: ubuntu-latest
     outputs:
       backend-digest: ${{ steps.backend.outputs.digest }}

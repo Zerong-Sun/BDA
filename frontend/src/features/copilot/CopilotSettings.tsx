@@ -154,7 +154,7 @@ function ProjectCopilotSettings({ projectId, hideActions = false, onActionsReady
           <div className="grid gap-3">
             <p className="text-sm" role="status">{config?.api_key_configured
               ? (language === 'zh' ? `当前模型：${config.llm_model} · ${config.inherited_provider ? '继承平台配置' : '项目专属配置'}` : `Model: ${config.llm_model} · ${config.inherited_provider ? 'Platform default' : 'Project configuration'}`)
-              : (language === 'zh' ? '尚无可用模型。请管理员设置唯一的平台默认模型，或在高级设置中配置项目模型。' : 'No model is ready. Ask an administrator to configure one platform default, or configure a project model in advanced settings.')}</p>
+              : (language === 'zh' ? '尚未配置模型。请为当前项目选择模型提供商并配置凭据，或联系管理员。' : 'No model is configured. Choose a provider and credentials for this project, or contact your administrator.')}</p>
             <Button type="button" variant="outline" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced}>
               {language === 'zh' ? '高级模型设置' : 'Advanced model settings'}
             </Button>

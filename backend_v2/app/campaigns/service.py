@@ -5,9 +5,11 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
+from ..candidates.models import Candidate
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
+from ..workflows.models import WorkflowRun
 from .models import Campaign, CampaignDecision, CampaignEvaluation, CampaignRound
 from .repository import CampaignRepository
 from .schemas import (
@@ -47,6 +49,10 @@ def update_campaign(campaign: Campaign, payload: CampaignUpdate, expected: int) 
 
 
 def create_round(session: Session, campaign: Campaign, payload: RoundCreate) -> CampaignRound:
+    if payload.workflow_run_id is not None:
+        workflow = session.get(WorkflowRun, payload.workflow_run_id)
+        if workflow is None or workflow.project_id != campaign.project_id:
+            raise DomainError("workflow_not_found", "Workflow was not found in this project", status_code=404)
     row = CampaignRound(
         campaign_id=campaign.id,
         round_number=CampaignRepository(session).next_round(campaign.id),
@@ -58,6 +64,13 @@ def create_round(session: Session, campaign: Campaign, payload: RoundCreate) -> 
 
 
 def create_evaluation(session: Session, round_: CampaignRound, payload: EvaluationCreate) -> CampaignEvaluation:
+    campaign = session.get(Campaign, round_.campaign_id)
+    if campaign is None:
+        raise DomainError("campaign_not_found", "Campaign was not found", status_code=404)
+    if payload.candidate_id is not None:
+        candidate = session.get(Candidate, payload.candidate_id)
+        if candidate is None or candidate.project_id != campaign.project_id:
+            raise DomainError("candidate_not_found", "Candidate was not found in this project", status_code=404)
     row = CampaignEvaluation(round_id=round_.id, **payload.model_dump())
     session.add(row)
     session.flush()

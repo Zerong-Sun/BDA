@@ -8,7 +8,7 @@ RUN npm ci
 COPY frontend .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.30.6-alpine
 # Pick up patched Alpine packages (openssl, expat, libpng, libxml2, musl, etc.)
 # ahead of the next nginx:1.27-alpine image refresh, to keep the Trivy CVE gate green.
 USER root

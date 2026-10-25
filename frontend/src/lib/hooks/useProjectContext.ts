@@ -6,7 +6,7 @@ import { useAppStore } from '../store/appStore'
 import { currentAuthGeneration } from '../api/client'
 
 // Keep view preferences, but never carry another project's evidence or draft.
-const PROJECT_SELECTION_PARAMS = ['run', 'node', 'candidate', 'dataset', 'structureA', 'structureB', 'compare', 'artifact', 'residues', 'knowledge', 'goal', 'draft', 'draft_project', 'service', 'from']
+const PROJECT_SELECTION_PARAMS = ['run', 'node', 'candidate', 'dataset', 'structureA', 'structureB', 'compare', 'artifact', 'residues', 'knowledge', 'goal', 'draft', 'draft_project', 'service', 'from', 'entry', 'campaign']
 
 export function useProjectContext() {
   const sessionGeneration = useRef(currentAuthGeneration())
@@ -55,6 +55,7 @@ export function useProjectContext() {
   const staleActiveProject = Boolean(projectsReady && activeProjectId && !projectIds.has(activeProjectId))
 
   const projectId = useMemo(() => {
+    // An explicit unavailable project must never silently open another one.
     if (urlProjectId) return projectIds.has(urlProjectId) ? urlProjectId : ''
     if (activeProjectId && projectIds.has(activeProjectId)) return activeProjectId
     return ''

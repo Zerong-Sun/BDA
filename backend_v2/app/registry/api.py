@@ -17,6 +17,7 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_roles
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
+from ..projects.service import require_project, visible_project_ids
 from .extensions import (
     ExtensionAssessment,
     ExtensionAssessmentCreate,
@@ -463,8 +464,12 @@ def list_llm_providers(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> LLMProviderPage:
-    rows, next_cursor = _rows(session, LLMProvider, cursor, limit)
-    return LLMProviderPage(items=[LLMProviderResponse.model_validate(row) for row in rows], next_cursor=next_cursor)
+    rows = RegistryRepository(session).llm_providers(visible_project_ids(session, user), decode_cursor(cursor), limit)
+    page = rows[:limit]
+    return LLMProviderPage(
+        items=[LLMProviderResponse.model_validate(row) for row in page],
+        next_cursor=encode_cursor(page[-1].id) if len(rows) > limit and page else None,
+    )
 
 
 @router.post(
@@ -488,6 +493,12 @@ def get_llm_provider(
     user: User = Depends(current_user),
 ) -> LLMProviderResponse:
     row = _resource(session, LLMProvider, provider_id, "llm_provider_not_found")
+    if user.role != "admin" and row.name.startswith("Project ") and row.name.endswith(" BYOK"):
+        try:
+            project_id = uuid.UUID(row.name[len("Project "):-len(" BYOK")])
+        except ValueError as exc:
+            raise DomainError("llm_provider_not_found", "LLM provider was not found", status_code=404) from exc
+        require_project(session, project_id, user)
     response.headers["ETag"] = etag(row.version)
     return LLMProviderResponse.model_validate(row)
 

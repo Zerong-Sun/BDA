@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
 from ..audit.service import record_audit
+from ..compute.models import Job
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
@@ -43,6 +44,10 @@ def create_candidate(session: Session, project: Project, payload: CandidateCreat
     if existing is not None:
         return replay(existing)
     _verify_artifacts(session, project, [payload.structure_artifact_id, payload.complex_artifact_id])
+    if payload.source_job_id is not None:
+        job = session.get(Job, payload.source_job_id)
+        if job is None or job.project_id != project.id:
+            raise DomainError("job_not_found", "Candidate source job must belong to the same project", status_code=404)
     candidate = Candidate(project_id=project.id, **values)
     try:
         with session.begin_nested():

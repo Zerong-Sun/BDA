@@ -11,3 +11,5 @@ and the current `main` branch.
 
 This alpha is not production-ready. Writes remain disabled by default. Do not
 place secrets or private datasets in this public repository or its issue tracker.
+
+Security-sensitive changes must follow [the engineering and release contract](docs/SECURITY_ENGINEERING.md). The latest [security upgrade review](docs/SECURITY_UPGRADE_2026-10-25.md) records fixes, verification and deployment requirements.

@@ -1,5 +1,7 @@
 # BDA Workbench
 
+**Security upgrade candidate:** [Project isolation, API and cluster hardening](docs/SECURITY_UPGRADE_2026-10-25.md). Upgrade requires explicit LLM origin approval and the deployment checks in the release notes.
+
 **2.6 release candidate:** [Install and upgrade Iteravia RC3](docs/RELEASE_2_6_RC3.md). RC3 opens the full Public workspace without an account, separates Private registration and team access, strengthens literature evidence and Bot reading contracts, and completes reviewed structure-to-experiment workflows. [Project learning](docs/LEARNING_V26.md) includes versioned assay/goal contracts, validated CSV ingestion, model validation and rollback, constrained batch decisions, experimental handoffs and result feedback, sourced learning records, and portable delivery packages. Synthetic software acceptance does not establish prospective experimental benefit; real two-round validation and operational release gates remain open.
 
 > **BDA Workbench** is an open, traceable workspace for computational protein-design research. The public alpha combines project evidence, workflow specifications, asynchronous operations, artifacts, experiments, and reviewable AI assistance in one versioned system. Its bundled `pd1-demo-v1` dataset is synthetic demonstration material; the current release is a reproducible staging baseline rather than a production deployment or a source of scientific conclusions.

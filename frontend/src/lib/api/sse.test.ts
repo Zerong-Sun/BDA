@@ -1,9 +1,25 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { streamServerEvents } from './sse'
+import { invalidateAuthRequests } from './client'
 
-vi.mock('./client', () => ({ API_BASE: '/api/v2', authToken: () => null }))
+afterEach(() => {
+  invalidateAuthRequests()
+  vi.unstubAllGlobals()
+})
 
-afterEach(() => vi.unstubAllGlobals())
+it('stops delivering frames immediately when the signed-in account changes', async () => {
+  const cancel = vi.fn()
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: first\n\ndata: private-old-account\n\n'))
+    }, cancel,
+  })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+  const onEvent = vi.fn(() => invalidateAuthRequests())
+  await expect(streamServerEvents('/events', { onEvent })).rejects.toThrow('Session ended')
+  expect(onEvent).toHaveBeenCalledOnce()
+  expect(cancel).toHaveBeenCalledOnce()
+})
 
 it('cancels the response body when a consumer stops on an event', async () => {
   const cancel = vi.fn()

@@ -1,6 +1,7 @@
 import type { PluginContext } from 'molstar/lib/mol-plugin/context'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyVisualPreset, enumerateChainsFromPlugin, loadStructureFromAuthenticatedUrl, structureFormatFromName } from './structureLoader'
+import { invalidateAuthRequests } from '../../lib/api/client'
 
 describe('switching the displayed structure preset', () => {
   it('replaces the previous scene instead of retaining its cartoon and colors', async () => {
@@ -39,6 +40,18 @@ describe('structureFormatFromName', () => {
 
 describe('loadStructureFromAuthenticatedUrl', () => {
   afterEach(() => vi.unstubAllGlobals())
+
+  it('discards a structure response which finishes after sign out', async () => {
+    let finish!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve })))
+    const viewer = { loadStructureFromData: vi.fn() }
+    const pending = loadStructureFromAuthenticatedUrl(viewer, '/api/v2/artifacts/old/content')
+    const rejected = expect(pending).rejects.toThrow('Session ended')
+    invalidateAuthRequests()
+    finish(new Response('HEADER old structure'))
+    await rejected
+    expect(viewer.loadStructureFromData).not.toHaveBeenCalled()
+  })
 
   it.each([
     ['chemical/x-mmcif', 'data_reference\n#\nloop_\n_atom_site.id\n1\n'],

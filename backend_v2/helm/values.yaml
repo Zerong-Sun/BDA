@@ -53,11 +53,15 @@ config:
   minioPublicEndpoint: artifacts.bda.example.invalid
   minioRegion: us-east-1
   computeBackend: lsf
+  computeMaxCollectionBytes: "10737418240"
+  computeMaxCollectionFiles: "10000"
   exposeDocs: "false"
   writesEnabled: "false"
   # Where the API writes BYOK provider keys and the LLM workers read them. Must be inside
   # the mounted claim below, because every pod's root filesystem is read-only.
   llmSecretDir: /var/lib/bda/secrets
+  # Comma-separated, operator-reviewed HTTPS origins; empty disables outbound LLM.
+  llmAllowedEndpointOrigins: ""
   # Site-specific; the chart refuses to render with computeBackend "lsf" until these and a
   # credential are supplied, rather than deploying something that cannot dispatch.
   lsf:

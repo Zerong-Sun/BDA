@@ -57,10 +57,23 @@ interface RefreshResponse { access_token: string; user?: { id: string; [key: str
 let refreshPromise: Promise<string> | null = null
 let refreshController: AbortController | null = null
 let authGeneration = 0
+let authController = new AbortController()
 
 export function currentAuthGeneration(): number { return authGeneration }
+/** Bind every stage of an operation to the account which started it. */
+export function captureAuthSession() {
+  const generation = authGeneration
+  return {
+    signal: authController.signal,
+    assertCurrent: () => {
+      if (generation !== authGeneration) throw new ApiError('Session ended', 401)
+    },
+  }
+}
 export function invalidateAuthRequests(): void {
   authGeneration += 1
+  authController.abort()
+  authController = new AbortController()
   refreshController?.abort()
   refreshController = null
   refreshPromise = null

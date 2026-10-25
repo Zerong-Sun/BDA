@@ -88,12 +88,16 @@ def update_target(
 
 
 def select_primary_target(project: Project, target: Target) -> Target:
+    if target.project_id != project.id:
+        raise DomainError("target_not_found", "Target does not belong to this project", status_code=404)
     project.primary_target_id = target.id
     project.version += 1
     return target
 
 
 def attach_structure(target: Target, artifact: Artifact, expected_version: int) -> Target:
+    if artifact.project_id != target.project_id or artifact.status != "available" or artifact.deleted_at is not None:
+        raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     if target.version != expected_version:
         raise DomainError("version_conflict", "Target was modified by another request", status_code=412)
     target.structure_artifact_id = artifact.id
@@ -116,6 +120,10 @@ def prepare_structure_revision(
     payload: TargetStructurePrepare,
     user: User,
 ) -> TargetStructureRevision:
+    if target.project_id != project.id:
+        raise DomainError("target_not_found", "Target does not belong to this project", status_code=404)
+    if artifact.project_id != project.id or artifact.status != "available" or artifact.deleted_at is not None:
+        raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     revision = TargetStructureRevision(
         target_id=target.id,
         source_artifact_id=artifact.id,
@@ -142,6 +150,8 @@ def prepare_structure_revision(
 def review_structure_revision(
     revision: TargetStructureRevision, target: Target, payload: TargetStructureReview, expected_version: int
 ) -> TargetStructureRevision:
+    if revision.target_id != target.id:
+        raise DomainError("structure_revision_not_found", "Structure revision was not found for this target", status_code=404)
     if revision.version != expected_version:
         raise DomainError("version_conflict", "Structure revision was modified by another request", status_code=412)
     if payload.approve and revision.status != "available":

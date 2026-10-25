@@ -5,6 +5,7 @@ on:
     branches: [main]
   # Stacked and release-branch PRs need the same gates as PRs aimed directly at main.
   pull_request:
+  workflow_call:
 
 # Least-privilege default token; jobs opt into more only if needed.
 permissions:

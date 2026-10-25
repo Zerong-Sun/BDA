@@ -26,10 +26,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .checked_reader import CHECKED_READ_CHUNK_BYTES, checked_reader_command
+
 _SENTINEL = re.compile(
     r"__BDA_BEGIN_(?P<token>[0-9a-f]{16})__\r?\n(?P<body>.*?)__BDA_END_(?P=token)_(?P<code>\d+)__",
     re.DOTALL,
 )
+
+
+def validate_ssh_destination(host: str, username: str | None = None) -> None:
+    # Destinations beginning '-' are parsed as OpenSSH options, including
+    # ProxyCommand. This boundary also protects per-node registry overrides.
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.:@\[\]-]*", host):
+        raise ValueError("ssh_destination_invalid")
+    if username is not None and not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", username):
+        raise ValueError("ssh_username_invalid")
 
 
 @dataclass(frozen=True)
@@ -56,11 +67,14 @@ class SSHTransport(Protocol):
 
     def stream(self, remote_path: str, *, chunk_size: int = 1024 * 1024) -> Iterator[bytes]: ...
 
+    def stream_checked(self, root: str, relative: str, *, max_bytes: int) -> Iterator[bytes]: ...
+
 
 class KeySSHTransport:
     """Non-interactive key auth over the system ssh client."""
 
     def __init__(self, host: str, *, key_path: str | None, connect_timeout: int, port: int | None = None, username: str | None = None) -> None:
+        validate_ssh_destination(host, username)
         self.host = host
         self.key_path = key_path
         self.connect_timeout = connect_timeout
@@ -68,7 +82,7 @@ class KeySSHTransport:
         self.username = username
 
     def _argv(self) -> list[str]:
-        argv = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={self.connect_timeout}"]
+        argv = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", f"ConnectTimeout={self.connect_timeout}"]
         if self.key_path:
             argv.extend(["-i", self.key_path])
         if self.port:
@@ -140,6 +154,29 @@ class KeySSHTransport:
             if process.wait(timeout=3600) != 0:
                 raise RuntimeError("ssh_stream_failed")
 
+    def stream_checked(self, root: str, relative: str, *, max_bytes: int) -> Iterator[bytes]:
+        command = checked_reader_command(root, relative, max_bytes)
+        process = subprocess.Popen(
+            [*self._argv(), self.host, command], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+        assert process.stdout is not None
+        total = 0
+        finished = False
+        try:
+            while chunk := process.stdout.read(CHECKED_READ_CHUNK_BYTES):
+                total += len(chunk)
+                if total > max_bytes:
+                    raise ValueError("checked_remote_read_size_exceeded")
+                yield chunk
+            if process.wait(timeout=60) != 0:
+                raise RuntimeError("checked_remote_read_failed")
+            finished = True
+        finally:
+            process.stdout.close()
+            if not finished and process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
+
 
 class PasswordSSHTransport:
     """Password auth via paramiko, for servers that do not offer publickey.
@@ -157,6 +194,7 @@ class PasswordSSHTransport:
         port: int = 22,
         connect_timeout: int = 10,
     ) -> None:
+        validate_ssh_destination(host, username)
         self.host = host
         self.username = username
         self._password = password
@@ -251,6 +289,41 @@ class PasswordSSHTransport:
                     yield chunk
         finally:
             sftp.close()
+
+    def stream_checked(self, root: str, relative: str, *, max_bytes: int) -> Iterator[bytes]:
+        # Do not use SFTP here: it cannot atomically open with NOFOLLOW. Keep the
+        # PTY required by Qiming, with a framed base64 stream rather than binary
+        # bytes that the terminal's CRLF conversion would corrupt.
+        token = uuid.uuid4().hex
+        command = checked_reader_command(root, relative, max_bytes, token=token)
+        stdin, stdout, stderr = self._connect().exec_command(command, timeout=600, get_pty=True)
+        started = False
+        total = 0
+        try:
+            while line := stdout.readline(2 * CHECKED_READ_CHUNK_BYTES + 128):
+                line = line.decode("ascii") if isinstance(line, bytes) else line
+                line = line.rstrip("\r\n")
+                if line == f"F:{token}":
+                    raise RuntimeError("checked_remote_read_failed")
+                if not started:
+                    if line == f"B:{token}":
+                        started = True
+                    continue
+                if line == f"E:{token}":
+                    return
+                if not line.startswith("D:"):
+                    raise RuntimeError("checked_remote_read_protocol_invalid")
+                chunk = base64.b64decode(line[2:], validate=True)
+                total += len(chunk)
+                if len(chunk) > CHECKED_READ_CHUNK_BYTES or total > max_bytes:
+                    raise ValueError("checked_remote_read_size_exceeded")
+                yield chunk
+            raise RuntimeError("checked_remote_read_incomplete")
+        finally:
+            stdin.close()
+            stdout.close()
+            stderr.close()
+            stdout.channel.close()
 
     def close(self) -> None:
         if self._client is not None:
