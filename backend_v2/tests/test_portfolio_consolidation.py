@@ -40,3 +40,30 @@ def test_consolidated_reference_retains_aliases_for_unique_notes_and_old_citatio
     # A bad cross-project pointer must not make a paper disappear.
     other.project_id=uuid.uuid4()
     assert len(_references([canonical, other]))==2
+
+
+def test_finding_consolidation_preserves_cycles_and_foreign_project_sources(compute_session):
+    from backend_v2.app.projects.models import Project
+    from backend_v2.app.research.models import ResearchFinding
+    from backend_v2.app.research.workspace import build_research_workspace
+
+    session, user, project, _ = compute_session
+    foreign = Project(organization_id=project.organization_id, owner_id=user.id,
+                      name="Other research", project_type="research")
+    session.add(foreign)
+    session.flush()
+    first = ResearchFinding(project_id=project.id, created_by=user.id,
+                            finding_type="references_reading", title="First", content="Same source")
+    second = ResearchFinding(project_id=project.id, created_by=user.id,
+                             finding_type="references_reading", title="Second", content="Same source")
+    other = ResearchFinding(project_id=foreign.id, created_by=user.id,
+                            finding_type="references_reading", title="Foreign", content="Same source")
+    session.add_all([first, second, other])
+    session.flush()
+    first.evidence = {"presentation_duplicate_of": str(second.id)}
+    assert build_research_workspace(session, project).counts["findings"] == 1
+    second.evidence = {"presentation_duplicate_of": str(first.id)}
+    assert build_research_workspace(session, project).counts["findings"] == 2
+    first.evidence = {"presentation_duplicate_of": str(other.id)}
+    second.evidence = {}
+    assert build_research_workspace(session, project).counts["findings"] == 2
