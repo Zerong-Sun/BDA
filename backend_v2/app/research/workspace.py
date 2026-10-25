@@ -567,6 +567,7 @@ def build_research_workspace(session: Session, project: Project) -> ResearchWork
     findings = [row for row in findings if not (
         (other := findings_by_id.get(str((row.evidence or {}).get("presentation_duplicate_of") or "")))
         and other.id != row.id and other.project_id == row.project_id
+        and not (other.evidence or {}).get("presentation_duplicate_of")
         and other.finding_type == row.finding_type and other.content.strip() == row.content.strip()
     )]
     documents = list(
