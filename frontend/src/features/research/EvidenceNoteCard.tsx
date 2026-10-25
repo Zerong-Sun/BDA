@@ -32,7 +32,7 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
       <Badge variant="secondary">{citationValueLabel(note.review_status, language)}</Badge>
       <span className={`text-xs ${note.anchor_status === 'changed' ? 'text-destructive' : 'text-muted-foreground'}`}>{anchor}</span>
     </div>
-    {showArgument ? <div><p className="mb-1 text-xs text-muted-foreground">{zh ? '我们需要的论点' : 'Our project argument'}</p><h3 className="whitespace-pre-wrap font-semibold leading-6">{note.argument}</h3></div> : null}
+    {showArgument ? <div><p className="mb-1 text-xs text-muted-foreground">{zh ? '论点' : 'Argument'}</p><h3 className="whitespace-pre-wrap font-semibold leading-6">{note.argument}</h3></div> : null}
     <div className="border-l-2 border-primary bg-muted/20 px-4 py-3">
       <p className="mb-2 text-xs font-medium text-muted-foreground">{zh ? '论文原文 · 原语言' : 'Original passage · source language'}</p>
       <blockquote className="whitespace-pre-wrap break-words text-sm leading-7">{note.quote}</blockquote>
@@ -41,8 +41,8 @@ export function EvidenceNoteCard({ note, projectId, canWrite, onEdit, showArgume
     </div>
     <a className="inline-flex min-w-0 items-start gap-2 break-words text-sm text-primary underline-offset-4 hover:underline" href={url} target="_blank" rel="noopener noreferrer"><ArrowSquareOutIcon className="mt-0.5 shrink-0" />{note.document_title}</a>
     <dl className="grid gap-4 text-sm md:grid-cols-2">
-      <div><dt className="mb-1 font-medium">{zh ? '论文观点' : 'What the paper says'}</dt><dd className="whitespace-pre-wrap leading-6 text-muted-foreground">{note.paper_claim}</dd></div>
-      <div><dt className="mb-1 font-medium">{zh ? '提供的论据 / 我们的解释' : 'Evidence / our interpretation'}</dt><dd className="whitespace-pre-wrap leading-6 text-muted-foreground">{note.interpretation}</dd></div>
+      <div><dt className="mb-1 font-medium">{zh ? '论据 · 研究结果' : 'Evidence · reported result'}</dt><dd className="whitespace-pre-wrap leading-6 text-muted-foreground">{note.paper_claim}</dd></div>
+      <div><dt className="mb-1 font-medium">{zh ? '论证 · 对本项目的意义' : 'Reasoning · relevance to this project'}</dt><dd className="whitespace-pre-wrap leading-6 text-muted-foreground">{note.interpretation}</dd></div>
       <div className="border-t pt-3 md:col-span-2"><dt className="mb-1 font-medium">{zh ? '适用边界 · 尚不能证明' : 'Limits · what remains unproven'}</dt><dd className="whitespace-pre-wrap leading-6 text-muted-foreground">{note.limitations}</dd></div>
     </dl>
     <Disclosure title={zh ? '核对上下文与来源记录' : 'Check context and provenance'}>

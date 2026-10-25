@@ -123,6 +123,22 @@ def test_research_translation_failure_marks_failed_and_closes_client(compute_ses
     evidence_tools.search_europe_pmc.assert_not_called()
 
 
+def test_saved_abstract_chunk_does_not_become_full_text_in_a_generated_draft(compute_session):
+    from backend_v2.app.literature.models import LiteratureChunk, LiteratureDocument
+    from backend_v2.app.research.generation import _annotate_source_references
+
+    session, _, project, _ = compute_session
+    doc = LiteratureDocument(project_id=project.id, title="Abstract only", source="pubmed",
+                             abstract="Measured result.", metadata_json={"content_provenance": {"content_kind": "database_abstract"}})
+    session.add(doc)
+    session.flush()
+    session.add(LiteratureChunk(document_id=doc.id, position=0, content=doc.abstract))
+    session.flush()
+    reference = _annotate_source_references(session, project.id, [{"document_id": str(doc.id)}])[0]
+    assert reference["metadata"]["full_text_retrieved"] is False
+    assert reference["metadata"]["abstract_available"] is True
+
+
 def test_incomplete_route_is_never_recommended(compute_session):
     session, _, project, _ = compute_session
     plan = create_route_plan(session, project, RoutePlanCreate(project_id=project.id, goal="Acquire a structure"))

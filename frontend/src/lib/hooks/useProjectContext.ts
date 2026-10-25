@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { listProjects } from '../api/projects'
+import { getProject, listProjects } from '../api/projects'
 import { useAppStore } from '../store/appStore'
 import { currentAuthGeneration } from '../api/client'
 
@@ -51,15 +51,32 @@ export function useProjectContext() {
   const projectIds = useMemo(() => new Set(visibleProjects.map((project) => project.id)), [visibleProjects])
   const urlProjectId = searchParams.get('project')
   const projectsReady = !projectsLoading && !projectsError
-  const staleUrlProject = Boolean(projectsReady && urlProjectId && !projectIds.has(urlProjectId))
-  const staleActiveProject = Boolean(projectsReady && activeProjectId && !projectIds.has(activeProjectId))
+  // Historical sources have direct links but do not reappear in the portfolio.
+  const lookupHistorical = Boolean(projectsReady && urlProjectId && !projectIds.has(urlProjectId) &&
+    urlProjectId !== deletingProjectId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(urlProjectId))
+  const historicalQuery = useQuery({
+    queryKey: ['historical-project', currentAuthGeneration(), urlProjectId],
+    queryFn: () => getProject(urlProjectId!),
+    enabled: lookupHistorical,
+    retry: false,
+    staleTime: 30_000,
+  })
+  const historyLink = historicalQuery.data?.localized_content?.portfolio_consolidation
+  const historicalProject = lookupHistorical && historyLink && typeof historyLink === 'object' &&
+    'role' in historyLink && historyLink.role === 'historical_source' &&
+    'canonical_project_id' in historyLink && typeof historyLink.canonical_project_id === 'string' &&
+    projectIds.has(historyLink.canonical_project_id) && historicalQuery.data?.id === urlProjectId
+    ? historicalQuery.data : null
+  const waitingHistorical = lookupHistorical && historicalQuery.isPending
+  const staleUrlProject = Boolean(projectsReady && !waitingHistorical && urlProjectId && !projectIds.has(urlProjectId) && !historicalProject)
+  const staleActiveProject = Boolean(projectsReady && !waitingHistorical && activeProjectId &&
+    !projectIds.has(activeProjectId) && historicalProject?.id !== activeProjectId)
 
   const projectId = useMemo(() => {
-    // An explicit unavailable project must never silently open another one.
-    if (urlProjectId) return projectIds.has(urlProjectId) ? urlProjectId : ''
+    if (urlProjectId) return projectIds.has(urlProjectId) || historicalProject ? urlProjectId : ''
     if (activeProjectId && projectIds.has(activeProjectId)) return activeProjectId
     return ''
-  }, [activeProjectId, projectIds, urlProjectId])
+  }, [activeProjectId, projectIds, urlProjectId, historicalProject])
 
   useEffect(() => {
     // A still-mounted view must not restore its old URL selection after logout.
@@ -77,7 +94,7 @@ export function useProjectContext() {
       const next = new URLSearchParams(searchParams)
       next.delete('project')
       for (const key of PROJECT_SELECTION_PARAMS) next.delete(key)
-      setSearchParams(next, { replace: true })
+      if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true })
     }
   }, [
     projectId,
@@ -89,7 +106,7 @@ export function useProjectContext() {
     staleUrlProject,
   ])
 
-  const activeProject = visibleProjects.find((p) => p.id === projectId) ?? null
+  const activeProject = visibleProjects.find((p) => p.id === projectId) ?? historicalProject
 
   const setProjectId = (nextProjectId: string) => {
     setActiveProjectId(nextProjectId)
@@ -108,7 +125,7 @@ export function useProjectContext() {
     projects: sortedProjects,
     visibleProjects,
     deletingProjectId,
-    projectsLoading,
+    projectsLoading: projectsLoading || waitingHistorical,
     projectsError,
     projectsQueryError,
     refetchProjects,

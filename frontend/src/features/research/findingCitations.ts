@@ -27,7 +27,7 @@ export function workspaceCitationRecords(references: readonly Record<string, unk
     const title = reference.title && typeof reference.title === 'object' ? reference.title as CitationRecord : {}
     return {
       ...provenance, entity_id: reference.document_id, document_id: reference.document_id,
-      ref_id: reference.ref_id, reference_ids: [reference.ref_id],
+      ref_id: reference.ref_id, reference_ids: [reference.ref_id, ...jsonArray(metadata.consolidated_ref_ids), ...jsonArray(metadata.consolidated_document_ids)],
       // Reviewed research packages use R036 in their bibliography and [36] in prose.
       // Preserve that explicit numbering; never infer it from array position.
       bibliography_number: /^R\d+$/.test(text(reference.ref_id)) ? String(Number(text(reference.ref_id).slice(1))) : undefined,

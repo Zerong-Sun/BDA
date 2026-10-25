@@ -51,8 +51,41 @@ describe('literature evidence workbench', () => {
     renderWithProviders(<LiteratureWorkbench projectId="project-one" references={[{ ...references[0], metadata: {
       project_scope_status: 'excluded', project_scope_reason: 'Unrelated sensor study',
     } }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Excluded · 1' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Excluded from this project’s evidence: Unrelated sensor study')
     expect(screen.getByText('Original source records')).toBeInTheDocument()
+  })
+
+  it('preserves distinct source notes after their publication entries are consolidated', async () => {
+    const merged = [{ ...references[0], metadata: { consolidated_document_ids: ['doc-two'] } }]
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={merged} />)
+    await waitFor(() => expect(screen.getAllByTestId('evidence-note-card')).toHaveLength(2))
+    expect(screen.getByText(second.quote)).toBeVisible()
+    expect(screen.getAllByRole('button', { name: /R01/ })).toHaveLength(1)
+  })
+  it('keeps related-topic papers and their argument cards out of direct evidence', async () => {
+    const classified = references.map((ref, i) => ({ ...ref, metadata: { evidence_curation: {
+      project_id: 'project-one', scope: i ? 'context' : 'core', reason: i ? 'Different biological endpoint' : 'Direct evidence',
+    } } }))
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={classified} />)
+    await screen.findByTestId('evidence-note-card')
+    fireEvent.click(screen.getByRole('button', { name: 'By argument' }))
+    expect(screen.getAllByTestId('evidence-note-card')).toHaveLength(1)
+    expect(screen.queryByText(second.quote)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Related background · 1' }))
+    expect(screen.getByText(second.quote)).toBeVisible()
+    expect(screen.queryByText(first.quote)).not.toBeInTheDocument()
+  })
+
+  it('quarantines a curation copied from a foreign project and omits unlinked notes', async () => {
+    const classified = [{ ...references[0], metadata: { evidence_curation: { project_id: 'foreign', scope: 'core' } } }]
+    renderWithProviders(<LiteratureWorkbench projectId="project-one" references={classified} />)
+    await waitFor(() => expect(api.list).toHaveBeenCalled())
+    expect(screen.queryByTestId('evidence-note-card')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Excluded · 1' }))
+    expect(await screen.findByText(first.quote)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'By argument' }))
+    expect(screen.queryByText(second.quote)).not.toBeInTheDocument()
   })
 
   it('shows original language, linked paper, author claim, inference and limits without expanding metadata', async () => {

@@ -14,8 +14,26 @@ const metadata = { evidence_packet: {
 } }
 
 describe('paper evidence source display', () => {
+  it('rejects a packet whose project or document attribution does not match the open paper', () => {
+    renderWithProviders(<LiteratureEvidencePacket projectId="project" documentId="paper" metadata={{ evidence_packet: {
+      ...metadata.evidence_packet, project_id: 'other', document_id: 'foreign-paper',
+    } }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('attribution does not match')
+    expect(screen.queryByRole('link', { name: 'Original source and license' })).not.toBeInTheDocument()
+  })
+
+  it('keeps original tables while the curated reading view omits earlier model prose', async () => {
+    renderWithProviders(<LiteratureEvidencePacket projectId="project" documentId="paper" metadata={{
+      ...metadata, evidence_curation: { project_id: 'project', scope: 'core' },
+    }} />)
+    expect(screen.queryByRole('button', { name: /Project arguments/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Model draft')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Original tables with headers/ }))
+    expect(await screen.findByRole('cell', { name: '121.2 nM' })).toBeVisible()
+  })
+
   it('retains curated claims alongside model drafts and resolves table source text', async () => {
-    renderWithProviders(<LiteratureEvidencePacket documentId="paper" metadata={metadata} />)
+    renderWithProviders(<LiteratureEvidencePacket projectId="project" documentId="paper" metadata={metadata} />)
     fireEvent.click(screen.getByRole('button', { name: /Project arguments/ }))
     expect(await screen.findByRole('heading', { name: 'Curated claim' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Model draft' })).toBeVisible()
@@ -23,7 +41,7 @@ describe('paper evidence source display', () => {
     expect(await screen.findByText('Measured affinity KD Sample 121.2 nM n = 3')).toBeVisible()
   })
   it('preserves table headers, merged cells, footnotes and safe source links', async () => {
-    renderWithProviders(<LiteratureEvidencePacket documentId="paper" metadata={metadata} />)
+    renderWithProviders(<LiteratureEvidencePacket projectId="project" documentId="paper" metadata={metadata} />)
     expect(screen.getByRole('link', { name: 'Original source and license' })).toHaveAttribute('href', 'https://example.org/paper')
     fireEvent.click(screen.getByRole('button', { name: /Original tables with headers/ }))
     const table = await screen.findByRole('table')

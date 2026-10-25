@@ -8,6 +8,32 @@ export type EvidenceDraft = EvidenceNoteWrite
 export type ArgumentChoice = { id?: string | null; argument: string }
 export const evidenceRelations = ['supports', 'contradicts', 'context'] as const
 
+export const referenceScopes = ['core', 'method', 'context', 'excluded', 'unreviewed'] as const
+export type ReferenceScope = typeof referenceScopes[number]
+
+export function referenceDocumentIds(reference: LiteratureReference): string[] {
+  const aliases = reference.metadata?.consolidated_document_ids
+  return [reference.document_id, ...(Array.isArray(aliases) ? aliases.filter((id): id is string => typeof id === 'string') : [])]
+}
+
+export function referenceCuration(reference: LiteratureReference, projectId: string): { scope: ReferenceScope; reason: string } {
+  const raw = reference.metadata?.evidence_curation
+  if (!raw && reference.metadata?.project_scope_status === 'excluded') return {
+    scope: 'excluded', reason: String(reference.metadata.project_scope_reason || ''),
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { scope: 'unreviewed', reason: '' }
+  const value = raw as Record<string, unknown>
+  if (value.project_id !== projectId) return { scope: 'excluded', reason: 'Project attribution mismatch' }
+  return {
+    scope: referenceScopes.includes(value.scope as ReferenceScope) ? value.scope as ReferenceScope : 'unreviewed',
+    reason: typeof value.reason === 'string' ? value.reason : '',
+  }
+}
+
+export function referenceScopeLabel(scope: ReferenceScope, zh: boolean): string {
+  return ({ core: zh ? '直接证据' : 'Direct evidence', method: zh ? '方法参考' : 'Methods', context: zh ? '旁支背景' : 'Related background', excluded: zh ? '已排除' : 'Excluded', unreviewed: zh ? '待核定' : 'Unclassified' })[scope]
+}
+
 export function relationLabel(relation: string, zh: boolean) {
   return ({ supports: zh ? '支持' : 'Supports', contradicts: zh ? '反驳 / 限制' : 'Contradicts / limits', context: zh ? '背景 / 方法' : 'Context / method' })[relation] ?? relation
 }

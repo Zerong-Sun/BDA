@@ -31,6 +31,13 @@ describe('ReviewMarkdown', () => {
     expect(container.querySelector('a[href^="javascript:"]')).toBeNull()
   })
 
+  it('shows the project introduction before its section index', () => {
+    const { container } = render(<ReviewMarkdown>{'A concrete project introduction.\n\n' + LONG}</ReviewMarkdown>)
+    const introduction = screen.getByText('A concrete project introduction.')
+    const index = container.querySelector('nav')!
+    expect(introduction.compareDocumentPosition(index) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('indexes the sections of a long document and links each to its heading', () => {
     const { container } = render(<ReviewMarkdown>{LONG}</ReviewMarkdown>)
 

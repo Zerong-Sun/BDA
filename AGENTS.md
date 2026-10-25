@@ -31,3 +31,11 @@ workers, migrations, scripts, UI state and release packaging.
 - Publish software from the public source tree, then use the one-way sync for the
   private overlay. Do not publish private overlay history. Release and deployment
   claims must name the exact commit and the checks actually completed.
+
+## Cluster scheduling
+
+- SuperFold jobs default to one GPU, one CPU and `ptile=1`; use CPU-only mode
+  only when explicitly requested and verify the actual backend at runtime.
+- Inspect authorized queues, compatible hosts, free GPUs and pending jobs before
+  selecting resources. Do not hardcode a queue or promise immediate RUN status.
+- Do not cancel or requeue existing jobs merely to update scheduling guidance.

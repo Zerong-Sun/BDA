@@ -354,6 +354,19 @@ def test_accepted_review_outranks_a_newer_draft_status_note() -> None:
             # With nothing accepted, the newest draft is still shown rather than nothing.
             fallback = workspace.preferred_review_brief(session, drafts_only.id)
             assert fallback is not None and fallback.title == "Newer draft"
+
+            # Display selection is independent of scientific acceptance. An
+            # editorial revision must not falsely acquire an accepted status.
+            curated = ResearchBrief(
+                project_id=reviewed.id, created_by=user.id, title="Evidence & reasoning",
+                content="Source-specific evidence.", status="draft",
+                scope={"display_role": "project_evidence_review"},
+            )
+            session.add(curated)
+            session.commit()
+            assert workspace.preferred_review_brief(session, reviewed.id).id == curated.id
+            assert curated.status == "draft"
+            assert workspace.preferred_review_brief(session, drafts_only.id).id == fallback.id
     finally:
         drop_all(engine, Base.metadata)
 

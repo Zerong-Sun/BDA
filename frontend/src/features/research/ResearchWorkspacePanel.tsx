@@ -199,11 +199,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   })
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 [&>*]:min-w-0">
-      <div aria-label={language === 'zh' ? '资料概况' : 'Workspace contents'} className="flex flex-wrap items-center justify-between gap-2 border-b border-border-soft pb-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-accent">{workspace.project.source_project_key || workspace.project.project_type}</p>
-
-          </div>
+      <div aria-label={language === 'zh' ? '资料概况' : 'Workspace contents'} className="flex flex-wrap items-center justify-end gap-2 border-b border-border-soft pb-3">
           <div className="flex flex-wrap gap-2 text-xs text-text-secondary">
             {packageVersion ? <Badge variant="outline">{format(w.packageVersion, { version: packageVersion })}</Badge> : null}
             {packageDate ? <Badge variant="outline">{format(w.evidenceAsOf, { date: packageDate })}</Badge> : null}
@@ -216,14 +212,15 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
       {view === 'evidence' ? (
         <>
           {workspace.review_document ? (
-            <Disclosure className="science-document" title={w.reviewTitle}>
+            <Disclosure key={workspace.review_document.id} className="science-document" defaultOpen={workspace.review_document.scope?.display_role === 'project_evidence_review'} title={w.reviewTitle}>
               <div>
               <div className="flex items-start justify-between gap-3"><SectionHeading title={workspaceText(workspace.review_document.title, language) || w.reviewTitle} /><AskCopilotButton entityId={workspace.review_document.id} entityType="review" label={workspaceText(workspace.review_document.title, language)} /></div>
-              <div className="mt-4"><ReviewMarkdown citations={workspaceCitationRecords(workspace.references, language)}>{workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
+              <div className="mt-4"><ReviewMarkdown citations={workspaceCitationRecords(workspace.references, language)}>{workspace.review_document.scope?.display_role === 'project_evidence_review' ? workspaceText(workspace.review_document.content, language).replace(/^# [^\n]+\n+/, '') : workspaceText(workspace.review_document.content, language)}</ReviewMarkdown></div>
               </div>
             </Disclosure>
           ) : <Alert><AlertDescription>{w.reviewEmpty}</AlertDescription></Alert>}
-          <Disclosure className="science-document" title={<span>{language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'} <span className="ml-2 text-xs font-normal text-text-muted">{workspace.review_sections.reduce((total, section) => total + (section.items?.length ?? 0), 0)} {language === 'zh' ? '条' : 'records'}</span></span>}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
+          <Disclosure key={`history-${projectId}`} className="science-document" title={<span>{language === 'zh' ? '研究笔记与审阅记录' : 'Research notes & review record'} <span className="ml-2 text-xs font-normal text-text-muted">{workspace.review_sections.reduce((total, section) => total + (section.items?.length ?? 0), 0)} {language === 'zh' ? '条' : 'records'}</span></span>}><ProjectReviewPanel workspace={workspace} showDocument={false} readOnly={readOnly} /></Disclosure>
+          <Disclosure key={`graph-${projectId}`} title={language === 'zh' ? '机制关系与历史证据' : 'Mechanism & historical evidence'} defaultOpen={workspace.review_document?.scope?.display_role !== 'project_evidence_review'}>
           <Frame>
             <FramePanel className="grid gap-4">
               <FrameHeader className="px-0 py-0">
@@ -264,6 +261,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
             </article>) : <Alert><AlertDescription>{w.evidenceEmpty}</AlertDescription></Alert>}
             </FramePanel>
           </Frame>
+          </Disclosure>
           <OperationBlock title={w.evidenceOperations}>
             <GenerateSimilarResearchPanel
               defaultTopic={

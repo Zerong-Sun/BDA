@@ -19,6 +19,14 @@ const reference: LiteratureReference = {
 }
 
 describe('standard citation exports', () => {
+  it('exports one publication for consolidated entries while annotation sources keep their own IDs', () => {
+    const other = { ...note, id: 'evidence-other', document_id: 'paper-old' }
+    const merged = { ...reference, metadata: { consolidated_document_ids: ['paper-old'] } }
+    const result = citationBibliography([note, other], [merged])
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({ id: 'urn:uuid:paper-1', DOI: '10.1000/test' })
+    expect(evidenceAnnotations([note, other], 'project-1', true).items[1]['bda:document']).toBe('urn:uuid:paper-old')
+  })
   it('exports unique CSL items without inventing author names or publication dates', () => {
     const result = citationBibliography([note, { ...note, id: 'evidence-2' }], [reference])
     expect(result).toHaveLength(1)

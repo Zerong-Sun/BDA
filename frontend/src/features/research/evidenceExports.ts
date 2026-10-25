@@ -1,19 +1,20 @@
 import { safeCitationUrl } from './citationMarkers'
-import { referenceUrl, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
+import { referenceUrl, referenceDocumentIds, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
 
 /** CSL-JSON bibliographic items only. An authorString stays a literal: do not guess names. */
 export function citationBibliography(notes: EvidenceNote[], references: LiteratureReference[]) {
   const seen = new Set<string>()
   return notes.filter((note) => {
-    if (seen.has(note.document_id)) return false
-    seen.add(note.document_id)
+    const id = references.find((ref) => referenceDocumentIds(ref).includes(note.document_id))?.document_id ?? note.document_id
+    if (seen.has(id)) return false
+    seen.add(id)
     return true
   }).map((note) => {
-    const ref = references.find((candidate) => candidate.document_id === note.document_id)
+    const ref = references.find((candidate) => referenceDocumentIds(candidate).includes(note.document_id))
     const year = String(ref?.year ?? '')
     const journal = ref?.journal?.trim()
     return {
-      id: `urn:uuid:${note.document_id}`, type: journal ? 'article-journal' : 'article', title: note.document_title,
+      id: `urn:uuid:${ref?.document_id ?? note.document_id}`, type: journal ? 'article-journal' : 'article', title: note.document_title,
       URL: (ref ? referenceUrl(ref) : '') || safeCitationUrl(note.source_url),
       ...(ref?.doi ? { DOI: ref.doi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '') } : {}),
       ...(ref?.authors?.trim() ? { author: [{ literal: ref.authors.trim() }] } : {}),

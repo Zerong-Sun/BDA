@@ -13,8 +13,9 @@ import { EvidenceNoteEditor } from './EvidenceNoteEditor'
 import { EvidenceSourceRetrieval } from './EvidenceSourceRetrieval'
 import { LiteratureSourceDetails } from './LiteratureSourceDetails'
 import { LiteratureEvidencePacket } from './LiteratureEvidencePacket'
+import { Disclosure } from '../../components/ui/Disclosure'
 import { citationValueLabel, safeCitationUrl } from './citationMarkers'
-import { argumentKey, evidenceMarkdown, evidenceRelations, noteMatches, referenceUrl, relationLabel, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
+import { argumentKey, evidenceMarkdown, evidenceRelations, noteMatches, referenceUrl, relationLabel, referenceCuration, referenceScopeLabel, referenceScopes, referenceDocumentIds, type ReferenceScope, type EvidenceNote, type LiteratureReference } from './evidenceNotes'
 import { citationBibliography, downloadEvidenceFile, evidenceAnnotations } from './evidenceExports'
 
 export function LiteratureWorkbench({ projectId, references, readOnly = false }: {
@@ -28,6 +29,8 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
   const [search, setSearch] = useState('')
   const [gapsOnly, setGapsOnly] = useState(false)
   const [evidenceFilter, setEvidenceFilter] = useState<'all' | 'review' | 'conflicts'>('all')
+  const classified = references.some((reference) => reference.metadata?.evidence_curation || reference.metadata?.project_scope_status === 'excluded')
+  const [scope, setScope] = useState<ReferenceScope>('core')
   const [selectedId, setSelectedId] = useState(references[0]?.document_id ?? '')
   const [editor, setEditor] = useState<{ reference: LiteratureReference; note?: EvidenceNote } | null>(null)
   const notes = useInfiniteQuery({
@@ -35,16 +38,25 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
     queryFn: ({ pageParam }) => listEvidenceNotes(projectId, pageParam),
     getNextPageParam: (page) => page.next_cursor ?? undefined, retry: false,
   })
-  const allNotes = notes.data?.pages.flatMap((page) => page.items) ?? []
+  // A note may only be displayed with a reference belonging to this workspace.
+  // The same restriction applies to argument grouping and every export.
+  const scopedReferences = classified ? references.filter((reference) => referenceCuration(reference, projectId).scope === scope) : references
+  const scopedIds = new Set(scopedReferences.flatMap(referenceDocumentIds))
+  const allNotes = (notes.data?.pages.flatMap((page) => page.items) ?? []).filter((note) => scopedIds.has(note.document_id))
   const complete = notes.isSuccess && !notes.hasNextPage
-  const hasNote = (id: string) => allNotes.some((note) => note.document_id === id)
-  const visibleReferences = references.filter((reference) => (!gapsOnly || !hasNote(reference.document_id)) &&
+  const paperNotes = (id: string) => {
+    const reference = references.find((item) => item.document_id === id)
+    const ids = reference ? referenceDocumentIds(reference) : [id]
+    return allNotes.filter((note) => ids.includes(note.document_id))
+  }
+  const hasNote = (id: string) => paperNotes(id).length > 0
+  const visibleReferences = scopedReferences.filter((reference) => (!gapsOnly || !hasNote(reference.document_id)) &&
     `${workspaceText(reference.title, language)} ${reference.authors ?? ''} ${reference.ref_id} ${reference.doi ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const selected = visibleReferences.find((reference) => reference.document_id === selectedId) ?? visibleReferences[0]
   const retracted = String(selected?.metadata?.pub_type ?? '').toLowerCase().includes('retracted publication')
   const filteredNotes = allNotes.filter((note) => evidenceFilter === 'all' || (evidenceFilter === 'conflicts' ? note.relation === 'contradicts' : note.review_status === 'pending' || note.anchor_status !== 'matched'))
   const visibleNotes = filteredNotes.filter((note) => noteMatches(note, search))
-  const displayedNotes = mode === 'papers' ? filteredNotes.filter((note) => note.document_id === selected?.document_id) : visibleNotes
+  const displayedNotes = mode === 'papers' ? filteredNotes.filter((note) => selected && referenceDocumentIds(selected).includes(note.document_id)) : visibleNotes
   const grouped = new Map<string, EvidenceNote[]>()
   for (const note of visibleNotes) grouped.set(argumentKey(note), [...(grouped.get(argumentKey(note)) ?? []), note])
   const argumentChoices = [...new Map(allNotes.map((note) => [argumentKey(note), { id: note.argument_id, argument: note.argument }])).values()]
@@ -58,10 +70,15 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
   return <section className="grid min-w-0 gap-5" aria-label={zh ? '文献论据工作台' : 'Literature evidence workbench'}>
     <header className="grid gap-4 border bg-background p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4"><div><p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Evidence notebook</p>
-        <h2 className="text-xl font-semibold">{zh ? '把论文变成可核对的论据' : 'From papers to traceable evidence'}</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{zh ? '我们的论点 → 论文原文 → 论据解释 → 适用边界。每条论据都保留论文链接，支持与反驳放在一起阅读。' : 'Project argument → original passage → interpretation → limits. Keep the paper link with every excerpt and read supporting and conflicting evidence together.'}</p></div><QuotesIcon className="hidden size-8 shrink-0 text-primary sm:block" /></div>
+        <h2 className="text-xl font-semibold">{zh ? '文献与证据' : 'Literature & evidence'}</h2>
+        </div><QuotesIcon className="hidden size-8 shrink-0 text-primary sm:block" /></div>
       <div className="flex flex-wrap gap-2 text-xs"><Badge variant="outline">{references.length} {zh ? '篇文献' : 'papers'}</Badge><Badge variant="outline">{allNotes.length}{complete ? '' : '+'} {zh ? '条已加载论据' : 'loaded evidence cards'}</Badge><Badge variant="outline">{allNotes.filter((note) => note.review_status === 'accepted').length} {zh ? '条已认可' : 'accepted cards'}</Badge></div>
     </header>
+    {classified ? <div role="group" aria-label={zh ? '文献用途' : 'Reference purpose'} className="flex flex-wrap gap-2">
+      {referenceScopes.map((value) => <Button key={value} type="button" size="sm" variant={scope === value ? 'secondary' : 'outline'} aria-pressed={scope === value} onClick={() => { setScope(value); setEditor(null); setGapsOnly(false); setSelectedId('') }}>
+        {referenceScopeLabel(value, zh)} · {references.filter((reference) => referenceCuration(reference, projectId).scope === value).length}
+      </Button>)}
+    </div> : null}
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex gap-1" role="group" aria-label={zh ? '阅读方式' : 'Reading view'}>
         <Button type="button" variant={mode === 'papers' ? 'default' : 'outline'} aria-pressed={mode === 'papers'} onClick={() => setMode('papers')}><BookOpenTextIcon />{zh ? '按文献阅读' : 'By paper'}</Button>
@@ -87,7 +104,7 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
         {visibleReferences.map((reference) => <Button type="button" key={reference.document_id} variant="ghost" aria-pressed={selected?.document_id === reference.document_id} className={`h-auto min-w-0 flex-col items-start gap-2 whitespace-normal p-3 text-left ${selected?.document_id === reference.document_id ? 'bg-muted border-l-primary' : ''}`} onClick={() => setSelectedId(reference.document_id)}>
           <span className="text-[10px] font-normal text-muted-foreground">{reference.ref_id} {reference.year ? `· ${reference.year}` : ''}</span>
           <span className="line-clamp-3 text-sm leading-5">{workspaceText(reference.title, language)}</span>
-          <span className="text-xs font-normal text-muted-foreground">{hasNote(reference.document_id) ? `${allNotes.filter((note) => note.document_id === reference.document_id).length} ${zh ? '条论据' : 'evidence cards'}` : complete ? (zh ? '待补齐论点与摘录' : 'Needs argument & excerpt') : (zh ? '论据状态待加载' : 'Evidence status not yet loaded')}</span>
+          <span className="text-xs font-normal text-muted-foreground">{hasNote(reference.document_id) ? `${paperNotes(reference.document_id).length} ${zh ? '条论据' : 'evidence cards'}` : complete ? (zh ? '待补齐论点与摘录' : 'Needs argument & excerpt') : (zh ? '论据状态待加载' : 'Evidence status not yet loaded')}</span>
         </Button>)}
         {!visibleReferences.length ? <p className="p-3 text-sm text-muted-foreground">{zh ? '没有符合条件的文献。' : 'No matching papers.'}</p> : null}
       </nav>
@@ -98,15 +115,20 @@ export function LiteratureWorkbench({ projectId, references, readOnly = false }:
           {selected.authors ? <p className="text-sm text-muted-foreground">{selected.authors}</p> : null}
           <div className="flex flex-wrap items-center gap-3">{referenceUrl(selected) ? <a href={referenceUrl(selected)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ArrowSquareOutIcon />{zh ? '打开论文' : 'Open paper'}</a> : <span className="text-xs text-muted-foreground">{zh ? '论文链接待补齐' : 'Paper link missing'}</span>}
             {selected.doi ? <a className="text-xs text-primary hover:underline" href={safeCitationUrl(`https://doi.org/${selected.doi}`)} target="_blank" rel="noopener noreferrer">DOI {selected.doi}</a> : null}
-            {canWrite ? <Button type="button" variant="outline" onClick={() => setEditor({ reference: selected })}>{zh ? '添加论点与原文' : 'Add argument & passage'}</Button> : null}</div>
-          {canWrite ? <EvidenceSourceRetrieval key={`retrieve-${selected.document_id}`} projectId={projectId} reference={selected} /> : null}
-          {retracted ? <p role="alert" className="rounded border border-danger p-3 text-sm">{zh ? '此论文已撤稿。保留原始来源供历史核对，不作为当前正向论据。请同时阅读撤稿通知。' : 'This paper is retracted. It is retained for historical inspection and must not support current positive claims. Read the retraction notice.'}</p> : null}
-          {selected.metadata?.project_scope_status === 'excluded' ? <p role="status" className="rounded border border-warning p-3 text-sm">{zh ? '已排除出本项目论据：' : 'Excluded from this project’s evidence: '}{String(selected.metadata.project_scope_reason || (zh ? '主题不适用，原始记录保留供核对。' : 'Topic is not applicable. The original record is retained.'))}</p> : null}
-          <LiteratureSourceDetails key={`source-${selected.document_id}`} projectId={projectId} documentId={selected.document_id} metadata={selected.metadata ?? {}} abstract={selected.abstract} />
-          <LiteratureEvidencePacket key={`evidence-packet-${selected.document_id}`} documentId={selected.document_id} metadata={selected.metadata ?? {}} />
+            {canWrite && !selected.metadata?.derived_from_finding_id ? <Button type="button" variant="outline" onClick={() => setEditor({ reference: selected })}>{zh ? '添加论点与原文' : 'Add argument & passage'}</Button> : null}</div>
+          {classified && referenceCuration(selected, projectId).reason ? <p className="text-sm leading-6 text-muted-foreground">{referenceCuration(selected, projectId).reason}</p> : null}
         </div>
+          {selected.metadata?.project_scope_status === 'excluded' ? <p role="status" className="rounded border border-warning p-3 text-sm">{zh ? '已排除出本项目论据：' : 'Excluded from this project’s evidence: '}{String(selected.metadata.project_scope_reason || (zh ? '主题不适用，原始记录保留供核对。' : 'Topic is not applicable. The original record is retained.'))}</p> : null}
+          {retracted ? <p role="alert" className="rounded border border-danger p-3 text-sm">{zh ? '此论文已撤稿。保留原始来源供历史核对，不作为当前正向论据。请同时阅读撤稿通知。' : 'This paper is retracted. It is retained for historical inspection and must not support current positive claims. Read the retraction notice.'}</p> : null}
         {displayedNotes.map(card)}
-        {complete && !displayedNotes.length ? <div className="border border-dashed p-6"><h4 className="font-medium">{hasNote(selected.document_id) ? (zh ? '没有符合筛选条件的论据' : 'No evidence matches this filter') : (zh ? '这篇文献还没有形成项目论据' : 'This paper has no project evidence card yet')}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{zh ? '已有题录或自动拆句仍需整理。请选出所需原文，写清它支持或限制哪个论点，以及适用条件。' : 'Bibliographic records and extracted sentences still need interpretation. Select a passage, identify the argument it supports or limits, and record its conditions.'}</p></div> : null}
+        {selected.metadata?.evidence_packet ? <Disclosure title={zh ? '原始图表、数据与附件' : 'Original figures, data & attachments'}>
+          <LiteratureEvidencePacket projectId={projectId} documentId={selected.document_id} metadata={selected.metadata} />
+        </Disclosure> : null}
+        {complete && !displayedNotes.length ? <div className="border border-dashed p-6"><h4 className="font-medium">{hasNote(selected.document_id) ? (zh ? '没有符合筛选条件的论据' : 'No evidence matches this filter') : (zh ? '这篇文献还没有形成项目论据' : 'This paper has no project evidence card yet')}</h4></div> : null}
+        {!selected.metadata?.derived_from_finding_id ? <>
+          <LiteratureSourceDetails key={`source-${selected.document_id}`} projectId={projectId} documentId={selected.document_id} metadata={selected.metadata ?? {}} abstract={selected.abstract} />
+          {canWrite ? <EvidenceSourceRetrieval key={`retrieve-${selected.document_id}`} projectId={projectId} reference={selected} /> : null}
+        </> : null}
       </div> : null}
     </div> : <div className="grid gap-7">
       {[...grouped].map(([id, group]) => <section key={id} className="grid gap-3"><h3 className="border-b pb-3 text-lg font-semibold">{group[0].argument}<span className="ml-3 text-xs font-normal text-muted-foreground">{group.length} {zh ? '条论据' : 'evidence cards'}</span></h3><div className="flex flex-wrap gap-2">{evidenceRelations.map((relation) => <Badge key={relation} variant="outline">{relationLabel(relation, zh)} · {group.filter((note) => note.relation === relation).length}</Badge>)}</div>{group.map(card)}</section>)}

@@ -24,27 +24,30 @@ function EvidenceTable({ children }: { children: ReactNode }) {
   return <DataGrid table={table} recordCount={0} tableLayout={{ width: 'auto', dense: true }} tableClassNames={{ base: 'text-left text-xs' }}><DataGridTableBase>{children}</DataGridTableBase></DataGrid>
 }
 
-function ArchivePart({ item }: { item: Record<string, unknown> }) {
+function ArchivePart({ item, projectId }: { item: Record<string, unknown>; projectId: string }) {
   const id = text(item.artifact_id)
-  const query = useQuery({ queryKey: ['literature-evidence-archive', id], queryFn: () => getArtifact(id), enabled: Boolean(id), retry: false })
-  const url = safeCitationUrl(query.data?.download_url)
+  const query = useQuery({ queryKey: ['literature-evidence-archive', projectId, id], queryFn: () => getArtifact(id), enabled: Boolean(id), retry: false })
+  const url = query.data?.project_id === projectId ? safeCitationUrl(query.data.download_url) : undefined
   return url ? <a className="text-accent underline" href={url} target="_blank" rel="noopener noreferrer">{show(item.part)} / {show(item.total_parts)} · {show(item.filename)}</a> : <span className="text-text-muted">{show(item.filename)} · {query.isError ? '链接读取失败 / Link unavailable' : '正在读取 / Loading'}</span>
 }
 
 /** Source extraction and scientific interpretation keep separate review states. */
-export function LiteratureEvidencePacket({ documentId, metadata }: { documentId: string; metadata: Record<string, unknown> }) {
+export function LiteratureEvidencePacket({ projectId, documentId, metadata }: { projectId: string; documentId: string; metadata: Record<string, unknown> }) {
   const { language } = useI18n()
   const zh = language === 'zh'
   const packet = jsonRecord(metadata.evidence_packet)
+  const matches = (!packet.project_id || packet.project_id === projectId) && (!packet.document_id || packet.document_id === documentId)
+  const curated = Boolean(metadata.evidence_curation)
   const archiveId = text(packet.archive_artifact_id)
-  const archive = useQuery({ queryKey: ['literature-evidence-archive', archiveId], queryFn: () => getArtifact(archiveId), enabled: Boolean(archiveId), retry: false })
+  const archive = useQuery({ queryKey: ['literature-evidence-archive', projectId, archiveId], queryFn: () => getArtifact(archiveId), enabled: matches && Boolean(archiveId), retry: false })
+  if (!matches) return <p role="alert">{zh ? '证据包归属不匹配，已停止显示。' : 'Evidence packet attribution does not match this paper.'}</p>
   if (!packet.schema) return <p className="text-xs text-text-muted">{zh ? '尚未提取图表与数据证据包。' : 'Figures and data have not yet been extracted.'}</p>
-  const analysis = jsonRecord(packet.analysis)
+  const analysis = curated ? {} : jsonRecord(packet.analysis)
   const figures = rows(packet.figures), tables = rows(packet.tables), values = rows(packet.data)
-  const argumentsList = [...rows(packet.arguments), ...rows(analysis.arguments)]
+  const argumentsList = curated ? [] : [...rows(packet.arguments), ...rows(analysis.arguments)]
   const passages = rows(packet.passages)
   const sourceUrl = safeCitationUrl(packet.source_url)
-  const archiveUrl = safeCitationUrl(archive.data?.download_url)
+  const archiveUrl = archive.data?.project_id === projectId ? safeCitationUrl(archive.data.download_url) : undefined
   const gaps = [...new Set([...jsonArray(packet.gaps), ...jsonArray(analysis.gaps)].map(show))]
   const source = (id: unknown) => {
     const table = tables.find((t) => t.id === id)
@@ -63,14 +66,14 @@ export function LiteratureEvidencePacket({ documentId, metadata }: { documentId:
     <p className="text-xs">{show(packet.content_kind)} · {figures.length} {zh ? '图项' : 'figures'} · {tables.length} {zh ? '表' : 'tables'} · {values.length} {zh ? '有原文定位的数值' : 'anchored values'}</p>
     {metadata.latest_evidence_packet ? <p className="text-warning">{zh ? '已发现新的来源版本；本证据包保留原有定位，需另行比较。' : 'A newer source snapshot exists; this packet preserves the earlier anchors.'}</p> : null}
     {sourceUrl ? <a className="text-accent underline" href={sourceUrl} target="_blank" rel="noopener noreferrer">{zh ? '原始来源与许可' : 'Original source and license'}</a> : null}
-    {rows(packet.archive_artifacts).length > 1 ? <div className="grid gap-1 text-xs"><p>{zh ? '下载本项目全部文献包分卷，解压到同一目录后打开 report.html：' : 'Download every part into the same folder, extract, then open report.html:'}</p>{rows(packet.archive_artifacts).map((part) => <ArchivePart key={text(part.artifact_id)} item={part} />)}</div> : archiveUrl ? <a className="text-accent underline" href={archiveUrl} target="_blank" rel="noopener noreferrer">{zh ? '下载本项目文献包（报告、图片、原始数据及补充材料）' : 'Download project literature package (report, figures, original data and supplements)'}</a> : null}
+    {rows(packet.archive_artifacts).length > 1 ? <div className="grid gap-1 text-xs"><p>{zh ? '下载本项目全部文献包分卷，解压到同一目录后打开 report.html：' : 'Download every part into the same folder, extract, then open report.html:'}</p>{rows(packet.archive_artifacts).map((part) => <ArchivePart key={text(part.artifact_id)} item={part} projectId={projectId} />)}</div> : archiveUrl ? <a className="text-accent underline" href={archiveUrl} target="_blank" rel="noopener noreferrer">{zh ? '项目历史文献归档（含旧报告及旁支资料）' : 'Historical project archive (earlier reports and related reading)'}</a> : null}
     {analysis.project_relevance ? <p>{show(analysis.project_relevance)}</p> : null}
     {analysis.paper_claim ? <p><strong>{zh ? '论文论点：' : 'Paper claim: '}</strong>{show(analysis.paper_claim)}</p> : null}
-    <Disclosure title={`${zh ? '项目论点及支持、反驳和适用条件' : 'Project arguments, support, contradictions and conditions'} (${argumentsList.length})`}>
+    {argumentsList.length ? <Disclosure title={`${zh ? '项目论点及支持、反驳和适用条件' : 'Project arguments, support, contradictions and conditions'} (${argumentsList.length})`}>
       <div className="grid gap-3 pt-2">{argumentsList.map((a, i) => <article key={i} className="space-y-2 border-l-2 pl-3"><h5 className="font-medium">{show(a.project_argument)}</h5><p>{show(a.paper_claim)}</p><p>{show(a.relation)} · {show(a.interpretation)}</p><p className="text-text-muted">{show(a.limitations)}</p>{jsonArray(a.source_ids).map((id, n) => <Disclosure key={n} title={`${zh ? '原文定位' : 'Source'}: ${show(id)}`}><blockquote className="whitespace-pre-wrap">{show(source(id))}</blockquote></Disclosure>)}</article>)}</div>
-    </Disclosure>
+    </Disclosure> : null}
     <Disclosure title={`${zh ? '定量数据、实验条件与原文' : 'Quantitative data, conditions and sources'} (${values.length})`}>
-      {!values.length ? <p className="pt-2">{zh ? '尚无通过原文数值定位的提取结果；不等于论文没有数据。' : 'No values with exact source anchors are saved; this does not mean the paper contains no data.'}</p> : <div className="overflow-x-auto pt-2"><EvidenceTable><thead><tr>{(zh ? ['指标', '数值 / 单位', '条件与对照', 'n / 误差', '原文定位'] : ['Measure', 'Value / unit', 'Conditions / control', 'n / uncertainty', 'Source']).map((h) => <th key={h} className="border p-2">{h}</th>)}</tr></thead><tbody>{values.map((v, i) => <tr key={i}><td className="border p-2">{show(v.measure)}<p>{show(v.interpretation)}</p></td><td className="border p-2">{show(v.value)} {show(v.unit)}</td><td className="border p-2">{show(v.condition)}<p>{show(v.comparator)}</p></td><td className="border p-2">{show(v.n)} / {show(v.uncertainty)}</td><td className="border p-2"><Disclosure title={show(v.source_id)}><blockquote>{show(v.source_quote)}</blockquote></Disclosure></td></tr>)}</tbody></EvidenceTable></div>}
+      {!values.length ? <p className="pt-2">{zh ? '尚无通过原文数值定位的提取结果；不等于论文没有数据。' : 'No values with exact source anchors are saved; this does not mean the paper contains no data.'}</p> : <div className="overflow-x-auto pt-2"><EvidenceTable><thead><tr>{(zh ? ['指标', '数值 / 单位', '条件与对照', 'n / 误差', '原文定位'] : ['Measure', 'Value / unit', 'Conditions / control', 'n / uncertainty', 'Source']).map((h) => <th key={h} className="border p-2">{h}</th>)}</tr></thead><tbody>{values.map((v, i) => <tr key={i}><td className="border p-2">{show(v.measure)}{!curated ? <p>{show(v.interpretation)}</p> : null}</td><td className="border p-2">{show(v.value)} {show(v.unit)}</td><td className="border p-2">{show(v.condition)}<p>{show(v.comparator)}</p></td><td className="border p-2">{show(v.n)} / {show(v.uncertainty)}</td><td className="border p-2"><Disclosure title={show(v.source_id)}><blockquote>{show(v.source_quote)}</blockquote></Disclosure></td></tr>)}</tbody></EvidenceTable></div>}
     </Disclosure>
     <Disclosure title={`${zh ? '原始图片和图注' : 'Original figures and captions'} (${figures.length})`}>
       <div className="grid gap-4 pt-2">{figures.map((f, i) => <article key={i} className="space-y-2"><h5 className="font-medium">{show(f.label || f.id)}</h5>{rows(f.assets).map((asset, n) => {

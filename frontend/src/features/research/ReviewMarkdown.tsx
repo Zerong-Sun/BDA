@@ -81,11 +81,9 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
     return undefined
   }
 
-  return (
-    <div className={`${PROSE}${presentation === 'chat' ? ' review-markdown--chat' : ''}`}>
-      {showToc ? (
-        <nav aria-label={language === 'zh' ? '章节' : 'Sections'} className="mb-4 border border-border-soft bg-surface-2 p-3">
-          <ol className="!ml-4 grid gap-0.5 text-xs sm:grid-cols-2">
+  const toc = showToc ? (
+        <nav aria-label={language === 'zh' ? '章节' : 'Sections'} className="my-4 border border-border-soft bg-surface-2 p-3">
+          <ol className="!ml-0 !list-none grid gap-0.5 text-xs sm:grid-cols-2">
             {headings.map((heading) => (
               <li key={heading}>
                 <a className="text-accent hover:underline" href={`#${idByHeading.get(heading)}`}
@@ -99,7 +97,10 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
             ))}
           </ol>
         </nav>
-      ) : null}
+      ) : null
+
+  return (
+    <div className={`${PROSE}${presentation === 'chat' ? ' review-markdown--chat' : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkCitationMarkers, { citations }]]}
         components={{
@@ -131,9 +132,9 @@ export function ReviewMarkdown({ children, citations = [], projectId, compactCit
             }}>{content}</a></sup>
           },
           h2: ({ children: content, ...props }) => (
-            <h2 {...props} id={idByHeading.get(headingText(content))} data-chat-emphasis={emphasis(content)}>
+            <>{headingText(content) === headings[0] ? toc : null}<h2 {...props} id={idByHeading.get(headingText(content))} data-chat-emphasis={emphasis(content)}>
               {content}
-            </h2>
+            </h2></>
           ),
         }}
       >

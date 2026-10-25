@@ -12,6 +12,8 @@
 
 ## 安全升级
 
+- [RC4 整合发布与仓库维护](RELEASE_2_6_RC4.md)
+
 - [2026-10-25 安全升级清单与验证](SECURITY_UPGRADE_2026-10-25.md)
 - [安全开发、接口配置与发布规范](SECURITY_ENGINEERING.md)
 
@@ -68,6 +70,8 @@
 - [最新结果、暂停状态与摘要修复（2026-10-19）](RESEARCH_SUMMARY_FIXES_2026-10-19.md)
 
 ## 研究记录与审核
+
+- [项目证据整理与历史来源保留](EVIDENCE_CURATION.md)
 
 - [研究决策中心](RESEARCH_DECISION_CENTER.md)
 - [仪器分析与质控审核](WETLAB_QUALITY_CONTROL.md)

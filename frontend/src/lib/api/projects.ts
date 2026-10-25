@@ -14,6 +14,7 @@ import {
   projectLibraryApiV2ProjectsLibraryGet,
   listWorkflowsApiV2ProjectsProjectIdWorkflowRunsGet,
   getProjectPromptDraftApiV2ProjectsPromptDraftsDraftIdGet,
+  getProjectApiV2ProjectsProjectIdGet,
   patchProjectApiV2ProjectsProjectIdPatch,
   patchTargetApiV2TargetsTargetIdPatch,
   postFindingApiV2ProjectsProjectIdResearchFindingsPost,
@@ -68,6 +69,12 @@ export async function listProjects(): Promise<Project[]> {
     cursor = page.next_cursor ?? null
   } while (cursor)
   return projects
+}
+
+export async function getProject(projectId: string): Promise<Project> {
+  return ProjectSchema.parse((await getProjectApiV2ProjectsProjectIdGet<true>({
+    path: { project_id: projectId }, throwOnError: true,
+  })).data)
 }
 
 export async function listProjectLibrary(): Promise<ProjectLibraryItem[]> {
