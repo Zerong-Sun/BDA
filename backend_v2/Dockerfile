@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 ARG BDA_BUILD_REVISION=development
 ARG BDA_SCHEMA_REVISION=0078_design_memory
