@@ -60,6 +60,7 @@ export interface StructureViewerProps {
   defaultRepresentation?: RepresentationPreset
   defaultColor?: ColorPreset
   showMetadata?: boolean
+  canvasFirst?: boolean
   onReady?: () => void
   onError?: (message: string) => void
   allowFullscreen?: boolean
@@ -96,6 +97,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
       defaultRepresentation = 'cartoon',
       defaultColor = 'chain-id',
       showMetadata = true,
+      canvasFirst = false,
       onReady,
       onError,
       allowFullscreen = true,
@@ -532,8 +534,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
       )
     }
 
-    const body = (
-      <>
+    const configuration = <>
         {showMetadata && source ? (
           <StructureMetadataPanel source={source} />
         ) : null}
@@ -562,6 +563,11 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
             fullscreenButtonRef={fullscreenButtonRef}
           />
         ) : null}
+    </>
+
+    const body = (
+      <>
+        {!canvasFirst || isFullscreen ? configuration : null}
         {isFullscreen && structureLoaded ? <div className="mb-2 flex items-center gap-3 rounded-lg border border-border-soft bg-surface-1 px-4 py-2 text-sm">
           <label htmlFor="structure-residue-query">{language === 'zh' ? '残基与侧链' : 'Residue & side chain'}</label>
           <Input id="structure-residue-query" aria-label={language === 'zh' ? '残基编号' : 'Residue identifier'} placeholder="A:54" value={residueQuery} onChange={event => setResidueQuery(event.target.value)} className="w-24 font-mono" />
@@ -627,6 +633,7 @@ export const StructureViewer = forwardRef<StructureViewerHandle, StructureViewer
             ) : null}
           </div>
         </div>
+        {canvasFirst && !isFullscreen ? configuration : null}
       </>
     )
 

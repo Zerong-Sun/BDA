@@ -176,7 +176,7 @@ export const useAppStore = create<AppState>()(
       copilotOpen: false,
       settingsOpen: false,
       activityOpen: false,
-      copilotWidth: 380,
+      copilotWidth: 480,
       targetIntakeOpen: false,
       deletingProjectId: null,
       workflowSeed: null,

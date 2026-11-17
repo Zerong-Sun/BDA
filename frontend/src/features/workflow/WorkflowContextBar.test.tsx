@@ -18,6 +18,8 @@ describe('organized route context', () => {
         method: '支架改造', objective: '比较假设', evidence: '尚无实验结果', next_step: '复核证据', aliases: ['Route A'],
       } },
     }]} onSelectRun={vi.fn()} />)
+    expect(screen.queryByTestId('route-explanation')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('路线摘要、证据与下一步'))
     expect(screen.getByTestId('route-explanation')).toHaveTextContent('尚无实验结果')
     expect(screen.getByText('支架改造 · draft')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '查看证据 →' })).toHaveAttribute('href', '#/research?project=project&tab=evidence')

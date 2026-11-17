@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure'
 import { useNavigate, useSearchParams } from 'react-router'
 import type { ResearchWorkspaceStructure } from '../../lib/api/generated/types.gen'
 import { workspaceText } from '../../lib/api/researchWorkspace'
@@ -56,7 +57,7 @@ export function StructureComparison({ structures, projectId }: { structures: Res
     <div className="mt-4">{item.download_url ? <StructureViewerLazy key={item.artifact_id} source={structureSourceFromUrl(item.download_url, {
       projectId, artifactId: item.artifact_id, pdbId: item.pdb_id, proteinName: workspaceText(item.name, language),
       chains: Array.isArray(item.lineage?.chains) ? item.lineage.chains.filter((chain): chain is string => typeof chain === 'string') : undefined,
-    })} height={400} showMetadata /> : <div className="science-empty"><p>{zh ? '结构文件尚不可用' : 'Structure file unavailable'}</p><span className="text-xs">{item.status.replaceAll('_', ' ')}</span></div>}</div>
+    })} height={400} canvasFirst showMetadata /> : <div className="science-empty"><p>{zh ? '结构文件尚不可用' : 'Structure file unavailable'}</p><span className="text-xs">{item.status.replaceAll('_', ' ')}</span></div>}</div>
     <h3>{workspaceText(item.name, language)}</h3>
     <p className="text-sm text-text-secondary">{workspaceText(item.role, language)}</p>
     <p className="mt-2 text-xs text-text-muted">{workspaceText(item.method, language) || (zh ? '方法未注明' : 'Method unspecified')} · {item.resolution ? `${item.resolution} Å` : (zh ? '分辨率未注明' : 'Resolution unspecified')}{item.reference_id ? ` · ${item.reference_id}` : ''}</p>
@@ -64,7 +65,7 @@ export function StructureComparison({ structures, projectId }: { structures: Res
   </div>
   return <section className="structure-comparison" aria-label={zh ? '交互式结构对照' : 'Interactive structure comparison'}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-lg font-medium">{zh ? '在结构之间，发现差异。' : 'Explore structures in context.'}</h2><p className="mt-1 text-sm text-text-secondary">{zh ? '旋转、选择链与切换表示。并排查看为独立视角，不作自动结构对齐。' : 'Rotate, select chains and change representation. Side-by-side views are independent, without automatic alignment.'}</p></div>
+      <div><h2 className="text-lg font-medium">{zh ? '在结构之间，发现差异。' : 'Explore structures in context.'}</h2><Disclosure className="structure-viewer-help mt-1 text-sm text-text-secondary" title={zh ? '操作说明与对照限制' : 'Controls & comparison limits'}><p>{zh ? '旋转、选择链与切换表示。并排查看为独立视角，不作自动结构对齐。' : 'Rotate, select chains and change representation. Side-by-side views are independent, without automatic alignment.'}</p></Disclosure></div>
       <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" aria-pressed={compare} disabled={structures.length < 2} onClick={toggleCompare}>{zh ? (compare ? '返回单结构' : '并排对照') : (compare ? 'Single structure' : 'Compare side by side')}</Button><Button type="button" onClick={ask}>{zh ? '交给 Bot 解读' : 'Discuss with a Bot'}</Button></div>
     </div>
     <div className="structure-comparison-panes" data-single={!compare}>{pane(left, 'left')}{compare && right ? pane(right, 'right') : null}</div>

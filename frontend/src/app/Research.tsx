@@ -89,9 +89,9 @@ function ProjectResearchPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             {!showResults ? <p className="text-xs uppercase tracking-wide text-accent">{t.research.page.eyebrow}</p> : null}
-            <h1 className="mt-2 text-3xl font-medium text-text-primary">{showResults ? (language === 'zh' ? '项目结果、报告与复核' : 'Project results, reports & review') : t.research.page.title}</h1>
+            <h1 className="mt-2 text-3xl font-medium text-text-primary">{tab === 'structures' ? (language === 'zh' ? '结构对照' : 'Structure comparison') : showResults ? (language === 'zh' ? '项目结果、报告与复核' : 'Project results, reports & review') : t.research.page.title}</h1>
           </div>
-          {projectId ? (
+          {projectId && tab !== 'structures' ? (
             <div className="shrink-0">
             <Button
               type="button"
@@ -130,7 +130,7 @@ function ProjectResearchPage() {
             ))}
           </TabsList>
         </header>
-        {group === 'evidence' ? <nav className="mb-4 flex flex-wrap gap-2" aria-label={language === 'zh' ? '证据资料类型' : 'Evidence categories'}>
+        {group === 'evidence' ? <nav className="research-evidence-navigation mb-4 flex flex-wrap gap-2" aria-label={language === 'zh' ? '证据资料类型' : 'Evidence categories'}>
           {RESEARCH_TABS.filter((item) => ['evidence', 'references', 'structures', 'data'].includes(item)).map((item) => (
             <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
           ))}
