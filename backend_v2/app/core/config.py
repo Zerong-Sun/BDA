@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import uuid
 from functools import lru_cache
@@ -97,6 +98,8 @@ class Settings(BaseSettings):
     # Exact origins approved by the operator; empty disables outbound model calls.
     # Private inference gateways must be explicitly approved here as well.
     llm_allowed_endpoint_origins: str = ""
+    # Optional operator-controlled CONNECT proxy on this host, never a project setting.
+    llm_loopback_proxy_url: str | None = None
     # Absolute, and outside the source tree. The previous relative default pointed into
     # `backend/`, a directory removed with v1, so BYOK either wrote into whatever the
     # working directory happened to be or failed outright on a read-only root filesystem.
@@ -183,6 +186,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_runtime(self) -> Settings:
+        if self.llm_loopback_proxy_url is not None:
+            try:
+                proxy = urlsplit(self.llm_loopback_proxy_url)
+                if (proxy.scheme not in {"http", "https"} or not proxy.hostname
+                        or not ipaddress.ip_address(proxy.hostname).is_loopback
+                        or proxy.port is None or not 1 <= proxy.port <= 65535
+                        or proxy.username is not None or proxy.password is not None
+                        or proxy.path not in {"", "/"} or proxy.query or proxy.fragment
+                        or any(c.isspace() or ord(c) < 32 for c in self.llm_loopback_proxy_url)
+                        or "\\" in self.llm_loopback_proxy_url):
+                    raise ValueError
+            except ValueError:
+                raise ValueError("LLM proxy must be an HTTP(S) loopback IP origin with an explicit port and no credentials") from None
         if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
             raise ValueError("BDA v2 requires PostgreSQL; SQLite is not supported")
         if self.compute_backend not in {"docker", "lsf", "demo"}:

@@ -139,19 +139,20 @@ function ReviewEditor({ state, workflowId, projectId, writable, copy }: { state:
   </form>
 }
 
-export function DesignLearningPanel({ workflowId, projectId, workflowVersion, draft, writable }: { workflowId: string; projectId: string; workflowVersion: number; draft: boolean; writable: boolean }) {
+export function DesignLearningPanel({ workflowId, projectId, workflowVersion, draft, writable, compact = false }: { workflowId: string; projectId: string; workflowVersion: number; draft: boolean; writable: boolean; compact?: boolean }) {
   const { language } = useI18n()
   const copy: Copy = (zh, en) => language === 'zh' ? zh : en
   const query = useQuery({ queryKey: ['design-learning', workflowId, workflowVersion], queryFn: () => memory.getDesignLearning(workflowId), refetchOnWindowFocus: false })
   const state = query.data
   const action = useAction(projectId)
   const labels = { missing: copy('待完成设计前评审', 'Pre-design review needed'), stale: copy('设计或经验已变化，需要重新评审', 'Design or lessons changed; review again'), ready: copy('设计前评审已通过', 'Pre-design review complete'), frozen: copy('原设计评审已冻结', 'Original design review frozen') }
-  return <section className="project-summary-card mb-4 space-y-3" aria-label={copy('设计学习闭环', 'Design learning loop')}>
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{copy('设计学习闭环', 'Design learning loop')}</h2><Link className="text-sm underline" to={`/learning?project=${projectId}`}>{copy('打开项目经验库', 'Open project lesson library')}</Link></div>
+  return <section className={`project-summary-card mb-4 ${compact ? 'design-learning-compact' : 'space-y-3'}`} aria-label={copy('设计学习闭环', 'Design learning loop')}>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{copy('设计学习闭环', 'Design learning loop')}</h2>{compact && state && !query.isError ? <p role="status" className="text-sm">{labels[state.state]} · {copy('经验条目', 'Prior lessons')} {state.lessons.length}</p> : null}<Link className="text-sm underline" to={`/learning?project=${projectId}`}>{copy('打开项目经验库', 'Open project lesson library')}</Link></div>
     {query.isPending && <p role="status">{copy('正在检查已有经验…', 'Checking prior experience…')}</p>}
     {query.isError && <p role="alert">{query.error.message}<Button type="button" variant="outline" onClick={() => void query.refetch()}>{copy('重试', 'Retry')}</Button></p>}
     {state && !query.isError && <>
-      <p role="status" className="text-sm font-medium">{labels[state.state]} · {copy('经验条目', 'Prior lessons')} {state.lessons.length}</p>
+      {!compact ? <p role="status" className="text-sm font-medium">{labels[state.state]} · {copy('经验条目', 'Prior lessons')} {state.lessons.length}</p> : null}
+      <Disclosure defaultOpen={!compact} className="design-learning-details" title={copy('查看学习评审与执行记录', 'Review learning & execution record')}>
       {state.manual_only && <div className="space-y-2 text-sm"><p>{copy('这是人工或外部执行路线。开始后冻结设计；完成表示执行记录已闭环，科学结论以逐项结果为准。', 'This route runs manually or externally. Starting freezes the design. Completion closes the execution record; scientific conclusions remain in the individual outcomes.')}</p>{draft ? <Button type="button" variant="outline" disabled={!writable || action.busy || state.state !== 'ready'} onClick={() => void action.perform(() => memory.recordManualExecution(workflowId, state.workflow_version, 'start'))}>{copy('开始人工 / 外部执行（不提交计算）', 'Start manual / external execution (no compute submission)')}</Button> : state.manual_execution && !state.manual_execution_complete && <Button type="button" variant="outline" disabled={!writable || action.busy || state.pending_feedback.length > 0} onClick={() => void action.perform(() => memory.recordManualExecution(workflowId, state.workflow_version, 'complete'))}>{copy('完成执行记录', 'Complete execution record')}</Button>}</div>}
       {!state.required && <p className="text-sm text-text-secondary">{copy('历史路线尚未启用此门控。草稿保存评审后启用；所有新建路线自动要求评审。', 'This historical route has no learning gate. Saving a draft review enables it; new routes require it automatically.')}</p>}
       {draft && <Disclosure key={`${state.state}:${state.required}`} title={copy('设计前学习清单', 'Pre-design learning checklist')}><div className="mt-3"><ReviewEditor key={`${workflowId}:${state.fingerprint}:${state.memory_digest}:${state.review?.id ?? ''}`} state={state} workflowId={workflowId} projectId={projectId} writable={writable} copy={copy} /></div></Disclosure>}
@@ -165,6 +166,7 @@ export function DesignLearningPanel({ workflowId, projectId, workflowVersion, dr
           </form>
         </Disclosure>}
       </>}
+      </Disclosure>
     </>}
     <Notice action={action} copy={copy} />
   </section>

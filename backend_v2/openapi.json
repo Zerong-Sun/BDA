@@ -8274,6 +8274,11 @@
             "title": "Data Boundary",
             "type": "string"
           },
+          "data_boundary_zh": {
+            "default": "",
+            "title": "Data Boundary Zh",
+            "type": "string"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -8284,6 +8289,11 @@
           },
           "effort": {
             "title": "Effort",
+            "type": "string"
+          },
+          "effort_zh": {
+            "default": "",
+            "title": "Effort Zh",
             "type": "string"
           },
           "function_ids": {
@@ -8302,6 +8312,11 @@
             "title": "License Boundary",
             "type": "string"
           },
+          "license_boundary_zh": {
+            "default": "",
+            "title": "License Boundary Zh",
+            "type": "string"
+          },
           "requirements": {
             "items": {
               "$ref": "#/components/schemas/ExtensionRequirement"
@@ -8313,8 +8328,18 @@
             "title": "Resources",
             "type": "string"
           },
+          "resources_zh": {
+            "default": "",
+            "title": "Resources Zh",
+            "type": "string"
+          },
           "rollout_trigger": {
             "title": "Rollout Trigger",
+            "type": "string"
+          },
+          "rollout_trigger_zh": {
+            "default": "",
+            "title": "Rollout Trigger Zh",
             "type": "string"
           },
           "sources": {
@@ -8363,6 +8388,11 @@
         "properties": {
           "boundary": {
             "title": "Boundary",
+            "type": "string"
+          },
+          "boundary_zh": {
+            "default": "",
+            "title": "Boundary Zh",
             "type": "string"
           },
           "id": {

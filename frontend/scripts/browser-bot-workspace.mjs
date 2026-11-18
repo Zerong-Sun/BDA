@@ -261,6 +261,7 @@ try {
   await page.getByRole('tab', { name: 'Tasks & deliverables', exact: true }).click()
   assert.equal(await page.getByLabel('Task goal', { exact: true }).inputValue(), 'Research the existing project sources')
   assert.ok(await page.getByRole('checkbox', { name: 'Allow external literature search and ingestion' }).isChecked())
+  await page.getByRole('button', { name: 'Project background', exact: true }).click()
   await page.getByRole('link', { name: 'Read project brief', exact: true }).click()
   await page.getByRole('region', { name: 'Project research summary' }).waitFor()
   await page.goBack()
@@ -273,7 +274,7 @@ try {
   await page.reload()
   await page.getByText(task.outcome.summary, { exact: true }).waitFor()
   await screenshot(page, 'task-delivery-en-light')
-  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Research', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Project results', exact: true }).click()
   await page.getByRole('region', { name: 'Project research summary' }).waitFor()
   await page.goBack()
   await page.getByText(task.outcome.summary, { exact: true }).waitFor()
@@ -374,22 +375,23 @@ try {
   await inbox.goto(`${origin}/#/inbox?project=proj_browser`)
   await inbox.getByRole('heading', { level: 1, name: 'Needs your decision', exact: true }).waitFor()
   const needsInput = inbox.getByRole('region', { name: 'Needs your input', exact: true })
-  const heldTask = needsInput.getByRole('link', { name: /Review the synthetic QA sources/ })
+  const heldTask = needsInput.getByRole('link').filter({ hasText: task.outcome.summary })
   await heldTask.waitFor()
-  // Recorded under the retired `librarian` id; it opens at the operator that absorbed it.
-  assert.ok((await heldTask.getAttribute('href')).includes('/bots/researcher?project=proj_browser&run=task-browser'))
+  // The inbox opens the durable task in the shared project task workspace.
+  assert.ok((await heldTask.getAttribute('href')).includes('/bots?project=proj_browser&view=tasks&run=task-browser'))
   await screenshot(inbox, 'inbox-en-light')
   for (const width of [390, 1024]) {
     await inbox.setViewportSize({ width, height: 1000 })
     await noOverflow(inbox, `Decisions ${width}`)
   }
-  await inbox.setViewportSize({ width: 1440, height: 1000 })
-  await inbox.getByRole('button', { name: 'Workbenches', exact: true }).click()
+  await inbox.setViewportSize({ width: 390, height: 1000 })
+  await inbox.getByRole('button', { name: 'Switch page', exact: true }).click()
   await inbox.getByRole('menuitem', { name: 'Candidates', exact: true }).waitFor()
   await inbox.keyboard.press('Escape')
+  await inbox.setViewportSize({ width: 1440, height: 1000 })
   await inbox.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Workflow', exact: true }).waitFor()
   assert.equal(writes.length, writesBeforeInbox, 'The decision inbox must only read')
-  checks.push('Decisions gathers what waits on a person, links each to where it is decided, and only reads; workbenches sit behind one menu')
+  checks.push('Decisions gathers what waits on a person, links each to where it is decided, and only reads; mobile workbenches use the page menu and desktop workbenches remain visible')
 
   failRoster = true
   const errorPage = await newPage()

@@ -47,6 +47,22 @@ function DrawerHarness() {
 }
 
 describe('CopilotDrawer', () => {
+  it('supports a wide reading pane with bounded keyboard resizing', () => {
+    const previousWidth = useAppStore.getState().copilotWidth
+    useAppStore.getState().setCopilotWidth(480)
+    renderWithProviders(<CopilotDrawer open onClose={() => undefined} />)
+    const slider = screen.getByRole('slider')
+    fireEvent.keyDown(slider, { key: 'End' })
+    expect(slider).toHaveAttribute('aria-valuenow', '800')
+    fireEvent.keyDown(slider, { key: 'ArrowLeft', shiftKey: true })
+    expect(slider).toHaveAttribute('aria-valuenow', '800')
+    fireEvent.keyDown(slider, { key: 'Home' })
+    expect(slider).toHaveAttribute('aria-valuenow', '300')
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(slider).toHaveAttribute('aria-valuenow', '300')
+    useAppStore.getState().setCopilotWidth(previousWidth)
+  })
+
   it('offers model configuration to project writers and hides it from project viewers', async () => {
     sessionStorage.setItem('bda_user', JSON.stringify({ role: 'researcher' }))
     server.use(

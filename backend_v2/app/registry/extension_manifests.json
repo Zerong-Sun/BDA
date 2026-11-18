@@ -27,33 +27,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "沿用 PostgreSQL、Redis、任务进程与制品存储；按实测负载配置容量。",
+    "license_boundary_zh": "遵循 BDA 及依赖许可；可选供应商另行审核。",
+    "data_boundary_zh": "沿用项目和制品的数据边界。",
+    "rollout_trigger_zh": "作为所有扩展的基础，需验证实际环境的故障恢复。",
+    "effort_zh": "已内置；部署验收仍按具体站点开展。"
   },
   {
     "id": "scientific-methods",
@@ -80,33 +90,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "使用已配置的模型令牌预算；方法包不执行任意代码。",
+    "license_boundary_zh": "BDA 编写的方法包采用 Apache-2.0；来源记录用于方法参考。",
+    "data_boundary_zh": "沿用现有模型与项目策略，不增加出站目的地。",
+    "rollout_trigger_zh": "扩展默认方法前，先评估来源准确性和复核耗时。",
+    "effort_zh": "已内置；科学评测工作量取决于任务集合。"
   },
   {
     "id": "scientific-models",
@@ -138,33 +158,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "选择已声明的 CPU/GPU 节点；逐模型实测内存、运行时长与输入规模。",
+    "license_boundary_zh": "代码与具体权重分别审核；AF3/Protenix 变体及 PyRosetta 依赖需要专门资格审核。",
+    "data_boundary_zh": "模型输入与权重保留在已审核的项目和站点边界内。",
+    "rollout_trigger_zh": "明确科学任务、基线、权重身份和有上限的试验预算。",
+    "effort_zh": "规划估算：共享 GPU 服务需 8–16 工程人周；不是供应商报价。"
   },
   {
     "id": "local-inference",
@@ -191,33 +221,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "评测 GPU 容量、量化、并发与上下文长度，并计入待机及运维。",
+    "license_boundary_zh": "推理服务代码与模型权重具有独立许可条款。",
+    "data_boundary_zh": "审核提示词、追踪记录、端点路由和保留策略；本地主机名称不证明数据隔离。",
+    "rollout_trigger_zh": "API 开销、隐私或延迟需求足以支持自建模型服务。",
+    "effort_zh": "规划估算：4–8 工程人周，另加实测 GPU 和运维成本。"
   },
   {
     "id": "durable-pipelines",
@@ -246,33 +286,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "工作流服务与任务进程容量、调度器集成及持久存储。",
+    "license_boundary_zh": "分别审核引擎和配套管线、容器的许可。",
+    "data_boundary_zh": "将外部工作流标识和谱系映射至现有项目、工作流及制品标识。",
+    "rollout_trigger_zh": "实测的多日任务恢复复杂度已超出现有任务进程模型。",
+    "effort_zh": "规划估算：12–24 工程人周；先接入一条范围明确的管线。"
   },
   {
     "id": "multimodal-data",
@@ -300,33 +350,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "存储与导入带宽、索引任务进程，以及备份和数据保留容量。",
+    "license_boundary_zh": "审核数据集、数据结构、标注与基础设施许可。",
+    "data_boundary_zh": "导入后仍须保留项目归属、来源、同意或合同范围及保留规则。",
+    "rollout_trigger_zh": "真实多测定数据已超出现有制品检索和质量工作流的能力。",
+    "effort_zh": "规划估算：8–16 工程人周，另加数据整理和存储成本。"
   },
   {
     "id": "robotic-assay",
@@ -355,33 +415,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "实体设备、耗材、校准、现场操作人员与维护。",
+    "license_boundary_zh": "审核机器人 SDK、设备供应商合同及测定和知识产权条款。",
+    "data_boundary_zh": "明确样本身份、仪器记录、实验室访问权限和供应商数据范围。",
+    "rollout_trigger_zh": "稳定重复的测定流程和现场负责人足以支持硬件集成。",
+    "effort_zh": "规划估算：首个测定需 12–30 工程人周；硬件和耗材需另行报价。"
   },
   {
     "id": "physics-validation",
@@ -409,33 +479,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "CPU/GPU 多次模拟、模拟数据存储与领域专业知识。",
+    "license_boundary_zh": "力场、参数化方法及模型组件的许可可能不同。",
+    "data_boundary_zh": "冻结初始结构、力场、随机种子、环境和数据归属。",
+    "rollout_trigger_zh": "决策反复依赖现有经验评分无法反映的效应。",
+    "effort_zh": "规划估算：12–24 工程人周，另加实测模拟成本。"
   },
   {
     "id": "model-finetuning",
@@ -464,33 +544,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "整理后的数据、分布式 GPU 时间、评测人员与权重存储。",
+    "license_boundary_zh": "训练数据、基础权重、衍生模型及服务输出均须分别审核。",
+    "data_boundary_zh": "防止跨项目泄漏；记录数据使用资格和精确训练快照。",
+    "rollout_trigger_zh": "冻结特征基线已达到瓶颈，且有足量已授权数据。",
+    "effort_zh": "规划估算：20–40+ 工程人周；计算成本由试点测量确定。"
   },
   {
     "id": "foundation-pretraining",
@@ -518,33 +608,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "大规模许可数据、多节点 GPU、可靠训练系统和专职研究团队。",
+    "license_boundary_zh": "数据收集、基础代码、再分发和训练后权重须分别约定条款。",
+    "data_boundary_zh": "先设计数据使用资格、去重、污染检查、来源及删除要求。",
+    "rollout_trigger_zh": "独有且可持续的数据和已验证的业务、科学需求超出现有模型能力。",
+    "effort_zh": "可行性估算：4–8 工程人周；训练总成本待测量后估算。"
   },
   {
     "id": "external-agents",
@@ -572,33 +672,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "联合身份、持久消息、配额及失败和重放处理。",
+    "license_boundary_zh": "审核协议实现和每个远程服务协议。",
+    "data_boundary_zh": "显式限定委托权限、项目边界、出站和审计；权限不得传递扩张。",
+    "rollout_trigger_zh": "明确的外部团队或服务需要持久协作任务协议。",
+    "effort_zh": "规划估算：6–12 工程人周，另加合作方集成工作。"
   },
   {
     "id": "collaborative-canvas",
@@ -626,33 +736,43 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "WebSocket 与在线状态服务、并发、版本存储和离线冲突处理。",
+    "license_boundary_zh": "部分画布库需要生产许可；审核具体软件包与版本。",
+    "data_boundary_zh": "在线状态、编辑与证据导出均须遵循项目访问控制。",
+    "rollout_trigger_zh": "已观察到的协作困难，足以支持在现有决策视图之外增加共同编辑。",
+    "effort_zh": "规划估算：4–8 工程人周，另加所选生产许可费用。"
   },
   {
     "id": "evaluation-observability",
@@ -682,32 +802,42 @@
         "id": "runtime",
         "title": "Executable adapter and recovery",
         "title_zh": "执行适配与恢复",
-        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof."
+        "boundary": "Implementation plus scoped failure/restart tests; configuration alone is not deployment proof.",
+        "boundary_zh": "需要可执行适配及限定范围的故障、重启测试；仅有配置不证明部署可用。"
       },
       {
         "id": "license",
         "title": "Code, weights and dependency terms",
         "title_zh": "代码、权重及依赖许可",
-        "boundary": "Review exact version/checkpoint and intended use, including commercial limits."
+        "boundary": "Review exact version/checkpoint and intended use, including commercial limits.",
+        "boundary_zh": "审核具体版本、权重与预期用途，包括商业使用限制。"
       },
       {
         "id": "data",
         "title": "Data isolation and egress",
         "title_zh": "数据隔离与出站",
-        "boundary": "Define project isolation, retention, destinations and approved data scope."
+        "boundary": "Define project isolation, retention, destinations and approved data scope.",
+        "boundary_zh": "明确项目隔离、数据保留、目的地和获准使用的数据范围。"
       },
       {
         "id": "validation",
         "title": "Acceptance evidence",
         "title_zh": "验收证据",
-        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria."
+        "boundary": "Frozen benchmark with baseline, failure cases and task-specific acceptance criteria.",
+        "boundary_zh": "使用固定基准、对照、失败案例及任务专属验收标准。"
       },
       {
         "id": "budget",
         "title": "Resource and operating budget",
         "title_zh": "资源与运行预算",
-        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately."
+        "boundary": "Estimate engineering, compute, licenses, experiments and ongoing operations separately.",
+        "boundary_zh": "分别估算工程、计算、许可、实验及持续运维成本。"
       }
-    ]
+    ],
+    "resources_zh": "追踪与评测存储、脱敏、基准维护及复核人员时间。",
+    "license_boundary_zh": "核心版、企业版和托管服务条款不同；审核选定组件。",
+    "data_boundary_zh": "默认不得导出凭据或原始私有项目数据；仅允许明确批准的追踪字段。",
+    "rollout_trigger_zh": "证据准确性和成本退化需要可重复的多供应商比较。",
+    "effort_zh": "先限定一个评测器；确定代表性数据集和保留要求后再估算。"
   }
 ]

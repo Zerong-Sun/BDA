@@ -73,9 +73,9 @@ function AuthPage({ mode }: { mode: Mode }) {
 
   return <main className="min-h-screen bg-background px-5 py-10 sm:px-10 lg:py-16" data-tour-id="auth-page">
     <div className="mx-auto max-w-6xl">
-      <header className="flex items-center justify-between gap-5">
+      <header className="flex flex-wrap items-center justify-between gap-3 sm:gap-5">
         <BigoBioLogo className="bigobio-logo--login" />
-        <div className="flex items-center gap-4"><Button type="button" variant="ghost" onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}>{language === 'en' ? '中文' : 'English'}</Button><Link to="/guide" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"><BookOpen aria-hidden="true" />{legacy.guide.nav.viewGuide}</Link></div>
+        <div className="flex shrink-0 flex-wrap items-center gap-4"><Button type="button" variant="ghost" onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}>{language === 'en' ? '中文' : 'English'}</Button><Link to="/guide" className="flex min-h-11 items-center gap-2 whitespace-nowrap text-sm text-muted-foreground hover:text-primary"><BookOpen aria-hidden="true" />{legacy.guide.nav.viewGuide}</Link></div>
       </header>
       <div className="mt-10 grid items-start gap-10 lg:mt-20 lg:grid-cols-[1.1fr_1fr] lg:gap-20">
         <section className="grid gap-6">

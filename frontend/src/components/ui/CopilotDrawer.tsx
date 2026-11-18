@@ -62,7 +62,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
     const startX = event.clientX
     const startWidth = copilotWidth
     const onMove = (moveEvent: PointerEvent) => {
-      setCopilotWidth(Math.min(560, Math.max(300, startWidth - (moveEvent.clientX - startX))))
+      setCopilotWidth(Math.min(800, Math.max(300, startWidth - (moveEvent.clientX - startX))))
     }
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
@@ -76,9 +76,9 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     if (event.key === 'Home') return setCopilotWidth(300)
-    if (event.key === 'End') return setCopilotWidth(560)
+    if (event.key === 'End') return setCopilotWidth(800)
     const delta = event.shiftKey ? 40 : 16
-    setCopilotWidth(Math.min(560, Math.max(300, copilotWidth + (event.key === 'ArrowLeft' ? delta : -delta))))
+    setCopilotWidth(Math.min(800, Math.max(300, copilotWidth + (event.key === 'ArrowLeft' ? delta : -delta))))
   }
 
   return (
@@ -96,7 +96,7 @@ export function CopilotDrawer({ open, onClose, pageContext }: CopilotDrawerProps
           variant="ghost"
           aria-label={t.copilot.drawer.resizeAriaLabel}
           aria-valuemin={300}
-          aria-valuemax={560}
+          aria-valuemax={800}
           aria-valuenow={copilotWidth}
           className="absolute inset-y-0 -left-2 z-10 flex w-4 cursor-col-resize items-center justify-center text-muted-foreground hover:text-primary"
           onPointerDown={startResize}
