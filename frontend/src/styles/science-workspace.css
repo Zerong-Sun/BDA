@@ -786,7 +786,11 @@ body { line-height: 1.6; }
   .research-page--structures .research-page-heading [role="tab"] { flex: 0 0 auto; white-space: nowrap; padding-inline: .625rem; }
   .research-page--structures .research-evidence-navigation { flex-wrap: nowrap; overflow-x: auto; margin-bottom: .5rem; }
   .research-page--structures .research-evidence-navigation > * { flex-shrink: 0; }
+  .research-page--structures .research-evidence-navigation { scrollbar-width: thin; }
   .research-page--structures .structure-comparison { gap: .5rem; }
+  .research-page--structures .structure-comparison-header { display: contents; }
+  .research-page--structures .structure-comparison-guidance { order: 3; }
+  .research-page--structures .structure-comparison-guidance h2 { display: none; }
   .research-page--structures .structure-comparison-pane { padding: .5rem; }
 }
 

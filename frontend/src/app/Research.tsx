@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { ChatCircleIcon } from '@phosphor-icons/react'
@@ -32,7 +32,13 @@ export function ResearchPage() {
 function ProjectResearchPage() {
   const { language, t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
+  const evidenceNavigation = useRef<HTMLElement>(null)
   const rawTab = searchParams.get('tab')
+  useEffect(() => {
+    const nav = evidenceNavigation.current
+    const selected = nav?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (nav && selected) nav.scrollLeft = selected.offsetLeft - nav.offsetLeft - (nav.clientWidth - selected.offsetWidth) / 2
+  }, [rawTab, language])
   const { projectId, activeProject } = useProjectContext()
   const retrospective = ['archived', 'completed'].includes(activeProject?.status ?? '')
   const workspaceQuery = useQuery({
@@ -130,7 +136,7 @@ function ProjectResearchPage() {
             ))}
           </TabsList>
         </header>
-        {group === 'evidence' ? <nav className="research-evidence-navigation mb-4 flex flex-wrap gap-2" aria-label={language === 'zh' ? '证据资料类型' : 'Evidence categories'}>
+        {group === 'evidence' ? <nav ref={evidenceNavigation} className="research-evidence-navigation mb-4 flex flex-wrap gap-2" aria-label={language === 'zh' ? '证据资料类型' : 'Evidence categories'}>
           {RESEARCH_TABS.filter((item) => ['evidence', 'references', 'structures', 'data'].includes(item)).map((item) => (
             <Button type="button" key={item} variant={tab === item ? 'secondary' : 'ghost'} size="sm" onClick={() => selectTab(item)} aria-pressed={tab === item}>{tabConfig[item].label}</Button>
           ))}
