@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ..core.config import get_settings
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
 from .endpoint_policy import validate_llm_endpoint
@@ -42,7 +43,10 @@ def structured_retry_provider(provider: LLMProvider) -> LLMProvider | None:
 async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) -> httpx.Response:
     try:
         async with asyncio.timeout(LLM_COMPLETION_DEADLINE_SECONDS):
-            async with httpx.AsyncClient(trust_env=False, follow_redirects=False) as client:
+            async with httpx.AsyncClient(
+                proxy=get_settings().llm_loopback_proxy_url,
+                trust_env=False, follow_redirects=False, verify=True,
+            ) as client:
                 # A timeout/connection break/5xx can happen after generation
                 # was accepted and charged. Never replay an ambiguous POST.
                 # Even an apparently safe connection failure remains one

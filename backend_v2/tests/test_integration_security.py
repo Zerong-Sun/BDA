@@ -112,7 +112,7 @@ def test_model_request_ignores_ambient_proxy_and_never_follows_redirects(monkeyp
     monkeypatch.setattr(provider, "credential_value", lambda _: "fixture-key")
     with pytest.raises(httpx.HTTPStatusError):
         provider.completion_message(SimpleNamespace(endpoint="https://api.trusted.test/v1", config={}, model="test", credential_ref="fixture"), [])
-    assert captured == {"trust_env": False, "follow_redirects": False}
+    assert captured == {"proxy": None, "trust_env": False, "follow_redirects": False, "verify": True}
 
 
 @pytest.mark.parametrize("host", ["-oProxyCommand=touch /tmp/exploit", "-F/tmp/evil", "host\nother", "host;whoami", ""])
