@@ -1,11 +1,1 @@
-[
-  {
-    "advisory": "GHSA-fc5q-39xc-vjpf",
-    "package": "picomatch",
-    "vulnerable_range": "<=4.0.7",
-    "severity": "high",
-    "reason": "No patched release exists (4.0.7 is the latest; upstream fixes are unmerged PRs). picomatch is reached only through build and test tooling (vite, vitest, tinyglobby, fdir, @parcel/watcher, typescript-eslint) evaluating repository-controlled globs; the served image contains only nginx and static dist assets. npm's suggested fix is a semver-major downgrade to vite 6 / vitest 3 that reintroduces fixed advisories.",
-    "reviewed": "2026-11-18",
-    "expires": "2026-12-18"
-  }
-]
+[]

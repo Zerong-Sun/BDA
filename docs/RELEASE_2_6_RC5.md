@@ -45,4 +45,5 @@
 
 本候选的最终检查结果以对应提交的 GitHub Actions 为准。本地未运行依赖 PostgreSQL 的
 数据库隔离测试与 `alembic downgrade base`，这两项以 CI 结果为准。
+2026-11-20 的 npm 审计已无告警，因此移除了 picomatch 的临时例外。
 发布源码候选不等于更新某个正在运行的服务。
