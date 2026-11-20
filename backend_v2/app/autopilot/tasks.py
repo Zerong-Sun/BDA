@@ -2,21 +2,13 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
-
 from ..compute.models import Job
 from ..copilot.models import CopilotAgentRun
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
 from ..workflows.models import WorkflowRun
-from .models import (
-    AutopilotCampaign,
-    AutopilotLedgerEntry,
-    AutopilotServicePrincipal,
-    AutopilotStage,
-    BudgetReservation,
-    CampaignBudget,
-)
+from .models import AutopilotLedgerEntry, AutopilotServicePrincipal
+from .repository import AutopilotRepository
 from .service import (
     UNSTARTED_STAGE_STATUSES,
     _advance_and_record,
@@ -35,18 +27,13 @@ def _worker_principal(session) -> AutopilotServicePrincipal:
     query in practice; going through the id keeps the creation in one place,
     which is the part that matters.
     """
-    principal = session.get(AutopilotServicePrincipal, _worker_principal_id(session))
+    principal = AutopilotRepository(session).service_principal(_worker_principal_id(session))
     assert principal is not None  # just written or just read by the lookup above
     return principal
 
 
 def _ledger_exists(session, campaign_id: uuid.UUID, event_type: str, operation_id: str) -> bool:
-    entries = session.scalars(
-        select(AutopilotLedgerEntry).where(
-            AutopilotLedgerEntry.campaign_id == campaign_id,
-            AutopilotLedgerEntry.event_type == event_type,
-        )
-    )
+    entries = AutopilotRepository(session).ledger_entries(campaign_id, event_type)
     return any(str(entry.payload.get("operation_id")) == operation_id for entry in entries)
 
 
@@ -66,15 +53,10 @@ def execute_campaign(self, campaign_id: str) -> dict:
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
+        campaign = AutopilotRepository(session).campaign_for_update(parsed)
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
-        reservation = session.scalar(
-            select(BudgetReservation).where(
-                BudgetReservation.campaign_id == parsed,
-                BudgetReservation.operation_id == uuid.UUID(operation_id),
-            )
-        )
+        reservation = AutopilotRepository(session).reservation_for_operation(parsed, uuid.UUID(operation_id))
         if campaign.status == "cancelled":
             return {"campaign_id": campaign_id, "status": "cancelled"}
         if campaign.status == "manual_takeover":
@@ -90,15 +72,7 @@ def execute_campaign(self, campaign_id: str) -> dict:
         # The frontmost stage that has not acted, which is *not* the same as the first
         # `pending` one: a held stage sits in `awaiting_release`, and selecting on
         # `pending` alone would step over it to the stage behind the gate.
-        first = session.scalar(
-            select(AutopilotStage)
-            .where(
-                AutopilotStage.campaign_id == parsed,
-                AutopilotStage.status.in_(UNSTARTED_STAGE_STATUSES),
-            )
-            .order_by(AutopilotStage.position)
-            .limit(1)
-        )
+        first = AutopilotRepository(session).first_stage_with_status(parsed, UNSTARTED_STAGE_STATUSES)
         resource = None
         held = first is not None and first.held
         if first is not None:
@@ -149,22 +123,13 @@ def reconcile_cancel(self, campaign_id: str) -> dict:
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
+        campaign = AutopilotRepository(session).campaign_for_update(parsed)
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
         if _ledger_exists(session, parsed, "campaign.cancel_reconciled", operation_id):
             return {"campaign_id": campaign_id, "status": "cancelled", "idempotent": True}
-        budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update())
-        reservations = list(
-            session.scalars(
-                select(BudgetReservation)
-                .where(
-                    BudgetReservation.campaign_id == parsed,
-                    BudgetReservation.status.in_(["reserved", "dispatched"]),
-                )
-                .with_for_update()
-            )
-        )
+        budget = AutopilotRepository(session).budget(parsed, for_update=True)
+        reservations = AutopilotRepository(session).open_reservations_for_update(parsed)
         released_gpu = sum(item.gpu_seconds for item in reservations)
         released_money = sum(item.money_micros for item in reservations)
         if budget is not None:
@@ -213,24 +178,17 @@ def settle_reservation(self, campaign_id: str, reservation_id: str, actual_gpu_s
     parsed = uuid.UUID(campaign_id)
     operation_id = str(self.request.id)
     with session_scope() as session:
-        campaign = session.scalar(select(AutopilotCampaign).where(AutopilotCampaign.id == parsed).with_for_update())
+        campaign = AutopilotRepository(session).campaign_for_update(parsed)
         if campaign is None:
             return {"campaign_id": campaign_id, "status": "missing"}
-        reservation = session.scalar(
-            select(BudgetReservation)
-            .where(
-                BudgetReservation.campaign_id == parsed,
-                BudgetReservation.id == uuid.UUID(reservation_id),
-            )
-            .with_for_update()
-        )
+        reservation = AutopilotRepository(session).reservation_for_update(parsed, uuid.UUID(reservation_id))
         if reservation is None:
             return {"campaign_id": campaign_id, "status": "reservation_missing"}
         if reservation.status in {"released", "committed"}:
             # Already settled, or released by a cancellation. Either way there is nothing
             # left to charge, and saying so beats charging it again.
             return {"campaign_id": campaign_id, "status": reservation.status, "idempotent": True}
-        budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == parsed).with_for_update())
+        budget = AutopilotRepository(session).budget(parsed, for_update=True)
         actual = max(0, int(actual_gpu_seconds))
         charged = min(actual, reservation.gpu_seconds)
         overrun = actual - charged
@@ -286,20 +244,13 @@ def stage_settled(self, run_id: str) -> dict:
     """
     parsed = uuid.UUID(run_id)
     with session_scope() as session:
-        stage = session.scalar(
-            select(AutopilotStage).where(
-                AutopilotStage.resource_type == "copilot_agent_run",
-                AutopilotStage.resource_id == parsed,
-            )
-        )
+        stage = next(iter(AutopilotRepository(session).stages_for_resource("copilot_agent_run", parsed)), None)
         if stage is None:
             return {"run_id": run_id, "status": "not_a_stage"}
         # Locked for the whole of this stay: two workers settling and advancing
         # one campaign would each read "the next unstarted stage" before either
         # wrote, and both would activate it.
-        campaign = session.scalar(
-            select(AutopilotCampaign).where(AutopilotCampaign.id == stage.campaign_id).with_for_update()
-        )
+        campaign = AutopilotRepository(session).campaign_for_update(stage.campaign_id)
         if campaign is None:
             # Only reachable as a race: `campaign_id` cascades, so a stage cannot
             # outlive its campaign, but the stage and the campaign are read in two
@@ -345,24 +296,11 @@ def workflow_stage_settled(job_id: str) -> dict:
         workflow = session.get(WorkflowRun, job.workflow_run_id) if job else None
         if workflow is None or workflow.status not in {"succeeded", "failed", "cancelled"}:
             return {"job_id": job_id, "status": "waiting_for_workflow"}
-        stages = list(
-            session.scalars(
-                select(AutopilotStage).where(
-                    AutopilotStage.resource_type == "workflow_run", AutopilotStage.resource_id == workflow.id
-                )
-            )
-        )
+        stages = AutopilotRepository(session).stages_for_resource("workflow_run", workflow.id)
         settled = []
         for initial_stage in stages:
-            campaign = session.scalar(
-                select(AutopilotCampaign).where(AutopilotCampaign.id == initial_stage.campaign_id).with_for_update()
-            )
-            stage = session.scalar(
-                select(AutopilotStage)
-                .where(AutopilotStage.id == initial_stage.id)
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            )
+            campaign = AutopilotRepository(session).campaign_for_update(initial_stage.campaign_id)
+            stage = AutopilotRepository(session).stage_for_update(initial_stage.id)
             if (
                 campaign is None
                 or stage is None

@@ -405,9 +405,10 @@ def announce_settled(session: Session, run: CopilotAgentRun) -> None:
     made and recorded: a consumer left to discover failure by polling does not,
     and the thing waiting sleeps for ever.
     """
-    from ..compute.repository import ComputeRepository
+    from ..platform.operations import enqueue_project_event
 
-    ComputeRepository(session).enqueue(
+    enqueue_project_event(
+        session,
         "copilot.agent_run.settled",
         run.id,
         project_id=run.project_id,

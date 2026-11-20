@@ -12,8 +12,9 @@ from ..core.problem import DomainError
 from ..projects.models import Project
 from ..projects.service import require_project_permission
 from ..workflows.models import WorkflowRun
-from ..workflows.repository import WorkflowRepository
+from ..workflows.service import get_workflow, lock_workflow, record_run_transition, workflow_nodes
 from .models import DesignLesson, DesignReview
+from .repository import DesignMemoryRepository
 from .schemas import FeedbackCreate, LessonCreate, ReviewCreate
 
 # Questions, not scientific conclusions. Domain-specific evidence lives in project lessons.
@@ -69,7 +70,7 @@ def digest(value) -> str:
 
 def fingerprint(session: Session, workflow: WorkflowRun) -> str:
     # Read executable rows, not merely the canvas cache. Presentation/layout changes do not invalidate review.
-    nodes = WorkflowRepository(session).nodes(workflow.id)
+    nodes = workflow_nodes(session, workflow.id)
     return digest(
         {
             "ancestor": workflow.derived_from_id,
@@ -102,13 +103,7 @@ def fingerprint(session: Session, workflow: WorkflowRun) -> str:
 
 
 def lessons(session: Session, project_id: uuid.UUID) -> list[DesignLesson]:
-    return list(
-        session.scalars(
-            select(DesignLesson)
-            .where(DesignLesson.project_id == project_id)
-            .order_by(DesignLesson.created_at, DesignLesson.id)
-        )
-    )
+    return DesignMemoryRepository(session).lessons(project_id)
 
 
 def active_lessons(rows: list[DesignLesson]) -> list[DesignLesson]:
@@ -139,13 +134,8 @@ def serialize(row) -> dict:
     }
 
 
-def latest_review(session: Session, workflow: WorkflowRun):
-    return session.scalar(
-        select(DesignReview)
-        .where(DesignReview.workflow_run_id == workflow.id)
-        .order_by(DesignReview.created_at.desc(), DesignReview.id.desc())
-        .limit(1)
-    )
+def latest_review(session: Session, workflow: WorkflowRun) -> DesignReview | None:
+    return DesignMemoryRepository(session).latest_review(workflow.id)
 
 
 def memory_digest(rows: list[DesignLesson]) -> str:
@@ -157,7 +147,7 @@ def review_state(session: Session, workflow: WorkflowRun) -> dict:
     review = latest_review(session, workflow)
     current = fingerprint(session, workflow)
     memory = memory_digest(rows)
-    nodes = WorkflowRepository(session).nodes(workflow.id)
+    nodes = workflow_nodes(session, workflow.id)
     valid = bool(review and review.fingerprint == current and review.memory_digest == memory)
     # Feedback adds new lessons; it must not retroactively invalidate an executed review.
     state = "ready" if valid else "stale" if review else "missing"
@@ -204,7 +194,7 @@ def blockers(session: Session, workflow: WorkflowRun) -> list[dict]:
             }
         )
     if workflow.derived_from_id:
-        parent = session.get(WorkflowRun, workflow.derived_from_id)
+        parent = get_workflow(session, workflow.derived_from_id)
         if parent and parent.status != "draft" and parent.graph.get("design_learning_required"):
             parent_state = review_state(session, parent)
             if not parent_state["review"] or parent_state["pending_feedback"]:
@@ -230,12 +220,7 @@ def audit(session, project, user, action, row):
 
 
 def save_review(session, project, workflow, user, payload: ReviewCreate, expected_version: int):
-    session.scalar(
-        select(WorkflowRun)
-        .where(WorkflowRun.id == workflow.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    lock_workflow(session, workflow.id)
     session.scalar(select(Project).where(Project.id == project.id).with_for_update())
     if workflow.status != "draft":
         raise DomainError("design_review_frozen", "Submitted design reviews are immutable", status_code=409)
@@ -266,10 +251,9 @@ def save_review(session, project, workflow, user, payload: ReviewCreate, expecte
         memory_digest=payload.memory_digest,
         payload={**payload.model_dump(mode="json"), "lesson_snapshots": [serialize(r) for r in active_lessons(rows)]},
     )
-    session.add(row)
-    workflow.graph = {**workflow.graph, "design_learning_required": True}
-    workflow.version += 1  # serializes concurrent reviews against the workflow version
-    session.flush()
+    # The version bump serializes concurrent reviews against the workflow version.
+    record_run_transition(workflow, graph_flags={"design_learning_required": True})
+    DesignMemoryRepository(session).add(row)
     audit(session, project, user, "design.review.create", row)
     return row
 
@@ -277,10 +261,10 @@ def save_review(session, project, workflow, user, payload: ReviewCreate, expecte
 def save_lesson(session, project, user, payload: LessonCreate, *, review=None, item_key=None, origin=None):
     session.scalar(select(Project).where(Project.id == project.id).with_for_update())
     if payload.supersedes_id:
-        previous = session.get(DesignLesson, payload.supersedes_id)
+        previous = DesignMemoryRepository(session).lesson(payload.supersedes_id)
         if not previous or previous.project_id != project.id:
             raise DomainError("design_lesson_not_found", "Prior lesson was not found in this project", status_code=404)
-        if session.scalar(select(DesignLesson.id).where(DesignLesson.supersedes_id == previous.id)):
+        if DesignMemoryRepository(session).is_superseded(previous.id):
             raise DomainError("design_lesson_superseded", "Revise the latest lesson instead", status_code=409)
     row = DesignLesson(
         project_id=project.id,
@@ -293,30 +277,25 @@ def save_lesson(session, project, user, payload: LessonCreate, *, review=None, i
             **({"origin": origin} if origin else {}),
         },
     )
-    session.add(row)
-    session.flush()
+    DesignMemoryRepository(session).add(row)
     audit(session, project, user, "design.feedback.create" if review else "design.lesson.create", row)
     return row
 
 
 def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
     # Serialize feedback with manual completion and review changes.
-    session.scalar(
-        select(WorkflowRun)
-        .where(WorkflowRun.id == workflow.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    lock_workflow(session, workflow.id)
     if workflow.status == "draft":
         raise DomainError(
             "design_not_executed",
             "Submit the reviewed design before recording its results; prior evidence belongs in the lesson library",
             status_code=409,
         )
-    review = session.get(DesignReview, payload.review_id)
+    review = DesignMemoryRepository(session).review(payload.review_id)
     if not review or review.workflow_run_id != workflow.id or review.project_id != project.id:
         raise DomainError("design_review_not_found", "Review was not found for this design", status_code=404)
-    if review.id != latest_review(session, workflow).id:
+    latest = latest_review(session, workflow)
+    if latest is None or review.id != latest.id:
         raise DomainError(
             "design_review_superseded", "Link results to the final review of the executed design", status_code=409
         )
@@ -328,7 +307,7 @@ def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
             status_code=422,
         )
     if payload.supersedes_id:
-        previous = session.get(DesignLesson, payload.supersedes_id)
+        previous = DesignMemoryRepository(session).lesson(payload.supersedes_id)
         if not previous or previous.review_id != review.id or previous.item_key != payload.item_key:
             raise DomainError(
                 "design_feedback_revision_mismatch",
@@ -340,12 +319,7 @@ def save_feedback(session, project, workflow, user, payload: FeedbackCreate):
 
 
 def manual_execution(session, project, workflow, user, phase: str, expected_version: int):
-    session.scalar(
-        select(WorkflowRun)
-        .where(WorkflowRun.id == workflow.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    lock_workflow(session, workflow.id)
     if workflow.version != expected_version:
         raise DomainError("version_conflict", "Workflow changed; reload before continuing", status_code=412)
     # Lesson revisions use this same project lock; read a consistent feedback set.
@@ -362,8 +336,7 @@ def manual_execution(session, project, workflow, user, phase: str, expected_vers
                 "Complete the current design review and parent feedback first",
                 status_code=409,
             )
-        workflow.status = "running"
-        workflow.graph = {**workflow.graph, "design_learning_manual_execution": True}
+        record_run_transition(workflow, status="running", graph_flags={"design_learning_manual_execution": True})
     else:
         if workflow.status != "running" or not state["manual_execution"] or state["pending_feedback"]:
             raise DomainError(
@@ -373,21 +346,21 @@ def manual_execution(session, project, workflow, user, phase: str, expected_vers
             )
         superseded = {row["supersedes_id"] for row in state["feedback"] if row["supersedes_id"]}
         outcomes = {row["payload"]["outcome"] for row in state["feedback"] if row["id"] not in superseded}
-        workflow.status = (
-            "cancelled"
+        record_run_transition(
+            workflow,
+            status="cancelled"
             if "execution_blocked" in outcomes
             else "failed"
             if "method_invalid" in outcomes
-            else "succeeded"
+            else "succeeded",
         )
-    workflow.version += 1
     session.flush()
     audit(session, project, user, "design.manual_execution." + phase, workflow)
     return {"workflow_run_id": str(workflow.id), "status": workflow.status, "workflow_version": workflow.version}
 
 
 def scope(session, workflow_id, user, *, write=False):
-    workflow = session.get(WorkflowRun, workflow_id)
+    workflow = get_workflow(session, workflow_id)
     if not workflow:
         raise DomainError("workflow_not_found", "Workflow was not found", status_code=404)
     project = require_project_permission(session, workflow.project_id, user, "write" if write else "read")
@@ -395,7 +368,7 @@ def scope(session, workflow_id, user, *, write=False):
 
 
 def import_lesson(session, project, user, source_id):
-    source = session.get(DesignLesson, source_id)
+    source = DesignMemoryRepository(session).lesson(source_id)
     if not source:
         raise DomainError("design_lesson_not_found", "Source lesson was not found", status_code=404)
     require_project_permission(session, source.project_id, user, "read")
@@ -418,9 +391,5 @@ def import_lesson(session, project, user, source_id):
 def review_history(session, workflow):
     return [
         serialize(row)
-        for row in session.scalars(
-            select(DesignReview)
-            .where(DesignReview.workflow_run_id == workflow.id)
-            .order_by(DesignReview.created_at.desc())
-        )
+        for row in DesignMemoryRepository(session).reviews(workflow.id)
     ]

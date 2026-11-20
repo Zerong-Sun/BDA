@@ -14,7 +14,6 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..copilot.call_guard import call_scope
 from ..core.celery_app import celery_app
@@ -129,17 +128,18 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
 
     import httpx
 
-    from ..candidates.models import Candidate
+    from ..artifacts.service import get_artifact, project_target_structures, register_stored_artifact
+    from ..candidates.service import link_structure, lock_candidate
 
     with session_scope() as session:
         # Outbox/Celery delivery is at-least-once. Serialize imports for the
         # same target through the complete fetch/store transaction so duplicate
         # deliveries cannot both create an artifact.
-        candidate = session.scalar(select(Candidate).where(Candidate.id == candidate_id).with_for_update())
+        candidate = lock_candidate(session, candidate_id)
         if candidate is None:
             raise ValueError("research_target_not_found")
         if candidate.structure_artifact_id:
-            artifact = session.get(Artifact, candidate.structure_artifact_id)
+            artifact = get_artifact(session, candidate.structure_artifact_id)
             if artifact is not None and artifact.status == "available":
                 return {
                     "id": "predicted_structure",
@@ -148,17 +148,10 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
                     "resolution": "existing_project_structure",
                     "artifact_id": str(artifact.id),
                 }
-        for artifact in session.scalars(
-            select(Artifact).where(
-                Artifact.project_id == candidate.project_id,
-                Artifact.artifact_type == "target_structure",
-                Artifact.deleted_at.is_(None),
-            )
-        ):
+        for artifact in project_target_structures(session, candidate.project_id):
             lineage = artifact.lineage or {}
             if str(lineage.get("research_target_id") or "") == str(candidate.id) and artifact.status == "available":
-                candidate.structure_artifact_id = artifact.id
-                candidate.version += 1
+                link_structure(candidate, artifact.id)
                 return {
                     "id": "predicted_structure",
                     "kind": "structure",
@@ -222,7 +215,8 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
         filename = f"{entry_id}-model_v{version}.pdb" if version else f"{entry_id}.pdb"
         object_key = f"projects/{project_id}/research-targets/{candidate_id}/{artifact_id}.pdb"
         ObjectStorage().put_bytes(object_key, body, "chemical/x-pdb")
-        artifact = Artifact(
+        artifact = register_stored_artifact(
+            session,
             id=artifact_id,
             project_id=project_id,
             created_by=created_by,
@@ -250,9 +244,7 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
                 "retrieved_at": datetime.now(UTC).isoformat(),
             },
         )
-        session.add(artifact)
-        candidate.structure_artifact_id = artifact.id
-        candidate.version += 1
+        link_structure(candidate, artifact.id)
         return {
             "id": "predicted_structure",
             "kind": "structure",
@@ -269,12 +261,13 @@ def _import_alphafold_research_structure(candidate_id: uuid.UUID) -> dict:
 def research_gaps_resolve(research_target_id: str, payload: dict) -> dict:
     import httpx
 
-    from ..candidates.models import Candidate
-    from ..literature.models import LiteratureChunk, LiteratureSearchRun
+    from ..candidates.service import get_candidate, settle_gap_resolution
+    from ..literature.models import LiteratureChunk
+    from ..literature.service import record_worker_search
 
     parsed = uuid.UUID(research_target_id)
     with SessionFactory() as session:
-        candidate = session.get(Candidate, parsed)
+        candidate = get_candidate(session, parsed)
         if candidate is None or candidate.candidate_kind != "research_target":
             return {"research_target_id": research_target_id, "status": "missing"}
         project = session.get(Project, candidate.project_id)
@@ -367,17 +360,9 @@ def research_gaps_resolve(research_target_id: str, payload: dict) -> dict:
                 )
                 continue
             with session_scope() as session:
-                run = LiteratureSearchRun(
-                    project_id=project_id,
-                    query=query,
-                    sources=["europe_pmc"],
-                    requested_limit=1,
-                    fetch_full_text=True,
-                    extract_claims=True,
-                    created_by=created_by,
+                run = record_worker_search(
+                    session, project_id=project_id, query=query, created_by=created_by, requested_limit=1
                 )
-                session.add(run)
-                session.flush()
                 run_id = str(run.id)
             search_result = literature_search.run(run_id)
             with SessionFactory() as session:
@@ -418,26 +403,15 @@ def research_gaps_resolve(research_target_id: str, payload: dict) -> dict:
     status = "completed_with_failures" if failed else "completed_with_remaining_scientific_gaps"
     operation_id = str(payload.get("operation_id") or "")
     with session_scope() as session:
-        candidate = session.scalar(select(Candidate).where(Candidate.id == parsed).with_for_update())
-        if candidate is None:
+        outcome = {
+            "status": status,
+            "completed_at": datetime.now(UTC).isoformat(),
+            "resolved_count": resolved,
+            "failed_count": failed,
+            "items": items,
+        }
+        if not settle_gap_resolution(session, parsed, operation_id, outcome):
             return {"research_target_id": research_target_id, "status": "missing"}
-        properties = dict(candidate.properties or {})
-        pending = properties.get("gap_resolution")
-        resolution = dict(pending) if isinstance(pending, dict) else {}
-        current_operation_id = str(resolution.get("operation_id") or "")
-        if not operation_id or not current_operation_id or operation_id == current_operation_id:
-            resolution.update(
-                {
-                    "status": status,
-                    "completed_at": datetime.now(UTC).isoformat(),
-                    "resolved_count": resolved,
-                    "failed_count": failed,
-                    "items": items,
-                }
-            )
-            properties["gap_resolution"] = resolution
-            candidate.properties = properties
-            candidate.version += 1
     return {
         "research_target_id": research_target_id,
         "operation_id": operation_id or None,

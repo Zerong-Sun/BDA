@@ -11,15 +11,24 @@ from jsonschema import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..artifacts.models import Artifact
 from ..audit.service import record_audit
 from ..core.config import get_settings
 from ..core.problem import DomainError
-from ..core.statuses import TERMINAL_JOB_STATUSES, JobStatus, WorkflowRunStatus
+from ..core.statuses import TERMINAL_JOB_STATUSES, JobStatus
 from ..identity.models import User
 from ..projects.models import Project
 from ..registry.site_runtime import resolve_plugin_runtime
-from ..workflows.models import WorkflowNode, WorkflowRun
-from ..workflows.repository import WorkflowRepository
+from ..workflows.models import WorkflowRun
+from ..workflows.service import (
+    get_node,
+    get_workflow,
+    lock_workflow,
+    mirror_node_status,
+    record_lineage,
+    set_workflow_status,
+    workflow_nodes,
+)
 from .access import lsf_target_snapshot, require_lsf_access
 from .binding import BindingError, resolve_artifact_bindings, resolve_pending_inputs
 from .models import ComputeDraft, IdempotencyRecord, Job, JobSubmission
@@ -39,6 +48,18 @@ ALLOWED_TRANSITIONS = {
     "failed": set(),
     "cancelled": set(),
 }
+
+
+def jobs_for_workflow(session: Session, workflow_run_id: uuid.UUID) -> list[Job]:
+    return ComputeRepository(session).jobs_for_workflow(workflow_run_id)
+
+
+def jobs_for_submission(session: Session, submission_id: uuid.UUID) -> list[Job]:
+    return ComputeRepository(session).jobs_for_submission(submission_id)
+
+
+def produced_artifacts(session: Session, job_id: uuid.UUID) -> list[Artifact]:
+    return ComputeRepository(session).produced_artifacts(job_id)
 
 
 def create_compute_draft(session: Session, payload: ComputeDraftCreate, user: User) -> ComputeDraft:
@@ -103,7 +124,7 @@ def _mirror_status_onto_node(session: Session, job: Job) -> None:
     finished work had not started. Only the newest attempt may write, so a retry is not
     overwritten by the failed attempt it replaced.
     """
-    node = session.get(WorkflowNode, job.workflow_node_id)
+    node = get_node(session, job.workflow_node_id)
     if node is None:
         return
     newest_attempt = session.scalar(
@@ -111,34 +132,7 @@ def _mirror_status_onto_node(session: Session, job: Job) -> None:
     )
     if newest_attempt is not None and job.attempt_number < newest_attempt:
         return
-    if node.status == job.status and node.error_message == job.error_message:
-        return
-    node.status = job.status
-    node.error_message = job.error_message
-    node.version += 1
-
-
-def _record_lineage(session: Session, workflow: WorkflowRun, nodes: list[WorkflowNode]) -> None:
-    """State what this run changed relative to the one it is compared against.
-
-    Computed at submission rather than when the link is drawn, because the parameters can
-    still be edited afterwards; what matters is the diff at the moment the run actually
-    happened. The author declares the ancestor, the platform decides what differs - so a
-    "single-variable control" is an observation about the record, not an assertion in it.
-    """
-    from ..workflows.lineage import arm_label_for, diff_parameters
-
-    baseline = session.get(WorkflowRun, workflow.derived_from_id) if workflow.derived_from_id else None
-    if baseline is None:
-        differences: dict[str, dict] = {}
-    else:
-        baseline_nodes = WorkflowRepository(session).nodes(baseline.id)
-        differences = diff_parameters(
-            {node.node_key: dict(node.parameters or {}) for node in baseline_nodes},
-            {node.node_key: dict(node.parameters or {}) for node in nodes},
-        )
-    workflow.varied_parameters = differences
-    workflow.arm_label = arm_label_for(baseline, differences)
+    mirror_node_status(node, job.status, job.error_message)
 
 
 def _payload_hash(workflow_id: uuid.UUID, payload: SubmissionCreate) -> str:
@@ -162,12 +156,7 @@ def create_submission(
     repo = ComputeRepository(session)
     scope = f"workflow:{workflow.id}:submit"
     digest = _payload_hash(workflow.id, payload)
-    session.scalar(
-        select(WorkflowRun)
-        .where(WorkflowRun.id == workflow.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    lock_workflow(session, workflow.id)
     existing = repo.idempotency(user.id, scope, idempotency_key)
     if existing:
         if existing.request_hash != digest:
@@ -193,7 +182,7 @@ def create_submission(
             "This workflow was already submitted; inspect its jobs or create a new run",
             status_code=409,
         )
-    nodes = WorkflowRepository(session).nodes(workflow.id)
+    nodes = workflow_nodes(session, workflow.id)
     if not nodes:
         raise DomainError("workflow_empty", "Workflow has no executable nodes", status_code=409)
     from ..registry.models import ModelPlugin
@@ -211,7 +200,7 @@ def create_submission(
 
     backend = workflow_backend(workflow, payload.compute_backend)
     require_lsf_access(user, backend)
-    _record_lineage(session, workflow, nodes)
+    record_lineage(session, workflow, nodes)
     if settings.is_production and backend == "demo":
         raise DomainError("demo_compute_forbidden", "Demo compute cannot run in production", status_code=409)
     # Refuse LSF before doing any work when no cluster is configured; the deployment
@@ -480,19 +469,6 @@ def schedule_ready_jobs(session: Session, submission: JobSubmission, workflow: W
         set_workflow_status(workflow, "queued")
 
 
-def set_workflow_status(workflow: WorkflowRun, status: WorkflowRunStatus) -> None:
-    """Move a run to a new status and bump its version.
-
-    The version is the ETag (see core.etag), so a background transition that left it
-    untouched made the ETag stop describing the resource it labels: a client holding a
-    pre-submit ETag still satisfied If-Match after the run had already finished.
-    """
-    if workflow.status == status:
-        return
-    workflow.status = status
-    workflow.version += 1
-
-
 DEFAULT_JOB_TIMEOUT = timedelta(minutes=180)
 
 
@@ -611,7 +587,7 @@ def retry_job(session: Session, job: Job, project: Project, user: User) -> Job:
     repo.append_event(retry, "job.pending", {"retry_of": str(job.id), "requested_by": str(user.id)})
     _mirror_status_onto_node(session, retry)
     submission = repo.submission(job.submission_id)
-    workflow = WorkflowRepository(session).get(job.workflow_run_id)
+    workflow = get_workflow(session, job.workflow_run_id)
     if submission and workflow:
         schedule_ready_jobs(session, submission, workflow)
     record_audit(

@@ -46,7 +46,7 @@ Planner 负责结构证据与方案，Analyst 负责仪器结果与归档，Audi
 ```bash
 BDA_PYTHON_BIN="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/backend_v2/.venv/bin"
 "$BDA_PYTHON_BIN/pytest" backend_v2/tests/test_bli_triplet_provenance.py backend_v2/tests/test_copilot_instrument_boundary.py backend_v2/tests/test_delivery_result_summary.py backend_v2/tests/test_copilot_project_context.py backend_v2/tests/test_copilot_structure_evidence.py backend_v2/tests/test_structure_residues.py
-npx --prefix frontend vitest run --root frontend src/features/copilot/ToolEvidence.test.tsx src/features/lab/instrumentAnalysis.test.tsx src/features/pdb-viewer/structureResidueIdentity.test.ts src/features/results/ResultsMetrics.test.tsx
+npx --prefix frontend vitest run --root frontend src/features/copilot/ToolEvidence.test.tsx src/features/lab/instrumentAnalysis.test.tsx src/components/pdb-viewer/structureResidueIdentity.test.ts src/features/results/ResultsMetrics.test.tsx
 ```
 
 人工走查可使用测试生成的合成文件：预览 → 明确保存 → 改参另存 → 拒绝/接受 → 从证据卡回到原结果，核对源文件未变、版本与处理条件可见、待审结果没有进入 Best reviewed KD。结构走查应同时选择带/不带插入码的残基，并验证没有把预测几何写成实验结论。上述步骤验证软件契约；真实 assay 的方法适用性与复现性需另行审核。

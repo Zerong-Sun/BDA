@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { useAppStore } from '../../lib/store/appStore'
 import { assessExtension, getExtensionCatalog, type ExtensionCatalog, type ExtensionEntry } from '../../lib/api/extensions'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { ExtensionCenter } from './ExtensionCenter'
 
 vi.mock('../../lib/api/extensions', () => ({ getExtensionCatalog: vi.fn(), assessExtension: vi.fn() }))
-vi.mock('../research/jsonHelpers', () => ({ currentRole: vi.fn() }))
+vi.mock('../../lib/auth/currentRole', () => ({ currentRole: vi.fn() }))
 
 const entry = (id: string, title: string, adapter: ExtensionEntry['manifest']['adapter']): ExtensionEntry => ({
   manifest: { id, version: '1.0.0', title, title_zh: title, description: `${title} description`, description_zh: `${title} description`, adapter,

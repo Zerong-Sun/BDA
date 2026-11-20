@@ -12,18 +12,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
-from ..candidates.models import Candidate
+from ..candidates.service import save_research_candidate
 from ..core.metrics import RESEARCH_DRAFT_VALIDATIONS, RESEARCH_IMPORT_ACCEPTANCE, RESEARCH_TOOL_FAILURES
 from ..core.problem import DomainError
 from ..identity.models import User
-from ..knowledge.models import KnowledgeEntry
+from ..knowledge.service import save_package_entry
 from ..literature.models import LiteratureChunk, LiteratureDocument
+from ..literature.service import save_package_document
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
 from ..projects.schemas import ProjectCreate
 from ..projects.service import create_project, require_project
-from ..targets.models import Target
+from ..targets.service import add_unconfirmed_primary_target
 from .evidence_tools import EvidenceToolService, titles_match
 from .models import ResearchBrief, ResearchFinding, ResearchGeneration
 from .schemas import (
@@ -792,17 +794,13 @@ def import_research_generation(
 
     primary = draft.get("primary_target")
     if primary:
-        target = Target(
-            project_id=project.id,
+        add_unconfirmed_primary_target(
+            session,
+            project,
             name=_localized_text(primary.get("name")),
             uniprot_accession=primary.get("uniprot_accession"),
             organism=primary.get("organism"),
-            identity_status="unconfirmed",
         )
-        session.add(target)
-        session.flush()
-        project.primary_target_id = target.id
-        project.version += 1
 
     review = draft.get("review_document") or {}
     source_scope = review.get("scope") or {}
@@ -906,61 +904,59 @@ def import_research_generation(
             "reason": "Imported reference; relevance to this project has not been reviewed.",
             "source_curation": previous_curation,
         }
-        session.add(
-            LiteratureDocument(
-                project_id=project.id,
-                title=_localized_text(reference.get("title"))[:500] or str(reference.get("ref_id")),
-                source="copilot_research_v2",
-                external_id=str(reference.get("pmid") or reference.get("doi") or reference.get("ref_id") or ""),
-                metadata_json=metadata,
-                status="pending_review",
-            )
+        save_package_document(
+            session,
+            project,
+            None,
+            title=_localized_text(reference.get("title"))[:500] or str(reference.get("ref_id")),
+            source="copilot_research_v2",
+            external_id=str(reference.get("pmid") or reference.get("doi") or reference.get("ref_id") or ""),
+            metadata=metadata,
+            status="pending_review",
         )
 
     for candidate in draft["research_targets"]:
-        session.add(
-            Candidate(
-                project_id=project.id,
-                candidate_key=str(candidate.get("candidate_key") or candidate.get("id")),
-                name=_localized_text(candidate.get("name"))[:240],
-                candidate_kind="research_target",
-                status="proposed",
-                rank=candidate.get("rank"),
-                score=candidate.get("score"),
-                scores=candidate.get("scores") or {},
-                properties={
-                    **(candidate.get("properties") or {}),
-                    "localized_content": {
-                        key: candidate.get(key)
-                        for key in ("name", "pain_group", "protein_type", "localization", "axis")
-                    },
-                    "reference_ids": candidate.get("reference_ids", []),
-                    "review_status": "pending_review",
-                    "checksum": row.checksum,
+        save_research_candidate(
+            session,
+            project,
+            None,
+            candidate_key=str(candidate.get("candidate_key") or candidate.get("id")),
+            name=_localized_text(candidate.get("name"))[:240],
+            rank=candidate.get("rank"),
+            score=candidate.get("score"),
+            scores=candidate.get("scores") or {},
+            properties={
+                **(candidate.get("properties") or {}),
+                "localized_content": {
+                    key: candidate.get(key)
+                    for key in ("name", "pain_group", "protein_type", "localization", "axis")
                 },
-            )
+                "reference_ids": candidate.get("reference_ids", []),
+                "review_status": "pending_review",
+                "checksum": row.checksum,
+            },
         )
 
     for entry in [*draft["methods"], *draft["datasets"]]:
         key = str(entry.get("key") or "methods")
-        session.add(
-            KnowledgeEntry(
-                project_id=project.id,
-                title=_localized_text(entry.get("title"))[:300] or key,
-                content=_localized_text(entry.get("content")),
-                entry_type=key,
-                source={
-                    **(entry.get("source") or {}),
-                    "entry_key": key,
-                    "localized_content": {"title": entry.get("title"), "content": entry.get("content")},
-                    "data": entry.get("data"),
-                    "display_data": entry.get("display_data"),
-                    "review_status": "pending_review",
-                    "checksum": row.checksum,
-                },
-                tags=["copilot-research-v2", "pending-review", "dataset" if key in DATASET_KEYS else "method"],
-                created_by=user.id,
-            )
+        save_package_entry(
+            session,
+            project,
+            None,
+            title=_localized_text(entry.get("title"))[:300] or key,
+            content=_localized_text(entry.get("content")),
+            entry_type=key,
+            source={
+                **(entry.get("source") or {}),
+                "entry_key": key,
+                "localized_content": {"title": entry.get("title"), "content": entry.get("content")},
+                "data": entry.get("data"),
+                "display_data": entry.get("display_data"),
+                "review_status": "pending_review",
+                "checksum": row.checksum,
+            },
+            tags=["copilot-research-v2", "pending-review", "dataset" if key in DATASET_KEYS else "method"],
+            created_by=user.id,
         )
 
     storage: ObjectStorage | None = None
@@ -997,31 +993,30 @@ def import_research_generation(
             status = "pending"
             size_bytes = 0
             checksum_sha256 = hashlib.sha256(object_key.encode()).hexdigest()
-        session.add(
-            Artifact(
-                project_id=project.id,
-                created_by=user.id,
-                artifact_type="target_structure",
-                filename=filename,
-                content_type=content_type,
-                object_key=object_key,
-                status=status,
-                size_bytes=size_bytes,
-                checksum_sha256=checksum_sha256,
-                lineage={
-                    **(structure.get("lineage") or {}),
-                    "pdb_id": structure.get("pdb_id"),
-                    "name": _localized_text(structure.get("name")),
-                    "role": _localized_text(structure.get("role")),
-                    "method": _localized_text(structure.get("method")),
-                    "resolution": structure.get("resolution"),
-                    "reference_id": structure.get("reference_id"),
-                    "rcsb_url": structure.get("rcsb_url"),
-                    "review_status": "pending_review",
-                    "checksum": row.checksum,
-                    "source_artifact_id": str(source_artifact.id) if source_artifact else None,
-                },
-            )
+        register_stored_artifact(
+            session,
+            project_id=project.id,
+            created_by=user.id,
+            artifact_type="target_structure",
+            filename=filename,
+            content_type=content_type,
+            object_key=object_key,
+            status=status,
+            size_bytes=size_bytes,
+            checksum_sha256=checksum_sha256,
+            lineage={
+                **(structure.get("lineage") or {}),
+                "pdb_id": structure.get("pdb_id"),
+                "name": _localized_text(structure.get("name")),
+                "role": _localized_text(structure.get("role")),
+                "method": _localized_text(structure.get("method")),
+                "resolution": structure.get("resolution"),
+                "reference_id": structure.get("reference_id"),
+                "rcsb_url": structure.get("rcsb_url"),
+                "review_status": "pending_review",
+                "checksum": row.checksum,
+                "source_artifact_id": str(source_artifact.id) if source_artifact else None,
+            },
         )
 
     session.flush()

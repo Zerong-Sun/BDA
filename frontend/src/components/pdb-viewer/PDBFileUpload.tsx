@@ -5,7 +5,7 @@ import { Frame, FramePanel } from '@/components/reui/frame'
 import { Button } from '@/components/ui/Button'
 import { Progress, ProgressLabel } from '@/components/ui/progress'
 import { uploadPdb } from '../../lib/api/targets'
-import { useToastStore } from '../../components/ui/toastStore'
+import { useToastStore } from '../ui/toastStore'
 import { useI18n } from '../../lib/i18n'
 
 interface PDBFileUploadProps {

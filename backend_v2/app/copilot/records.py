@@ -15,6 +15,7 @@ from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
 from ..knowledge.models import KnowledgeEntry
+from ..knowledge.service import save_content_addressed_entry
 
 KIND = "bot_work_record"
 NAMESPACE = uuid.UUID("8b37d975-e31c-413d-8d13-3db272809141")
@@ -182,14 +183,9 @@ def refresh_record(session, project_id, bot_id, actor_id):
     content = markdown(project_id, bot_id, items)
     digest = hashlib.sha256(content.encode()).hexdigest()
     row_id = uuid.uuid5(NAMESPACE, f"{project_id}:{bot_id}:{digest}")
-    existing = session.get(KnowledgeEntry, row_id)
-    if existing is not None:
-        return existing
-    pending = next((row for row in session.new if isinstance(row, KnowledgeEntry) and row.id == row_id), None)
-    if pending is not None:
-        return pending
-    row = KnowledgeEntry(
-        id=row_id,
+    return save_content_addressed_entry(
+        session,
+        entry_id=row_id,
         project_id=project_id,
         created_by=actor_id,
         title=f"{bot_id} · 工作记录 · {digest[:12]}",
@@ -198,8 +194,6 @@ def refresh_record(session, project_id, bot_id, actor_id):
         tags=["bot-record", bot_id],
         source={"format": "markdown", "bot_id": bot_id, "schema_version": 1, "sha256": digest, "items": items},
     )
-    session.add(row)
-    return row
 
 
 def refresh_project_records(session, project_id, actor_id):

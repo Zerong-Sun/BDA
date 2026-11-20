@@ -31,7 +31,7 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
 import { localizeStatusLabel } from '../../components/ui/statusLabel'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { projectText } from '../../lib/i18n/projectText'
 
 interface ProjectChooserProps {

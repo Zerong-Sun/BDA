@@ -32,12 +32,12 @@ from backend_v2.app.autopilot.service import (
     next_stage,
     settle_stage,
 )
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.copilot import agent_runs
 from backend_v2.app.copilot.models import CopilotAgentRun, CopilotConfig
 from backend_v2.app.core.models import Base
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.projects.models import Project
 from backend_v2.tests._sqlite import drop_all, enforce_foreign_keys
 from sqlalchemy import create_engine, select

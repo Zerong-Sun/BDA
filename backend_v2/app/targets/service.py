@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
 from ..audit.service import record_audit
+from ..core.models import update_versioned
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
@@ -45,6 +48,71 @@ def upsert_target(session: Session, project: Project, payload: TargetUpsert, use
         actor_id=user.id,
     )
     return target
+
+
+def sync_package_target(
+    session: Session,
+    project: Project,
+    *,
+    name: str,
+    uniprot_accession: str | None,
+    organism: str | None,
+) -> Target:
+    """Make a research package's primary target the project's primary target.
+
+    A package carries only name, accession and organism. Sequence, target kind and
+    chemical identity are left alone so a re-import never erases what a user entered,
+    and the version moves only when one of the package fields actually changed.
+    """
+    repo = TargetRepository(session)
+    target = repo.by_project(project.id)
+    if target is None:
+        target = repo.add(Target(project_id=project.id, name=name))
+    update_versioned(
+        target,
+        name=name,
+        uniprot_accession=uniprot_accession,
+        organism=organism,
+        identity_status="confirmed" if uniprot_accession else "unconfirmed",
+    )
+    if project.primary_target_id != target.id:
+        project.primary_target_id = target.id
+        project.version += 1
+    return target
+
+
+def add_unconfirmed_primary_target(
+    session: Session, project: Project, *, name: str, uniprot_accession: str | None, organism: str | None
+) -> Target:
+    """Give a new project the primary target an unreviewed import proposed; a person confirms it later."""
+    target = TargetRepository(session).add(
+        Target(
+            project_id=project.id,
+            name=name,
+            uniprot_accession=uniprot_accession,
+            organism=organism,
+            identity_status="unconfirmed",
+        )
+    )
+    project.primary_target_id = target.id
+    project.version += 1
+    return target
+
+
+def get_target(session: Session, target_id: uuid.UUID) -> Target | None:
+    return TargetRepository(session).get(target_id)
+
+
+def project_primary_target(session: Session, project: Project) -> Target | None:
+    return session.get(Target, project.primary_target_id) if project.primary_target_id else None
+
+
+def release_structure(target: Target, artifact_id: uuid.UUID) -> None:
+    """Detach a structure that is being retired, if it is this target's current one."""
+    if target.structure_artifact_id == artifact_id:
+        target.structure_artifact_id = None
+        target.structure_status = "missing"
+        target.version += 1
 
 
 def create_target(session: Session, project: Project, payload: TargetUpsert, user: User) -> Target:

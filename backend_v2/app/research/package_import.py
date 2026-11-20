@@ -9,20 +9,29 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
+from ..artifacts.service import project_target_structures, retire_artifact, update_artifact_lineage
 from ..candidates.models import Candidate
-from ..compute.models import OutboxEvent
+from ..candidates.service import delete_project_candidates, project_candidates, save_research_candidate
+from ..core.models import update_versioned as _update_versioned
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..knowledge.models import KnowledgeEntry
+from ..knowledge.service import project_entries, save_package_entry
 from ..literature.models import LiteratureDocument
-from ..platform.models import Operation
-from ..platform.operations import enqueue_operation
+from ..literature.service import delete_project_documents, project_documents, save_package_document
+from ..platform.operations import cancel_pending_operation, enqueue_operation, project_operations
 from ..projects.models import Project
-from ..projects.repository import ProjectRepository
 from ..projects.schemas import ProjectCreate
-from ..projects.service import create_project, soft_delete_builtin_research_duplicates
+from ..projects.service import (
+    create_project,
+    flag_adopted_user_project,
+    link_research_package,
+    project_for_research_source,
+    soft_delete_builtin_research_duplicates,
+    sync_package_project,
+)
 from ..targets.models import Target
-from ..targets.repository import TargetRepository
+from ..targets.service import project_primary_target, release_structure, sync_package_target
 from .models import ResearchBrief, ResearchFinding
 from .package_validation import (
     TRUSTED_BUILTIN_PACKAGE_CHECKSUMS,
@@ -64,17 +73,6 @@ def _localized(value: object) -> dict[str, str]:
 
 def _text(value: object, language: str = "zh") -> str:
     return _localized(value)[language]
-
-
-def _update_versioned(row: object, **values: object) -> bool:
-    changed = False
-    for field, value in values.items():
-        if getattr(row, field) != value:
-            setattr(row, field, value)
-            changed = True
-    if changed and getattr(row, "id", None) is not None:
-        row.version += 1  # type: ignore[attr-defined]
-    return changed
 
 
 def _reference_projects(reference: dict, projects: list[dict]) -> list[str]:
@@ -179,9 +177,7 @@ def _legacy_package_project(
     for project in candidates:
         findings = session.scalars(select(ResearchFinding).where(ResearchFinding.project_id == project.id))
         if any((finding.evidence or {}).get("package_id") == package_id for finding in findings):
-            project.source_package_id = package_id
-            project.source_project_key = str(source.get("id") or "")
-            project.version += 1
+            link_research_package(project, package_id=package_id, project_key=str(source.get("id") or ""))
             return project
     return None
 
@@ -246,32 +242,19 @@ def _package_claim_lineage_project(
             lower = {name.casefold() for name in project_names}
             matched = (project.name or "").strip().casefold() in lower
         if matched:
-            localized = dict(project.localized_content) if isinstance(project.localized_content, dict) else {}
-            localized["adopted_user_project"] = True
-            project.localized_content = localized
-            project.version += 1
+            flag_adopted_user_project(project)
             return project
     return None
 
 
 def _upsert_target(session: Session, project: Project, payload: dict) -> Target:
-    repo = TargetRepository(session)
-    target = repo.by_project(project.id)
-    if target is None:
-        target = Target(project_id=project.id, name=_text(payload.get("name")))
-        repo.add(target)
-    accession = str(payload.get("uniprot") or "") or None
-    _update_versioned(
-        target,
+    return sync_package_target(
+        session,
+        project,
         name=_text(payload.get("name")),
-        uniprot_accession=accession,
+        uniprot_accession=str(payload.get("uniprot") or "") or None,
         organism=str(payload.get("organism") or "") or None,
-        identity_status="confirmed" if accession else "unconfirmed",
     )
-    if project.primary_target_id != target.id:
-        project.primary_target_id = target.id
-        project.version += 1
-    return target
 
 
 def _upsert_brief(session: Session, project: Project, package_id: str, source: dict) -> None:
@@ -379,17 +362,16 @@ def _upsert_findings(
 
 
 def _upsert_candidates(session: Session, project: Project, package: dict, project_source: dict) -> int:
-    project_candidates = [
+    package_candidates = [
         item
         for item in package.get("candidates", [])
         if str(item.get("project_id") or "") == str(project.source_project_key or "")
     ]
-    rows = list(session.scalars(select(Candidate).where(Candidate.project_id == project.id)))
-    by_key = {row.candidate_key: row for row in rows}
+    by_key = {row.candidate_key: row for row in project_candidates(session, project.id)}
     bibliometrics = {str(item.get("id")): item for item in package.get("bibliometrics", [])}
-    ranked = sorted(project_candidates, key=lambda item: float(item.get("weighted_score", 0)), reverse=True)
+    ranked = sorted(package_candidates, key=lambda item: float(item.get("weighted_score", 0)), reverse=True)
     rank_by_key = {str(item.get("candidate_id")): index + 1 for index, item in enumerate(ranked)}
-    for item in project_candidates:
+    for item in package_candidates:
         key = str(item.get("candidate_id"))
         localized = {
             "name": _localized(item.get("target")),
@@ -428,33 +410,18 @@ def _upsert_candidates(session: Session, project: Project, package: dict, projec
             "specificity": item.get("specificity"),
             "safety": item.get("safety"),
         }
-        row = by_key.get(key)
-        if row is None:
-            session.add(
-                Candidate(
-                    project_id=project.id,
-                    candidate_key=key,
-                    name=_text(item.get("target")),
-                    candidate_kind="research_target",
-                    status="proposed",
-                    rank=rank_by_key[key],
-                    score=float(item.get("weighted_score", 0)),
-                    scores=scores,
-                    properties=properties,
-                )
-            )
-        else:
-            _update_versioned(
-                row,
-                name=_text(item.get("target")),
-                candidate_kind="research_target",
-                status="proposed",
-                rank=rank_by_key[key],
-                score=float(item.get("weighted_score", 0)),
-                scores=scores,
-                properties=properties,
-            )
-    return len(project_candidates)
+        save_research_candidate(
+            session,
+            project,
+            by_key.get(key),
+            candidate_key=key,
+            name=_text(item.get("target")),
+            rank=rank_by_key[key],
+            score=float(item.get("weighted_score", 0)),
+            scores=scores,
+            properties=properties,
+        )
+    return len(package_candidates)
 
 
 def _upsert_references(
@@ -473,8 +440,7 @@ def _upsert_references(
         for ref in package.get("references", [])
         if project_key in _reference_projects(ref, package.get("projects", []))
     }
-    rows = list(session.scalars(select(LiteratureDocument).where(LiteratureDocument.project_id == project.id)))
-    by_external = {str(row.external_id): row for row in rows if row.external_id}
+    by_external = {str(row.external_id): row for row in project_documents(session, project.id) if row.external_id}
     count = 0
     for ref in package.get("references", []):
         ref_id = str(ref.get("ref_id"))
@@ -503,24 +469,15 @@ def _upsert_references(
             document_status = row.status
             if "verification_status" in saved:
                 metadata["verification_status"] = saved["verification_status"]
-        if row is None:
-            session.add(
-                LiteratureDocument(
-                    project_id=project.id,
-                    title=str(ref.get("title") or ref_id),
-                    source="research_package",
-                    external_id=ref_id,
-                    metadata_json=metadata,
-                    status=document_status,
-                )
-            )
-        else:
-            _update_versioned(
-                row,
-                title=str(ref.get("title") or ref_id),
-                metadata_json=metadata,
-                status=document_status,
-            )
+        save_package_document(
+            session,
+            project,
+            row,
+            external_id=ref_id,
+            title=str(ref.get("title") or ref_id),
+            metadata=metadata,
+            status=document_status,
+        )
         count += 1
     return count
 
@@ -545,10 +502,9 @@ def _upsert_knowledge(
         "ontology_relations": package.get("ontology_relations", []),
         "validation_report": package.get("validation_report"),
     }
-    rows = list(session.scalars(select(KnowledgeEntry).where(KnowledgeEntry.project_id == project.id)))
     by_key = {
         str(row.source.get("entry_key")): row
-        for row in rows
+        for row in project_entries(session, project.id)
         if _managed_package_match(row.source.get("package_id"), package_id) and row.source.get("entry_key")
     }
     for key, value in entries.items():
@@ -569,22 +525,16 @@ def _upsert_knowledge(
                 else None
             ),
         }
-        row = by_key.get(key)
-        title = key.replace("_", " ").title()
-        if row is None:
-            session.add(
-                KnowledgeEntry(
-                    project_id=project.id,
-                    title=title,
-                    content=serialized,
-                    entry_type=key,
-                    source=source,
-                    tags=["research-package", project_key.lower()],
-                    created_by=project.owner_id,
-                )
-            )
-        else:
-            _update_versioned(row, title=title, content=serialized, source=source)
+        save_package_entry(
+            session,
+            project,
+            by_key.get(key),
+            entry_type=key,
+            title=key.replace("_", " ").title(),
+            content=serialized,
+            source=source,
+            tags=["research-package", project_key.lower()],
+        )
     return len(entries)
 
 
@@ -626,57 +576,40 @@ def _reconcile_managed_project(
         ):
             session.delete(finding)
 
-    for candidate in session.scalars(select(Candidate).where(Candidate.project_id == project.id)):
+    def stale_candidate(candidate: Candidate) -> bool:
         properties = candidate.properties or {}
-        if _managed_package_match(properties.get("source_package_id"), package_id) and candidate.candidate_key not in (
-            desired_candidates
-        ):
-            session.delete(candidate)
+        return (
+            _managed_package_match(properties.get("source_package_id"), package_id)
+            and candidate.candidate_key not in desired_candidates
+        )
 
-    for document in session.scalars(select(LiteratureDocument).where(LiteratureDocument.project_id == project.id)):
+    def stale_document(document: LiteratureDocument) -> bool:
         metadata = document.metadata_json or {}
-        if _managed_package_match(metadata.get("package_id"), package_id) and str(document.external_id or "") not in (
-            desired_references
-        ):
-            session.delete(document)
+        return (
+            _managed_package_match(metadata.get("package_id"), package_id)
+            and str(document.external_id or "") not in desired_references
+        )
+
+    def stale_structure(record: dict) -> bool:
+        return (
+            _managed_package_match(record.get("source_package_id"), package_id)
+            and str(record.get("pdb_id") or "").upper() not in desired_structures
+        )
+
+    delete_project_candidates(session, project.id, stale_candidate)
+    delete_project_documents(session, project.id, stale_document)
 
     now = datetime.now(UTC)
-    primary_target = session.get(Target, project.primary_target_id) if project.primary_target_id else None
-    for artifact in session.scalars(
-        select(Artifact).where(
-            Artifact.project_id == project.id,
-            Artifact.artifact_type == "target_structure",
-            Artifact.deleted_at.is_(None),
-        )
-    ):
-        lineage = artifact.lineage or {}
-        if _managed_package_match(lineage.get("source_package_id"), package_id) and str(
-            lineage.get("pdb_id") or ""
-        ).upper() not in desired_structures:
-            artifact.deleted_at = now
-            artifact.version += 1
-            if primary_target is not None and primary_target.structure_artifact_id == artifact.id:
-                primary_target.structure_artifact_id = None
-                primary_target.structure_status = "missing"
-                primary_target.version += 1
+    primary_target = project_primary_target(session, project)
+    for artifact in project_target_structures(session, project.id):
+        if stale_structure(artifact.lineage or {}):
+            retire_artifact(artifact, now)
+            if primary_target is not None:
+                release_structure(primary_target, artifact.id)
 
-    for operation in session.scalars(
-        select(Operation).where(
-            Operation.project_id == project.id,
-            Operation.kind == "target.structure.import",
-            Operation.status == "pending",
-        )
-    ):
-        progress = operation.progress or {}
-        if _managed_package_match(progress.get("source_package_id"), package_id) and str(
-            progress.get("pdb_id") or ""
-        ).upper() not in desired_structures:
-            event = session.get(OutboxEvent, operation.id)
-            if event is not None and event.published_at is None:
-                session.delete(event)
-            operation.status = "cancelled"
-            operation.finished_at = now
-            operation.version += 1
+    for operation in project_operations(session, project.id, "target.structure.import", ["pending"]):
+        if stale_structure(operation.progress or {}):
+            cancel_pending_operation(session, operation, now)
 
 
 def _structure_operations(
@@ -688,24 +621,11 @@ def _structure_operations(
     user: User,
 ) -> list[uuid.UUID]:
     existing_by_pdb = {
-        str(item.lineage.get("pdb_id", "")).upper(): item
-        for item in session.scalars(
-            select(Artifact).where(
-                Artifact.project_id == project.id,
-                Artifact.artifact_type == "target_structure",
-                Artifact.deleted_at.is_(None),
-            )
-        )
+        str(item.lineage.get("pdb_id", "")).upper(): item for item in project_target_structures(session, project.id)
     }
     pending = {
         str(item.progress.get("pdb_id", "")).upper()
-        for item in session.scalars(
-            select(Operation).where(
-                Operation.project_id == project.id,
-                Operation.kind == "target.structure.import",
-                Operation.status.in_(["pending", "running"]),
-            )
-        )
+        for item in project_operations(session, project.id, "target.structure.import", ["pending", "running"])
     }
     primary = str(source.get("primary_target", {}).get("pdb_id") or "").upper()
     operation_ids: list[uuid.UUID] = []
@@ -719,9 +639,9 @@ def _structure_operations(
         }
         existing = existing_by_pdb.get(pdb_id)
         if existing is not None:
-            _update_versioned(
+            update_artifact_lineage(
                 existing,
-                lineage={
+                {
                     **(existing.lineage or {}),
                     "name": structure.get("name"),
                     "method": structure.get("method"),
@@ -766,13 +686,13 @@ def _structure_operations(
                     "localized_content": localized_content,
                 },
             },
+            progress={
+                "pdb_id": pdb_id,
+                "attach_to_target": attach,
+                "source_package_id": package.get("package_id"),
+                "source_project_key": source.get("id"),
+            },
         )
-        operation.progress = {
-            "pdb_id": pdb_id,
-            "attach_to_target": attach,
-            "source_package_id": package.get("package_id"),
-            "source_project_key": source.get("id"),
-        }
         operation_ids.append(operation.id)
     return operation_ids
 
@@ -802,11 +722,10 @@ def import_research_package(
         "structures": 0,
     }
     operation_ids: list[uuid.UUID] = []
-    repo = ProjectRepository(session)
 
     for source in package["projects"]:
         key = str(source.get("id") or "").strip()
-        project = repo.by_research_source(payload.organization_id, package_id, key)
+        project = project_for_research_source(session, payload.organization_id, package_id, key)
         if project is None:
             project = _versioned_package_project(session, payload.organization_id, package_id, key)
         if project is None:
@@ -861,9 +780,9 @@ def import_research_package(
         if adopted:
             localized = dict(project.localized_content) if isinstance(project.localized_content, dict) else {}
             localized["adopted_user_project"] = True
-            _update_versioned(project, localized_content=localized)
+            sync_package_project(project, localized_content=localized)
         else:
-            _update_versioned(
+            sync_package_project(
                 project,
                 name=_text(source.get("name")),
                 summary=_text(source.get("summary")),
@@ -874,7 +793,7 @@ def import_research_package(
             )
         _reconcile_managed_project(session, project, package, key)
         if adopted:
-            target = session.get(Target, project.primary_target_id) if project.primary_target_id else None
+            target = project_primary_target(session, project)
         else:
             target = _upsert_target(session, project, source.get("primary_target", {}))
         _upsert_brief(session, project, package_id, source)

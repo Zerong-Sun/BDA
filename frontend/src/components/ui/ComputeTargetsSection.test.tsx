@@ -5,7 +5,7 @@ import { useAppStore } from '../../lib/store/appStore'
 import { ComputeTargetsSection } from './ComputeTargetsSection'
 import { awaitOperation } from '../../lib/api/operations'
 import { listComputeNodes } from '../../lib/api/registry'
-vi.mock('../../features/research/jsonHelpers', () => ({currentRole: () => 'admin'}))
+vi.mock('../../lib/auth/currentRole', () => ({currentRole: () => 'admin'}))
 vi.mock('../../lib/api/operations', () => ({awaitOperation: vi.fn()}))
 vi.mock('../../lib/api/registry', () => ({listComputeNodes: vi.fn(),checkComputeNodeHealth: vi.fn().mockResolvedValue({operation_id:'op'}),createComputeNode: vi.fn(),disableComputeNode: vi.fn()}))
 afterEach(cleanup)

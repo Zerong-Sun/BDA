@@ -14,10 +14,9 @@ from collections.abc import Iterator
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.models import Organization, User
-from backend_v2.app.platform.models import Operation
+from backend_v2.app.platform.models import Operation, OutboxEvent
 from backend_v2.app.platform.operations import (
     enqueue_operation,
     finish_operation,

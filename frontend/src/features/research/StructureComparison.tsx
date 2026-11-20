@@ -6,8 +6,8 @@ import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
 import { Button } from '../../components/ui/Button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
-import { structureSourceFromUrl } from '../pdb-viewer/types'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
+import { structureSourceFromUrl } from '../../components/pdb-viewer/types'
 
 export function StructureComparison({ structures, projectId }: { structures: ResearchWorkspaceStructure[]; projectId: string }) {
   const { language } = useI18n()

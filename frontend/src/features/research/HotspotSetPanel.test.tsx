@@ -18,7 +18,7 @@ import { HotspotSetPanel } from './HotspotSetPanel'
  * covered by the browser matrix.
  */
 
-vi.mock('../pdb-viewer/StructureViewerLazy', () => ({
+vi.mock('../../components/pdb-viewer/StructureViewerLazy', () => ({
   StructureViewerLazy: ({ onResiduePick }: { onResiduePick?: (residue: { chainId: string; seq: number; insertionCode?: string }) => void }) => (
     <div>
       <button type="button" onClick={() => onResiduePick?.({ chainId: 'A', seq: 164 })}>pick A164</button>

@@ -35,6 +35,7 @@ from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.problem import DomainError
 from ..experiments.models import ExperimentResult
+from ..experiments.service import add_experiment_result
 from .diagnostics import check, finite_json, quality, trace_arrays
 from .kernels import akta, bli, bli_kinetic, calculators
 
@@ -116,12 +117,13 @@ def _record(
     candidate_id: uuid.UUID | None,
 ) -> ExperimentResult:
     if candidate_id is not None:
-        from ..candidates.models import Candidate
+        from ..candidates.service import get_candidate
 
-        candidate = session.get(Candidate, candidate_id)
+        candidate = get_candidate(session, candidate_id)
         if candidate is None or candidate.project_id != project_id:
             raise DomainError("candidate_not_found", "Project candidate was not found", status_code=404)
-    row = ExperimentResult(
+    row = add_experiment_result(
+        session,
         project_id=project_id,
         candidate_id=candidate_id,
         source_artifact_id=artifact.id,
@@ -140,7 +142,6 @@ def _record(
         },
         created_by=user_id,
     )
-    session.add(row)
     session.flush()
     return row
 
@@ -488,18 +489,16 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
     Returns None when there is nothing to record: no candidate to attach to, no
     value fitted, or an experiment type with no agreed metric key.
     """
-    from ..candidates.models import Candidate, CandidateMetric
+    from ..candidates.service import lock_candidate, record_measured_metric, withdraw_measured_metrics
 
     if result.candidate_id is not None:
-        candidate = session.scalar(select(Candidate).where(Candidate.id == result.candidate_id,
-                                   Candidate.project_id == result.project_id).with_for_update())
-        if candidate is None:
+        candidate = lock_candidate(session, result.candidate_id)
+        if candidate is None or candidate.project_id != result.project_id:
             raise DomainError("candidate_not_found", "Project candidate was not found", status_code=404)
     review = result.result_metadata.get("instrument_qc_review", {})
     if review.get("status") != "accepted":
         # Projection is disposable; preserve the original result and audit history.
-        session.query(CandidateMetric).filter(CandidateMetric.source_experiment_result_id == result.id).delete(synchronize_session="fetch")
-        session.flush()
+        withdraw_measured_metrics(session, result.id)
         return None
     if result.candidate_id is None or result.value is None or not math.isfinite(result.value):
         return None
@@ -520,40 +519,13 @@ def record_measured_metric(session: Session, result: ExperimentResult) -> Any | 
     # is the experiment type so a KD from BLI and one from another assay do not
     # overwrite each other, and re-analysing the same run updates in place
     # rather than accumulating a row per attempt.
-    existing = session.scalar(
-        select(CandidateMetric).where(
-            CandidateMetric.candidate_id == result.candidate_id,
-            CandidateMetric.metric_key == metric_key,
-            CandidateMetric.method == result.experiment_type,
-            CandidateMetric.model_variant == "",
-            CandidateMetric.condition == "",
-        )
-    )
-    if existing is not None:
-        existing.value = float(result.value)
-        existing.unit = result.unit or unit
-        existing.source_experiment_result_id = result.id
-        existing.context = {**existing.context, **metric_context}
-        existing.version += 1
-        session.flush()
-        return existing
-
-    metric = CandidateMetric(
+    return record_measured_metric(
+        session,
         candidate_id=result.candidate_id,
         metric_key=metric_key,
         value=float(result.value),
         method=result.experiment_type,
-        model_variant="",
-        # Not a prediction. This is the distinction the column was added for.
-        evidence_kind="measured",
-        # A bench instrument is as independent as an assessor gets: it has no
-        # stake in the design model's ranking.
-        assessor="instrument",
-        condition="",
         unit=result.unit or unit,
         context=metric_context,
         source_experiment_result_id=result.id,
     )
-    session.add(metric)
-    session.flush()
-    return metric

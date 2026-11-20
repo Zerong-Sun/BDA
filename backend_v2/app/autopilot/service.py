@@ -4,20 +4,18 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
 from ..campaigns.models import Campaign
 from ..compute.models import Job
-from ..compute.repository import ComputeRepository
-from ..compute.service import transition_job
+from ..compute.service import jobs_for_workflow, transition_job
 from ..copilot.models import CopilotAgentRun
 from ..core import review
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.models import Operation
-from ..platform.operations import enqueue_operation
+from ..platform.operations import enqueue_operation, enqueue_project_event
 from ..projects.models import Project
 from ..research.models import ResearchGeneration
 from . import gates, operators
@@ -30,6 +28,7 @@ from .models import (
     BudgetReservation,
     CampaignBudget,
 )
+from .repository import AutopilotRepository
 from .schemas import AutopilotConfirm, AutopilotDraftCreate, AutopilotStart
 
 DEFAULT_STAGE_KEYS = ["research", "plan", "compute", "review"]
@@ -84,14 +83,14 @@ def create_draft(session: Session, payload: AutopilotDraftCreate, user: User) ->
 
 
 def require_draft(session: Session, draft_id: uuid.UUID) -> AutopilotDraft:
-    draft = session.get(AutopilotDraft, draft_id)
+    draft = AutopilotRepository(session).draft(draft_id)
     if draft is None:
         raise DomainError("autopilot_draft_not_found", "Autopilot draft was not found", status_code=404)
     return draft
 
 
 def require_campaign(session: Session, campaign_id: uuid.UUID) -> AutopilotCampaign:
-    campaign = session.get(AutopilotCampaign, campaign_id)
+    campaign = AutopilotRepository(session).campaign(campaign_id)
     if campaign is None:
         raise DomainError("autopilot_campaign_not_found", "Autopilot campaign was not found", status_code=404)
     return campaign
@@ -210,7 +209,7 @@ def _record_confirmation_decision(
     if project is None:  # pragma: no cover - the campaign's FK guarantees it
         return
     stages = ", ".join(str(key) for key in stage_keys)
-    budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id))
+    budget = AutopilotRepository(session).budget(campaign.id)
     limits = []
     if budget is not None and budget.gpu_seconds_limit is not None:
         limits.append(f"GPU {budget.gpu_seconds_limit}s")
@@ -259,17 +258,12 @@ def _reserve_budget(
     campaign: AutopilotCampaign,
     payload: AutopilotStart,
 ) -> BudgetReservation:
-    existing = session.scalar(
-        select(BudgetReservation).where(
-            BudgetReservation.campaign_id == campaign.id,
-            BudgetReservation.idempotency_key == payload.idempotency_key,
-        )
-    )
+    existing = AutopilotRepository(session).reservation_by_key(campaign.id, payload.idempotency_key)
     if existing is not None:
         if existing.gpu_seconds != payload.gpu_seconds or existing.money_micros != payload.money_micros:
             raise DomainError("idempotency_conflict", "Reservation key was reused with another budget", status_code=409)
         return existing
-    budget = session.scalar(select(CampaignBudget).where(CampaignBudget.campaign_id == campaign.id).with_for_update())
+    budget = AutopilotRepository(session).budget(campaign.id, for_update=True)
     if budget is None:
         raise DomainError("campaign_budget_missing", "Campaign budget is missing", status_code=409)
     next_gpu = budget.gpu_seconds_reserved + budget.gpu_seconds_committed + payload.gpu_seconds
@@ -362,7 +356,7 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
     campaign.status = "cancelled"
     campaign.cancelled_at = campaign.cancelled_at or datetime.now(UTC)
     campaign.version += 1
-    stages = list(session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id)))
+    stages = AutopilotRepository(session).stages(campaign.id)
     for stage in stages:
         if stage.status in {"pending", "running", "blocked"}:
             stage.status = "cancelled"
@@ -376,7 +370,8 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
             if job and job.status not in {"succeeded", "failed", "cancelled"}:
                 if job.status != "cancel_requested":
                     transition_job(session, job, "cancel_requested")
-                    ComputeRepository(session).enqueue(
+                    enqueue_project_event(
+                        session,
                         "job.cancel",
                         job.id,
                         project_id=job.project_id,
@@ -387,7 +382,7 @@ def cancel_campaign(session: Session, campaign: AutopilotCampaign, user: User) -
 
             project = session.get(Project, campaign.project_id)
             assert project is not None
-            for job in ComputeRepository(session).jobs_for_workflow(stage.resource_id):
+            for job in jobs_for_workflow(session, stage.resource_id):
                 if job.status not in {"succeeded", "failed", "cancelled", "cancel_requested"}:
                     transition_job(session, job, "cancel_requested")
                     request_cancel(session, job, project, user)
@@ -599,12 +594,7 @@ def _stop_operators(session: Session, campaign: AutopilotCampaign, *, reason: st
     from ..copilot import agent_runs as copilot_runs
 
     stopped: list[str] = []
-    stages = session.scalars(
-        select(AutopilotStage).where(
-            AutopilotStage.campaign_id == campaign.id,
-            AutopilotStage.resource_type == "copilot_agent_run",
-        )
-    )
+    stages = AutopilotRepository(session).stages(campaign.id, resource_type="copilot_agent_run")
     for stage in stages:
         if stage.resource_id is None:
             continue
@@ -617,7 +607,7 @@ def _stop_operators(session: Session, campaign: AutopilotCampaign, *, reason: st
 
 
 def require_stage(session: Session, stage_id: uuid.UUID) -> AutopilotStage:
-    stage = session.get(AutopilotStage, stage_id)
+    stage = AutopilotRepository(session).stage(stage_id)
     if stage is None:
         raise DomainError("autopilot_stage_not_found", "Autopilot stage was not found", status_code=404)
     return stage
@@ -828,7 +818,7 @@ def finish_campaign(session: Session, campaign: AutopilotCampaign, *, user: User
     """
     if campaign.status in {"cancelled", "manual_takeover"}:
         return campaign
-    stages = list(session.scalars(select(AutopilotStage).where(AutopilotStage.campaign_id == campaign.id)))
+    stages = AutopilotRepository(session).stages(campaign.id)
     if not stages:
         # `all([])` is True, so without this a campaign with no stages reports
         # `succeeded` - an outcome for work that was never declared, let alone
@@ -863,15 +853,7 @@ def next_stage(session: Session, campaign: AutopilotCampaign) -> AutopilotStage 
     the stage behind it. `execute_campaign` has always read it this way and this
     is that same read, shared so the two cannot drift apart.
     """
-    return session.scalar(
-        select(AutopilotStage)
-        .where(
-            AutopilotStage.campaign_id == campaign.id,
-            AutopilotStage.status.in_(UNSTARTED_STAGE_STATUSES),
-        )
-        .order_by(AutopilotStage.position)
-        .limit(1)
-    )
+    return AutopilotRepository(session).first_stage_with_status(campaign.id, UNSTARTED_STAGE_STATUSES)
 
 
 def advance_campaign(
@@ -894,12 +876,7 @@ def advance_campaign(
     """
     if campaign.status in {"cancelled", "manual_takeover", "blocked", "succeeded", "failed"}:
         return None, None
-    in_flight = session.scalar(
-        select(AutopilotStage).where(
-            AutopilotStage.campaign_id == campaign.id,
-            AutopilotStage.status == "ready",
-        )
-    )
+    in_flight = AutopilotRepository(session).stage_in_flight(campaign.id)
     if in_flight is not None:
         # A campaign runs one stage at a time - `execute_campaign` activates only
         # the frontmost - so a stage already in flight means this advance has
@@ -924,9 +901,7 @@ def _worker_principal_id(session: Session) -> uuid.UUID:
     attributing an automatic settlement to the person who confirmed the campaign
     would answer it wrongly.
     """
-    principal = session.scalar(
-        select(AutopilotServicePrincipal).where(AutopilotServicePrincipal.name == "autopilot-worker")
-    )
+    principal = AutopilotRepository(session).service_principal_named("autopilot-worker")
     if principal is None:
         principal = AutopilotServicePrincipal(
             name="autopilot-worker",

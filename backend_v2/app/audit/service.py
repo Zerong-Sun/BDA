@@ -19,17 +19,17 @@ def record_audit(
     organization_id: uuid.UUID | None = None,
     result: str = "success",
     payload: dict | None = None,
-) -> None:
-    session.add(
-        AuditLog(
-            actor_id=actor_id,
-            organization_id=organization_id,
-            project_id=project_id,
-            action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            trace_id=current_trace_id(),
-            result=result,
-            payload=payload or {},
-        )
+) -> AuditLog:
+    row = AuditLog(
+        actor_id=actor_id,
+        organization_id=organization_id,
+        project_id=project_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        trace_id=current_trace_id(),
+        result=result,
+        payload=payload or {},
     )
+    session.add(row)
+    return row

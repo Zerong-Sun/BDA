@@ -40,7 +40,7 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
 import { findDemoProject } from './demoProject'
-import { getTourSection, getTourStep, TOUR_SECTIONS, type TourSection, type TourStep } from './tourData'
+import { getTourSection, getTourStep, TOUR_SECTIONS, type TourSection, type TourStep } from '../../lib/tour/tourData'
 import './tour.css'
 
 const ANCHOR_ATTEMPTS = 40

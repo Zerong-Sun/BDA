@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,52 @@ MODELS = {
     "method_plugin": MethodPlugin,
     "llm_provider": LLMProvider,
 }
+
+
+def provider_request_variant(provider: LLMProvider, config: dict) -> LLMProvider:
+    """An unsaved copy of a provider with different request settings; never added to a session."""
+    return LLMProvider(id=provider.id, name=provider.name, model=provider.model,
+                       provider_type=provider.provider_type, endpoint=provider.endpoint,
+                       credential_ref=provider.credential_ref, config=config)
+
+
+def provider_named(session: Session, name: str) -> LLMProvider | None:
+    return session.scalar(select(LLMProvider).where(LLMProvider.name == name))
+
+
+def save_byok_provider(
+    session: Session,
+    existing: LLMProvider | None,
+    *,
+    name: str,
+    endpoint: str | None,
+    model: str | None,
+    credential_ref: str,
+) -> LLMProvider:
+    """Create or re-point a project's bring-your-own-key provider."""
+    if existing is None:
+        provider = LLMProvider(
+            name=name,
+            provider_type="openai_compatible",
+            endpoint=endpoint,
+            model=model,
+            credential_ref=credential_ref,
+            config={},
+            enabled=True,
+        )
+        session.add(provider)
+        session.flush()
+        return provider
+    existing.endpoint = endpoint or existing.endpoint
+    existing.model = model or existing.model
+    existing.credential_ref = credential_ref
+    existing.enabled = True
+    existing.version += 1
+    return existing
+
+
+def get_plugin(session: Session, plugin_id: uuid.UUID) -> ModelPlugin | None:
+    return session.get(ModelPlugin, plugin_id)
 
 
 def create_resource(session: Session, kind: str, data: dict):

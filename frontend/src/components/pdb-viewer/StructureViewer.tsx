@@ -9,7 +9,7 @@ import {
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useToastStore } from '../../components/ui/toastStore'
+import { useToastStore } from '../ui/toastStore'
 import {
   type ColorPreset,
   type RepresentationPreset,

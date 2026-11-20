@@ -7,8 +7,10 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
+from ..platform.models import OutboxEvent
+from ..platform.operations import enqueue_project_event
 from ..workflows.models import WorkflowNode
-from .models import ComputeDraft, IdempotencyRecord, Job, JobEvent, JobSubmission, OutboxEvent
+from .models import ComputeDraft, IdempotencyRecord, Job, JobEvent, JobSubmission
 
 
 class ComputeRepository:
@@ -128,14 +130,7 @@ class ComputeRepository:
         project_id: uuid.UUID,
         payload: dict | None = None,
     ) -> None:
-        """Queue project work with the RLS fence required by restricted workers."""
-        self.session.add(
-            OutboxEvent(
-                topic=topic,
-                aggregate_id=aggregate_id,
-                payload={**(payload or {}), "project_id": str(project_id)},
-            )
-        )
+        enqueue_project_event(self.session, topic, aggregate_id, project_id=project_id, payload=payload)
 
     def has_outbox_event(self, topic: str, aggregate_id: uuid.UUID) -> bool:
         return (

@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 
-from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.config import get_settings
@@ -47,7 +47,8 @@ def ligand_import(import_id: str) -> dict:
     with session_scope() as session:
         row = session.get(LigandImport, parsed)
         if row and row.status != "available":
-            artifact = Artifact(
+            artifact = register_stored_artifact(
+                session,
                 project_id=project_id,
                 created_by=created_by,
                 artifact_type="ligand",
@@ -58,7 +59,6 @@ def ligand_import(import_id: str) -> dict:
                 checksum_sha256=checksum,
                 lineage={"source": source, "source_url": source_url, "ligand_import_id": import_id},
             )
-            session.add(artifact)
             session.flush()
             row.artifact_id = artifact.id
             row.status = "available"

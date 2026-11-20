@@ -9,8 +9,8 @@ import {
   CommandItem,
   CommandList,
   CommandShortcut,
-} from './command'
-import { Button } from './Button'
+} from '../../components/ui/command'
+import { Button } from '../../components/ui/Button'
 import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'

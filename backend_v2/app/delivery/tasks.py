@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from ..artifacts.models import Artifact, ArtifactLineageEdge
+from ..artifacts.service import add_lineage_edge, register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.database import SessionFactory, session_scope  # noqa: F401 - shared task fixture compatibility
@@ -38,17 +38,16 @@ def build_delivery_package(package_id: str) -> dict:
             checksum = hashlib.sha256(data).hexdigest()
             key = f"projects/{package.project_id}/delivery/{parsed}/{checksum}.zip"
             storage.put_bytes(key, data, "application/zip")
-            artifact = Artifact(project_id=package.project_id, created_by=package.created_by,
-                                artifact_type="delivery_package", filename=f"{package.name}.zip",
-                                content_type="application/zip", object_key=key, size_bytes=len(data),
-                                checksum_sha256=checksum,
-                                lineage={"delivery_package_id": package_id, "format": "ro-crate-1.1", "record_counts": counts})
-            session.add(artifact)
+            artifact = register_stored_artifact(session, project_id=package.project_id, created_by=package.created_by,
+                                                artifact_type="delivery_package", filename=f"{package.name}.zip",
+                                                content_type="application/zip", object_key=key, size_bytes=len(data),
+                                                checksum_sha256=checksum,
+                                                lineage={"delivery_package_id": package_id, "format": "ro-crate-1.1", "record_counts": counts})
             session.flush()
             for source in snapshot["artifacts"]:
-                session.add(ArtifactLineageEdge(project_id=package.project_id,
-                                               parent_artifact_id=uuid.UUID(source["id"]), child_artifact_id=artifact.id,
-                                               relation="delivery_includes", details={"checksum_sha256": source["checksum_sha256"]}))
+                add_lineage_edge(session, project_id=package.project_id,
+                                 parent_artifact_id=uuid.UUID(source["id"]), child_artifact_id=artifact.id,
+                                 relation="delivery_includes", details={"checksum_sha256": source["checksum_sha256"]})
             package.selection = {**selection, "record_counts": counts}
             package.artifact_id = artifact.id
             package.status = "available"

@@ -8,12 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import pytest
-from backend_v2.app.compute.models import Job, JobSubmission, OutboxEvent
+from backend_v2.app.compute.models import Job, JobSubmission
 from backend_v2.app.compute.schemas import SubmissionCreate
 from backend_v2.app.compute.service import create_submission
 from backend_v2.app.core.database import SessionFactory
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, User
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.projects.models import Project
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun

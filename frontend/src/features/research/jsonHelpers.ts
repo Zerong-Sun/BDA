@@ -44,15 +44,6 @@ export function claimTitle(item: Record<string, unknown>) {
   )
 }
 
-export function currentRole() {
-  try {
-    const raw = sessionStorage.getItem('bda_user')
-    return raw ? text((JSON.parse(raw) as { role?: unknown }).role) : ''
-  } catch {
-    return ''
-  }
-}
-
 export function commaList(value: string) {
   return value.split(',').map((item) => item.trim()).filter(Boolean)
 }

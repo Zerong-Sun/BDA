@@ -4,7 +4,7 @@ import { ArrowRightIcon, ArrowCounterClockwiseIcon } from '@phosphor-icons/react
 import { getProjectOverview } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
-import { derivePipeline, PIPELINE_STAGES, type StageKey } from '../../features/workflow/pipelineStages'
+import { derivePipeline, PIPELINE_STAGES, type StageKey } from '../../lib/workflow/pipelineStages'
 import { Button } from './Button'
 
 /**

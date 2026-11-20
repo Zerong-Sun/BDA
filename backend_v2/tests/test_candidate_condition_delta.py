@@ -1,6 +1,6 @@
 """Δ between conditions must be storable, queryable, and never silently overwritten.
 
-Before this, `_record_metrics` matched an existing row on (candidate, key, method,
+Before this, `record_candidate_metrics` matched an existing row on (candidate, key, method,
 variant) without `condition`, so a control score silently overwrote the target score
 instead of accumulating beside it; a selectivity panel could never form.
 """
@@ -14,8 +14,8 @@ import pytest
 from backend_v2.app.candidates.delta import compute_condition_deltas, upsert_condition_deltas
 from backend_v2.app.candidates.models import Candidate, CandidateMetric
 from backend_v2.app.candidates.repository import CandidateRepository
+from backend_v2.app.candidates.service import record_candidate_metrics
 from backend_v2.app.compute.parsers.base import ParsedMetric
-from backend_v2.app.compute.tasks import _record_metrics
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.models import Organization, User
 from backend_v2.app.projects.models import Project, ProjectMember
@@ -134,13 +134,13 @@ def test_a_second_condition_no_longer_overwrites_the_first(db_session: Session) 
     db_session.add(candidate)
     db_session.flush()
 
-    _record_metrics(
+    record_candidate_metrics(
         db_session,
         candidate,
         [ParsedMetric(key="iptm", value=0.94, method="alphafold3", condition="ligand:TCI")],
         job_id=None,
     )
-    _record_metrics(
+    record_candidate_metrics(
         db_session,
         candidate,
         [ParsedMetric(key="iptm", value=0.73, method="alphafold3", condition="ligand:P0T")],
@@ -160,7 +160,7 @@ def test_recollecting_the_same_condition_still_updates_in_place(db_session: Sess
     db_session.flush()
 
     for value in (0.90, 0.94):
-        _record_metrics(
+        record_candidate_metrics(
             db_session,
             candidate,
             [ParsedMetric(key="iptm", value=value, method="alphafold3", condition="ligand:TCI")],
@@ -178,7 +178,7 @@ def test_upsert_condition_deltas_writes_a_queryable_delta_metric(db_session: Ses
     db_session.add(candidate)
     db_session.flush()
 
-    _record_metrics(
+    record_candidate_metrics(
         db_session,
         candidate,
         [
@@ -210,7 +210,7 @@ def test_upsert_condition_deltas_is_a_no_op_with_only_one_condition(db_session: 
     db_session.add(candidate)
     db_session.flush()
 
-    _record_metrics(
+    record_candidate_metrics(
         db_session,
         candidate,
         [ParsedMetric(key="iptm", value=0.94, method="alphafold3", condition="ligand:TCI")],

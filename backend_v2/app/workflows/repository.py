@@ -20,6 +20,14 @@ class WorkflowRepository:
     def get(self, workflow_id: uuid.UUID) -> WorkflowRun | None:
         return self.session.get(WorkflowRun, workflow_id)
 
+    def lock(self, workflow_id: uuid.UUID) -> WorkflowRun | None:
+        return self.session.scalar(
+            select(WorkflowRun)
+            .where(WorkflowRun.id == workflow_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
     def list_project(self, project_id: uuid.UUID, *, after: uuid.UUID | None, limit: int) -> list[WorkflowRun]:
         query = select(WorkflowRun).where(WorkflowRun.project_id == project_id)
         if after:

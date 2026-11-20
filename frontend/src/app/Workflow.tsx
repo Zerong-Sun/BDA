@@ -65,7 +65,7 @@ import {
 import { Button } from '../components/ui/Button'
 import { Textarea } from '../components/ui/textarea'
 import { Skeleton } from '../components/ui/Skeleton'
-import { currentRole } from '../features/research/jsonHelpers'
+import { currentRole } from '../lib/auth/currentRole'
 
 function templateForPlugin(
   plugin: ModelPlugin,

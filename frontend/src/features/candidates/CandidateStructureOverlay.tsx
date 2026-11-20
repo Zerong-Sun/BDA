@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { candidateScore, candidateStrings, candidateText, type Candidate } from '../../lib/schemas/candidate'
-import type { StructureMetadataResponse } from '../pdb-viewer/types'
+import type { StructureMetadataResponse } from '../../components/pdb-viewer/types'
 import { useI18n } from '../../lib/i18n'
 
 interface CandidateStructureOverlayProps {

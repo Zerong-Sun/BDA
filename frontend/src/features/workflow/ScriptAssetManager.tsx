@@ -21,7 +21,7 @@ import {
 } from '../../components/reui/sortable'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { useAppStore } from '../../lib/store/appStore'
 
 export function ScriptAssetManager() {

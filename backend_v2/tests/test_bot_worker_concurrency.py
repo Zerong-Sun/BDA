@@ -11,11 +11,10 @@ from types import SimpleNamespace
 
 import pytest
 from backend_v2.app.compute import tasks
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.core import celery_app as worker
 from backend_v2.app.core.config import get_settings
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
-from backend_v2.app.platform.models import Operation
+from backend_v2.app.platform.models import Operation, OutboxEvent
 from backend_v2.app.platform.operations import enqueue_operation, finish_operation, mark_operation_running
 from backend_v2.app.projects.models import Project
 from backend_v2.tests.test_platform_operations import _queue

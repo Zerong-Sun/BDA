@@ -62,12 +62,12 @@ import { fetchPdb } from '../../lib/api/targets'
 import { confirmTargetIdentity } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useProjectTargetStructure } from '../../lib/hooks/useProjectTargetStructure'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
 import {
   parseHotspotResidue,
   structureSourceFromTarget,
   structureSourceFromUrl,
-} from '../pdb-viewer/types'
+} from '../../components/pdb-viewer/types'
 import { useI18n } from '../../lib/i18n'
 import { SaveToReviewButton } from './SaveToReviewButton'
 

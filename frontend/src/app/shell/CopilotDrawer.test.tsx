@@ -6,7 +6,7 @@ import { renderWithProviders } from '../../test/renderWithProviders'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/handlers'
 import { useAppStore } from '../../lib/store/appStore'
-import { Button } from './Button'
+import { Button } from '../../components/ui/Button'
 import { CopilotDrawer } from './CopilotDrawer'
 
 vi.mock('../../features/copilot/CopilotChat', () => ({ CopilotChat: () => <div>Conversation</div> }))

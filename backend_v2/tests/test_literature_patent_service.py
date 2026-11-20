@@ -270,8 +270,7 @@ def test_legal_events_are_shown_per_country_and_only_for_a_completed_lookup(sess
 
 
 def test_a_legal_status_lookup_is_queued_for_this_projects_saved_patents(session: Session, monkeypatch) -> None:
-    from backend_v2.app.compute.models import OutboxEvent
-    from backend_v2.app.platform.models import Operation
+    from backend_v2.app.platform.models import Operation, OutboxEvent
 
     monkeypatch.setattr(patent_service, "credential_available", lambda reference: True)
     project_id = _project(session)

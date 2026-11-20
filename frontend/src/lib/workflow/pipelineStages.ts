@@ -1,4 +1,4 @@
-import type { ProjectOverview } from '../../lib/api/projects'
+import type { ProjectOverview } from '../api/projects'
 
 /** Progress describes existing records, never whether a workspace may be opened.
  * Empty workspaces accept manual input; execution has its own preflight gates. */

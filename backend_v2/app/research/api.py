@@ -13,8 +13,7 @@ from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
-from ..projects.repository import ProjectRepository
-from ..projects.service import require_project, require_project_permission
+from ..projects.service import list_visible_projects, require_project, require_project_permission
 from . import goals
 from .copilot_import import import_copilot_research_result, validation_response
 from .generation import create_research_generation, import_research_generation, require_research_generation
@@ -81,7 +80,7 @@ def get_research_packages(
 ) -> list[ResearchPackageDescriptor]:
     visible = {
         project.source_package_id
-        for project in ProjectRepository(session).list_visible(user, after=None, limit=10_000)
+        for project in list_visible_projects(session, user, after=None, limit=10_000)
         if project.source_package_id
     }
     return [

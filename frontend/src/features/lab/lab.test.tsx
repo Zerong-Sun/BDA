@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PIPELINE_STAGES, derivePipeline } from '../workflow/pipelineStages'
+import { PIPELINE_STAGES, derivePipeline } from '../../lib/workflow/pipelineStages'
 import { en } from '../../lib/i18n/en'
 import { zh } from '../../lib/i18n/zh'
 

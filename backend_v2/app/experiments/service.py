@@ -16,6 +16,13 @@ from .models import ExperimentResult
 from .schemas import ExperimentResultBatch, ExperimentResultCreate
 
 
+def add_experiment_result(session: Session, **fields: object) -> ExperimentResult:
+    """A result produced by a verified worker (job collection or instrument analysis)."""
+    row = ExperimentResult(**fields)
+    session.add(row)
+    return row
+
+
 def reserved_learning_field(values: dict) -> str | None:
     """Learning observations must enter through their contract-aware adapter."""
     metadata = values.get("result_metadata")

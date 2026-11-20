@@ -16,7 +16,7 @@ import { StatusPill } from '../../components/ui/StatusPill'
 import { statusTone } from '../../components/ui/statusTone'
 import { useAppStore } from '../../lib/store/appStore'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
-import { currentRole } from '../../features/research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { useI18n } from '../../lib/i18n'
 import { isSettled, listOperations, type Operation } from '../../lib/api/operations'
 

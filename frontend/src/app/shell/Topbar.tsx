@@ -6,23 +6,23 @@ import { CommandPalette } from './CommandPalette'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { projectText } from '../../lib/i18n/projectText'
-import { BackendHealthBanner } from './BackendHealthBanner'
+import { BackendHealthBanner } from '../../components/ui/BackendHealthBanner'
 import { ActivityIndicatorButton } from '../../features/operations/ActivityIndicatorButton'
-import { UserMenu } from './UserMenu'
-import { HelpMenu } from './HelpMenu'
-import { StatusPill } from './StatusPill'
-import { statusTone } from './statusTone'
-import { Button } from './Button'
-import { BigoBioLogo } from './BigoBioLogo'
-import { StatusBadge } from './statusBadge'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu'
+import { UserMenu } from '../../components/ui/UserMenu'
+import { HelpMenu } from '../../components/ui/HelpMenu'
+import { StatusPill } from '../../components/ui/StatusPill'
+import { statusTone } from '../../components/ui/statusTone'
+import { Button } from '../../components/ui/Button'
+import { BigoBioLogo } from '../../components/ui/BigoBioLogo'
+import { StatusBadge } from '../../components/ui/statusBadge'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './select'
+} from '../../components/ui/select'
 
 export function Topbar() {
   const navigate = useNavigate()

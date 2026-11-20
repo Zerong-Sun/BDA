@@ -18,10 +18,10 @@ import {
 } from '../../lib/hooks/useProjectTargetStructure'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { approveTargetStructure, prepareTargetStructure } from '../../lib/api/projects'
-import { ProjectTargetViewer } from '../pdb-viewer/ProjectTargetViewer'
-import { PDBFileUpload } from '../pdb-viewer/PDBFileUpload'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
-import { structureSourceFromUrl } from '../pdb-viewer/types'
+import { ProjectTargetViewer } from '../../components/pdb-viewer/ProjectTargetViewer'
+import { PDBFileUpload } from '../../components/pdb-viewer/PDBFileUpload'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
+import { structureSourceFromUrl } from '../../components/pdb-viewer/types'
 import { TargetStructureOverlay } from './TargetStructureOverlay'
 
 interface ActiveProjectPanelProps {

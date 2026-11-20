@@ -46,7 +46,7 @@ Copilot 提供项目内的问答、证据检索、研究草案、实验工具调
 | 处理需等待的多步任务 | Copilot → 我的任务与交付物 | 服务端保存轮次、工具调用、成本与等待状态。可离开页面后返回；停止任务使用取消入口。 |
 | 看执行脚本并运行 | Workflow → 提交工作流 → 预览 → 确认；或计算草案确认面板 | 这是用户控制的执行接口，确认后 worker 才可能创建/提交真实作业。聊天没有提交工具。 |
 
-入口实现：[Copilot 抽屉](../frontend/src/components/ui/CopilotDrawer.tsx)、[Research](../frontend/src/app/Research.tsx)、[Workflow](../frontend/src/app/Workflow.tsx)、[任务书](../frontend/src/features/projects/ProjectChooser.tsx)、[决策树引导](../frontend/src/features/timeline/DecisionTreeBootstrap.tsx)。完整用户路径见[平台使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
+入口实现：[Copilot 抽屉](../frontend/src/app/shell/CopilotDrawer.tsx)、[Research](../frontend/src/app/Research.tsx)、[Workflow](../frontend/src/app/Workflow.tsx)、[任务书](../frontend/src/features/projects/ProjectChooser.tsx)、[决策树引导](../frontend/src/features/timeline/DecisionTreeBootstrap.tsx)。完整用户路径见[平台使用指南](GUIDED_PLATFORM_WORKFLOW.md)。
 
 ## 2. 聊天、后台任务和页面 AI 的区别
 

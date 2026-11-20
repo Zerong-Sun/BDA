@@ -16,7 +16,7 @@ from backend_v2.app.campaigns.models import Campaign, CampaignRound
 from backend_v2.app.candidates.models import Candidate
 from backend_v2.app.compute import tasks
 from backend_v2.app.compute.adapters import AdapterStatus
-from backend_v2.app.compute.models import ComputeDraft, Job, JobSubmission, OutboxEvent
+from backend_v2.app.compute.models import ComputeDraft, Job, JobSubmission
 from backend_v2.app.copilot import tasks as copilot_tasks
 from backend_v2.app.copilot.models import CopilotConversation, CopilotMessage
 from backend_v2.app.core import celery_app as celery_app_module
@@ -42,6 +42,7 @@ from backend_v2.app.literature.models import (
     LiteratureSearchRun,
     LiteratureSubscription,
 )
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.projects.models import Project
 from backend_v2.app.registry import tasks as registry_tasks
 from backend_v2.app.registry.models import ComputeNode, ModelPlugin, RegistryServer

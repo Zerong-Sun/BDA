@@ -10,7 +10,7 @@ import { WorkflowPage } from './Workflow'
 import { CandidatesPage } from './Candidates'
 import { ResultsPage } from './Results'
 
-vi.mock('../features/pdb-viewer/StructureViewerLazy', () => ({
+vi.mock('../components/pdb-viewer/StructureViewerLazy', () => ({
   StructureViewerLazy: () => <div data-testid="mock-structure-viewer">3D viewer lazy boundary</div>,
 }))
 

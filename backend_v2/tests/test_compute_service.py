@@ -9,7 +9,7 @@ import pytest
 from backend_v2.app import all_models  # noqa: F401
 from backend_v2.app.compute import api as compute_api
 from backend_v2.app.compute import service as compute_service
-from backend_v2.app.compute.models import Job, JobEvent, OutboxEvent
+from backend_v2.app.compute.models import Job, JobEvent
 from backend_v2.app.compute.schemas import SubmissionCreate
 from backend_v2.app.compute.service import (
     create_submission,
@@ -22,6 +22,7 @@ from backend_v2.app.core.models import Base
 from backend_v2.app.core.pagination import decode_cursor, encode_cursor
 from backend_v2.app.core.problem import DomainError
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.workflows.models import WorkflowNode, WorkflowRun

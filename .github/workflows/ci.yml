@@ -70,6 +70,8 @@ jobs:
         run: |
           PYTHONPATH=. python backend_v2/scripts/export_openapi.py backend_v2/openapi.json
           git diff --exit-code -- backend_v2/openapi.json
+      - name: Reject cross-domain repository imports and model writes
+        run: PYTHONPATH=. python backend_v2/scripts/check_domain_boundaries.py
       - name: Validate v2 data-flow matrix and write permissions
         run: PYTHONPATH=. python backend_v2/scripts/check_flow_matrix.py contracts/v2-flow-matrix.yaml
       - name: Reject plugin catalog drift
@@ -130,7 +132,7 @@ jobs:
             --glob '!frontend/src/lib/api/copilot.ts' \
             --glob '!frontend/src/lib/api/sse.ts' \
             --glob '!frontend/src/lib/api/researchPackages.ts' \
-            --glob '!frontend/src/features/pdb-viewer/structureLoader.ts' \
+            --glob '!frontend/src/components/pdb-viewer/structureLoader.ts' \
             --glob '!**/*.test.*'; then
             echo 'Raw fetch is limited to transport, SSE, presigned object transfer, and structure URLs.' >&2
             exit 1
@@ -168,7 +170,11 @@ jobs:
         working-directory: frontend
         # Build, codegen, lint, and browser tooling execute in trusted CI, so
         # vulnerabilities in devDependencies are part of the supply chain too.
-        run: npm audit
+        # audit-exceptions.json may accept a non-critical advisory with no
+        # patched release for at most 30 days; anything else fails.
+        run: |
+          node --test scripts/npm-audit-policy.self-test.mjs
+          node scripts/check-npm-audit.mjs
       - name: Filesystem & config vulnerability scan (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

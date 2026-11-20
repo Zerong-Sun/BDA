@@ -11,8 +11,7 @@ import uuid
 from sqlalchemy import select
 
 from ..compute.models import Job
-from ..compute.repository import ComputeRepository
-from ..compute.service import TERMINAL_STATES
+from ..compute.service import TERMINAL_STATES, jobs_for_submission, jobs_for_workflow
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
 
@@ -43,7 +42,7 @@ def campaign_advance(job_id: str) -> dict:
         )
         if round_ is None:
             return {"job_id": job_id, "status": "unlinked"}
-        jobs = ComputeRepository(session).jobs_for_submission(job.submission_id)
+        jobs = jobs_for_submission(session, job.submission_id)
         if not jobs or any(item.status not in TERMINAL_STATES for item in jobs):
             round_.status = "running"
             round_.submission_id = job.submission_id
@@ -92,9 +91,9 @@ def campaign_evaluate(round_id: str) -> dict:
             return {"round_id": round_id, "status": "missing"}
         jobs = []
         if round_.submission_id:
-            jobs = ComputeRepository(session).jobs_for_submission(round_.submission_id)
+            jobs = jobs_for_submission(session, round_.submission_id)
         elif round_.workflow_run_id:
-            jobs = ComputeRepository(session).jobs_for_workflow(round_.workflow_run_id)
+            jobs = jobs_for_workflow(session, round_.workflow_run_id)
         if any(job.project_id != campaign.project_id for job in jobs):
             raise ValueError("campaign_job_project_mismatch")
         candidates = (

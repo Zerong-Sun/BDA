@@ -1,4 +1,4 @@
-import { currentRole } from '../features/research/jsonHelpers'
+import { currentRole } from '../lib/auth/currentRole'
 import { isPublicVisitor } from '../lib/auth/publicWorkspace'
 import { Disclosure } from '../components/ui/Disclosure'
 import { useState } from 'react'

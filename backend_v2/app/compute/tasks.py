@@ -20,7 +20,8 @@ import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..artifacts.models import Artifact, ArtifactLineageEdge, ArtifactUpload
+from ..artifacts.models import Artifact, ArtifactUpload
+from ..artifacts.service import add_lineage_edge, register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.config import get_settings
@@ -33,19 +34,17 @@ from ..core.metrics import (
     OUTBOX_DEAD_LETTERED,
     STUCK_OPERATIONS,
 )
-from ..platform.models import Operation
+from ..platform.models import Operation, OutboxEvent
 from ..projects.models import Project
 from ..registry.ports import output_port_for_artifact, parse_output_ports
-from ..workflows.models import WorkflowNode, WorkflowRun
-from ..workflows.repository import WorkflowRepository
+from ..workflows.service import create_single_node_run, get_workflow
 from .adapters import RuntimeJob, adapter_for
-from .models import Job, JobAttempt, JobSubmission, OutboxEvent
+from .models import Job, JobAttempt, JobSubmission
 from .repository import ComputeRepository
 from .service import TERMINAL_STATES, _mirror_status_onto_node, schedule_ready_jobs, transition_job
 
 if TYPE_CHECKING:  # imported lazily at runtime to avoid a circular import
     from ..candidates.models import Candidate
-    from .parsers import ParsedMetric
 
 settings = get_settings()
 
@@ -601,7 +600,8 @@ def _persist_outputs(session: Session, job: Job, submission: JobSubmission, veri
     )
     artifacts: list[Artifact] = []
     for output in verified:
-        artifact = Artifact(
+        artifact = register_stored_artifact(
+            session,
             project_id=job.project_id,
             created_by=submission.created_by,
             artifact_type=output["artifact_type"],
@@ -620,20 +620,16 @@ def _persist_outputs(session: Session, job: Job, submission: JobSubmission, veri
                 "metadata": output["metadata"],
             },
         )
-        session.add(artifact)
         session.flush()
-        session.add_all(
-            [
-                ArtifactLineageEdge(
-                    project_id=job.project_id,
-                    parent_artifact_id=parent.id,
-                    child_artifact_id=artifact.id,
-                    relation="compute_input",
-                    details={"job_id": str(job.id), "attempt": job.attempt_number},
-                )
-                for parent in input_artifacts
-            ]
-        )
+        for parent in input_artifacts:
+            add_lineage_edge(
+                session,
+                project_id=job.project_id,
+                parent_artifact_id=parent.id,
+                child_artifact_id=artifact.id,
+                relation="compute_input",
+                details={"job_id": str(job.id), "attempt": job.attempt_number},
+            )
         artifacts.append(artifact)
     snapshot = job.runtime_spec.get("plugin_snapshot") or {}
     if snapshot.get("output_parser") == "alphafold3":
@@ -641,58 +637,6 @@ def _persist_outputs(session: Session, job: Job, submission: JobSubmission, veri
         declared = any(port.get("name") == PORT["name"] for port in snapshot.get("output_ports", []))
         artifacts.extend(collect(session, artifacts, declared=declared))
     return artifacts
-
-
-def _record_metrics(
-    session: Session,
-    candidate: Candidate,
-    metrics: list[ParsedMetric],
-    job_id: uuid.UUID | None,
-) -> None:
-    """Upsert a candidate's metrics, keyed by where each number came from.
-
-    Re-collecting an attempt must not duplicate rows, so a metric is matched on
-    (candidate, key, method, variant, condition) - the same tuple the table's unique
-    constraint uses. Condition has to be part of the match: a design scored against a
-    panel of ligands reports the same (key, method, variant) once per ligand, and
-    without condition in the WHERE clause the second ligand's row would be found as
-    "existing" and silently overwrite the first instead of accumulating beside it.
-    """
-    from ..candidates.models import CandidateMetric
-
-    for metric in metrics:
-        existing = session.scalar(
-            select(CandidateMetric).where(
-                CandidateMetric.candidate_id == candidate.id,
-                CandidateMetric.metric_key == metric.key,
-                CandidateMetric.method == metric.method,
-                CandidateMetric.model_variant == metric.model_variant,
-                CandidateMetric.condition == metric.condition,
-            )
-        )
-        if existing is not None:
-            existing.value = metric.value
-            existing.unit = metric.unit
-            existing.evidence_kind = metric.evidence_kind
-            existing.assessor = metric.assessor
-            existing.context = metric.context
-            existing.source_job_id = job_id
-            continue
-        session.add(
-            CandidateMetric(
-                candidate_id=candidate.id,
-                metric_key=metric.key,
-                value=metric.value,
-                method=metric.method,
-                model_variant=metric.model_variant,
-                evidence_kind=metric.evidence_kind,
-                assessor=metric.assessor,
-                condition=metric.condition,
-                unit=metric.unit,
-                context=metric.context,
-                source_job_id=job_id,
-            )
-        )
 
 
 def backfill_candidate_structures(existing, item, artifact_at) -> None:
@@ -727,7 +671,8 @@ def _apply_parsed_outputs(
 ) -> None:
     """Run the plugin's output parser and persist the candidates/results it found."""
     from ..candidates.models import Candidate
-    from ..experiments.models import ExperimentResult
+    from ..candidates.service import add_collected_candidate, record_candidate_metrics
+    from ..experiments.service import add_experiment_result
     from .parsers import ParseContext, get_parser
 
     snapshot = job.runtime_spec.get("plugin_snapshot")
@@ -763,11 +708,12 @@ def _apply_parsed_outputs(
             # ProteinMPNN design is the ordinary case, and its confidence numbers used
             # to be dropped here. Metrics are recorded below for new and existing alike.
             backfill_candidate_structures(existing, item, artifact_at)
-            _record_metrics(session, existing, item.metrics, job.id)
+            record_candidate_metrics(session, existing, item.metrics, job.id)
             continue
         structure = artifact_at(item.structure_output_index)
         complex_artifact = artifact_at(item.complex_output_index)
-        candidate = Candidate(
+        candidate = add_collected_candidate(
+            session,
             project_id=job.project_id,
             candidate_key=item.candidate_key,
             name=item.name or item.candidate_key,
@@ -780,9 +726,7 @@ def _apply_parsed_outputs(
             complex_artifact_id=complex_artifact.id if complex_artifact else None,
             source_job_id=job.id,
         )
-        session.add(candidate)
-        session.flush()
-        _record_metrics(session, candidate, item.metrics, job.id)
+        record_candidate_metrics(session, candidate, item.metrics, job.id)
         by_key[item.candidate_key] = candidate
 
     if by_key:
@@ -801,22 +745,21 @@ def _apply_parsed_outputs(
                 )
             )
         source = artifact_at(result.source_output_index)
-        session.add(
-            ExperimentResult(
-                project_id=job.project_id,
-                candidate_id=linked.id if linked else None,
-                candidate_ref=result.candidate_ref,
-                source_artifact_id=source.id if source else None,
-                batch_key=result.batch_key,
-                experiment_type=result.experiment_type,
-                pass_status=result.pass_status,
-                value=result.value,
-                unit=result.unit,
-                conclusion=result.conclusion,
-                failure_reason=result.failure_reason,
-                result_metadata=result.metadata,
-                created_by=submission.created_by,
-            )
+        add_experiment_result(
+            session,
+            project_id=job.project_id,
+            candidate_id=linked.id if linked else None,
+            candidate_ref=result.candidate_ref,
+            source_artifact_id=source.id if source else None,
+            batch_key=result.batch_key,
+            experiment_type=result.experiment_type,
+            pass_status=result.pass_status,
+            value=result.value,
+            unit=result.unit,
+            conclusion=result.conclusion,
+            failure_reason=result.failure_reason,
+            result_metadata=result.metadata,
+            created_by=submission.created_by,
         )
 
     from ..workflows.gate_runtime import capture_results
@@ -846,7 +789,7 @@ def cancel_job(self, job_id: str) -> dict:
 
 def _advance_submission(session: Session, job: Job) -> None:
     submission = session.get(JobSubmission, job.submission_id)
-    workflow = WorkflowRepository(session).get(job.workflow_run_id)
+    workflow = get_workflow(session, job.workflow_run_id)
     if submission and workflow:
         schedule_ready_jobs(session, submission, workflow)
 
@@ -993,25 +936,23 @@ def compute_draft_confirm(draft_id: str) -> dict:
         if draft.confirmed_job_id:
             return {"draft_id": draft_id, "status": "accepted", "job_id": str(draft.confirmed_job_id)}
         specification = draft.specification
-        workflow = WorkflowRun(
+        workflow, node = create_single_node_run(
+            session,
             project_id=draft.project_id,
+            created_by=draft.created_by,
             name=f"Compute draft: {draft.name}",
             status="queued",
             graph={"nodes": [{"key": "compute"}], "edges": [], "source_compute_draft_id": draft_id},
-            created_by=draft.created_by,
-        )
-        session.add(workflow)
-        session.flush()
-        node = WorkflowNode(
-            workflow_run_id=workflow.id,
-            node_key="compute",
-            node_type="compute",
-            model_plugin=str(specification.get("model_plugin") or "custom"),
-            container_image=specification.get("image"),
-            command=specification.get("command"),
-            queue=specification.get("queue"),
-            status="draft",
-            parameters=specification.get("parameters") or {},
+            node={
+                "node_key": "compute",
+                "node_type": "compute",
+                "model_plugin": str(specification.get("model_plugin") or "custom"),
+                "container_image": specification.get("image"),
+                "command": specification.get("command"),
+                "queue": specification.get("queue"),
+                "status": "draft",
+                "parameters": specification.get("parameters") or {},
+            },
         )
         submission = JobSubmission(
             workflow_run_id=workflow.id,

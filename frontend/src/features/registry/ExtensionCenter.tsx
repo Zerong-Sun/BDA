@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
 import { assessExtension, getExtensionCatalog, type ExtensionAssessment, type ExtensionCatalog, type ExtensionEntry } from '../../lib/api/extensions'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 
 function RegistryChoice({ label, placeholder, value, options, disabled, onChange }: {
   label: string; placeholder: string; value: string; options: Array<{ id: string; label: string }>; disabled: boolean; onChange: (value: string) => void

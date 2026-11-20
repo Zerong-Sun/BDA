@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useToastStore } from '../../components/ui/toastStore'
+import { useToastStore } from '../ui/toastStore'
 import { useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import {

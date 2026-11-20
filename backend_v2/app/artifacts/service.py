@@ -8,11 +8,13 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
 from ..core.config import get_settings
 from ..core.metrics import ARTIFACT_CHECKSUM_FAILURES
+from ..core.models import update_versioned
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..projects.models import Project
@@ -20,6 +22,45 @@ from .models import Artifact, ArtifactLineageEdge, ArtifactUpload
 from .repository import ArtifactRepository
 from .schemas import UploadComplete, UploadCreate
 from .storage import ObjectStorage
+
+
+def get_artifact(session: Session, artifact_id: uuid.UUID) -> Artifact | None:
+    """A live (not deleted) artifact; callers still check its project and status."""
+    return ArtifactRepository(session).artifact(artifact_id)
+
+
+def project_target_structures(session: Session, project_id: uuid.UUID) -> list[Artifact]:
+    return list(
+        session.scalars(
+            select(Artifact).where(
+                Artifact.project_id == project_id,
+                Artifact.artifact_type == "target_structure",
+                Artifact.deleted_at.is_(None),
+            )
+        )
+    )
+
+
+def register_stored_artifact(session: Session, **fields: object) -> Artifact:
+    """Record an object the caller already wrote to storage; the caller supplies its checksum."""
+    artifact = Artifact(**fields)
+    session.add(artifact)
+    return artifact
+
+
+def add_lineage_edge(session: Session, **fields: object) -> ArtifactLineageEdge:
+    edge = ArtifactLineageEdge(**fields)
+    session.add(edge)
+    return edge
+
+
+def update_artifact_lineage(artifact: Artifact, lineage: dict) -> None:
+    update_versioned(artifact, lineage=lineage)
+
+
+def retire_artifact(artifact: Artifact, now: datetime) -> None:
+    artifact.deleted_at = now
+    artifact.version += 1
 
 
 def _validate_artifact_content(filename: str, content_type: str, body: bytes) -> None:

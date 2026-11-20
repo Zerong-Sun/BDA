@@ -10,9 +10,9 @@ import { Input } from '../../components/ui/Input'
 import { Alert, AlertDescription } from '../../components/reui/alert'
 import { Badge } from '../../components/reui/badge'
 import { Frame, FramePanel } from '../../components/reui/frame'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
-import type { HighlightedResidue, StructureSource } from '../pdb-viewer/types'
-import { useCopilotReadOnly } from '../copilot/commandAccess'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
+import type { HighlightedResidue, StructureSource } from '../../components/pdb-viewer/types'
+import { useWorkspaceReadOnly } from '../../lib/hooks/useWorkspaceReadOnly'
 import {
   confirmHotspotSet,
   createHotspotSet,
@@ -50,7 +50,7 @@ export function HotspotSetPanel({
   const { language } = useI18n()
   const zh = language === 'zh'
   const queryClient = useQueryClient()
-  const readOnly = useCopilotReadOnly()
+  const readOnly = useWorkspaceReadOnly()
   const sets = useHotspotSets(projectId || null)
   const [picking, setPicking] = useState(false)
   const [picked, setPicked] = useState<HotspotResidue[]>([])

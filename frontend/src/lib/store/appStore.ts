@@ -6,7 +6,7 @@ import {
   getTourStep,
   TOUR_SECTIONS,
   type TourSectionId,
-} from '../../features/tour/tourData'
+} from '../tour/tourData'
 
 export type Language = 'en' | 'zh'
 export type AppMode = 'application' | 'demo'

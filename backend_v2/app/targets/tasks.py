@@ -10,6 +10,7 @@ import hashlib
 import uuid
 
 from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.config import get_settings
@@ -70,7 +71,8 @@ def target_structure_import(target_id: str, payload: dict) -> dict:
         target = session.get(Target, parsed)
         if target is None:
             return {"target_id": target_id, "status": "missing"}
-        artifact = Artifact(
+        artifact = register_stored_artifact(
+            session,
             id=artifact_id,
             project_id=project_id,
             created_by=created_by,
@@ -82,7 +84,6 @@ def target_structure_import(target_id: str, payload: dict) -> dict:
             checksum_sha256=checksum,
             lineage={"source": "rcsb", "pdb_id": pdb_id, **(payload.get("metadata") or {})},
         )
-        session.add(artifact)
         if payload.get("attach_to_target", True):
             target.structure_artifact_id = artifact.id
             target.structure_status = "available"
@@ -146,7 +147,8 @@ def target_structure_prepare(revision_id: str) -> dict:
         revision = session.get(TargetStructureRevision, parsed)
         if revision is None:
             return {"revision_id": revision_id, "status": "missing"}
-        artifact = Artifact(
+        artifact = register_stored_artifact(
+            session,
             id=artifact_id,
             project_id=project_id,
             created_by=created_by,
@@ -158,7 +160,6 @@ def target_structure_prepare(revision_id: str) -> dict:
             checksum_sha256=checksum,
             lineage={"source_artifact_id": str(revision.source_artifact_id), "revision_id": revision_id},
         )
-        session.add(artifact)
         revision.prepared_artifact_id = artifact.id
         revision.status = "available"
         revision.version += 1

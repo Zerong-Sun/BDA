@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { useToastStore } from './toastStore'
 import { useI18n } from '../../lib/i18n'
-import { currentRole } from '../../features/research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import {
   addOrganizationMember,
   createOrganization,

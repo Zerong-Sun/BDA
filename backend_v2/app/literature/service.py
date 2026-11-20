@@ -1,8 +1,12 @@
+import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
+from ..core.models import update_versioned
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
@@ -22,6 +26,45 @@ from .schemas import (
     SubscriptionCreate,
     SubscriptionUpdate,
 )
+
+
+def project_documents(session: Session, project_id: uuid.UUID) -> list[LiteratureDocument]:
+    return list(session.scalars(select(LiteratureDocument).where(LiteratureDocument.project_id == project_id)))
+
+
+def save_package_document(
+    session: Session,
+    project: Project,
+    existing: LiteratureDocument | None,
+    *,
+    external_id: str,
+    title: str,
+    metadata: dict,
+    status: str,
+    source: str = "research_package",
+) -> None:
+    """Create or refresh a bibliography entry carried by an imported research package."""
+    if existing is None:
+        session.add(
+            LiteratureDocument(
+                project_id=project.id,
+                title=title,
+                source=source,
+                external_id=external_id,
+                metadata_json=metadata,
+                status=status,
+            )
+        )
+        return
+    update_versioned(existing, title=title, metadata_json=metadata, status=status)
+
+
+def delete_project_documents(
+    session: Session, project_id: uuid.UUID, should_delete: Callable[[LiteratureDocument], bool]
+) -> None:
+    for document in project_documents(session, project_id):
+        if should_delete(document):
+            session.delete(document)
 
 
 def ingest(session: Session, project: Project, payload: LiteratureIngest, user: User) -> LiteratureDocument:
@@ -56,6 +99,24 @@ def subscribe(session: Session, project: Project, payload: SubscriptionCreate, u
         user=user,
         payload={"subscription_id": str(row.id)},
     )
+    return row
+
+
+def record_worker_search(
+    session: Session, *, project_id: uuid.UUID, query: str, created_by: uuid.UUID, requested_limit: int
+) -> LiteratureSearchRun:
+    """A Europe PMC search a worker runs inline rather than through the search queue."""
+    row = LiteratureSearchRun(
+        project_id=project_id,
+        query=query,
+        sources=["europe_pmc"],
+        requested_limit=requested_limit,
+        fetch_full_text=True,
+        extract_claims=True,
+        created_by=created_by,
+    )
+    session.add(row)
+    session.flush()
     return row
 
 

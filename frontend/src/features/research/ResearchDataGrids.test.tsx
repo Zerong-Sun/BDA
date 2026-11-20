@@ -26,7 +26,7 @@ vi.mock('./GenerateSimilarResearchPanel', () => ({ GenerateSimilarResearchPanel:
 vi.mock('./LiteraturePanel', () => ({ LiteraturePanel: () => null }))
 vi.mock('./TargetIntelligencePanel', () => ({ TargetIntelligencePanel: () => null }))
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => null }))
-vi.mock('../pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: () => null }))
+vi.mock('../../components/pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: () => null }))
 
 const localized = (en: string, zh = `中文 ${en}`) => ({ en, zh, default: en })
 
