@@ -12,6 +12,7 @@ CI 逐条运行下列脚本，任一失败即阻断合并。它们校验的是"�
 |---|---|
 | `export_openapi.py` | 导出 `backend_v2/openapi.json`；CI 重新导出后比对，未再生成即失败。前端生成 SDK 也由它驱动 |
 | `check_coverage.py` | 总覆盖率 85%，外加 identity、compute、artifacts、research 包与 migration 的 95% 门槛。阈值写在脚本里 |
+| `check_domain_boundaries.py` | `app/` 下任一域不得导入其他域的 `repository`，也不得直接构造其他域的模型；跨域读写走所属域的 service 或 outbox 事件 |
 | `check_flow_matrix.py` | `contracts/v2-flow-matrix.yaml` 必须覆盖每张表，并声明域、生产者、消费者、API 路径与 UI |
 | `check_document_inventory.py` | 活跃 Markdown 的唯一 H1、五个元数据字段、无断链、可从 `docs/README.md` 到达；并校验外部数据索引 |
 | `check_decision_coverage.py` | `DECISIONS.md` 的每条编号决策要么有时间线记录，要么在决策记录契约里被声明为缺口。契约位于 `private/contracts/decision-records.yaml`，公开仓库没有该目录时按"无可校验"通过 |

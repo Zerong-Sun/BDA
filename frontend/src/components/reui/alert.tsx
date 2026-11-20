@@ -8,7 +8,7 @@ const alertVariants = cva(
     "has-[>[data-slot=alert-title]+[data-slot=alert-description]]:[&_[data-slot=alert-action]]:sm:row-end-3",
     "has-[>[data-slot=alert-title]+[data-slot=alert-description]]:items-start",
     "has-[>[data-slot=alert-title]+[data-slot=alert-description]]:[&_svg]:translate-y-0.5",
-    "rounded-none",
+    "rounded-[var(--workspace-panel-radius,12px)]",
     "px-3",
     "py-2.5",
     "has-[>svg]:gap-x-2.5",

@@ -111,7 +111,7 @@ def release_gate(
     from sqlalchemy import select
 
     from ..compute.models import Job
-    from ..compute.repository import ComputeRepository
+    from ..platform.operations import enqueue_project_event
     from .models import GateEvaluation
 
     _workflow(session, workflow_id, user)
@@ -140,7 +140,7 @@ def release_gate(
     gate.status = "materializing"
     gate.released_by = user.id
     gate.version += 1
-    ComputeRepository(session).enqueue("gate.resume", gate.id, project_id=gate.project_id)
+    enqueue_project_event(session, "gate.resume", gate.id, project_id=gate.project_id)
     from ..audit.service import record_audit
 
     project = require_project(session, gate.project_id, user)
@@ -164,7 +164,7 @@ def retry_gate(
     from sqlalchemy import select
 
     from ..compute.models import Job
-    from ..compute.repository import ComputeRepository
+    from ..platform.operations import enqueue_project_event
     from .models import GateEvaluation
 
     workflow = _workflow(session, workflow_id, user)
@@ -202,7 +202,7 @@ def retry_gate(
     )
     session.add(row)
     session.flush()
-    ComputeRepository(session).enqueue("gate.evaluate", row.id, project_id=row.project_id)
+    enqueue_project_event(session, "gate.evaluate", row.id, project_id=row.project_id)
     return _gate_summary(row)
 
 
@@ -213,7 +213,7 @@ def preview_gate(
     from sqlalchemy import select
 
     from ..compute.models import Job
-    from ..compute.repository import ComputeRepository
+    from ..platform.operations import enqueue_project_event
     from .models import GateEvaluation
 
     workflow = _workflow(session, workflow_id, user)
@@ -274,7 +274,7 @@ def preview_gate(
     )
     session.add(row)
     session.flush()
-    ComputeRepository(session).enqueue("gate.evaluate", row.id, project_id=row.project_id)
+    enqueue_project_event(session, "gate.evaluate", row.id, project_id=row.project_id)
     return _gate_summary(row)
 
 

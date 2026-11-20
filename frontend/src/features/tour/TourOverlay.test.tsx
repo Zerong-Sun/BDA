@@ -4,7 +4,7 @@ import { initialTourState, useAppStore } from '../../lib/store/appStore'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { TourOverlay } from './TourOverlay'
 import { HelpMenu } from '../../components/ui/HelpMenu'
-import { TOUR_SECTIONS } from './tourData'
+import { TOUR_SECTIONS } from '../../lib/tour/tourData'
 
 const projectContext = vi.hoisted(() => ({
   projectId: 'pd1-demo',

@@ -549,7 +549,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasHandle, WorkflowCanvasPro
           edgeTypes={edgeTypes}
           fitView
           minZoom={0.1}
-          fitViewOptions={overview ? { padding: 0.07, minZoom: 0.1, maxZoom: 1.25 } : { nodes: focusNodeId ? [{ id: focusNodeId }] : undefined, padding: 0.12, minZoom: 0.9, maxZoom: 1 }}
+          fitViewOptions={overview ? { padding: 0.07, minZoom: 0.1, maxZoom: 1.25 } : { nodes: focusNodeId ? [{ id: focusNodeId }] : undefined, padding: focusNodeId || nodes.length === 1 ? { top: '12px', bottom: '60%', x: 0.12 } : 0.12, minZoom: 0.9, maxZoom: 1 }}
           proOptions={proOptions}
           nodesDraggable={!readOnly && !overview}
           nodesConnectable={!readOnly && !overview}

@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { useI18n } from '../../lib/i18n'
 import type { ProjectOverview } from '../../lib/api/projects'
-import { currentStageIndex, PIPELINE_STAGES } from '../workflow/pipelineStages'
+import { currentStageIndex, PIPELINE_STAGES } from '../../lib/workflow/pipelineStages'
 
 export function ProjectNextAction({ overview }: { overview: ProjectOverview }) {
   const { language, t } = useI18n()

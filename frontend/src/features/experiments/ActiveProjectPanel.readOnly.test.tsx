@@ -83,7 +83,7 @@ vi.mock('../../lib/api/projects', async (importOriginal) => {
   }
 })
 
-vi.mock('../pdb-viewer/ProjectTargetViewer', () => ({
+vi.mock('../../components/pdb-viewer/ProjectTargetViewer', () => ({
   ProjectTargetViewer: () => <div>Target viewer</div>,
 }))
 

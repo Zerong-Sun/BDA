@@ -8,8 +8,10 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ..core.config import get_settings
 from ..core.problem import DomainError
 from ..registry.models import LLMProvider
+from ..registry.service import provider_request_variant
 from .endpoint_policy import validate_llm_endpoint
 
 LLM_TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
@@ -34,15 +36,16 @@ def structured_retry_provider(provider: LLMProvider) -> LLMProvider | None:
     config = {key: value for key, value in (provider.config or {}).items()
               if key not in {"thinking", "reasoning", "reasoning_effort"}}
     config.update({"thinking": {"type": "disabled"}, "response_format": {"type": "json_object"}})
-    return LLMProvider(id=provider.id, name=provider.name, model=provider.model,
-                       provider_type=provider.provider_type, endpoint=provider.endpoint,
-                       credential_ref=provider.credential_ref, config=config)
+    return provider_request_variant(provider, config)
 
 
 async def _completion_response(endpoint: str, token: str, body: dict[str, Any]) -> httpx.Response:
     try:
         async with asyncio.timeout(LLM_COMPLETION_DEADLINE_SECONDS):
-            async with httpx.AsyncClient(trust_env=False, follow_redirects=False) as client:
+            async with httpx.AsyncClient(
+                proxy=get_settings().llm_loopback_proxy_url,
+                trust_env=False, follow_redirects=False, verify=True,
+            ) as client:
                 # A timeout/connection break/5xx can happen after generation
                 # was accepted and charged. Never replay an ambiguous POST.
                 # Even an apparently safe connection failure remains one

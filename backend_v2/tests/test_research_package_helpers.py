@@ -12,22 +12,27 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
+import pytest
 from backend_v2.app.artifacts.models import Artifact
 from backend_v2.app.candidates.models import Candidate
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.literature.models import LiteratureDocument
-from backend_v2.app.platform.models import Operation
+from backend_v2.app.platform.models import Operation, OutboxEvent
 from backend_v2.app.projects.models import Project
 from backend_v2.app.research.models import ResearchFinding
 from backend_v2.app.research.package_import import (
     BUILTIN_RESEARCH_PACKAGE_PREFIXES,
     _candidate_card,
+    _legacy_package_project,
     _managed_package_match,
+    _package_claim_lineage_project,
     _project_completeness_score,
     _project_package_meta,
     _reconcile_managed_project,
     _structure_operations,
     _upsert_candidates,
+    _upsert_findings,
+    _upsert_references,
+    _versioned_package_project,
 )
 from backend_v2.app.targets.models import Target
 
@@ -291,3 +296,93 @@ def test_structure_operations_skip_blank_existing_and_pending_structures(monkeyp
     assert existing.lineage["source_package_id"] == "pd1-demo-v1"
     assert existing.version == 2
     enqueue.assert_not_called()
+
+
+def _named(name: str) -> Project:
+    return Project(id=uuid.uuid4(), name=name, localized_content={}, version=1)
+
+
+def _finding(**evidence: object) -> ResearchFinding:
+    return ResearchFinding(evidence=evidence)
+
+
+def test_only_builtin_packages_look_for_an_earlier_package_version() -> None:
+    session = Mock()
+    assert _versioned_package_project(session, uuid.uuid4(), "user-package", "PD1") is None
+    session.scalars.assert_not_called()
+
+
+def test_legacy_project_needs_a_name_and_a_finding_from_this_package() -> None:
+    session = Mock()
+    assert _legacy_package_project(session, uuid.uuid4(), "pkg-1", {"name": ""}) is None
+    session.scalars.assert_not_called()
+
+    unrelated, legacy = _named("PD-1"), _named("PD-1")
+    session.scalars.side_effect = [
+        [unrelated, legacy],
+        [_finding(package_id="other")],
+        [_finding(package_id="pkg-1")],
+    ]
+
+    found = _legacy_package_project(session, uuid.uuid4(), "pkg-1", {"id": "PD1", "name": {"zh": "PD-1"}})
+
+    assert found is legacy
+    assert (legacy.source_package_id, legacy.source_project_key, legacy.version) == ("pkg-1", "PD1", 2)
+    assert unrelated.source_package_id is None
+
+
+def test_claim_lineage_adoption_needs_something_to_match_on() -> None:
+    session = Mock()
+    package = {"package_id": "pd1-demo-v2", "projects": [{"id": "PD1", "name": ""}], "edges": []}
+    assert _package_claim_lineage_project(session, uuid.uuid4(), package, "PD1") is None
+    session.scalars.assert_not_called()
+
+
+def test_claim_lineage_adopts_a_user_project_carrying_this_packages_claims() -> None:
+    builtin = _named("PD-1")
+    builtin.source_package_id = "pd1-demo-v1"
+    untagged, other_claims, owner = _named("mine"), _named("mine"), _named("mine")
+    package = {
+        "package_id": "pd1-demo-v2",
+        "projects": [{"id": "PD1", "name": {"zh": "PD-1"}}],
+        "edges": [{"project": "PD1", "claim_id": "c-1"}, {"project": "OTHER", "claim_id": "c-9"}],
+    }
+    session = Mock()
+    session.scalars.side_effect = [
+        [builtin, untagged, other_claims, owner],
+        [_finding(package_id="elsewhere", claim_id="c-1")],
+        [_finding(package_id="pd1-demo-v1", claim_id="c-9")],
+        [_finding(package_id="pd1-demo-v1", claim_id="c-1")],
+    ]
+
+    assert _package_claim_lineage_project(session, uuid.uuid4(), package, "PD1") is owner
+    assert owner.localized_content == {"adopted_user_project": True}
+    assert (owner.name, owner.version) == ("mine", 2)
+    assert other_claims.version == untagged.version == 1
+
+
+def test_claim_lineage_falls_back_to_the_project_name_without_claim_ids() -> None:
+    adopted = _named("  pd-1 ")
+    package = {"package_id": "pd1-demo-v2", "projects": [{"id": "PD1", "name": {"zh": "PD-1"}}], "edges": []}
+    session = Mock()
+    session.scalars.side_effect = [[adopted], [_finding(package_id="pd1-demo-v2")]]
+
+    assert _package_claim_lineage_project(session, uuid.uuid4(), package, "PD1") is adopted
+    assert adopted.localized_content == {"adopted_user_project": True}
+
+
+def test_findings_and_references_of_other_projects_are_not_imported_here(monkeypatch: pytest.MonkeyPatch) -> None:
+    project = _named("PD-1")
+    session = Mock()
+    session.scalars.return_value = []
+    package = {
+        "package_id": "pkg-1",
+        "projects": [{"id": "PD1"}, {"id": "OTHER"}],
+        "edges": [{"project": "OTHER", "claim_id": "c-9"}],
+        "references": [{"ref_id": "r-9", "project_ids": ["OTHER"]}],
+    }
+    monkeypatch.setattr("backend_v2.app.research.package_import.project_documents", lambda *_: [])
+
+    assert _upsert_findings(session, project, package, "PD1") == 0
+    assert _upsert_references(session, project, package, "PD1", trusted_package=False) == 0
+    session.add.assert_not_called()

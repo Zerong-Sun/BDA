@@ -9,12 +9,12 @@ from sqlalchemy.orm import Session
 
 from ..artifacts.models import Artifact
 from ..artifacts.storage import ObjectStorage
-from ..compute.models import Job, OutboxEvent
+from ..compute.models import Job
 from ..core.config import get_settings
 from ..core.database import SessionFactory
 from ..core.metrics import MISSING_WORKER_QUEUES
 from ..registry.models import ComputeNode, ModelPlugin, RegistryServer
-from .models import MigrationRun, Operation
+from .models import MigrationRun, Operation, OutboxEvent
 from .repository import PlatformRepository
 from .schemas_operations import OperationsSummary
 

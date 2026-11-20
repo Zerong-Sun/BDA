@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ..artifacts.repository import ArtifactRepository
+from ..artifacts.service import get_artifact
 from ..core.database import get_session
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
@@ -177,7 +177,7 @@ def attach_structure_artifact(
     user: User = Depends(require_command),
 ) -> TargetResponse:
     target, _ = _target(session, target_id, user)
-    artifact = ArtifactRepository(session).artifact(payload.artifact_id)
+    artifact = get_artifact(session, payload.artifact_id)
     if artifact is None or artifact.project_id != target.project_id or artifact.status != "available":
         raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     attach_structure(target, artifact, _version(if_match))
@@ -204,7 +204,7 @@ def import_target_structure(
         raise DomainError("artifact_id_required", "artifact_id is required for an artifact import", status_code=422)
     if payload.source == "artifact":
         assert payload.artifact_id is not None  # rejected above before creating any operation
-        artifact = ArtifactRepository(session).artifact(payload.artifact_id)
+        artifact = get_artifact(session, payload.artifact_id)
         if artifact is None or artifact.project_id != target.project_id or artifact.status != "available":
             raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     operation = enqueue_operation(
@@ -291,7 +291,7 @@ def prepare_structure(
     user: User = Depends(require_command),
 ) -> TargetStructureRevisionResponse:
     target, project = _target(session, target_id, user)
-    artifact = ArtifactRepository(session).artifact(payload.source_artifact_id)
+    artifact = get_artifact(session, payload.source_artifact_id)
     if artifact is None or artifact.project_id != target.project_id or artifact.status != "available":
         raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     revision = prepare_structure_revision(session, target, project, artifact, payload, user)

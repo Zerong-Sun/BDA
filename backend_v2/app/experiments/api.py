@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ..artifacts.repository import ArtifactRepository
+from ..artifacts.service import get_artifact
 from ..core.database import get_session
 from ..core.pagination import decode_cursor, encode_cursor
 from ..core.problem import DomainError
@@ -89,7 +89,7 @@ def import_results(
     user: User = Depends(require_command),
 ) -> ExperimentResultImportAccepted:
     project = require_project_permission(session, project_id, user, "experiment")
-    artifact = ArtifactRepository(session).artifact(payload.artifact_id)
+    artifact = get_artifact(session, payload.artifact_id)
     if artifact is None or artifact.project_id != project.id or artifact.status != "available":
         raise DomainError("artifact_not_found", "Available project artifact was not found", status_code=404)
     if artifact.content_type not in {

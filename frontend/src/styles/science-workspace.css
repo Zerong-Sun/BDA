@@ -636,7 +636,7 @@ body { line-height: 1.6; }
 }
 
 /* A selected task puts the report ahead of the project directory and context. */
-.bot-page--task { max-width: 960px; margin-inline: auto; }
+.bot-page--task { max-width: 1440px; margin-inline: auto; }
 .bot-page--task .science-page-header { padding-bottom: .75rem; margin-bottom: .75rem; }
 .bot-page--task .science-page-header .science-eyebrow,
 .bot-page--task .science-page-header p:not(.science-eyebrow) { display: none; }
@@ -672,7 +672,7 @@ body { line-height: 1.6; }
 /* Keep composing outside the independently scrolling answer/history surface. */
 .room-compose-panel { flex-shrink: 0; display: grid; gap: .5rem; padding: .75rem; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-surface-1); }
 .room-compose-panel .room-composer { align-items: flex-end; }
-.room-compose-panel textarea, .copilot-compose-panel textarea { min-height: 64px; max-height: 160px; resize: vertical; flex: 1; background: var(--bg-app); }
+.room-compose-panel textarea, .copilot-compose-panel textarea { min-height: 64px; max-height: min(40dvh, 360px); resize: vertical; flex: 1; background: var(--bg-app); }
 .room-input-help { font-size: .6875rem; color: var(--text-muted); }
 @media (max-width: 640px) {
   .room-scroll--focus { height: 52dvh; min-height: 220px; }
@@ -749,3 +749,66 @@ body { line-height: 1.6; }
 .copilot-console [data-slot="tabs-content"] {
   scroll-padding-block: .75rem;
 }
+
+/* Shared workspace geometry: panels and controls retain distinct hierarchy. */
+:root {
+  --workspace-panel-radius: 12px;
+  --workspace-control-radius: 8px;
+  --workspace-feedback-duration: 150ms;
+  --workspace-feedback-easing: ease-out;
+}
+:is(.project-row, .project-summary-card, .bot-main, .science-team-preview,
+    .project-brief--compact, .structure-comparison-pane, .room-compose-panel) {
+  border-radius: var(--workspace-panel-radius);
+}
+:is(.projects-page, .bot-page, .research-page) [data-slot="button"],
+.bot-roster-item, .structure-comparison-pane select {
+  border-radius: var(--workspace-control-radius);
+}
+.project-row, .project-card-actions a, .bot-avatar, .bot-face i {
+  transition-duration: var(--workspace-feedback-duration);
+  transition-timing-function: var(--workspace-feedback-easing);
+}
+.room-history-feed, .room-scroll--focus {
+  scrollbar-gutter: stable;
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-row, .project-card-actions a, .bot-avatar, .bot-face i {
+    transition: none;
+  }
+}
+
+/* UI-001: give the mobile structure viewer priority over navigation chrome. */
+@media (max-width: 640px) {
+  .research-page--structures .research-page-heading { gap: .5rem; margin-bottom: .5rem; padding-bottom: .5rem; }
+  .research-page--structures .research-page-heading h1 { font-size: 1.125rem; }
+  .research-page--structures .research-page-heading [role="tablist"] { display: flex; flex-wrap: nowrap; overflow-x: auto; }
+  .research-page--structures .research-page-heading [role="tab"] { flex: 0 0 auto; white-space: nowrap; padding-inline: .625rem; }
+  .research-page--structures .research-evidence-navigation { flex-wrap: nowrap; overflow-x: auto; margin-bottom: .5rem; }
+  .research-page--structures .research-evidence-navigation > * { flex-shrink: 0; }
+  .research-page--structures .research-evidence-navigation { scrollbar-width: thin; }
+  .research-page--structures .structure-comparison { gap: .5rem; }
+  .research-page--structures .structure-comparison-header { display: contents; }
+  .research-page--structures .structure-comparison-guidance { order: 3; }
+  .research-page--structures .structure-comparison-guidance h2 { display: none; }
+  .research-page--structures .structure-comparison-pane { padding: .5rem; }
+}
+
+/* UI-002: on narrow screens, begin with the selected work surface. */
+@media (max-width: 767px) {
+  .bot-page > .science-page-header { flex-direction: row; align-items: center; gap: .5rem; margin-bottom: .75rem; padding-bottom: .75rem; }
+  .bot-page > .science-page-header h1 { font-size: 1.25rem; }
+  .bot-page > .science-page-header p { display: none; }
+  .bot-page .bot-workspace-grid > .bot-main { order: 0; }
+  .bot-page .bot-workspace-grid > .bot-roster { order: 1; }
+  .bot-page .bot-workspace-grid > .bot-context { order: 2; }
+  .bot-page .bot-surface-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .bot-page .bot-surface-tabs [role="tab"] { flex: 0 0 auto; white-space: nowrap; }
+}
+
+/* UI-003: keep learning gate status visible without displacing the graph. */
+.design-learning-compact { padding: .5rem .75rem; margin-bottom: .5rem; }
+.design-learning-compact > div:first-child { justify-content: flex-start; gap: .5rem 1rem; }
+.design-learning-compact > div:first-child > a { margin-inline-start: auto; }
+.design-learning-compact .design-learning-details { margin-top: .125rem; }
+.design-learning-compact .design-learning-details > [data-slot="accordion-item"] > [data-slot="accordion-header"] > button { padding-block: .375rem; }

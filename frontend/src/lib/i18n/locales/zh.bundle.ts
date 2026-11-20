@@ -235,7 +235,7 @@ export const bundleZh = {
       starterInterpretResults: '解读验证读数并建议第二轮约束。',
       starterNextStep: '下一步该做什么以推进项目闭环？',
       degradedModeBanner:
-        '当前未配置 LLM API Key，Copilot 处于离线规则模式。请配置 LLM_API_KEY 以启用完整工具辅助回答。',
+        '模型当前不可用，对话仅提供有限的离线回答。请打开模型设置，检查本项目选择的供应商。',
       defaultProjectTopic: '此蛋白质设计项目',
       defaultProjectType: '蛋白质设计',
       inputLabel: '向 Copilot 提问',

@@ -22,7 +22,6 @@ import uuid
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from contextvars import ContextVar, Token
-from datetime import UTC, datetime
 from os import getpid
 from socket import gethostname
 
@@ -146,7 +145,7 @@ celery_app.conf.update(
 @heartbeat_sent.connect
 def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
     """Publish worker identity without making task execution depend on telemetry."""
-    from ..platform.models import WorkerHeartbeat
+    from ..platform.operations import record_worker_heartbeat
 
     # Celery emits this signal from Heart, not from the Worker. Its dispatcher
     # carries --hostname; using the machine hostname collapses separately named
@@ -157,14 +156,14 @@ def _publish_worker_heartbeat(sender=None, **_kwargs) -> None:
     )
     try:
         with session_scope() as session:
-            row = session.get(WorkerHeartbeat, instance_id)
-            if row is None:
-                row = WorkerHeartbeat(instance_id=instance_id, service="celery-worker")
-                session.add(row)
-            row.queues = settings.worker_queue_list
-            row.build_revision = settings.build_revision
-            row.schema_revision = settings.schema_revision
-            row.last_seen_at = datetime.now(UTC)
+            record_worker_heartbeat(
+                session,
+                instance_id,
+                service="celery-worker",
+                queues=settings.worker_queue_list,
+                build_revision=settings.build_revision,
+                schema_revision=settings.schema_revision,
+            )
     except Exception:
         return
 

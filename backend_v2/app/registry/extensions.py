@@ -24,6 +24,7 @@ class ExtensionRequirement(BaseModel):
     title: str
     title_zh: str
     boundary: str
+    boundary_zh: str = ""
 
 
 class ExtensionManifest(BaseModel):
@@ -37,10 +38,15 @@ class ExtensionManifest(BaseModel):
     function_ids: list[str]
     adapter: Literal["builtin", "model_registry", "provider_registry", "planned"]
     resources: str
+    resources_zh: str = ""
     license_boundary: str
+    license_boundary_zh: str = ""
     data_boundary: str
+    data_boundary_zh: str = ""
     rollout_trigger: str
+    rollout_trigger_zh: str = ""
     effort: str
+    effort_zh: str = ""
     sources: list[str]
     requirements: list[ExtensionRequirement]
 

@@ -6,7 +6,7 @@ import {
   getTourStep,
   TOUR_SECTIONS,
   type TourSectionId,
-} from '../../features/tour/tourData'
+} from '../tour/tourData'
 
 export type Language = 'en' | 'zh'
 export type AppMode = 'application' | 'demo'
@@ -176,7 +176,7 @@ export const useAppStore = create<AppState>()(
       copilotOpen: false,
       settingsOpen: false,
       activityOpen: false,
-      copilotWidth: 380,
+      copilotWidth: 480,
       targetIntakeOpen: false,
       deletingProjectId: null,
       workflowSeed: null,

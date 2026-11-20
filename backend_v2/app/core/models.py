@@ -27,3 +27,18 @@ class UUIDVersionMixin:
     @declared_attr.directive
     def __mapper_args__(cls) -> dict:
         return {"version_id_col": cls.version, "version_id_generator": False}
+
+
+def update_versioned(row: object, **values: object) -> bool:
+    """Assign only the values that differ; bump the version once if any did.
+
+    A row that has not been flushed yet keeps its initial version.
+    """
+    changed = False
+    for field, value in values.items():
+        if getattr(row, field) != value:
+            setattr(row, field, value)
+            changed = True
+    if changed and getattr(row, "id", None) is not None:
+        row.version += 1  # type: ignore[attr-defined]
+    return changed

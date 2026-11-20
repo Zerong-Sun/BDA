@@ -19,7 +19,6 @@ from ..artifacts.models import Artifact
 from ..audit.models import AuditLog
 from ..audit.service import record_audit
 from ..core.problem import DomainError
-from ..core.trace import current_trace_id
 from ..literature.models import LiteratureChunk, LiteratureDocument
 from ..projects.service import require_project_permission
 from ..registry.models import ModelPlugin
@@ -456,19 +455,16 @@ def save_evidence(workflow_id, edge_id, payload, session, user):
         "calibration": _calibration_snapshot(session, workflow.project_id, payload.calibration),
     }
     # The public API cannot choose the audit identity, actor, review status or binding hash.
-    event = AuditLog(
-        id=uuid.uuid4(),
+    event = record_audit(
+        session,
         actor_id=user.id,
         project_id=project.id,
         organization_id=project.organization_id,
         action=CANDIDATE,
         entity_type="workflow_scientific_evidence",
         entity_id=workflow.id,
-        trace_id=current_trace_id(),
-        result="success",
         payload=data,
     )
-    session.add(event)
     session.flush()
     return {"id": str(event.id), **data, "issues": _candidate_issues(session, workflow, data, current)}
 

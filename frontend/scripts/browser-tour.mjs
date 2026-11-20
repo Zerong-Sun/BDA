@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
 import { createFixtureRouter, createStorageSeed } from './browser-harness-core.mjs'
-import { TOUR_SECTIONS } from '../src/features/tour/tourData.ts'
+import { TOUR_SECTIONS } from '../src/lib/tour/tourData.ts'
 
 const port = Number(process.env.BDA_TOUR_UX_PORT ?? 4192)
 const origin = `http://127.0.0.1:${port}`

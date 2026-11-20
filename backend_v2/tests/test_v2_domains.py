@@ -196,6 +196,7 @@ def test_research_target_gap_resolution_is_enqueued(domain_client) -> None:
     assert accepted.json()["research_target_id"] == candidate["id"]
     saved = client.get(f"/api/v2/candidates/{candidate['id']}").json()
     assert saved["properties"]["gap_resolution"]["status"] == "pending"
+    assert saved["properties"]["gap_resolution"]["operation_id"] == accepted.json()["operation_id"]
     rejected = client.post(
         f"/api/v2/projects/{project_id}/research-targets/{candidate['id']}/gap-resolutions",
         json={"resolve_references": False, "resolve_structure": False},

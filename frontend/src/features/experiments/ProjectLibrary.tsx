@@ -26,7 +26,7 @@ import { getBundledProteinResearchPackage, syncBundledProteinResearchPackage } f
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import type { useDeleteProjectLifecycle } from '../../lib/hooks/useDeleteProjectLifecycle'
 import { isPublicVisitor } from '../../lib/auth/publicWorkspace'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { projectBrief } from '../projects/projectBrief'
 
 type SortKey = 'status' | 'name' | 'recent'

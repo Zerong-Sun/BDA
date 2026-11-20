@@ -619,7 +619,8 @@ async function assertReducedMotion(page, { requiredLayer = null, label = 'docume
       const style = getComputedStyle(element)
       const rect = element.getBoundingClientRect()
       return (
-        style.display !== 'none'
+        element.checkVisibility({ checkVisibilityCSS: true })
+        && style.display !== 'none'
         && style.visibility !== 'hidden'
         && rect.width > 0
         && rect.height > 0
@@ -787,7 +788,8 @@ async function auditKeyboardFocus(page, testCase) {
       const style = getComputedStyle(element)
       const rect = element.getBoundingClientRect()
       return (
-        style.display !== 'none'
+        element.checkVisibility({ checkVisibilityCSS: true })
+        && style.display !== 'none'
         && style.visibility !== 'hidden'
         && rect.width > 0
         && rect.height > 0
@@ -795,6 +797,7 @@ async function auditKeyboardFocus(page, testCase) {
     }
     const selector = [
       'a[href]',
+      'summary',
       'button',
       'input:not([type="hidden"])',
       'select',

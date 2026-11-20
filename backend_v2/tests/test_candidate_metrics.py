@@ -12,8 +12,8 @@ import uuid
 import pytest
 from backend_v2.app.candidates.models import Candidate, CandidateMetric
 from backend_v2.app.candidates.repository import CandidateRepository
+from backend_v2.app.candidates.service import record_candidate_metrics
 from backend_v2.app.compute.parsers import ParseContext, ParsedMetric, get_parser
-from backend_v2.app.compute.tasks import _record_metrics
 from backend_v2.app.core.database import SessionFactory
 from backend_v2.app.identity.models import Organization
 from backend_v2.app.identity.service import bootstrap_admin
@@ -167,7 +167,7 @@ def test_a_second_method_scores_a_candidate_another_method_created() -> None:
         session.add(candidate)
         session.flush()
 
-        _record_metrics(
+        record_candidate_metrics(
             session,
             candidate,
             [ParsedMetric(key="plddt", value=96.1, method=METHOD, model_variant="model_4_ptm_seed_0")],
@@ -193,7 +193,7 @@ def test_recollecting_updates_a_metric_instead_of_duplicating_it() -> None:
         session.flush()
 
         for value in (90.0, 93.5):
-            _record_metrics(
+            record_candidate_metrics(
                 session,
                 candidate,
                 [ParsedMetric(key="plddt", value=value, method=METHOD, model_variant="model_4_ptm_seed_0")],
@@ -221,7 +221,7 @@ def test_candidates_can_be_filtered_by_a_metric_range() -> None:
             candidate = Candidate(project_id=project.id, candidate_key=key, name=key)
             session.add(candidate)
             session.flush()
-            _record_metrics(
+            record_candidate_metrics(
                 session,
                 candidate,
                 [

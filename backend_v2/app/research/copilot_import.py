@@ -8,14 +8,13 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from ..candidates.models import Candidate
+from ..candidates.service import save_research_candidate
 from ..core.problem import DomainError
 from ..identity.models import User
-from ..literature.models import LiteratureDocument
-from ..projects.repository import ProjectRepository
+from ..literature.service import save_package_document
 from ..projects.schemas import ProjectCreate
-from ..projects.service import create_project, require_project
-from ..targets.models import Target
+from ..projects.service import create_project, project_for_research_source, require_project
+from ..targets.service import add_unconfirmed_primary_target
 from .models import ResearchBrief, ResearchFinding
 from .schemas import (
     CopilotResearchImportResponse,
@@ -212,8 +211,7 @@ def import_copilot_research_result(
     # session rolls back any later failure, so an invalid or failed import is atomic.
     result, checksum = validate_copilot_research_result(payload)
     package_id = f"copilot-research:{checksum}"
-    repo = ProjectRepository(session)
-    existing = repo.by_research_source(payload.organization_id, package_id, result.project.key)
+    existing = project_for_research_source(session, payload.organization_id, package_id, result.project.key)
     if existing is not None:
         require_project(session, existing.id, user)
         return CopilotResearchImportResponse(
@@ -248,17 +246,13 @@ def import_copilot_research_result(
     )
 
     if result.primary_target is not None:
-        target = Target(
-            project_id=project.id,
+        add_unconfirmed_primary_target(
+            session,
+            project,
             name=result.primary_target.name,
             uniprot_accession=result.primary_target.uniprot,
             organism=result.primary_target.organism,
-            identity_status="unconfirmed",
         )
-        session.add(target)
-        session.flush()
-        project.primary_target_id = target.id
-        project.version += 1
 
     evidence_relations = {
         "schema_version": result.schema_version,
@@ -285,21 +279,20 @@ def import_copilot_research_result(
 
     references = {reference.id: reference for reference in result.references}
     for reference in result.references:
-        external_id = reference.pmid or reference.doi or reference.id
-        session.add(
-            LiteratureDocument(
-                project_id=project.id,
-                title=reference.title,
-                source="copilot_research",
-                external_id=external_id,
-                metadata_json={
-                    **reference.model_dump(mode="json"),
-                    "citation_id": reference.id,
-                    "checksum": checksum,
-                    "review_status": "pending_review",
-                },
-                status="pending_review",
-            )
+        save_package_document(
+            session,
+            project,
+            None,
+            external_id=reference.pmid or reference.doi or reference.id,
+            title=reference.title,
+            metadata={
+                **reference.model_dump(mode="json"),
+                "citation_id": reference.id,
+                "checksum": checksum,
+                "review_status": "pending_review",
+            },
+            status="pending_review",
+            source="copilot_research",
         )
 
     node_labels = {node.id: node.label for node in result.nodes}
@@ -352,23 +345,21 @@ def import_copilot_research_result(
         )
 
     for rank, candidate in enumerate(result.candidates, start=1):
-        session.add(
-            Candidate(
-                project_id=project.id,
-                candidate_key=candidate.id,
-                name=candidate.name,
-                candidate_kind="research_target",
-                status="proposed",
-                rank=rank,
-                score=candidate.score,
-                scores={},
-                properties={
-                    "summary": candidate.summary,
-                    "reference_ids": candidate.reference_ids,
-                    "source_package_id": package_id,
-                    "review_status": "pending_review",
-                },
-            )
+        save_research_candidate(
+            session,
+            project,
+            None,
+            candidate_key=candidate.id,
+            name=candidate.name,
+            rank=rank,
+            score=candidate.score,
+            scores={},
+            properties={
+                "summary": candidate.summary,
+                "reference_ids": candidate.reference_ids,
+                "source_package_id": package_id,
+                "review_status": "pending_review",
+            },
         )
 
     session.flush()

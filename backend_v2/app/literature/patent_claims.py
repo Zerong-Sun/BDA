@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.database import session_scope
 from .epo_ops import PublicationRef
@@ -175,13 +175,13 @@ def collect_claims(lookup_id: str, payload: dict[str, Any]) -> dict[str, Any]:
                 ).with_for_update())
                 if document is None or (document.metadata_json or {}).get('patent_claims', {}).get('lookup_id') == lookup_id:
                     continue
-                artifact = Artifact(
+                artifact = register_stored_artifact(
+                    session,
                     project_id=project_id, created_by=requested_by, artifact_type='patent_claims_response',
                     filename=f'epo-claims-{reference.docdb}.xml', content_type='application/xml',
                     object_key=object_key, size_bytes=len(raw), checksum_sha256=checksum,
                     lineage={'lookup_id': lookup_id, 'document_id': str(document_id), 'database': 'epo_ops'},
                 )
-                session.add(artifact)
                 session.flush()
                 trace = LiteratureRetrievalTrace(
                     project_id=project_id, document_id=document_id,

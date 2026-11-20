@@ -12,11 +12,12 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from ..artifacts.models import Artifact, ArtifactLineageEdge
+from ..artifacts.models import Artifact
+from ..artifacts.service import add_lineage_edge, register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..compute.binding import _manifest_entry
 from ..compute.models import Job, JobSubmission
-from ..compute.repository import ComputeRepository
+from ..platform.operations import enqueue_project_event
 from .gate_engine import evaluate, records_in_file, subset_file
 from .gate_schemas import GatePolicy
 from .models import GateEvaluation, WorkflowResult, WorkflowRun
@@ -224,7 +225,7 @@ def ensure_gate(session, target, source, edge):
     )
     session.add(gate)
     session.flush()
-    ComputeRepository(session).enqueue("gate.evaluate", gate.id, project_id=gate.project_id)
+    enqueue_project_event(session, "gate.evaluate", gate.id, project_id=gate.project_id)
     return gate
 
 
@@ -384,7 +385,9 @@ def run_gate(session, gate, storage=None):
     ]
     if policy.mode == "integrity":
         # Reference/parameter data isn't candidate data: exact files, never an implicit data-edge bypass.
-        artifacts = ComputeRepository(session).produced_artifacts(source_id)
+        from ..compute.service import produced_artifacts
+
+        artifacts = produced_artifacts(session, source_id)
         records = [
             {
                 "id": str(a.id),
@@ -559,7 +562,8 @@ def materialize(session, gate, records, storage):
             if artifact is None:
                 object_key = f"projects/{gate.project_id}/gates/{gate.id}/{checksum}/{Path(source.filename).name}"
                 storage.put_bytes(object_key, data, source.content_type)
-                artifact = Artifact(
+                artifact = register_stored_artifact(
+                    session,
                     id=artifact_id,
                     project_id=gate.project_id,
                     created_by=source.created_by,
@@ -575,16 +579,14 @@ def materialize(session, gate, records, storage):
                         "source_artifact_id": str(source.id),
                     },
                 )
-                session.add(artifact)
                 session.flush()
-                session.add(
-                    ArtifactLineageEdge(
-                        project_id=gate.project_id,
-                        parent_artifact_id=source.id,
-                        child_artifact_id=artifact.id,
-                        relation="gate_subset",
-                        details={"gate_id": str(gate.id)},
-                    )
+                add_lineage_edge(
+                    session,
+                    project_id=gate.project_id,
+                    parent_artifact_id=source.id,
+                    child_artifact_id=artifact.id,
+                    relation="gate_subset",
+                    details={"gate_id": str(gate.id)},
                 )
         inputs.append(_manifest_entry(gate.snapshot["edge"]["target_port"], artifact))
     return inputs

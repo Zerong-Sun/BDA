@@ -241,7 +241,7 @@ export const bundleEn = {
         'Interpret the validation readouts and suggest round-two constraints.',
       starterNextStep: 'What should I do next to move this project through the loop?',
       degradedModeBanner:
-        'Copilot is running in offline rule-based mode because no LLM API key is configured. Configure LLM_API_KEY for full tool-assisted answers.',
+        'The model is unavailable. This conversation is using limited offline responses. Open model settings to check the provider selected for this project.',
       defaultProjectTopic: 'this protein-design project',
       defaultProjectType: 'protein design',
       inputLabel: 'Ask the Copilot a question',

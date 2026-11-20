@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.database import SessionFactory, session_scope
@@ -164,7 +165,8 @@ def intelligence_export(run_id: str) -> dict:
     with session_scope() as session:
         existing = session.scalar(select(Artifact).where(Artifact.object_key == key))
         if existing is None:
-            existing = Artifact(
+            existing = register_stored_artifact(
+                session,
                 project_id=project_id,
                 created_by=created_by,
                 artifact_type="intelligence_report",
@@ -175,7 +177,6 @@ def intelligence_export(run_id: str) -> dict:
                 checksum_sha256=checksum,
                 lineage={"intelligence_run_id": run_id},
             )
-            session.add(existing)
             session.flush()
         artifact_id = existing.id
     return {"run_id": run_id, "status": "available", "artifact_id": str(artifact_id)}

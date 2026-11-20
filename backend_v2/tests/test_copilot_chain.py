@@ -788,7 +788,7 @@ def test_reviewing_a_declaration_changes_nothing(session: Session) -> None:
 
 
 def _outbox(session: Session) -> list[str]:
-    from backend_v2.app.compute.models import OutboxEvent
+    from backend_v2.app.platform.models import OutboxEvent
 
     return [
         str(row.payload.get("run_id"))

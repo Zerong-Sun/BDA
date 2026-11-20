@@ -82,13 +82,11 @@ def upsert_condition_deltas(session: Session, candidate_id: uuid.UUID) -> list[C
 
     Cheap to call after any metric write: with fewer than two conditions on a group it
     is a no-op, and with them unchanged it overwrites existing delta rows with the same
-    values rather than accumulating duplicates (``_record_metrics`` matches on
+    values rather than accumulating duplicates (``record_candidate_metrics`` matches on
     candidate/key/method/variant/condition).
     """
-    # Deferred: compute/tasks.py calls this after recording a job's metrics, and
-    # _record_metrics lives there, so a module-level import would cycle.
     from ..compute.parsers.base import ParsedMetric
-    from ..compute.tasks import _record_metrics
+    from .service import record_candidate_metrics
 
     repo = CandidateRepository(session)
     deltas = compute_condition_deltas(repo.metrics_for(candidate_id))
@@ -113,7 +111,7 @@ def upsert_condition_deltas(session: Session, candidate_id: uuid.UUID) -> list[C
         )
         for delta in deltas
     ]
-    _record_metrics(session, candidate, parsed, job_id=None)
+    record_candidate_metrics(session, candidate, parsed, job_id=None)
     written_keys = {(m.key, m.method, m.model_variant, m.condition) for m in parsed}
     return [
         row

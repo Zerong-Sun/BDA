@@ -16,7 +16,7 @@ import { StatusPill } from '../../components/ui/StatusPill'
 import { statusTone } from '../../components/ui/statusTone'
 import { useAppStore } from '../../lib/store/appStore'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
-import { currentRole } from '../../features/research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { useI18n } from '../../lib/i18n'
 import { isSettled, listOperations, type Operation } from '../../lib/api/operations'
 
@@ -122,7 +122,7 @@ export function ActivityDrawer() {
         <div className="flex flex-wrap items-center gap-2">
           <Select value={scope} onValueChange={(next) => next && setScope(next as Scope)}>
             <SelectTrigger className="h-8 w-32 text-xs" aria-label={copy.scope}>
-              <SelectValue />
+              <SelectValue>{copy.scopes[scope]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {scopes.map((item) => (
@@ -134,7 +134,7 @@ export function ActivityDrawer() {
           </Select>
           <Select value={status} onValueChange={(next) => setStatus(next ?? '')}>
             <SelectTrigger className="h-8 w-32 text-xs" aria-label={copy.statusFilter}>
-              <SelectValue placeholder={copy.anyStatus} />
+              <SelectValue>{status ? copy.status[status as keyof typeof copy.status] : copy.anyStatus}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {STATUS_FILTERS.map((item) => (

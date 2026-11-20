@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from ..artifacts.models import Artifact
+from ..artifacts.service import register_stored_artifact
 from ..artifacts.storage import ObjectStorage
 from ..core.celery_app import celery_app
 from ..core.database import session_scope
@@ -218,7 +219,8 @@ def literature_search(search_run_id: str) -> dict:
     search_object_key = f"projects/{project_id}/literature/searches/{parsed}/{database.replace('_', '-')}.json"
     ObjectStorage().put_bytes(search_object_key, search_payload, "application/json")
     with session_scope() as session:
-        raw_search_artifact = Artifact(
+        raw_search_artifact = register_stored_artifact(
+            session,
             project_id=project_id,
             created_by=created_by,
             artifact_type="literature_search_response",
@@ -233,7 +235,6 @@ def literature_search(search_run_id: str) -> dict:
                 "query": query,
             },
         )
-        session.add(raw_search_artifact)
         session.flush()
         session.add(
             LiteratureRetrievalTrace(
@@ -431,7 +432,8 @@ def literature_search(search_run_id: str) -> dict:
                 )
                 ObjectStorage().put_bytes(object_key, full_text.content, "application/xml")
                 with session_scope() as session:
-                    artifact = Artifact(
+                    artifact = register_stored_artifact(
+                        session,
                         project_id=project_id,
                         created_by=created_by,
                         artifact_type="literature_full_text_xml",
@@ -448,7 +450,6 @@ def literature_search(search_run_id: str) -> dict:
                             "license_text": license_text,
                         },
                     )
-                    session.add(artifact)
                     session.flush()
                     raw_artifact_id = artifact.id
                     trace = LiteratureRetrievalTrace(
@@ -794,7 +795,8 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
             object_key = f"projects/{project_id}/literature/documents/{document_id}/epo-ops-family-legal/{hashlib.sha256(raw).hexdigest()}.json"
             ObjectStorage().put_bytes(object_key, raw, "application/json")
             with session_scope() as session:
-                artifact = Artifact(
+                artifact = register_stored_artifact(
+                    session,
                     project_id=project_id,
                     created_by=requested_by,
                     artifact_type="patent_legal_status_response",
@@ -810,7 +812,6 @@ def patent_legal_status(lookup_id: str, payload: dict) -> dict:
                         "publication": reference.docdb,
                     },
                 )
-                session.add(artifact)
                 session.flush()
                 trace = LiteratureRetrievalTrace(
                     project_id=project_id,

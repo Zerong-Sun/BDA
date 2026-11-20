@@ -5,7 +5,7 @@ import { server } from '../../test/mocks/handlers'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { useAppStore } from '../../lib/store/appStore'
 import { Topbar } from './Topbar'
-import { WorkspaceNavigation } from './WorkspaceNavigation'
+import { WorkspaceNavigation } from '../../components/ui/WorkspaceNavigation'
 
 describe('Topbar logout', () => {
   beforeEach(() => {

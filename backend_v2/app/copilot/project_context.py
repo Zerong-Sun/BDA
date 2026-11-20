@@ -385,9 +385,9 @@ class ProjectContextService:
         *,
         limit: int = 12,
     ) -> list[dict[str, Any]]:
-        from ..knowledge.repository import KnowledgeRepository
+        from ..knowledge.service import search_entries
 
-        matches = KnowledgeRepository(self.session).search(self.project_id, query, limit=limit)
+        matches = search_entries(self.session, self.project_id, query, limit=limit)
         return [
             self._item(
                 "knowledge_entry",

@@ -7,10 +7,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.identity.models import User
 from backend_v2.app.literature import patent_service
-from backend_v2.app.platform.models import Operation
+from backend_v2.app.platform.models import Operation, OutboxEvent
 from backend_v2.tests.test_literature_patent_service import _patent, _project
 from backend_v2.tests.test_literature_patent_service import session as session
 from backend_v2.tests.test_room_decision_hotspot_api import client as client

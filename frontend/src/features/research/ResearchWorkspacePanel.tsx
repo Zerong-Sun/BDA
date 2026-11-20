@@ -32,7 +32,7 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { StructureComparison } from './StructureComparison'
 import { HotspotSetPanel } from './HotspotSetPanel'
 import { useProjectTargetStructure } from '../../lib/hooks/useProjectTargetStructure'
-import { structureSourceFromTarget } from '../pdb-viewer/types'
+import { structureSourceFromTarget } from '../../components/pdb-viewer/types'
 import { GenerateSimilarResearchPanel } from './GenerateSimilarResearchPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { LiteraturePanel } from './LiteraturePanel'
@@ -199,7 +199,7 @@ export function ResearchWorkspacePanel({ view }: { view: ResearchTab }) {
   })
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 [&>*]:min-w-0">
-      <div aria-label={language === 'zh' ? '资料概况' : 'Workspace contents'} className="flex flex-wrap items-center justify-end gap-2 border-b border-border-soft pb-3">
+      <div aria-label={language === 'zh' ? '资料概况' : 'Workspace contents'} className={`workspace-contents flex flex-wrap items-center justify-end gap-2 border-b border-border-soft pb-3${view === 'structures' ? ' order-last' : ''}`}>
           <div className="flex flex-wrap gap-2 text-xs text-text-secondary">
             {packageVersion ? <Badge variant="outline">{format(w.packageVersion, { version: packageVersion })}</Badge> : null}
             {packageDate ? <Badge variant="outline">{format(w.evidenceAsOf, { date: packageDate })}</Badge> : null}

@@ -776,13 +776,12 @@ _register(ToolSpec(
 
 
 def _list_proteins(ctx: ToolContext, args: dict[str, Any]) -> Any:
-    from ..wetlab.repository import ProteinRepository
-    from ..wetlab.service import to_read
+    from ..wetlab.service import list_project_proteins, to_read
 
-    rows = ProteinRepository(ctx.session).list_project(
+    rows = list_project_proteins(
+        ctx.session,
         _project_of(ctx),
-        None,
-        _arg_int(args, "limit", 25),
+        limit=_arg_int(args, "limit", 25),
         search=_arg_str(args, "search") or None,
     )
     return [to_read(row).model_dump(mode="json") for row in rows]

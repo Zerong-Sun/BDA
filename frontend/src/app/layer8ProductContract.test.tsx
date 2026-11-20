@@ -10,7 +10,7 @@ import { WorkflowPage } from './Workflow'
 import { CandidatesPage } from './Candidates'
 import { ResultsPage } from './Results'
 
-vi.mock('../features/pdb-viewer/StructureViewerLazy', () => ({
+vi.mock('../components/pdb-viewer/StructureViewerLazy', () => ({
   StructureViewerLazy: () => <div data-testid="mock-structure-viewer">3D viewer lazy boundary</div>,
 }))
 
@@ -154,6 +154,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Layer 8 product contract pages', () => {
+  it('opens project creation as one dialog without a management drawer', async () => {
+    installBaseHandlers(readinessReady)
+    renderWithProviders(<ExperimentsPage />)
+    await screen.findAllByText('Binder Design MVP')
+    fireEvent.click(screen.getByRole('button', { name: /new project/i }))
+    expect(await screen.findByRole('dialog')).toBeVisible()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Close project manager' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /new project/i })).toBeVisible()
+  })
+
   it('Experiments shows the selected project and routes blocked users to target readiness repair', async () => {
     localStorage.setItem('bda_intro_dismissed', 'true')
     installBaseHandlers(readinessBlocked)

@@ -50,7 +50,7 @@ vi.mock('../../lib/api/projects', async (importOriginal) => {
 vi.mock('../../lib/api/targets', () => ({ fetchPdb: vi.fn() }))
 vi.mock('../../lib/hooks/useProjectContext', () => ({ useProjectContext: vi.fn() }))
 vi.mock('../../lib/hooks/useProjectTargetStructure', () => ({ useProjectTargetStructure: vi.fn() }))
-vi.mock('../pdb-viewer/StructureViewerLazy', () => ({
+vi.mock('../../components/pdb-viewer/StructureViewerLazy', () => ({
   StructureViewerLazy: () => <div aria-label="structure viewer" />,
 }))
 

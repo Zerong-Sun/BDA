@@ -17,7 +17,7 @@ from ..core.sse import observed_sse
 from ..identity.deps import current_user, require_command, streaming_user
 from ..identity.models import User
 from ..projects.service import require_project, require_project_permission
-from ..workflows.repository import WorkflowRepository
+from ..workflows.service import get_workflow
 from .repository import ComputeRepository
 from .schemas import (
     CancelResponse,
@@ -92,7 +92,7 @@ def submit_workflow(
     session: Session = Depends(get_session),
     user: User = Depends(require_command),
 ) -> SubmissionResponse:
-    workflow = WorkflowRepository(session).get(workflow_id)
+    workflow = get_workflow(session, workflow_id)
     if workflow is None:
         raise DomainError("workflow_not_found", "Workflow run was not found", status_code=404)
     project = require_project_permission(session, workflow.project_id, user, "compute")
@@ -131,7 +131,7 @@ def list_workflow_jobs(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> JobPage:
-    workflow = WorkflowRepository(session).get(workflow_id)
+    workflow = get_workflow(session, workflow_id)
     if workflow is None:
         raise DomainError("workflow_not_found", "Workflow run was not found", status_code=404)
     require_project(session, workflow.project_id, user)

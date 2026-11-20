@@ -19,7 +19,7 @@ import {
 } from '../../lib/api/workflowGates'
 import { emptyPolicy, gateLabel, type GatePolicy, type GateSummary } from './gates'
 import { getArtifact } from '../../lib/api/artifacts'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
 import { GatePolicyEditor } from './GatePolicyEditor'
 import { GateEvidencePanel } from './GateEvidencePanel'
 

@@ -3,12 +3,12 @@ import os
 from pathlib import Path
 
 import pytest
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.compute.schemas import SubmissionCreate
 from backend_v2.app.compute.service import create_submission, schedule_ready_jobs, transition_job
 from backend_v2.app.core.database import SessionFactory
 from backend_v2.app.identity.models import Organization
 from backend_v2.app.identity.service import bootstrap_admin
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.app.registry.models import ModelPlugin
 from backend_v2.app.research.models import ResearchFinding

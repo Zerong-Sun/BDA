@@ -65,7 +65,7 @@ import {
 import { Button } from '../components/ui/Button'
 import { Textarea } from '../components/ui/textarea'
 import { Skeleton } from '../components/ui/Skeleton'
-import { currentRole } from '../features/research/jsonHelpers'
+import { currentRole } from '../lib/auth/currentRole'
 
 function templateForPlugin(
   plugin: ModelPlugin,
@@ -840,7 +840,7 @@ function WorkflowWorkspace() {
         <Button type="button" variant="outline" onClick={() => void workflowPreflight.refetch()}>{language === 'zh' ? '重新检查' : 'Run check again'}</Button>
       </Alert> : null}
 
-      {!isDemoMode && workflowRunId && workflowRun && <DesignLearningPanel key={workflowRunId} workflowId={workflowRunId} projectId={projectId} workflowVersion={workflowRun.version} draft={draftWorkflow} writable={canEdit && !unsavedNodeChanges} />}
+      {!isDemoMode && workflowRunId && workflowRun && <DesignLearningPanel compact key={workflowRunId} workflowId={workflowRunId} projectId={projectId} workflowVersion={workflowRun.version} draft={draftWorkflow} writable={canEdit && !unsavedNodeChanges} />}
       {!showRoutePlanner ? <WorkflowToolbar
         isDemoMode={isDemoMode}
         readOnly={readOnly || unsavedNodeChanges}

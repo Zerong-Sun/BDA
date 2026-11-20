@@ -1,6 +1,62 @@
 import { generatedClient } from './generatedTransport'
 import { WorkflowGraphSchema, type WorkflowEdge } from '../schemas/workflow'
-import type { GatePolicy, GateResult, GateSummary } from '../../features/workflow/gates'
+
+export interface GateRules {
+  operator: 'and' | 'or'
+  conditions: Array<{
+    metric: string
+    op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'ne'
+    value: number
+  }>
+  sort_metric?: string | null
+  descending: boolean
+  top_n?: number | null
+}
+export interface GatePolicy extends Record<string, unknown> {
+  mode: 'automatic' | 'manual' | 'review' | 'integrity' | 'dependency'
+  configured: boolean
+  rules: GateRules
+  structure?: {
+    preset?: 'multi_helix' | 'structured' | 'beta_sheet'
+    min_strands?: number
+    chains: string[]
+    min_helices: number
+    min_helix_length: number
+    start?: number | null
+    end?: number | null
+  } | null
+  script_preview_id?: string | null
+  script?: string | null
+}
+export interface GateSummary {
+  id: string
+  edge_id: string
+  status: string
+  version: number
+  revision: number
+  preview: boolean
+  total: number
+  passed: number
+  selected: number
+  selected_ids: string[]
+  error?: string
+  created_at: string
+  source_job_id?: string
+  released_by?: string
+  policy?: GatePolicy
+}
+export interface GateResult {
+  id: string
+  key: string
+  sequence?: string
+  passed: boolean
+  needs_attention?: boolean
+  selected: boolean
+  reasons: string[]
+  metrics: Record<string, number>
+  files: Array<{ artifact_id: string; port: string; selector: Record<string, unknown> }>
+}
+
 
 async function call<T>(
   url: string,

@@ -223,7 +223,7 @@ class TestTheStageOpensARun:
     def test_the_run_is_dispatched_rather_than_left_for_a_sweep(self, session: Session) -> None:
         """Nothing looks at a `running` run no worker was told about - the
         deadlock delegation had."""
-        from backend_v2.app.compute.models import OutboxEvent
+        from backend_v2.app.platform.models import OutboxEvent
 
         campaign, _, _ = _campaign(session)
         stage = _stage(session, campaign)

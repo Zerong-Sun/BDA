@@ -1,14 +1,52 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..compute.models import OutboxEvent
 from ..identity.models import User
-from .models import Operation
+from .models import Operation, OutboxEvent, WorkerHeartbeat
+
+
+def record_worker_heartbeat(
+    session: Session,
+    instance_id: str,
+    *,
+    service: str,
+    queues: list[str],
+    build_revision: str,
+    schema_revision: str,
+) -> WorkerHeartbeat:
+    row = session.get(WorkerHeartbeat, instance_id)
+    if row is None:
+        row = WorkerHeartbeat(instance_id=instance_id, service=service)
+        session.add(row)
+    row.queues = queues
+    row.build_revision = build_revision
+    row.schema_revision = schema_revision
+    row.last_seen_at = datetime.now(UTC)
+    return row
+
+
+def enqueue_project_event(
+    session: Session,
+    topic: str,
+    aggregate_id: uuid.UUID,
+    *,
+    project_id: uuid.UUID,
+    payload: dict | None = None,
+) -> None:
+    """Queue project work with the RLS fence required by restricted workers."""
+    session.add(
+        OutboxEvent(
+            topic=topic,
+            aggregate_id=aggregate_id,
+            payload={**(payload or {}), "project_id": str(project_id)},
+        )
+    )
 
 
 def enqueue_operation(
@@ -21,6 +59,7 @@ def enqueue_operation(
     project_id: uuid.UUID | None = None,
     organization_id: uuid.UUID | None = None,
     payload: dict | None = None,
+    progress: dict | None = None,
 ) -> Operation:
     from ..copilot.call_guard import current_scope_id
 
@@ -36,6 +75,7 @@ def enqueue_operation(
         kind=topic,
         resource_type=resource_type,
         resource_id=resource_id,
+        progress=progress or {},
     )
     session.add(operation)
     session.flush()
@@ -53,6 +93,30 @@ def enqueue_operation(
         )
     )
     return operation
+
+
+def project_operations(
+    session: Session, project_id: uuid.UUID, kind: str, statuses: Iterable[str]
+) -> list[Operation]:
+    return list(
+        session.scalars(
+            select(Operation).where(
+                Operation.project_id == project_id,
+                Operation.kind == kind,
+                Operation.status.in_(list(statuses)),
+            )
+        )
+    )
+
+
+def cancel_pending_operation(session: Session, operation: Operation, now: datetime) -> None:
+    """Withdraw an operation no worker has picked up, along with its unpublished event."""
+    event = session.get(OutboxEvent, operation.id)
+    if event is not None and event.published_at is None:
+        session.delete(event)
+    operation.status = "cancelled"
+    operation.finished_at = now
+    operation.version += 1
 
 
 def mark_operation_running(session: Session, operation_id: uuid.UUID) -> None:
@@ -104,8 +168,6 @@ def _announce_settled(session: Session, operation: Operation) -> None:
     the queued work being observable at all; the alternative - asking the waiting
     side to poll - trades a cheap write for a permanent one.
     """
-    from ..compute.models import OutboxEvent
-
     session.add(
         OutboxEvent(
             topic="operation.settled",

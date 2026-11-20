@@ -1,3 +1,4 @@
+import { Disclosure } from '../../components/ui/Disclosure'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { getClusterHealth, listComputeNodes } from '../../lib/api/registry'
@@ -122,7 +123,7 @@ export function WorkflowContextBar({
         </Button>
       </div>
       </FramePanel>
-      {activeRun ? <div className="project-summary-grid" data-testid="route-explanation">
+      {activeRun ? <Disclosure className="px-2 py-1" title={language === 'zh' ? '路线摘要、证据与下一步' : 'Route summary, evidence & next step'}><div className="project-summary-grid mt-2" data-testid="route-explanation">
         <section className="project-summary-card">
           <h2>{language === 'zh' ? '路线与现状' : 'Route and status'}</h2>
           <p className="text-sm text-text-secondary">{typeof presentation.summary === 'string' && presentation.summary.trim() ? presentation.summary : (language === 'zh' ? '尚未保存路线总结。节点与产物见下方工作流。' : 'No route summary saved. Inspect nodes and outputs in the workflow below.')}</p>
@@ -141,7 +142,7 @@ export function WorkflowContextBar({
           <p className="text-sm text-text-secondary">{typeof presentation.next_step === 'string' && presentation.next_step.trim() ? presentation.next_step : (language === 'zh' ? '尚未记录下一步；先检查节点结果和门控。' : 'No next step recorded; inspect node results and gates first.')}</p>
           <nav className="project-card-actions"><Link to={`/research?project=${encodeURIComponent(activeProject.id)}`}>{language === 'zh' ? '项目结果与报告' : 'Project results and reports'} →</Link></nav>
         </section>
-      </div> : null}
+      </div></Disclosure> : null}
     </Frame>
   )
 }

@@ -1,10 +1,9 @@
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
-from ..candidates.repository import CandidateRepository
+from ..candidates.service import begin_gap_resolution, record_gap_resolution_operation
 from ..core.problem import DomainError
 from ..identity.models import User
 from ..platform.operations import enqueue_operation
@@ -27,31 +26,7 @@ def request_gap_resolution(
     payload: ResearchGapResolutionCreate,
     user: User,
 ) -> ResearchGapResolutionAccepted:
-    # Multiple Copilot/API requests may target the same gap concurrently.
-    # Lock before incrementing the attempt and enqueuing the operation so the
-    # versioned candidate update cannot race into a StaleDataError/HTTP 500.
-    candidate = CandidateRepository(session).get(research_target_id, for_update=True)
-    if (
-        candidate is None
-        or candidate.project_id != project.id
-        or candidate.candidate_kind != "research_target"
-    ):
-        raise DomainError(
-            "research_target_not_found",
-            "Research target was not found in this project",
-            status_code=404,
-        )
-    properties = dict(candidate.properties or {})
-    previous = properties.get("gap_resolution")
-    attempt = int(previous.get("attempt") or 0) + 1 if isinstance(previous, dict) else 1
-    properties["gap_resolution"] = {
-        "status": "pending",
-        "attempt": attempt,
-        "requested_at": datetime.now(UTC).isoformat(),
-        "items": [],
-    }
-    candidate.properties = properties
-    candidate.version += 1
+    candidate = begin_gap_resolution(session, project, research_target_id)
     operation = enqueue_operation(
         session,
         topic="research.gaps.resolve",
@@ -62,8 +37,7 @@ def request_gap_resolution(
         user=user,
         payload=payload.model_dump(mode="json"),
     )
-    properties["gap_resolution"]["operation_id"] = str(operation.id)
-    candidate.properties = properties
+    record_gap_resolution_operation(candidate, operation.id)
     record_audit(
         session,
         action="research.gaps.resolve.request",

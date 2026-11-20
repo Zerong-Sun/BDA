@@ -10,7 +10,7 @@ const nativeFileInputCounts = new Map([
   ['src/features/workflow/NodeAssistance.tsx', 1],
   ['src/features/artifacts/ArtifactUploadDropzone.tsx', 1],
   ['src/features/lab/InstrumentAnalysis.tsx', 1],
-  ['src/features/pdb-viewer/PDBFileUpload.tsx', 2],
+  ['src/components/pdb-viewer/PDBFileUpload.tsx', 2],
   ['src/features/results/ExperimentUpload.tsx', 1],
 ])
 
@@ -132,7 +132,7 @@ const rawUiRule = {
         // The Mol* fullscreen surface owns its dialog semantics: a registry
         // Dialog would remount the subtree and dispose the WebGL viewer.
         const isStructureViewerFullscreenDialog =
-          filename === 'src/features/pdb-viewer/StructureViewer.tsx' &&
+          filename === 'src/components/pdb-viewer/StructureViewer.tsx' &&
           name === 'div' &&
           (roleText === 'role="dialog"' ||
             roleText === "role={isFullscreen ? 'dialog' : undefined}")
@@ -192,6 +192,7 @@ export default defineConfig([
       'src/features/**/*.tsx',
       'src/lib/**/*.tsx',
       'src/components/ui/**/*.tsx',
+      'src/components/pdb-viewer/**/*.tsx',
     ],
     ignores: [
       '**/*.test.tsx',

@@ -5,7 +5,7 @@ import { useAppStore } from '../../lib/store/appStore'
 import type { ResearchWorkspaceStructure } from '../../lib/api/generated/types.gen'
 import { StructureComparison } from './StructureComparison'
 
-vi.mock('../pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: ({ source }: { source: { artifactId: string } }) => <div data-testid="comparison-viewer">{source.artifactId}</div> }))
+vi.mock('../../components/pdb-viewer/StructureViewerLazy', () => ({ StructureViewerLazy: ({ source }: { source: { artifactId: string } }) => <div data-testid="comparison-viewer">{source.artifactId}</div> }))
 const structures: ResearchWorkspaceStructure[] = [1, 2].map((id) => ({
   artifact_id: `artifact-${id}`, pdb_id: `DEMO${id}`, name: { en: `Synthetic structure ${id}` }, role: { en: 'Synthetic QA data' }, method: { en: 'Synthetic' }, status: 'available', download_url: `https://example.test/demo-${id}.pdb`,
 }))

@@ -13,7 +13,7 @@ import {
 import { ApiState } from '../../components/ui/ApiState'
 import { useI18n } from '../../lib/i18n'
 import { useAppStore } from '../../lib/store/appStore'
-import { currentRole } from './jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { useToastStore } from '../../components/ui/toastStore'
 import {
   buildGoalTree,

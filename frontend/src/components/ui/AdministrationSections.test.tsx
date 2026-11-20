@@ -1,4 +1,4 @@
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { AdministrationSections } from './AdministrationSections'
@@ -64,6 +64,7 @@ describe('AdministrationSections', () => {
     // The point of the new read endpoint: a membership shown as a person, not a UUID.
     expect(await screen.findByText('Bench Mate')).toBeInTheDocument()
     expect(screen.getByText('bench-mate')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Organization' })).toHaveTextContent('Org One')
 
     expect(await screen.findByText('job.submit')).toBeInTheDocument()
     expect(screen.getByText(/trace-abc/)).toBeInTheDocument()
@@ -76,4 +77,30 @@ describe('AdministrationSections', () => {
     // Awaited, not read synchronously: the label renders before the count arrives.
     expect(await screen.findByText('2')).toBeInTheDocument()
   })
+  it('distinguishes failed reads from empty data and retries each section', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'admin' }))
+    api.organizations.mockRejectedValueOnce(new Error('Organizations unavailable'))
+    api.audit.mockRejectedValueOnce(new Error('Audit unavailable'))
+    api.summary.mockRejectedValueOnce(new Error('Health unavailable'))
+    renderWithProviders(<AdministrationSections />)
+    expect(await screen.findByText('Organizations unavailable')).toBeInTheDocument()
+    expect(await screen.findByText('Audit unavailable')).toBeInTheDocument()
+    expect(await screen.findByText('Health unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+    expect(screen.queryByText('Undelivered events')).not.toBeInTheDocument()
+    for (const button of screen.getAllByRole('button', { name: 'Retry' })) fireEvent.click(button)
+    expect(await screen.findByText('Bench Mate')).toBeInTheDocument()
+    expect(await screen.findByText('job.submit')).toBeInTheDocument()
+    expect(await screen.findByText('2')).toBeInTheDocument()
+  })
+
+  it('shows member read failure with a retry instead of an empty roster', async () => {
+    sessionStorage.setItem('bda_user', JSON.stringify({ role: 'admin' }))
+    api.members.mockRejectedValueOnce(new Error('Members unavailable'))
+    renderWithProviders(<AdministrationSections />)
+    expect(await screen.findByText('Members unavailable')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Bench Mate')).toBeInTheDocument()
+  })
+
 })

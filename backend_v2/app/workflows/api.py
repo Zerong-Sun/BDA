@@ -14,7 +14,7 @@ from ..core.problem import DomainError
 from ..identity.deps import current_user, require_command
 from ..identity.models import User
 from ..projects.service import require_project
-from ..registry.repository import RegistryRepository
+from ..registry.service import get_plugin
 from .gate_schemas import ConnectionUpdate, GatePreview, GateRelease, ScriptImport
 from .models import WorkflowNode, WorkflowRun
 from .preflight import evaluate_preflight
@@ -255,7 +255,7 @@ def patch_workflow_node(
 
         validate_configuration(
             payload.configuration,
-            RegistryRepository(session).plugin(node.model_plugin_id) if node.model_plugin_id else None,
+            get_plugin(session, node.model_plugin_id) if node.model_plugin_id else None,
         )
     if payload.input_bindings is not None:
         from .connections import replace_connections
@@ -373,7 +373,7 @@ def preview_node_script(
     if node is None:
         raise DomainError("workflow_node_not_found", "Workflow node was not found", status_code=404)
     workflow = _workflow(session, node.workflow_run_id, user)
-    plugin = RegistryRepository(session).plugin(node.model_plugin_id) if node.model_plugin_id else None
+    plugin = get_plugin(session, node.model_plugin_id) if node.model_plugin_id else None
     from types import SimpleNamespace
 
     from .assistance import node_command
@@ -454,7 +454,7 @@ def parameter_suggestions(
     node = WorkflowRepository(session).node(node_id)
     if not node or node.workflow_run_id != workflow.id:
         raise DomainError("workflow_node_not_found", "Node not found", status_code=404)
-    plugin = RegistryRepository(session).plugin(node.model_plugin_id) if node.model_plugin_id else None
+    plugin = get_plugin(session, node.model_plugin_id) if node.model_plugin_id else None
     project = require_project(session, workflow.project_id, user)
     return suggest_parameters(workflow, node, WorkflowRepository(session).nodes(workflow.id), plugin, project, session)
 

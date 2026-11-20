@@ -122,7 +122,7 @@ const fileInputManifest = new Map<string, FileInputManifestEntry>([
     },
   ],
   [
-    'src/features/pdb-viewer/PDBFileUpload.tsx',
+    'src/components/pdb-viewer/PDBFileUpload.tsx',
     {
       intrinsicCount: 2,
       registryCount: 0,
@@ -174,7 +174,7 @@ function sourceFiles(directory: string): string[] {
 }
 
 function applicationSourceFiles() {
-  const domainFiles = ['app', 'features', 'lib'].flatMap((directory) =>
+  const domainFiles = ['app', 'features', 'lib', 'components/pdb-viewer'].flatMap((directory) =>
     sourceFiles(resolve(sourceRoot, directory)),
   )
   const semanticUiFiles = sourceFiles(resolve(sourceRoot, 'components/ui')).filter(
@@ -616,7 +616,7 @@ describe('REUI migration guardrails', () => {
               // The fullscreen surface is a hand-rolled dialog on purpose: a
               // registry Dialog would remount this subtree and dispose the Mol*
               // viewer, so the wrapper carries the dialog semantics itself.
-              relativePath === 'src/features/pdb-viewer/StructureViewer.tsx' &&
+              relativePath === 'src/components/pdb-viewer/StructureViewer.tsx' &&
               tag === 'div' &&
               (roleText === 'role="dialog"' ||
                 roleText === "role={isFullscreen ? 'dialog' : undefined}")

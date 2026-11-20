@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 from backend_v2.app.compute import tasks as compute_tasks
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.copilot import agent_loop, agent_runs, call_guard
 from backend_v2.app.copilot import tasks as copilot_tasks
 from backend_v2.app.core import celery_app as worker
+from backend_v2.app.platform.models import OutboxEvent
 from backend_v2.app.platform.operations import enqueue_operation
 from backend_v2.app.research import search_query
 from backend_v2.tests.test_compute_tasks import task_database as _task_database

@@ -6,7 +6,7 @@ import { useI18n } from '../../lib/i18n'
 import { Button } from '../../components/ui/Button'
 import { ApiState } from '../../components/ui/ApiState'
 import { Disclosure } from '../../components/ui/Disclosure'
-import { StructureViewerLazy } from '../pdb-viewer/StructureViewerLazy'
+import { StructureViewerLazy } from '../../components/pdb-viewer/StructureViewerLazy'
 
 const Residues = z.array(z.object({ chain: z.string(), seq: z.number().int(), insertion_code: z.string().nullable().optional(), name: z.string().optional() })).max(200)
 export function ArtifactEvidence({ projectId, artifactId, residues }: { projectId: string; artifactId: string; residues: string | null }) {

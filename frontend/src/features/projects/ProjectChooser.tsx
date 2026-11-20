@@ -31,13 +31,14 @@ import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useAppStore } from '../../lib/store/appStore'
 import { useI18n } from '../../lib/i18n'
 import { localizeStatusLabel } from '../../components/ui/statusLabel'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { projectText } from '../../lib/i18n/projectText'
 
 interface ProjectChooserProps {
   title?: string
   description?: string
   compact?: boolean
+  createOnly?: boolean
   creating?: boolean
   onCreatingChange?: (creating: boolean) => void
   onCreated?: () => void
@@ -58,6 +59,7 @@ export function ProjectChooser({
   title,
   description,
   compact = false,
+  createOnly = false,
   creating: creatingProp,
   onCreatingChange,
   onCreated,
@@ -129,7 +131,7 @@ export function ProjectChooser({
 
   return (
     <>
-      <AppFrame
+      {!createOnly ? <AppFrame
         dense={compact}
         heading={
           <h2 className="flex items-center gap-2">
@@ -217,7 +219,7 @@ export function ProjectChooser({
             </AlertDescription>
           </Alert>
         ) : null}
-      </AppFrame>
+      </AppFrame> : null}
 
       <Dialog open={creating && !viewer} onOpenChange={setCreating}>
         <DialogContent className="sm:max-w-lg">

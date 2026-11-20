@@ -97,7 +97,7 @@ def pg_env():
 
 
 def test_concurrent_release_is_idempotent_and_rls_is_enforced(pg_env):
-    from backend_v2.app.compute.models import OutboxEvent
+    from backend_v2.app.platform.models import OutboxEvent
 
     s, w, _, _, _, gate, storage = runtime_fixture(pg_env, mode="review")
     run_gate(s, gate, storage)
@@ -146,7 +146,7 @@ def test_concurrent_release_is_idempotent_and_rls_is_enforced(pg_env):
 
 
 def test_worker_publishes_evaluating_and_reentry_does_not_duplicate_dispatch(pg_env, monkeypatch):
-    from backend_v2.app.compute.models import OutboxEvent
+    from backend_v2.app.platform.models import OutboxEvent
     from backend_v2.app.workflows.gate_runtime import execute_gate
 
     s, _, _, _, target, gate, storage = runtime_fixture(pg_env)

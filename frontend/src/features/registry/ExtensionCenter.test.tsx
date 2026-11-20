@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../../test/renderWithProviders'
 import { useAppStore } from '../../lib/store/appStore'
 import { assessExtension, getExtensionCatalog, type ExtensionCatalog, type ExtensionEntry } from '../../lib/api/extensions'
-import { currentRole } from '../research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import { ExtensionCenter } from './ExtensionCenter'
 
 vi.mock('../../lib/api/extensions', () => ({ getExtensionCatalog: vi.fn(), assessExtension: vi.fn() }))
-vi.mock('../research/jsonHelpers', () => ({ currentRole: vi.fn() }))
+vi.mock('../../lib/auth/currentRole', () => ({ currentRole: vi.fn() }))
 
 const entry = (id: string, title: string, adapter: ExtensionEntry['manifest']['adapter']): ExtensionEntry => ({
   manifest: { id, version: '1.0.0', title, title_zh: title, description: `${title} description`, description_zh: `${title} description`, adapter,
@@ -31,6 +31,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 describe('Extension center', () => {
+  it('uses supplied Chinese requirements and preserves untranslated source text', async () => {
+    useAppStore.setState({ language: 'zh' })
+    const localized = structuredClone(catalog)
+    localized.extensions[0].manifest.resources_zh = '按实测负载配置容量。'
+    localized.extensions[0].manifest.requirements = [{ id: 'data', title: 'Data', title_zh: '数据', boundary: 'Original boundary', boundary_zh: '保留项目隔离。' }]
+    vi.mocked(getExtensionCatalog).mockResolvedValue(localized)
+    renderWithProviders(<ExtensionCenter />)
+    expect(await screen.findByText('按实测负载配置容量。')).toBeVisible()
+    expect(screen.getByText('Review exact code and weights')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '集成要求与参考' }))
+    expect(await screen.findByText('保留项目隔离。')).toBeVisible()
+    expect(screen.queryByText('Original boundary')).not.toBeInTheDocument()
+  })
+
   it('shows actual model declarations and separates them from proof and future adapters', async () => {
     renderWithProviders(<ExtensionCenter />)
     expect(await screen.findByRole('heading', { name: 'Boltz 2 · 2' })).toBeInTheDocument()

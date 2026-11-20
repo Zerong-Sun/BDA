@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ClipboardTextIcon, HeartbeatIcon, PlusIcon, UsersThreeIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ApiState } from '@/components/ui/ApiState'
 import {
   Select,
   SelectContent,
@@ -12,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { useToastStore } from './toastStore'
 import { useI18n } from '../../lib/i18n'
-import { currentRole } from '../../features/research/jsonHelpers'
+import { currentRole } from '../../lib/auth/currentRole'
 import {
   addOrganizationMember,
   createOrganization,
@@ -89,11 +90,12 @@ function OrganizationsSection() {
         {copy.organizations}
       </div>
 
+      <ApiState isLoading={organizations.isPending} isError={organizations.isError} error={organizations.error} onRetry={() => void organizations.refetch()}>
       {organizations.data?.length ? (
         <>
           <Select value={activeId ?? ''} onValueChange={(next) => next && setSelected(next)}>
             <SelectTrigger className="h-8 w-full text-xs" aria-label={copy.organization}>
-              <SelectValue />
+              <SelectValue>{organizations.data.find((organization) => organization.id === activeId)?.name}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {organizations.data.map((organization) => (
@@ -104,6 +106,7 @@ function OrganizationsSection() {
             </SelectContent>
           </Select>
 
+          <ApiState isLoading={members.isPending} isError={members.isError} error={members.error} onRetry={() => void members.refetch()}>
           {members.data?.length ? (
             <ul className="grid gap-1">
               {members.data.map((member) => (
@@ -122,10 +125,13 @@ function OrganizationsSection() {
           ) : (
             <p className="text-xs text-text-secondary">{copy.noMembers}</p>
           )}
+          </ApiState>
         </>
       ) : (
         <p className="text-xs text-text-secondary">{copy.noOrganizations}</p>
       )}
+
+      </ApiState>
 
       <form
         className="flex flex-wrap items-center gap-2"
@@ -212,6 +218,7 @@ function AuditSection() {
         aria-label={copy.auditFilterPlaceholder}
         onChange={(event) => setAction(event.target.value)}
       />
+      <ApiState isLoading={logs.isPending} isError={logs.isError} error={logs.error} onRetry={() => void logs.refetch()}>
       {logs.data?.length ? (
         <ul className="grid max-h-64 gap-1 overflow-y-auto">
           {logs.data.map((entry) => (
@@ -234,6 +241,7 @@ function AuditSection() {
       ) : (
         <p className="text-xs text-text-secondary">{copy.noAudit}</p>
       )}
+      </ApiState>
     </section>
   )
 }
@@ -261,6 +269,7 @@ function PlatformHealthSection() {
         <HeartbeatIcon className="h-4 w-4 text-accent" />
         {copy.platformHealth}
       </div>
+      <ApiState isLoading={summary.isPending} isError={summary.isError} error={summary.error} onRetry={() => void summary.refetch()}>
       <div className="grid grid-cols-2 gap-2">
         {stuck.map((item) => (
           <div key={item.label} className="rounded-md border border-border-soft px-3 py-2">
@@ -287,6 +296,7 @@ function PlatformHealthSection() {
           .map(([status, count]) => `${status} ${count}`)
           .join(' · ') || '—'}
       </p>
+      </ApiState>
     </section>
   )
 }

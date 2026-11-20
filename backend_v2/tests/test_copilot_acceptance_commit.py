@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 import pytest
 from backend_v2.app import all_models  # noqa: F401
-from backend_v2.app.compute.models import OutboxEvent
 from backend_v2.app.copilot.api import router
 from backend_v2.app.copilot.models import (
     CopilotAgentRun,
@@ -19,7 +18,7 @@ from backend_v2.app.core.database import get_session
 from backend_v2.app.core.models import Base
 from backend_v2.app.identity.deps import current_user
 from backend_v2.app.identity.models import Organization, OrganizationMember, User
-from backend_v2.app.platform.models import Operation
+from backend_v2.app.platform.models import Operation, OutboxEvent
 from backend_v2.app.projects.models import Project, ProjectMember
 from backend_v2.tests._sqlite import enforce_foreign_keys
 from fastapi import FastAPI

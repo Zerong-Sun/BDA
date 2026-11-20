@@ -65,6 +65,12 @@ def sequence_digest(sequence: str) -> str:
     return hashlib.sha256(sequence.encode("ascii")).hexdigest()
 
 
+def list_project_proteins(
+    session: Session, project_id: uuid.UUID, *, limit: int, search: str | None = None
+) -> list[Protein]:
+    return ProteinRepository(session).list_project(project_id, None, limit, search=search)
+
+
 def to_read(protein: Protein) -> ProteinRead:
     """Project a row onto the wire, dropping the sequence.
 
@@ -313,9 +319,9 @@ def promote_candidate(
     and ProteinHunter parsers put it. A candidate with no sequence - a fold-only
     result, say - cannot be made, and says so rather than creating an empty row.
     """
-    from ..candidates.repository import CandidateRepository
+    from ..candidates.service import get_candidate
 
-    candidate = CandidateRepository(session).get(candidate_id)
+    candidate = get_candidate(session, candidate_id)
     if candidate is None or candidate.project_id != project_id:
         raise DomainError(
             "candidate_not_found",

@@ -10,6 +10,7 @@ from ..artifacts.models import Artifact
 from ..audit.service import record_audit
 from ..candidates.models import Candidate
 from ..compute.models import Job
+from ..core.models import update_versioned
 from ..core.problem import DomainError
 from ..core.rate_limit import enforce_project_quota
 from ..experiments.models import ExperimentResult
@@ -20,7 +21,7 @@ from ..literature.models import LiteratureDocument
 from ..platform.operations import enqueue_operation
 from ..research.models import ResearchFinding
 from ..research.workspace import _references, preferred_review_brief
-from ..targets.repository import TargetRepository
+from ..targets.service import project_primary_target
 
 # Through the timeline domain's own service, never into its table: a prompt rewrite is
 # a decision on the project record, and this is the write that makes it non-optional.
@@ -180,6 +181,44 @@ def create_project(session: Session, payload: ProjectCreate, user: User) -> Proj
     return project
 
 
+_PACKAGE_PROJECT_FIELDS = frozenset(
+    {"name", "summary", "project_type", "source_package_id", "source_project_key", "localized_content"}
+)
+
+
+def list_visible_projects(session: Session, user: User, *, after: uuid.UUID | None, limit: int) -> list[Project]:
+    return ProjectRepository(session).list_visible(user, after=after, limit=limit)
+
+
+def project_for_research_source(
+    session: Session, organization_id: uuid.UUID, package_id: str, project_key: str
+) -> Project | None:
+    return ProjectRepository(session).by_research_source(organization_id, package_id, project_key)
+
+
+def link_research_package(project: Project, *, package_id: str, project_key: str) -> None:
+    """Claim a project that predates package ids for the package that produced it."""
+    project.source_package_id = package_id
+    project.source_project_key = project_key
+    project.version += 1
+
+
+def flag_adopted_user_project(project: Project) -> None:
+    """Mark a user-owned project as carrying package content without taking over its identity."""
+    localized = dict(project.localized_content) if isinstance(project.localized_content, dict) else {}
+    localized["adopted_user_project"] = True
+    project.localized_content = localized
+    project.version += 1
+
+
+def sync_package_project(project: Project, **values: object) -> bool:
+    """Apply the fields a research package is allowed to own on a project."""
+    unknown = set(values) - _PACKAGE_PROJECT_FIELDS
+    if unknown:
+        raise ValueError(f"A research package cannot set project fields: {', '.join(sorted(unknown))}")
+    return update_versioned(project, **values)
+
+
 def create_project_prompt_draft(
     session: Session, payload: ProjectPromptDraftCreate, user: User
 ) -> ProjectPromptDraftAccepted:
@@ -325,7 +364,7 @@ def candidate_funnel(session: Session, project_id: uuid.UUID) -> CandidateFunnel
 
 
 def target_readiness(session: Session, project: Project) -> TargetReadinessResponse:
-    target = TargetRepository(session).get(project.primary_target_id) if project.primary_target_id else None
+    target = project_primary_target(session, project)
     blockers: list[str] = []
     if target is None:
         blockers.append("primary_target_missing")
@@ -595,7 +634,7 @@ def project_library_item(session: Session, project: Project) -> ProjectLibraryIt
     def count(model, *criteria) -> int:
         return int(session.scalar(select(func.count(model.id)).where(*criteria)) or 0)
 
-    target = TargetRepository(session).get(project.primary_target_id) if project.primary_target_id else None
+    target = project_primary_target(session, project)
     package_meta = project.localized_content.get("package", {}) if isinstance(project.localized_content, dict) else {}
 
     def package_count(key: str, actual: int) -> int:

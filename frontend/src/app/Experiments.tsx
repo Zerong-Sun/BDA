@@ -1,4 +1,4 @@
-import { currentRole } from '../features/research/jsonHelpers'
+import { currentRole } from '../lib/auth/currentRole'
 import { isPublicVisitor } from '../lib/auth/publicWorkspace'
 import { Disclosure } from '../components/ui/Disclosure'
 import { useState } from 'react'
@@ -21,6 +21,7 @@ import { DesignPromptCard } from '../features/experiments/DesignPromptCard'
 import { ActiveProjectPanel } from '../features/experiments/ActiveProjectPanel'
 import { WorkflowProgress } from '../features/experiments/WorkflowProgress'
 import { ProjectLibrary } from '../features/experiments/ProjectLibrary'
+import { ProjectChooser } from '../features/projects/ProjectChooser'
 import { ManageProjectDrawer } from '../features/experiments/ManageProjectDrawer'
 import { CampaignPanel } from '../features/research/CampaignPanel'
 import { findDemoProject, isDemoProject } from '../features/tour'
@@ -45,8 +46,8 @@ export function ExperimentsPage() {
 
   const openCreate = () => {
     if (viewer) return
+    setManageOpen(false)
     setCreateOpen(true)
-    setManageOpen(true)
   }
 
   const exploreDemo = () => {
@@ -198,11 +199,12 @@ export function ExperimentsPage() {
         </Alert>
       ) : null}
 
+      <ProjectChooser createOnly creating={createOpen} onCreatingChange={setCreateOpen} onCreated={() => setCreateOpen(false)} />
       <ManageProjectDrawer
         open={manageOpen}
         onClose={() => setManageOpen(false)}
-        creating={createOpen}
-        onCreatingChange={setCreateOpen}
+        creating={false}
+        onCreatingChange={(open) => { if (open) openCreate() }}
       />
     </section>
   )

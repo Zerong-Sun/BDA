@@ -19,7 +19,7 @@ import {
   currentStageIndex,
   pipelineStageState,
   type StageState,
-} from '../workflow/pipelineStages'
+} from '../../lib/workflow/pipelineStages'
 
 type StepState = StageState
 

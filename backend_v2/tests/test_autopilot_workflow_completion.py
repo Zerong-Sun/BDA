@@ -82,8 +82,8 @@ def test_takeover_and_cancel_stop_late_workflow_events(session, monkeypatch, sta
 
 def test_cancel_requests_cancellation_for_submitted_workflow_jobs(session, monkeypatch):
     from backend_v2.app.autopilot.service import cancel_campaign
-    from backend_v2.app.compute.models import OutboxEvent
     from backend_v2.app.identity.models import User
+    from backend_v2.app.platform.models import OutboxEvent
 
     campaign, stage, _, _, job = _execution(session, monkeypatch)
     job.status = "running"

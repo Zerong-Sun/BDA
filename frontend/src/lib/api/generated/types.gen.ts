@@ -4787,6 +4787,10 @@ export type ExtensionManifest = {
      */
     data_boundary: string;
     /**
+     * Data Boundary Zh
+     */
+    data_boundary_zh?: string;
+    /**
      * Description
      */
     description: string;
@@ -4798,6 +4802,10 @@ export type ExtensionManifest = {
      * Effort
      */
     effort: string;
+    /**
+     * Effort Zh
+     */
+    effort_zh?: string;
     /**
      * Function Ids
      */
@@ -4811,6 +4819,10 @@ export type ExtensionManifest = {
      */
     license_boundary: string;
     /**
+     * License Boundary Zh
+     */
+    license_boundary_zh?: string;
+    /**
      * Requirements
      */
     requirements: Array<ExtensionRequirement>;
@@ -4819,9 +4831,17 @@ export type ExtensionManifest = {
      */
     resources: string;
     /**
+     * Resources Zh
+     */
+    resources_zh?: string;
+    /**
      * Rollout Trigger
      */
     rollout_trigger: string;
+    /**
+     * Rollout Trigger Zh
+     */
+    rollout_trigger_zh?: string;
     /**
      * Sources
      */
@@ -4848,6 +4868,10 @@ export type ExtensionRequirement = {
      * Boundary
      */
     boundary: string;
+    /**
+     * Boundary Zh
+     */
+    boundary_zh?: string;
     /**
      * Id
      */

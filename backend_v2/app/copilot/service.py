@@ -21,7 +21,8 @@ from ..platform.models import Operation
 from ..platform.operations import enqueue_operation
 from ..projects.models import Project
 from ..registry.models import LLMProvider, ModelPlugin
-from ..targets.repository import TargetRepository
+from ..registry.service import provider_named, save_byok_provider
+from ..targets.service import project_primary_target
 from . import agent_runs
 from . import bots as bot_roster
 from .capabilities import (
@@ -177,25 +178,10 @@ def put_config(
         secret_path = _store_local_secret(secret_root, project_id, raw_api_key)
         provider_name = f"Project {project_id} BYOK"
         if provider is None or provider.name != provider_name:
-            provider = session.scalar(select(LLMProvider).where(LLMProvider.name == provider_name))
-        if provider is None:
-            provider = LLMProvider(
-                name=provider_name,
-                provider_type="openai_compatible",
-                endpoint=endpoint,
-                model=model,
-                credential_ref=f"file:{secret_path}",
-                config={},
-                enabled=True,
-            )
-            session.add(provider)
-            session.flush()
-        else:
-            provider.endpoint = endpoint or provider.endpoint
-            provider.model = model or provider.model
-            provider.credential_ref = f"file:{secret_path}"
-            provider.enabled = True
-            provider.version += 1
+            provider = provider_named(session, provider_name)
+        provider = save_byok_provider(
+            session, provider, name=provider_name, endpoint=endpoint, model=model, credential_ref=f"file:{secret_path}"
+        )
         row.llm_provider_id = provider.id
         settings_payload["api_key_preview"] = f"••••{raw_api_key[-4:]}"
     elif provider is not None:
@@ -342,7 +328,7 @@ def _route_option(
 
 
 def create_route_plan(session: Session, project: Project, payload: RoutePlanCreate) -> RoutePlanResponse:
-    target = TargetRepository(session).get(project.primary_target_id) if project.primary_target_id else None
+    target = project_primary_target(session, project)
     evidence = list(
         session.scalars(
             select(KnowledgeEntry)

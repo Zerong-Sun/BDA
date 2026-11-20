@@ -5,7 +5,7 @@ import { getProjectOverview } from '../../lib/api/projects'
 import { useProjectContext } from '../../lib/hooks/useProjectContext'
 import { useI18n } from '../../lib/i18n'
 import { projectText } from '../../lib/i18n/projectText'
-import { derivePipeline, type StageState } from '../../features/workflow/pipelineStages'
+import { derivePipeline, type StageState } from '../../lib/workflow/pipelineStages'
 import {
   Stepper,
   StepperIndicator,

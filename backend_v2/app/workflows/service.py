@@ -1,16 +1,110 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from ..audit.service import record_audit
 from ..core.problem import DomainError
+from ..core.statuses import WorkflowNodeStatus, WorkflowRunStatus
 from ..identity.models import User
 from ..projects.models import Project
 from .models import WorkflowNode, WorkflowRun
 from .repository import WorkflowRepository
 from .schemas import RoutePresentation, WorkflowCreate, WorkflowLayoutUpdate, WorkflowNodeInput, WorkflowNodeUpdate
+
+
+def get_workflow(session: Session, workflow_id: uuid.UUID) -> WorkflowRun | None:
+    return WorkflowRepository(session).get(workflow_id)
+
+
+def workflow_nodes(session: Session, workflow_id: uuid.UUID) -> list[WorkflowNode]:
+    return WorkflowRepository(session).nodes(workflow_id)
+
+
+def get_node(session: Session, node_id: uuid.UUID) -> WorkflowNode | None:
+    return WorkflowRepository(session).node(node_id)
+
+
+def lock_workflow(session: Session, workflow_id: uuid.UUID) -> WorkflowRun | None:
+    """Row-lock a run and refresh it, so the caller decides on committed state."""
+    return WorkflowRepository(session).lock(workflow_id)
+
+
+def set_workflow_status(workflow: WorkflowRun, status: WorkflowRunStatus) -> None:
+    """Move a run to a new status and bump its version.
+
+    The version is the ETag (see core.etag), so a background transition that left it
+    untouched made the ETag stop describing the resource it labels: a client holding a
+    pre-submit ETag still satisfied If-Match after the run had already finished.
+    """
+    if workflow.status == status:
+        return
+    workflow.status = status
+    workflow.version += 1
+
+
+def record_run_transition(
+    workflow: WorkflowRun, *, status: WorkflowRunStatus | None = None, graph_flags: dict[str, Any] | None = None
+) -> None:
+    """Apply a design-record transition; the version always moves so it serializes concurrent writers."""
+    if status is not None:
+        workflow.status = status
+    if graph_flags:
+        workflow.graph = {**workflow.graph, **graph_flags}
+    workflow.version += 1
+
+
+def mirror_node_status(node: WorkflowNode, status: WorkflowNodeStatus, error_message: str | None) -> None:
+    """Copy the newest attempt's job status onto its node; the caller decides which attempt is newest."""
+    if node.status == status and node.error_message == error_message:
+        return
+    node.status = status
+    node.error_message = error_message
+    node.version += 1
+
+
+def record_lineage(session: Session, workflow: WorkflowRun, nodes: list[WorkflowNode]) -> None:
+    """State what this run changed relative to the one it is compared against.
+
+    Computed at submission rather than when the link is drawn, because the parameters can
+    still be edited afterwards; what matters is the diff at the moment the run actually
+    happened. The author declares the ancestor, the platform decides what differs - so a
+    "single-variable control" is an observation about the record, not an assertion in it.
+    """
+    from .lineage import arm_label_for, diff_parameters
+
+    repo = WorkflowRepository(session)
+    baseline = repo.get(workflow.derived_from_id) if workflow.derived_from_id else None
+    if baseline is None:
+        differences: dict[str, dict] = {}
+    else:
+        differences = diff_parameters(
+            {node.node_key: dict(node.parameters or {}) for node in repo.nodes(baseline.id)},
+            {node.node_key: dict(node.parameters or {}) for node in nodes},
+        )
+    workflow.varied_parameters = differences
+    workflow.arm_label = arm_label_for(baseline, differences)
+
+
+def create_single_node_run(
+    session: Session,
+    *,
+    project_id: uuid.UUID,
+    created_by: uuid.UUID,
+    name: str,
+    status: WorkflowRunStatus,
+    graph: dict[str, Any],
+    node: dict[str, Any],
+) -> tuple[WorkflowRun, WorkflowNode]:
+    """A run with one node, for work confirmed outside the graph editor."""
+    workflow = WorkflowRepository(session).add(
+        WorkflowRun(project_id=project_id, name=name, status=status, graph=graph, created_by=created_by)
+    )
+    row = WorkflowNode(workflow_run_id=workflow.id, **node)
+    session.add(row)
+    return workflow, row
 
 
 def update_presentation(

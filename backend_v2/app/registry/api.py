@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ..artifacts.repository import ArtifactRepository
+from ..artifacts.service import get_artifact
 from ..audit.service import record_audit
 from ..core.config import get_settings
 from ..core.database import get_session
@@ -610,7 +610,7 @@ def create_script_asset(
     session: Session = Depends(get_session),
     user: User = Depends(require_roles("admin")),
 ) -> ScriptAssetResponse:
-    artifact = ArtifactRepository(session).artifact(payload.artifact_id)
+    artifact = get_artifact(session, payload.artifact_id)
     if artifact is None or artifact.status != "available":
         raise DomainError("artifact_not_found", "Available script artifact was not found", status_code=404)
     row = create_script_asset_service(session, payload, artifact, user)
